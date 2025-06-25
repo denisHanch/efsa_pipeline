@@ -9,6 +9,10 @@ jobs:
   commit-message-check:
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
     - name: Check commit message format
       run: |
         ISSUE_PREFIX="${{ vars.PROJECT_PREFIX }}"
