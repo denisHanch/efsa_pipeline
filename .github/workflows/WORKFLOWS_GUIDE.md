@@ -4,7 +4,7 @@ This document outlines the GitHub Actions workflows used within the repository, 
 
 
 ## Validation Checks
-***./checks/ folder***
+***./checks/*** folder
 
 Validation workflows explicitly ensure code quality, conventions, and standards. They run on every Pull Request targeting the main branch.  
 
@@ -17,7 +17,7 @@ Validation workflows explicitly ensure code quality, conventions, and standards.
 
 
 ## Automation Workflows (automation/ folder)
-***./automation/ folder***
+***./automation/*** folder
 
 Automation workflows handle routine tasks like notifications, linking issues, and maintaining repository organization. They are explicitly prefixed with "Automation:" and **do not** block PR merges.
 
