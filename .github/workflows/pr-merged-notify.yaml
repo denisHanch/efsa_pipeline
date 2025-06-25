@@ -1,0 +1,33 @@
+name: PR Merged Notification
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  comment-on-issue:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    steps:
+      - name: Comment PR merged on Issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const regex = /(\w+-\d+)/;
+            const match = pr.title.match(regex);
+            
+            if (match) {
+              const issuePrefix = match[1];
+              const issueNumber = issuePrefix.split('-')[1];
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: `PR [#${pr.number}](${pr.html_url}) merged! Branch \`${pr.head.ref}\` has been deleted.`
+              });
+            } else {
+              console.log("Issue number not found in PR title.");
+            }
