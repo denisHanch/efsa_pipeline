@@ -2,7 +2,7 @@ name: "CHECK: Branch Naming"
 
 on:
   pull_request:
-    branches-ignore:
+    branches:
       - main
 
 jobs:
@@ -11,9 +11,9 @@ jobs:
     steps:
     - name: Check branch name convention
       run: |
-        BRANCH="${GITHUB_REF##refs/heads/}"
+        BRANCH="${{ github.head_ref }}"
         ISSUE_PREFIX="${{ vars.PROJECT_PREFIX }}"
-        if ! [[ $BRANCH =~(feature|bugfix|docs)/${ISSUE_PREFIX}-[0-9]+_.+ ]]; then
+        if ! [[ $BRANCH =~ ^(feature|bugfix|docs)/${ISSUE_PREFIX}-[0-9]+_.+ ]]; then
           echo "Branch name is invalid. Must follow pattern:"
           echo "(feature|bugfix|docs)/${ISSUE_PREFIX}-#ISSUE_your_branch_name"
           exit 1
