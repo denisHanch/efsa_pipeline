@@ -13,22 +13,23 @@ jobs:
       with:
         fetch-depth: 0
         
-    - name: Check commit message format
+    - name: Check commit message format (with diagnostics)
       run: |
         ISSUE_PREFIX="${{ vars.PROJECT_PREFIX }}"
-
-        # Check if previous commit exists
+    
         if git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null; then
           commit_range="${{ github.event.before }}..${{ github.sha }}"
         else
-          # If previous commit not found (initial commit, rewritten history), check last commit only
           commit_range="${{ github.sha }}"
         fi
     
-        invalid_msgs=$(git log --no-merges --format="%s" $commit_range | grep -vE "^${ISSUE_PREFIX}-[0-9]+: .+")
-        if [ ! -z "$invalid_msgs" ] ; then
-          echo "Invalid commit message format"
-          echo "$invalid_msgs"
-          echo "Expected format: '${ISSUE_PREFIX}-#ISSUE: Your commit message'"
+        invalid_msgs=$(git log --no-merges --format="%s" $commit_range | grep -vE "^${ISSUE_PREFIX}-[0-9]+: .+" || true)
+    
+        if [ ! -z "$invalid_msgs" ]; then
+          echo "🚨 Invalid commit messages detected clearly:"
+          git log --no-merges --format="- %s" $commit_range
+          echo "❗ Must match exactly: '${ISSUE_PREFIX}-#ISSUE: Your commit message'"
           exit 1
+        else
+          echo "✅ All commit messages are valid!"
         fi
