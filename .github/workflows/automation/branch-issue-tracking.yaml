@@ -1,4 +1,4 @@
-name: Branch Issue Tracking
+name: "AUTOMATION: Branch Issue Tracking"
 
 on:
   push:

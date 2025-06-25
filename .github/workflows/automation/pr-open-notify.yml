@@ -1,4 +1,4 @@
-name: PR Open Notification
+name: "AUTOMATION: PR Open Notification"
 
 on:
   pull_request:

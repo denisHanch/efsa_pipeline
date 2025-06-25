@@ -1,4 +1,4 @@
-name: PR Merged Notification
+name: "AUTOMATION: PR Merged Notification"
 
 on:
   pull_request:

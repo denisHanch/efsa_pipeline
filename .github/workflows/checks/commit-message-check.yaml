@@ -1,4 +1,4 @@
-name: Commit message check
+name: "CHECK Commit Message Format"
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: Issue Prefixer
+name: "AUTOMATION: Issue Prefixer"
 
 on:
   issues:
