@@ -1,0 +1,20 @@
+name: Branch Naming Check
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  branch-name-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check branch name convention
+      run: |
+        BRANCH="${GITHUB_REF##refs/heads/}"
+        ISSUE_PREFIX="${{ vars.PROJECT_PREFIX }}"
+        if ! [[ $BRANCH =~(feature|bugfix|docs)/${ISSUE_PREFIX}-[0-9]+_.+ ]]; then
+          echo "Branch name is invalid. Must follow pattern:"
+          echo "(feature|bugfix|docs)/${ISSUE_PREFIX}-#ISSUE_your_branch_name"
+          exit 1
+        fi
