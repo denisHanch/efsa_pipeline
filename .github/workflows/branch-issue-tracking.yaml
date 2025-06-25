@@ -1,0 +1,47 @@
+name: Branch Issue Tracking
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'bugfix/**'
+      - 'docs/**'
+
+jobs:
+  notify-issue-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Notify Issue Branch Creation
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.ref.replace('refs/heads/', '');
+            const prefix = "${{ vars.PROJECT_PREFIX }}";
+            const match = branch.match(new RegExp(`^(feature|bugfix|docs)/${prefix}-(\\d+)_.*`));
+
+            if (match) {
+              const issueNumber = match[2];
+              const user = context.actor;
+
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+              });
+
+              const branchMention = `Branch **${branch}** created and pushed by @${user}`;
+
+              const alreadyNotified = comments.some(comment => comment.body.includes(branchMention));
+
+              if (!alreadyNotified) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body: `${branchMention}. Work in progress!`,
+                });
+              }
+            }
