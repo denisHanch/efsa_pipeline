@@ -16,7 +16,7 @@ jobs:
     - name: Check commit message format
       run: |
         ISSUE_PREFIX="${{ vars.PROJECT_PREFIX }}"
-        invalid_msgs=$(git log --format="%s" ${{github.event.before }}..${{ github.sha }} | grep -vE "^${ISSUE_PREFIX}-[0-9]+: .+")
+        invalid_msgs=$(git log --no-merges --format="%s" ${{github.event.before }}..${{ github.sha }} | grep -vE "^${ISSUE_PREFIX}-[0-9]+: .+")
         if [ ! -z "$invalid_msgs" ] ; then
           echo "Invalid commit message format"
           echo "$invalid_msgs"
