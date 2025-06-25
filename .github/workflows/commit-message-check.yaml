@@ -1,0 +1,21 @@
+name: Commit message check
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  commit-message-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check commit message format
+      run: |
+        ISSUE_PREFIX="${{ vars.PROJECT_PREFIX }}"
+        invalid_msgs=$(git log --format="%s" ${{github.event.before }}..${{ github.sha }} | grep -vE "^${ISSUE_PREFIX}-[0-9]+: .+")
+        if [ ! -z "$invalid_msgs" ] ; then
+          echo "Invalid commit message format"
+          echo "$invalid_msgs"
+          echo "Expected format: '${ISSUE_PREFIX}-#ISSUE: Your commit message'"
+          exit 1
+        fi
