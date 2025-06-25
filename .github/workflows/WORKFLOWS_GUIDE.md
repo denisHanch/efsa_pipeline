@@ -20,7 +20,7 @@ File is prefixed with **auto**. Automation workflows handle routine tasks like n
 | Workflow                   | Trigger                                 | Automated Task / Purpose                                         |
 | -------------------------- | --------------------------------------- | ---------------------------------------------------------------- |
 | **Issue Prefixer**         | `issues [opened]`                       | Automatically prefixes issue titles with `PROJECT_PREFIX-#ISSUE` |
-| **Branch-Issue Linking**   | `push [feature/**, bugfix/**, docs/**]` | Comments on issues when associated branches are created/pushed.  |
-| **PR Opened Notification** | `pull_request [opened]`                 | Notifies issue when related PR is opened                         |
-| **PR Merged Notification** | `pull_request [closed]`       | Notifies issue upon PR merge completion                          |
+| **Branch-Issue Linking**   | `push [feature/**, bugfix/**, docs/**]` | Comments on issue when associated branches are created/pushed.  |
+| **PR Opened Notification** | `pull_request [opened]`                 | Comments on issue when related PR is opened                         |
+| **PR Merged Notification** | `pull_request [closed]`       | Comments on issue upon PR merge completion                          |
 
