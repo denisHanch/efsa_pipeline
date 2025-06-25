@@ -13,7 +13,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_token }}
           script: |
-            const prefix = "EFSA";
+            const prefix = "${{ vars.PROJECT_PREFIX }}";
             const issueNumber = context.issue.number;
             const originalTitle = context.payload.issue.title;
 
