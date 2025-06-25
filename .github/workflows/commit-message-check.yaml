@@ -16,13 +16,13 @@ jobs:
     - name: Check commit message format
       run: |
         ISSUE_PREFIX="${{ vars.PROJECT_PREFIX }}"
-        # Correct handling for initial and force-push scenarios
-        if git rev-parse --verify "${{ github.event.before }}" >/dev/null 2>&1; then
-          commit_range="${{ github.event.before }}..${{ github.sha }}"
-        else
-          # First commit or force push, check only current SHA
-          commit_range="${{ github.sha }}"
-        fi
+
+        # Explicit handling of new branch and force-push scenarios
+          if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+            commit_range="${{ github.sha }}"
+          else
+            commit_range="${{ github.event.before }}..${{ github.sha }}"
+          fi
     
         invalid_msgs=$(git log --no-merges --format="%s" $commit_range | grep -vE "^${ISSUE_PREFIX}-[0-9]+: .+")
         if [ ! -z "$invalid_msgs" ] ; then
