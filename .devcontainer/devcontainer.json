@@ -1,0 +1,17 @@
+{
+    "name": "Python Dev Container",
+    "build": {
+      "dockerfile": "Dockerfile"
+    },
+    "customizations": {
+        "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash"
+        },
+        "extensions": [
+            "ms-python.python"
+        ]
+    },
+    "workspaceFolder": "/efsa_pipeline",
+    "mounts": ["source=${localWorkspaceFolder},target=/efsa_pipeline,type=bind"]
+  }
+  
