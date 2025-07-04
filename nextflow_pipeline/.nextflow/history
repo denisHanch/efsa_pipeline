@@ -1,0 +1,29 @@
+2025-07-04 12:55:25	-	awesome_torvalds	-	7fe4d83ffac65883bba5bb9b1ed58f56	f4f77eb0-169d-4a3e-b00e-bdfebeead8d5	nextflow run pipeline.nf
+2025-07-04 12:56:03	-	stupefied_swartz	-	ab284c1644c650669644e23f5b304b9c	2741a270-aa9b-4138-8a28-da46917e76df	nextflow run pipeline.nf
+2025-07-04 12:56:31	-	stupefied_brenner	-	f0d5d8fd6344b2a4f1cb97cbab48560a	fb4264d9-4a8e-4f1d-982b-364ecabe08cd	nextflow run pipeline.nf
+2025-07-04 12:57:15	-	focused_tuckerman	-	f0d5d8fd6344b2a4f1cb97cbab48560a	2ae9213a-74b2-4e8f-a90c-9e20bfc5348e	nextflow run pipeline.nf
+2025-07-04 12:58:12	3.9s	awesome_boyd	OK	f0d5d8fd6344b2a4f1cb97cbab48560a	8d8b18c7-152f-4878-ac45-7cb525629b39	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:05:15	5.4s	pensive_bhabha	ERR	4dc473ce021d1474bc9dbf4fea77ba51	547a1ee5-d07e-475e-a97a-bbf750a97b0e	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:06:07	5.4s	condescending_golick	ERR	b3774614b199a65e8666d2222a431f91	89f58506-ea2f-4cb1-b955-3ab3dd4ff31a	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:08:38	2.7s	confident_ptolemy	OK	819fa9ead747a491fde15419d7136f80	3f7cd4b9-80dd-46f2-8cd7-1c9b0f1399f8	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:10:42	4.7s	distracted_hawking	ERR	d2bf76242da855baa9f55bed755e9e97	42b88847-c606-446c-b5a6-9ad133ce559f	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:12:26	2.9s	desperate_noether	ERR	6b1bd3fdf726d1105496bf04277a5ef4	b0880b3b-7fd4-4bb2-a8aa-2afa355f1786	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:12:43	3.3s	voluminous_swartz	OK	2fb88d2654561016f42d9c34f818c7ca	361c7a64-2f8e-4bff-8eb5-92a53d8c2300	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:13:33	4.3s	crazy_kilby	OK	dadbb642902b855e8dae20f00698d133	bd8b0141-ad64-4340-8fa8-0ea2c9d17fbb	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:18:12	3s	dreamy_lamarr	OK	dadbb642902b855e8dae20f00698d133	beaf780f-1be2-455a-915e-0aab4d7ab080	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:18:35	4s	golden_celsius	ERR	729203920d0f39e41fa7730ba9f4ec93	202bee1f-b915-41cc-98bc-c8ff169631ab	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:20:32	3s	intergalactic_gauss	ERR	e757b7cd3753a3dd709624460ec6ff7a	fc3d82f2-f771-475a-8310-1502b9ce22c8	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:21:26	2.7s	drunk_ekeblad	OK	cbd10c6c2cd182e1927aeea794cb4fad	ba37631d-d28e-4d21-8466-a29af91fc496	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:25:00	3.1s	ecstatic_marconi	OK	0e4c021b8d9346df52e26f9b870e2a06	f18629f9-44ab-4644-acf9-e94478e0a48b	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:25:37	3.3s	tiny_baekeland	ERR	0e4c021b8d9346df52e26f9b870e2a06	788cbd7d-bed3-4348-abc2-7f0e28a977b9	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:26:04	3.6s	hopeful_volta	OK	97fad4280f4f92c9640f0417850f2f2e	0fe90a78-bd0e-433e-a41d-30dfa47c843e	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:27:39	4.2s	maniac_hirsch	OK	83ed916cd54737a5a0e9fc1a47031e38	3def29a0-16ce-4135-99ca-32662f820d3f	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:28:14	3s	soggy_mendel	OK	d57dacdbfbde7db5a0a8a08b372e820a	7adabb92-3f98-492e-bb77-65a7e8e46336	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:28:38	2.7s	boring_brattain	ERR	499935ab649cf61af5a14114ffd80c75	05782229-1c13-4207-8468-775bdf7ac475	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:29:33	3.4s	zen_hilbert	OK	ad396c6b152dcbb129c2a8d8d8d63c43	4df2a39a-f0f5-439e-b143-e60a5e7ca277	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:30:13	3.1s	magical_mayer	OK	afa84ebcb9dba843812faee81a2e8880	c672eeee-ec3e-4768-8643-a76157ba225f	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:34:10	3s	hopeful_legentil	OK	c21008b771a2930f32f3fb3a6bb9ddbe	5740429b-6a59-40b2-a462-4357e234bfa3	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:35:05	2.6s	special_koch	OK	c21008b771a2930f32f3fb3a6bb9ddbe	00c7d9ef-a628-4ca2-9ba2-95a7a5c4d786	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:36:20	3.4s	deadly_maxwell	ERR	c21008b771a2930f32f3fb3a6bb9ddbe	733cddf2-3950-4f2c-bf2f-bdaf9bfb132b	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:38:45	3.6s	golden_bartik	ERR	508efa0357fdfe63c95297dde8253357	969cbeac-f9b2-4e29-b380-10d1caec6af2	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-04 13:39:10	3.8s	nasty_elion	OK	63e57c5f3dde1484ba43cf121120682a	c2f7be45-785b-4976-8d81-678f42321d9c	nextflow run pipeline.nf --fastqDir test_files/fastq/
