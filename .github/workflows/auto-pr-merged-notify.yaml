@@ -3,6 +3,8 @@ name: "AUTOMATION: PR Merged Notification"
 on:
   pull_request:
     types: [closed]
+    branches-ignore:
+      - 'no-issue*'
 
 jobs:
   comment-on-issue:
@@ -30,4 +32,5 @@ jobs:
               });
             } else {
               console.log("Issue number not found in PR title.");
+              exit 1
             }

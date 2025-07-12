@@ -3,6 +3,8 @@ name: "AUTOMATION: PR Open Notification"
 on:
   pull_request:
     types: [opened]
+    branches-ignore:
+      - 'no-issue*'
 
 jobs:
   comment-on-issue:
@@ -29,4 +31,5 @@ jobs:
               });
             } else {
               console.log("Issue number not found in PR title.");
+              exit 1
             }
