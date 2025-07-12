@@ -1,17 +1,23 @@
+#!/usr/bin/env nextflow
+nextflow.enable.dsl=2
+
 process validation {
-  tag { sample.baseName }
+    tag { sample.baseName }
 
-  // Use the local "pipeline-validation:dev" image you built
-  container 'pipeline-validation:dev'
+    // Use the local "pipeline-validation:dev"
+    container 'pipeline-validation:dev'
 
-  input:
-    path sample
+    input:
+      path sample
+      path validation_script
 
-  output:
-    path "${sample.baseName}.validationd.txt"
+    output:
+      path "*.${task.process}.txt", emit: report
+      stdout emit: log
 
-  script:
-  """
-  python modules/validation/validation.py $sample ${sample.baseName}.validation.txt
-  """
+    script:
+    """
+    echo "Starting validation"
+    python $validation_script $sample ${sample.baseName}.${task.process}.txt
+    """
 }
