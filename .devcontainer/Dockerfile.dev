@@ -1,0 +1,25 @@
+FROM python:3.10-slim
+
+# Install Git
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git \
+ && rm -rf /var/lib/apt/lists/*
+ 
+# Install Java (for Nextflow Nextflow) and curl for fetching Nextflow
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      default-jdk \
+      curl \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install the Nextflow launcher
+RUN curl -fsSL https://get.nextflow.io | bash \
+ && mv nextflow /usr/local/bin/ \
+ && chmod +x /usr/local/bin/nextflow
+
+# Install Docker CLI so Nextflow can spawn containers
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends docker.io \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
