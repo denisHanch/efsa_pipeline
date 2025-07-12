@@ -17,20 +17,24 @@ jobs:
         run: |
           ISSUE_PREFIX="${{ vars.PROJECT_PREFIX }}"
 
-          # Check if previous commit exists
+          # determine the range of commits
           if git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null; then
             commit_range="${{ github.event.before }}..${{ github.sha }}"
           else
-            # If previous commit not found (initial commit, rewritten history), check last commit only
             commit_range="${{ github.sha }}"
           fi
 
-          invalid_msgs=$(git log --no-merges --format="%s" $commit_range | grep -vE "^${ISSUE_PREFIX}-[0-9]+: .+" || true)
+          # allow either no-issue* OR ISSUE_PREFIX-<number>: <message>
+          invalid_msgs=$(
+            git log --no-merges --format="%s" $commit_range \
+            | grep -vE "^(no-issue|${ISSUE_PREFIX}-[0-9]+: .+)" \
+            || true
+          )
 
-          if [ ! -z "$invalid_msgs" ] ; then
+          if [ -n "$invalid_msgs" ] ; then
             echo "🚨 Invalid commit message(s) detected:"
             echo "$invalid_msgs"
-            echo "❗ Expected format: '${ISSUE_PREFIX}-#ISSUE: Your commit message'"
+            echo "❗ Expected format: '${ISSUE_PREFIX}-<number>: Your commit message' or start with 'no-issue'"
             exit 1
           else
             echo "✅ All commit messages are valid!"
