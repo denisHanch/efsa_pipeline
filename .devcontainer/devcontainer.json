@@ -12,6 +12,10 @@
         ]
     },
     "workspaceFolder": "/efsa_pipeline",
-    "mounts": ["source=${localWorkspaceFolder},target=/efsa_pipeline,type=bind"]
-  }
+  "mounts": [
+      "source=${localWorkspaceFolder},target=/efsa_pipeline,type=bind",
+      "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+      // "source=/lib/modules,target=/lib/modules,type=bind,consistency=cached"
+  ]
+}
   

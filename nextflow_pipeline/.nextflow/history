@@ -27,3 +27,44 @@
 2025-07-04 13:36:20	3.4s	deadly_maxwell	ERR	c21008b771a2930f32f3fb3a6bb9ddbe	733cddf2-3950-4f2c-bf2f-bdaf9bfb132b	nextflow run pipeline.nf --fastqDir test_files/fastq/
 2025-07-04 13:38:45	3.6s	golden_bartik	ERR	508efa0357fdfe63c95297dde8253357	969cbeac-f9b2-4e29-b380-10d1caec6af2	nextflow run pipeline.nf --fastqDir test_files/fastq/
 2025-07-04 13:39:10	3.8s	nasty_elion	OK	63e57c5f3dde1484ba43cf121120682a	c2f7be45-785b-4976-8d81-678f42321d9c	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-12 09:33:02	7.1s	spontaneous_monod	OK	63e57c5f3dde1484ba43cf121120682a	4085bf2c-62f9-4038-9353-6cbc4a6124e3	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-12 09:37:09	-	boring_banach	-	d8795a5d58f41320b4973b88248a7e7c	e7ef5d2a-be9c-4154-be44-719beee36fd3	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 09:37:47	4.9s	intergalactic_pare	OK	510eb0a9d50f28c072beed8e2ba609c8	085e13b9-0441-4546-bc12-7a609998aad9	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-12 09:38:16	4.7s	angry_goldberg	OK	510eb0a9d50f28c072beed8e2ba609c8	4bc905e8-d8a5-412c-8e1a-21a3800ac581	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 09:38:47	5.5s	fabulous_goldwasser	OK	f72a65db71e7f741f7ed117dc1c88d27	5772bad9-2f57-4cef-b729-ce075e3e1616	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 09:39:35	-	insane_jennings	-	9800118c7f9b9782aaf9bcf3c8cc8617	26fbb2c2-edf4-4768-a646-a411ed9a67cb	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 09:40:16	7.1s	trusting_darwin	ERR	37f320c32a2cd2af2c0fa28a6036f48f	6d3938ec-f8b7-4722-a9de-0b112d1ce322	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 09:42:46	6.8s	sharp_shockley	ERR	37f320c32a2cd2af2c0fa28a6036f48f	8460bb75-6c19-472c-8198-05aff44db8b7	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:24:58	4.8s	stoic_solvay	ERR	37f320c32a2cd2af2c0fa28a6036f48f	c63669e0-a9f4-434d-9007-3ebbbedb7b90	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:27:38	5s	marvelous_gutenberg	ERR	37f320c32a2cd2af2c0fa28a6036f48f	9a485e41-0432-4324-a68a-3ec1abd24055	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:28:07	5.3s	lonely_pike	ERR	37f320c32a2cd2af2c0fa28a6036f48f	87f69b68-b82d-4262-b3b1-fdf3e8414bbc	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:31:29	-	grave_kimura	-	37f320c32a2cd2af2c0fa28a6036f48f	591db4e1-61a4-4c31-a571-ac6b4cd6b903	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:32:24	-	cranky_gauss	-	37f320c32a2cd2af2c0fa28a6036f48f	ec9e22de-2117-462d-aa29-8276cc3a4799	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:34:29	-	serene_booth	-	37f320c32a2cd2af2c0fa28a6036f48f	98533dd4-0e98-4113-9ede-1ce79faf9360	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:38:52	-	nauseous_lattes	-	37f320c32a2cd2af2c0fa28a6036f48f	bcbeb1db-2243-4b8c-8ff2-53685a1e616d	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:40:36	-	evil_mclean	-	37f320c32a2cd2af2c0fa28a6036f48f	ec39a900-f5bd-403f-a04f-457ca8fbc4b0	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:41:24	5.1s	peaceful_stonebraker	ERR	37f320c32a2cd2af2c0fa28a6036f48f	806de17e-d3c5-473e-aa3d-c9e2ca3dae16	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:42:29	5.1s	romantic_northcutt	ERR	37f320c32a2cd2af2c0fa28a6036f48f	5cbeac08-73e8-438d-bdc9-f3abfa88c3fe	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:53:28	6s	distracted_caravaggio	ERR	37f320c32a2cd2af2c0fa28a6036f48f	97537565-efeb-46b7-ac54-1565a9578213	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:54:27	-	thirsty_wegener	-	37f320c32a2cd2af2c0fa28a6036f48f	034a3a36-936a-430c-beec-081596ac7f19	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 11:54:46	5.6s	clever_woese	ERR	37f320c32a2cd2af2c0fa28a6036f48f	5549aa3c-2cf9-47d7-96a5-ce3f9e9b04db	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 12:35:27	5.9s	evil_austin	ERR	37f320c32a2cd2af2c0fa28a6036f48f	ca13a84c-05be-4abd-84bc-ded506866ad3	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 12:36:31	5.3s	distracted_lalande	ERR	37f320c32a2cd2af2c0fa28a6036f48f	25cfe89b-2820-4ce1-bc09-8e5a685b9bb7	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 12:39:26	5.7s	pensive_wing	ERR	37f320c32a2cd2af2c0fa28a6036f48f	7ced57cd-443a-44b1-80fc-d170129a0d51	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 12:45:28	4.5s	furious_lichterman	OK	37f320c32a2cd2af2c0fa28a6036f48f	3aa84152-90cc-48c2-9fd7-a4bf458743be	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 12:51:46	4.8s	thirsty_hoover	OK	37f320c32a2cd2af2c0fa28a6036f48f	f0fb6988-39bf-42f9-9654-7bf55dec1339	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 13:05:23	6.6s	awesome_lamarr	OK	37f320c32a2cd2af2c0fa28a6036f48f	65122cdb-ec93-46d9-9dee-5654f53d96e5	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 13:08:59	6.1s	determined_wilson	OK	37f320c32a2cd2af2c0fa28a6036f48f	868b62b2-675a-4ab3-8dec-4eeb3b533607	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 13:13:28	6.6s	boring_hodgkin	OK	37f320c32a2cd2af2c0fa28a6036f48f	923863b8-c0dd-436e-830c-a2e62318f19c	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 13:16:02	7s	hopeful_jennings	OK	37f320c32a2cd2af2c0fa28a6036f48f	f03e1308-9d51-40cc-8be3-ae68eba060a6	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 13:19:30	6.6s	evil_sax	OK	37f320c32a2cd2af2c0fa28a6036f48f	7516bcb8-73e9-436e-bbeb-48dafbcd79b6	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 13:20:09	-	gloomy_lumiere	-	37f320c32a2cd2af2c0fa28a6036f48f	5d21dc17-001d-4e67-a501-bd36bb501a43	nextflow run pipeline.nf --fastqDir test_files/fastq2/
+2025-07-12 14:23:20	5.6s	hopeful_lattes	OK	37f320c32a2cd2af2c0fa28a6036f48f	ba8c832e-1a8f-420c-ab8b-f377a314aad6	nextflow run pipeline.nf --fastqDir test_files/fastq2
+2025-07-12 14:42:58	-	magical_rosalind	-	37f320c32a2cd2af2c0fa28a6036f48f	9a3d125d-775d-4cc8-848d-9892b094153d	nextflow run pipeline.nf
+2025-07-12 14:43:31	5.5s	fabulous_aryabhata	OK	37f320c32a2cd2af2c0fa28a6036f48f	d540e2c8-f44f-49da-b8c7-924c3ab205c6	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-12 14:45:13	7.2s	suspicious_solvay	OK	37f320c32a2cd2af2c0fa28a6036f48f	33ef404f-1c85-463b-a40b-8e919c0a61ff	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-12 14:51:29	1m 56s	nauseous_jennings	ERR	37f320c32a2cd2af2c0fa28a6036f48f	4597f1fb-4f39-442f-85d5-433faf7a00ae	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-12 14:56:25	3m 47s	distraught_aryabhata	OK	37f320c32a2cd2af2c0fa28a6036f48f	a5c7dcf0-80ea-475a-83ae-8fc2a2b3d2dd	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-12 15:17:35	5.1s	romantic_moriondo	OK	37f320c32a2cd2af2c0fa28a6036f48f	17aeed65-7300-43e9-aa47-2a4c9898a9eb	nextflow run pipeline.nf --fastqDir test_files/fastq/
+2025-07-13 07:07:49	-	wise_feynman	-	37f320c32a2cd2af2c0fa28a6036f48f	9e294f89-5359-4131-a8e7-07b67876da87	nextflow run pipeline.nf
+2025-07-13 07:08:13	4.1s	zen_poitras	OK	37f320c32a2cd2af2c0fa28a6036f48f	753048e8-987e-41ad-b78e-4bb99572af16	nextflow run pipeline.nf --fastqDir test_files/fastq2/
