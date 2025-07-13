@@ -3,8 +3,9 @@ name: "AUTOMATION: PR Open Notification"
 on:
   pull_request:
     types: [opened]
-    branches-ignore:
-      - 'no-issue*'
+
+env:
+  IGNORE_PREFIX: ${{ vars.IGNORE_PREFIX }}
 
 jobs:
   comment-on-issue:
@@ -16,6 +17,15 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const pr = context.payload.pull_request;
+
+            const ignore_prefix = process.env.IGNORE_PREFIX;
+            
+            // Check if the source branch has 'no-issue' prefix
+            if (pr.head.ref.startsWith(ignore_prefix)) {
+              console.log(`Skipping PR from branch '${pr.head.ref}' (${ignore_prefix} prefix)`);
+              return;
+            }
+
             const regex = /(\w+-\d+)/;
             const match = pr.title.match(regex);
             
@@ -31,5 +41,5 @@ jobs:
               });
             } else {
               console.log("Issue number not found in PR title.");
-              exit 1
+              process.exit(1);
             }

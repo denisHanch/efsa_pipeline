@@ -8,6 +8,11 @@ on:
 jobs:
   commit-message-check:
     runs-on: ubuntu-latest
+
+    env:
+      ISSUE_PREFIX: ${{ vars.PROJECT_PREFIX }}
+      IGNORE_PREFIX: ${{ vars.IGNORE_PREFIX }}
+      
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,14 +32,14 @@ jobs:
           # Allow either no-issue* OR ISSUE_PREFIX-<number>: <message>
           invalid_msgs=$(
             git log --no-merges --format="%s" $commit_range \
-            | grep -vE "^(no-issue|${ISSUE_PREFIX}-[0-9]+: .+)" \
+            | grep -vE "^(${IGNORE_PREFIX}|${ISSUE_PREFIX}-[0-9]+: .+)" \
             || true
           )
 
           if [ -n "$invalid_msgs" ] ; then
             echo "🚨 Invalid commit message(s) detected:"
             echo "$invalid_msgs"
-            echo "❗ Expected format: '${ISSUE_PREFIX}-<#ISSUE>: Your commit message' or start with 'no-issue'"
+            echo "❗ Expected format: '${ISSUE_PREFIX}-<#ISSUE>: Your commit message' or start with '${IGNORE_PREFIX}'"
             exit 1
           else
             echo "✅ All commit messages are valid!"
