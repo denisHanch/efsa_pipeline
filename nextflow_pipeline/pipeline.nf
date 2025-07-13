@@ -1,7 +1,6 @@
 #!/usr/bin/env nextflow
 
-include { qc } from './qc.nf'
-
+include { fastqc; multiqc; trimgalore } from './qc.nf'
 
 workflow {
     if (!params.fastqDir) {
@@ -12,10 +11,11 @@ workflow {
         Channel.fromPath("$params.fastqDir/*.fastq.gz") | set { fastqs }
         }
     fastqs
-    | map {[(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq\.gz/)[0][1], it]} 
+    | map {[(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq.gz/)[0][1], it]}
     | groupTuple(sort: true)
     | set { fastqs }
-    qc(fastqs)
-    fastqs.view()
+    fastqs | trimgalore | set { trimmed }
+    fastqc(trimmed).collect() | multiqc
+    trimmed.view()
 
 }

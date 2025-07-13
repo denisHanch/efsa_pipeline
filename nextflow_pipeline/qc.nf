@@ -1,7 +1,5 @@
 #!/usr/bin/env nextflow
 
-include { header } from './util'
-
 /*
  * Step 1. Trim adapters and low quality reads
  */
@@ -44,12 +42,6 @@ process fastqc {
     file("results_fastqc_${pair_id}")
 
     script:
-    if (params.log) {
-        log.info """${header('F A S T Q C')}
-        reads :  '${reads}'
-        """
-    }
-
     """
     mkdir results_fastqc_${pair_id}
     fastqc $reads -o results_fastqc_${pair_id}
@@ -72,9 +64,6 @@ process multiqc {
     file('multiqc_report_primary_qc.html')
 
     script:
-    if (params.log) {
-         log.info """${header(' M U L T I Q C  F A S T Q')}"""
-    }
     """
     multiqc fastq/
     mv multiqc_report.html multiqc_report_primary_qc.html
@@ -85,7 +74,7 @@ workflow qc {
     take:
         fastqs
     main:
-        // fastqs | trimgalore | set { trimmed }
+        fastqs | trimgalore | set { trimmed }
 
         fastqc(fastqs).collect() | multiqc
     emit:
