@@ -1,4 +1,4 @@
-# efsa_pipeline
+# EFSA Pipeline
 
 From within dev container:  
 
