@@ -8,15 +8,19 @@ on:
 jobs:
   branch-name-check:
     runs-on: ubuntu-latest
+
+    env:
+      ISSUE_PREFIX: ${{ vars.PROJECT_PREFIX }}
+      IGNORE_PREFIX: ${{ vars.IGNORE_PREFIX }}
+
     steps:
       - name: Check branch name convention
         run: |
           BRANCH="${{ github.head_ref }}"
-          ISSUE_PREFIX="${{ vars.PROJECT_PREFIX }}"
           
           # Allow quick-fix branches prefixed with "no-issue"
-          if [[ "$BRANCH" =~ ^no-issue ]]; then
-            echo "✅ Detected 'no-issue' branch – skipping naming convention."
+          if [[ "$BRANCH" =~ ^${IGNORE_PREFIX} ]]; then
+            echo "✅ Detected '${IGNORE_PREFIX}' branch – skipping naming convention."
             exit 0
           fi
 
@@ -24,7 +28,7 @@ jobs:
           if ! [[ $BRANCH =~ ^(feature|bugfix|docs)/${ISSUE_PREFIX}-[0-9]+_.+ ]]; then
             echo "❗ Branch name is invalid. Must follow pattern:"
             echo "  (feature|bugfix|docs)/${ISSUE_PREFIX}-<number>_your_branch_name"
-            echo "  or start with 'no-issue'"
+            echo "  or start with '${IGNORE_PREFIX}'"
             exit 1
           else
             echo "✅ Branch name valid: $BRANCH"
