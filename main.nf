@@ -1,10 +1,10 @@
 #!/usr/bin/env nextflow
-nextflow.enable.dsl=2
 
-include { fastqc }    from './modules/fastqc/fastqc.nf'
-include { trimming }  from './modules/trimming/trimming.nf'
-include { multiqc }   from './modules/multiqc/multiqc.nf'
-include { validation }  from './modules/validation/validation.nf'
+
+// Include workflows
+include { BASIC_ANALYSIS } from './workflows/basic.nf'
+include { ADVANCED_ANALYSIS } from './workflows/advanced.nf'
+
 
 // Publishing process to copy final outputs
 process publish_results {
@@ -28,6 +28,26 @@ def debugView = { ch, name ->
     .view()
 }
 
+// Help message
+def helpMessage() {
+    log.info"""
+    Usage:
+    nextflow run main.nf --workflow [basic|advanced] --input <input_file> --reference <reference_file>
+    
+    Options:
+    --workflow     Choose workflow: 'basic' or 'advanced' (default: basic)
+    --input        Input FASTQ file
+    --reference    Reference FASTA file
+    --outdir       Output directory (default: results)
+    """.stripIndent()
+}
+
+// Show help
+if (params.help) {
+    helpMessage()
+    exit 0
+}
+
 workflow {
 
     // 1) Load input FASTQ files & debug
@@ -35,31 +55,26 @@ workflow {
            .set { samples_ch }
     debugView(samples_ch, 'RAW_SAMPLES')
 
-    // 2) FASTQC: access named outputs using .out.emit_name
-    fastqc(samples_ch)
-    def qc_ch = fastqc.out.report
-    def qc_log = fastqc.out.log
-    debugView(qc_log, 'FASTQC')
+    // Select workflow based on parameter
+    if (params.workflow == 'basic') {
+        log.info "Running BASIC analysis workflow"
+        results = BASIC_ANALYSIS(samples_ch)
 
-    // 3) Trimming on QCed reads
-    trimming(qc_ch)
-    def trim_ch = trimming.out.report
-    def trim_log = trimming.out.log
-    debugView(trim_log, 'TRIMMING')
+        // Combine all outputs into a single channel and publish once
+        all_outputs = results.fastqc_out.mix(results.trimm_report)
+        publish_results(all_outputs)
+        
+    } else if (params.workflow == 'advanced') {
+        log.info "Running ADVANCED analysis workflow"
+        results = ADVANCED_ANALYSIS(samples_ch)
+        
+        
+        all_outputs = results.val_out.mix(results.mq_out)
+        publish_results(all_outputs)
+        
+    } else {
+        error "Invalid workflow: ${params.workflow}. Choose 'basic' or 'advanced'"
+    }
 
-    // 4) Validation on trimmed reads
-    validation(trim_ch, file("${projectDir}/modules/validation/validation.py"))
-    def val_ch = validation.out.report
-    def val_log = validation.out.log
-    debugView(val_log, 'VALIDATION')
-
-    // 5) MultiQC aggregates validation & QC reports
-    def combo_ch = qc_ch.mix(val_ch)
-    multiqc(combo_ch)
-    def mq_ch = multiqc.out.report
-    def mq_log = multiqc.out.log
-    debugView(mq_log, 'MULTIQC')
-
-    // 6) Publish final aggregated outputs
-    publish_results(mq_ch)
+    
 }

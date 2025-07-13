@@ -1,8 +1,7 @@
 #!/usr/bin/env nextflow
-nextflow.enable.dsl=2
 
 process multiqc {
-    container 'ewels/multiqc:1.13--py_0'
+    container 'multiqc/multiqc:v1.30'
     tag { report.baseName }
 
     input:

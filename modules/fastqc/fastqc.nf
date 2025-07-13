@@ -1,5 +1,4 @@
 #!/usr/bin/env nextflow
-nextflow.enable.dsl=2
 
 process fastqc {
     container 'biocontainers/fastqc:0.11.9--0'
