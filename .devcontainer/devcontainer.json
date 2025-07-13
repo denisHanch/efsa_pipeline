@@ -11,11 +11,10 @@
             "ms-python.python"
         ]
     },
-    "workspaceFolder": "/efsa_pipeline",
+    "workspaceFolder": "${localWorkspaceFolder}",
   "mounts": [
-      "source=${localWorkspaceFolder},target=/efsa_pipeline,type=bind",
+      "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
       "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-      // "source=/lib/modules,target=/lib/modules,type=bind,consistency=cached"
   ]
 }
   

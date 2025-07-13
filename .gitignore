@@ -193,4 +193,8 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 output/
+
 .DS_Store
+.nextflow
+.nextflow.log.*
+work/
