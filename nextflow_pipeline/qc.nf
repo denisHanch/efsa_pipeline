@@ -6,31 +6,25 @@ include { header } from './util'
  * Step 1. Trim adapters and low quality reads
  */
 process trimgalore {
-    container 'vibsinglecellnf/trimgalore:0.6.7'
+
+    container 'vibsinglecellnf/trimgalore:trimgalore-0.6.7-cutadapt-4.1'
     tag "$pair_id"
-    publishDir "$params.outDir/trimmed_reads"
+    publishDir "${params.outDir}/trimmed_reads", mode: 'copy'
     cpus 4
-    memory 8.GB
+    memory '4 GB'
 
     input:
-    tuple val(pair_id), file(r1), file(r2)
+    tuple val(pair_id), path(reads)
 
     output:
-    tuple val(pair_id), file('out/*val_1.fq.gz'), file('out/*val_2.fq.gz')
+    tuple val(pair_id), file('out/*_val_1.fq.gz'), file('out/*_val_2.fq.gz')
 
     script:
-    if (params.log) {
-        log.info """${header('T R I M - G A L O R E')}
-        reads : '${reads}'
-        """
-    }
-
     """
-    trim_galore --gzip --cores $task.cpus -q 20 --illumina --phred33 --paired -o out $reads
-
-    ls -l *
+    trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 --paired -o out ${reads[0]} ${reads[1]}
     """
 }
+
 
 
 /*
@@ -39,12 +33,12 @@ process trimgalore {
 process fastqc {
     container 'biocontainers/fastqc:v0.11.9_cv8'
     tag "FASTQC on $pair_id"
-    publishDir "$params.outDir/fastqc_out"
+    publishDir "$params.outDir/fastqc_out", mode: "link"
     cpus 4
-    memory 8.GB
+    memory '4 GB'
 
     input:
-    tuple val(pair_id), file(r1), file(r2)
+    tuple val(pair_id), path(reads)
 
     output:
     file("results_fastqc_${pair_id}")
@@ -91,10 +85,10 @@ workflow qc {
     take:
         fastqs
     main:
-        fastqs | trimgalore | set { trimmed }
+        // fastqs | trimgalore | set { trimmed }
 
-        fastqc(trimmed).collect() | multiqc
+        fastqc(fastqs).collect() | multiqc
     emit:
-        trimmed
+        fastqs
 
 } 
