@@ -52,7 +52,7 @@ process fastqc {
 
     """
     mkdir results_fastqc_${pair_id}
-    fastqc --threads 4 -f fastq -q $reads -o results_fastqc_${pair_id}
+    fastqc $reads -o results_fastqc_${pair_id}
     """
 }
 
