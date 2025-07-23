@@ -46,7 +46,7 @@
     // Add you git identity into container
     //"source=${env:HOME}/.gitconfig,target=/root/.gitconfig,type=bind,consistency=cached",
     // Forward local ssh-agent into dev container
-    "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
+    // "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
   ],
 
   "remoteEnv": {

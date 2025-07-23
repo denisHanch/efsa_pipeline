@@ -16,4 +16,6 @@ RUN curl -fsSL https://get.nextflow.io | bash \
  && mv nextflow /usr/local/bin/ \
  && chmod +x /usr/local/bin/nextflow
 
+COPY .inputrc /root/
+
 WORKDIR /EFSA_workspace

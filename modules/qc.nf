@@ -1,15 +1,13 @@
 #!/usr/bin/env nextflow
 
 /*
- * Step 1. Trim adapters and low quality reads
+ * Trim adapters and low quality reads
  */
 process trimgalore {
 
     container 'vibsinglecellnf/trimgalore:trimgalore-0.6.7-cutadapt-4.1'
     tag "$pair_id"
-    publishDir "$params.out_dir/trimmed_reads", mode: 'copy'
-    cpus 4
-    memory '4 GB'
+    publishDir "${params.outDir}/trimmed_reads", mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
@@ -26,14 +24,13 @@ process trimgalore {
 
 
 /*
- * Step 2. Check quality of reads
+ * Check quality of reads
  */
 process fastqc {
     container 'biocontainers/fastqc:v0.11.9_cv8'
     tag "FASTQC on $pair_id"
-    publishDir "$params.out_dir/fastqc_out", mode: "link"
-    cpus 4
-    memory '4 GB'
+    publishDir "$params.outDir/fastqc_out", mode: "link"
+
 
     input:
     tuple val(pair_id), path(reads)
@@ -49,13 +46,11 @@ process fastqc {
 }
 
 /*
- * Step 3. Generate multiqc report
+ * Generate multiqc report
  */
 process multiqc {
     container 'staphb/multiqc'
-    publishDir "$params.out_dir/multiqc", mode: "copy"
-    cpus 2
-    memory 4.GB
+    publishDir "$params.outDir/multiqc", mode: "copy"
 
     input:
     file('fastq/*')
@@ -69,15 +64,3 @@ process multiqc {
     mv multiqc_report.html multiqc_report_primary_qc.html
     """
 }
-
-workflow qc {
-    take:
-        fastqs
-    main:
-        fastqs | trimgalore | set { trimmed }
-
-        fastqc(fastqs).collect() | multiqc
-    emit:
-        fastqs
-
-} 

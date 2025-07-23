@@ -4,6 +4,7 @@
 // Include workflows
 include { BASIC_ANALYSIS } from './workflows/basic.nf'
 include { ADVANCED_ANALYSIS } from './workflows/advanced.nf'
+include { fastqToVcf } from './workflows/short-read-ref.nf'
 
 
 // Publishing process to copy final outputs
