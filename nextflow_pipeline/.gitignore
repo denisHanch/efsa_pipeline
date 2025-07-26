@@ -1,5 +1,0 @@
-test_files/
-.nextflow.log*
-work/
-.nextflow/
-results/

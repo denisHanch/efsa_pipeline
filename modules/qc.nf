@@ -7,13 +7,13 @@ process trimgalore {
 
     container 'vibsinglecellnf/trimgalore:trimgalore-0.6.7-cutadapt-4.1'
     tag "$pair_id"
-    publishDir "${params.outDir}/trimmed_reads", mode: 'copy'
+    publishDir "${params.out_dir}/trimmed_reads", mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
 
     output:
-    tuple val(pair_id), file('out/*_val_1.fq.gz'), file('out/*_val_2.fq.gz')
+    tuple val(pair_id), path('out/*.fq.gz')
 
     script:
     """
@@ -29,7 +29,7 @@ process trimgalore {
 process fastqc {
     container 'biocontainers/fastqc:v0.11.9_cv8'
     tag "FASTQC on $pair_id"
-    publishDir "$params.outDir/fastqc_out", mode: "link"
+    publishDir "$params.out_dir/fastqc_out", mode: "link"
 
 
     input:
@@ -50,7 +50,7 @@ process fastqc {
  */
 process multiqc {
     container 'staphb/multiqc'
-    publishDir "$params.outDir/multiqc", mode: "copy"
+    publishDir "$params.out_dir/multiqc", mode: "copy"
 
     input:
     file('fastq/*')
