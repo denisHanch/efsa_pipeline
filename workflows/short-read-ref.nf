@@ -1,8 +1,9 @@
 #!/usr/bin/env nextflow
 
+include { convert_bcf_to_vcf; delly; samtools_index; picard_dict; svviz } from '../modules/sv_calling.nf'
 include { freebayes; snpeff; build_config; bcftools_stats } from '../modules/variant_calling.nf'
 include { fastqc; multiqc; trimgalore } from '../modules/qc.nf'
-include { bwa_index; bwa_mapping; samtool_index; samtool_stats; picard } from '../modules/mapping.nf'
+include { bwa_index; bwa_mapping; samtool_index_bam; samtool_stats; picard } from '../modules/mapping.nf'
 
 
 workflow {
@@ -30,7 +31,7 @@ workflow {
     bwa_index(fasta) | set { fasta_index }
     bwa_mapping(fasta, fasta_index, trimmed) | set { bam }
     samtool_stats(bam) | set { stats_out }
-    samtool_index(bam) | set { indexed_bam }
+    samtool_index_bam(bam) | set { indexed_bam }
     picard(fasta, indexed_bam) | set { picard_out }
     // indexed_bam.view()
 
@@ -44,7 +45,11 @@ workflow {
     // qc_vcf.view()
 
     // SVs variant calling
-
+    samtools_index(fasta) | set { fai }
+    picard_dict(fasta) | set { dict }
+    delly(indexed_bam, fasta, fai, dict) | set { bcf }
+    convert_bcf_to_vcf(bcf) | set { sv_vcf }
+    svviz(sv_vcf, indexed_bam, fasta, fai )
 
     // running multiqc on all files
     fastqc_out.mix(stats_out).mix(picard_out).mix(qc_vcf).mix(bcftools_out).collect() | multiqc

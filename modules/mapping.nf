@@ -52,7 +52,7 @@ process bwa_mapping {
 /*
  * Indexing BAM file
 */
-process samtool_index {
+process samtool_index_bam {
     container 'simonovaekat/bwa-samtools:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/bam", mode: 'copy'
