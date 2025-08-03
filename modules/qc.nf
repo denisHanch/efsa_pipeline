@@ -64,3 +64,25 @@ process multiqc {
     mv multiqc_report.html multiqc_report_primary_qc.html
     """
 }
+
+
+// Long reads pipeline function
+
+process nanoplot {
+container 'staphb/nanoplot:latest'
+    tag "$pair_id"
+    publishDir "${params.out_dir}/nanoplot", mode: 'copy'
+
+    input:
+    path reads
+    
+    
+    output:
+    path('nanoplot_report')
+    
+
+    script:
+    """
+    NanoPlot --fastq $reads --outdir nanoplot_report --threads 4
+    """
+}
