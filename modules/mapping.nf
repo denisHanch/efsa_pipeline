@@ -116,3 +116,25 @@ process samtool_stats {
     samtools stats $bam_file > ${bam_file}.stats
     """
 }
+
+
+
+// Long read function pipeline
+
+
+process minimap2 {
+container 'staphb/minimap2:latest'
+    tag "$pair_id"
+    publishDir "${params.out_dir}/minimap2", mode: 'copy'
+
+    input:
+
+    
+    output:
+    
+
+    script:
+    """
+    
+    """
+}

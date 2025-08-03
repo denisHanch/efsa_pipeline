@@ -49,7 +49,7 @@ workflow {
     picard_dict(fasta) | set { dict }
     delly(indexed_bam, fasta, fai, dict) | set { bcf }
     convert_bcf_to_vcf(bcf) | set { sv_vcf }
-    svviz(sv_vcf, indexed_bam, fasta, fai )
+    // svviz(sv_vcf, indexed_bam, fasta, fai )
 
     // running multiqc on all files
     fastqc_out.mix(stats_out).mix(picard_out).mix(qc_vcf).mix(bcftools_out).collect() | multiqc
