@@ -1,0 +1,18 @@
+# Use a base image with Python
+FROM python:3.9-slim
+
+# Install dependencies (including wget and unzip for example genome files)
+RUN apt-get update && apt-get install -y \
+    libbz2-dev \
+    build-essential \
+    git \
+    python3-dev \
+    gcc \
+    libbz2-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install requirments
+RUN git clone https://github.com/fritzsedlazeck/SURVIVOR.git
+RUN cd SURVIVOR/Debug && make
+
+ENV PATH="/SURVIVOR/Debug:${PATH}"

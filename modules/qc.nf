@@ -1,5 +1,7 @@
 #!/usr/bin/env nextflow
 
+// Processes for  short-read pipeline
+
 /*
  * Trim adapters and low quality reads
  */
@@ -66,15 +68,18 @@ process multiqc {
 }
 
 
-// Long reads pipeline function
+// Processes for long-read pipeline
 
+/*
+ * Check QC of input samples
+*/
 process nanoplot {
 container 'staphb/nanoplot:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/nanoplot", mode: 'copy'
 
     input:
-    path reads
+    tuple val(pair_id), path(reads)
     
     
     output:
@@ -83,6 +88,6 @@ container 'staphb/nanoplot:latest'
 
     script:
     """
-    NanoPlot --fastq $reads --outdir nanoplot_report --threads 4
+    NanoPlot --fastq $reads --outdir nanoplot_report --threads 6
     """
 }
