@@ -1,5 +1,7 @@
 #!/usr/bin/env nextflow
 
+// Processes for short-read pipeline
+
 /*
  * Index the genome
 */
@@ -118,23 +120,46 @@ process samtool_stats {
 }
 
 
+// Processes for long-read pipeline
 
-// Long read function pipeline
-
-
+/*
+ * Map long reads
+*/
 process minimap2 {
 container 'staphb/minimap2:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/minimap2", mode: 'copy'
 
     input:
+    tuple val(pair_id), path(reads)
+    path fasta_file
 
-    
     output:
+    tuple val(pair_id), path("${pair_id}.sam")
     
 
     script:
     """
-    
+    minimap2 -ax map-pb $fasta_file $reads > ${pair_id}.sam
+    """
+}
+
+/*
+ * Sort reads with samtools
+*/
+process samtools_sort {
+container ''
+    tag "$pair_id"
+    publishDir "${params.out_dir}/minimap2", mode: 'copy'
+
+    input:
+    tuple val(pair_id), path(sam)
+
+    output:
+    tuple val(pair_id), path("${pair_id}.bam")
+
+    script:
+    """
+    samtools sort $sam -o ${pair_id}.bam
     """
 }
