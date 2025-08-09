@@ -148,7 +148,7 @@ container 'staphb/minimap2:latest'
  * Sort reads with samtools
 */
 process samtools_sort {
-container ''
+container 'simonovaekat/bwa-samtools:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/minimap2", mode: 'copy'
 
