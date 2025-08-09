@@ -1,6 +1,9 @@
 
 // Processes for short-read pipeline
 
+/*
+ * Index fasta file with samtools
+*/
 process samtools_index {
     container 'simonovaekat/bwa-samtools:latest'
     publishDir "${params.out_dir}/samtools_index_dict", mode: 'copy'
@@ -17,6 +20,9 @@ process samtools_index {
     """   
 }
 
+/*
+ * Create picard dictionary to run delly
+*/
 process picard_dict {
     container 'quay.io/biocontainers/picard:2.26.10--hdfd78af_0'
     publishDir "${params.out_dir}/samtools_index_dict", mode: 'copy'
@@ -34,7 +40,9 @@ process picard_dict {
     """  
 }
 
-
+/*
+ * Running delly SV caller
+*/
 process delly {
     container 'biocontainers/delly:v0.8.1-2-deb_cv1'
     tag "$pair_id"
@@ -56,6 +64,9 @@ process delly {
     """
 }
 
+/*
+ * Convert bcf (default delly output) to vcf
+*/
 process convert_bcf_to_vcf {
     container 'biocontainers/bcftools:v1.9-1-deb_cv1'
     tag "$pair_id"
@@ -74,7 +85,7 @@ process convert_bcf_to_vcf {
 
 }
 
-
+// not working currently - trying to find nice tool for visualization of SVs
 process svviz {
     container 'simonovaekat/svviz2:latest'
     tag "$pair_id"

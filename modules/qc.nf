@@ -19,7 +19,7 @@ process trimgalore {
 
     script:
     """
-    trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 --paired -o out ${reads[0]} ${reads[1]}
+    trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 --paired -o out ${reads}
     """
 }
 
@@ -58,12 +58,11 @@ process multiqc {
     file('fastq/*')
 
     output:
-    file('multiqc_report_primary_qc.html')
+    file('multiqc_report.html')
 
     script:
     """
-    multiqc fastq/
-    mv multiqc_report.html multiqc_report_primary_qc.html
+    multiqc .
     """
 }
 
@@ -77,17 +76,16 @@ process nanoplot {
 container 'staphb/nanoplot:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/nanoplot", mode: 'copy'
+    cpus 6
 
     input:
     tuple val(pair_id), path(reads)
     
-    
     output:
     path('nanoplot_report')
     
-
     script:
     """
-    NanoPlot --fastq $reads --outdir nanoplot_report --threads 6
+    NanoPlot --fastq $reads --outdir nanoplot_report --threads ${task.cpus}
     """
 }

@@ -3,6 +3,7 @@
 include { nanoplot } from '../modules/qc.nf'
 include { samtool_stats; minimap2; samtools_sort; samtool_index_bam } from '../modules/mapping.nf'
 include { sniffles; debreak; cute_sv; survivor } from '../modules/sv_calling.nf'
+include { bcftools_stats } from '../modules/variant_calling.nf'
 
 
 workflow {
@@ -34,7 +35,6 @@ workflow {
     debreak(fasta, indexed_bam) | set { debreak_vcf }
     sniffles(indexed_bam) | set { sniffles_vcf }
 
-    survivor(cute_vcf, debreak_vcf, sniffles_vcf)
-
-
+    survivor(cute_vcf, debreak_vcf, sniffles_vcf) | set { merged_vcf }
+    bcftools_stats(merged_vcf) | multiqc
 }
