@@ -8,11 +8,13 @@
     "context": "."
   },
 
+  // Need DinD for nextflow to mount and run docker container
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/robsyme/features/nextflow:1": {}
+  },
 
   "workspaceFolder": "/EFSA_workspace",
-  
-  // User inside container
-  "remoteUser": "root",
 
   // to avoid "fatal: detected dubious ownership in repository at" error
   "postCreateCommand": "git config --file .git/config --add safe.directory ${containerWorkspaceFolder}",
@@ -36,22 +38,9 @@
     // mount repo into workspaceFolder
     "source=${localWorkspaceFolder},target=${containerWorkspaceFolder},type=bind,consistency=cached",
 
-    // allow Docker-in-Docker (user must be in docker group or root)
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
-
     // bind data folders
     "source=${localWorkspaceFolder}/data/inputs,target=${containerWorkspaceFolder}/data/inputs,type=bind,consistency=cached",
     "source=${localWorkspaceFolder}/data/outputs,target=${containerWorkspaceFolder}/data/outputs,type=bind,consistency=cached",
-
-    // Add you git identity into container
-    //"source=${env:HOME}/.gitconfig,target=/root/.gitconfig,type=bind,consistency=cached",
-    // Forward local ssh-agent into dev container
-    "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
-  ],
-
-  "remoteEnv": {
-    "SSH_AUTH_SOCK": "/ssh-agent"
-  }
-
+  ]
 }
   

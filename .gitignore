@@ -86,3 +86,12 @@ data/outputs/*
 # Nextflow specific ignores
 .nextflow*
 work/*
+
+output/
+
+.DS_Store
+.nextflow
+.nextflow.log.*
+timeline*.html
+report*.html
+work/
