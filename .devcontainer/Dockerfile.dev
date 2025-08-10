@@ -4,7 +4,7 @@ RUN apt-get update && \
      apt-get install -y --no-install-recommends \
        openssh-client
 
-# history earch 
+# history search 
 COPY .inputrc /root/
 
 WORKDIR /EFSA_workspace
