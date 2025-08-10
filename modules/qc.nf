@@ -55,11 +55,10 @@ process multiqc {
     file('fastq/*')
 
     output:
-    file('multiqc_report_primary_qc.html')
+    file('multiqc_report.html')
 
     script:
     """
-    multiqc fastq/
-    mv multiqc_report.html multiqc_report_primary_qc.html
+    multiqc .
     """
 }
