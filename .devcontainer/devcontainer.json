@@ -1,27 +1,22 @@
-
 {
   "name": "EFSA Pipeline Dev",
 
-  // Build the container from your Dockerfile.dev
   "build": {
     "dockerfile": "Dockerfile.dev",
-    "context": "."
+    "context": ".."
   },
 
-
   "workspaceFolder": "/EFSA_workspace",
-  
-  // User inside container
   "remoteUser": "root",
+  "overrideCommand": false,
 
-  // to avoid "fatal: detected dubious ownership in repository at" error
-  "postCreateCommand": "git config --file .git/config --add safe.directory ${containerWorkspaceFolder}",
+  // Generate .inputrc (optional) + safe.directory + pre-seed known_hosts for git hosts
+  "postCreateCommand": "printf '\"\\e[A\": history-search-backward\n\"\\e[B\": history-search-forward\nset show-all-if-ambiguous On\nset completion-ignore-case On\nset colored-stats On\nset visible-stats On\n' > /root/.inputrc && git config --file .git/config --add safe.directory ${containerWorkspaceFolder} && mkdir -p /root/.ssh && touch /root/.ssh/known_hosts && ssh-keyscan -T 5 github.com gitlab.com bitbucket.org >> /root/.ssh/known_hosts || true",
 
-  // VS Code–specific customizations
   "customizations": {
     "vscode": {
       "settings": {
-        "python.pythonPath": "/usr/local/bin/python3"
+        "python.defaultInterpreterPath": "/usr/local/bin/python3"
       },
       "extensions": [
         "ms-python.python",
@@ -33,25 +28,20 @@
   },
 
   "mounts": [
-    // mount repo into workspaceFolder
+    // repo (remote) -> container
     "source=${localWorkspaceFolder},target=${containerWorkspaceFolder},type=bind,consistency=cached",
 
-    // allow Docker-in-Docker (user must be in docker group or root)
+    // remote data dir -> container (change to your real path)
+    "source=/mnt/raid/Projects/EFSA/bind_mount,target=${containerWorkspaceFolder}/data,type=bind,consistency=cached",
+
+    // Docker on host (DooD)
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
 
-    // bind data folders
-    "source=${localWorkspaceFolder}/data/inputs,target=${containerWorkspaceFolder}/data/inputs,type=bind,consistency=cached",
-    "source=${localWorkspaceFolder}/data/outputs,target=${containerWorkspaceFolder}/data/outputs,type=bind,consistency=cached",
-
-    // Add you git identity into container
-    //"source=${env:HOME}/.gitconfig,target=/root/.gitconfig,type=bind,consistency=cached",
-    // Forward local ssh-agent into dev container
+    // SSH agent socket from the *remote shell* into container
     "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
   ],
 
   "remoteEnv": {
     "SSH_AUTH_SOCK": "/ssh-agent"
   }
-
 }
-  
