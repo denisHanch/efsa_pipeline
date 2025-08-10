@@ -15,9 +15,6 @@
   },
 
   "workspaceFolder": "/EFSA_workspace",
-  
-  // User inside container
-  "remoteUser": "root",
 
   // to avoid "fatal: detected dubious ownership in repository at" error
   "postCreateCommand": "git config --file .git/config --add safe.directory ${containerWorkspaceFolder}",
@@ -44,9 +41,6 @@
     // bind data folders
     "source=${localWorkspaceFolder}/data/inputs,target=${containerWorkspaceFolder}/data/inputs,type=bind,consistency=cached",
     "source=${localWorkspaceFolder}/data/outputs,target=${containerWorkspaceFolder}/data/outputs,type=bind,consistency=cached",
-
-    // Add you git identity into container
-    "source=${env:HOME}/.gitconfig,target=/root/.gitconfig,type=bind,consistency=cached",
   ]
 }
   
