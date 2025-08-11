@@ -15,7 +15,7 @@ ERROR_CODES = {
     "04": "",
     "05": "File management failed",
     "06": "File validation failed",
-    "07": "",
+    "07": "FASTA Editation failed",
     "08": "",
     "09": "",
     "10": "Unknown Exception",
@@ -46,16 +46,20 @@ def check_cfg(cfg: dict):
     mandatory_arguments = [
         "ref_genome_filename",
         "mod_genome_filename",
-        "mod_reads_filename",
         "ref_genome_extension", # data format specification - temporary?
         "mod_genome_extension", # data format specification - temporary?
-        "mod_reads_extension"   # data format specification - temporary?
+        "reads"
     ]
     
     missing = [arg for arg in mandatory_arguments if arg not in cfg]
     
     if missing:
         error("01",f"Missing mandatory arguments: {', '.join(missing)}")
+    
+    if len(cfg["reads"]) == 0:
+        error("01",f"Missing Reads")
+
+
 
 def read_cfg(cfg_path: str) -> dict:
     """
@@ -77,10 +81,10 @@ def read_cfg(cfg_path: str) -> dict:
     except (FileNotFoundError, json.JSONDecodeError) as e:
         error("05",f"Reading configuration file failed: {e}")    
 
-def create_tmp():
+def create_tmp(base_path = os.getcwd()):
     try:
-        cwd = os.getcwd()
-        tmp_dir = os.path.join(cwd,"tmp")
+        # base_path = os.getcwd()
+        tmp_dir = os.path.join(base_path,"tmp")
         os.makedirs(tmp_dir,exist_ok=True)
         return tmp_dir
     except (PermissionError, OSError) as e:
