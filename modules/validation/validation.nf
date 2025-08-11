@@ -1,40 +1,48 @@
 #!/usr/bin/env nextflow
-
 nextflow.enable.dsl=2
 
-params.mode = params.mode ?: 'prod' // default to 'prod' if not specified
+// Only use a fallback if the user didn't provide --input_dir
+params.input_dir = params.input_dir ?: "$baseDir/data"  // or remove this line entirely
+
+// Safety: expand relative/tilde and normalize
+def input_dir = file(params.input_dir).toAbsolutePath()
 
 process validation {
-    container 'pipeline-validation:dev'
-    errorStrategy 'ignore' // Do not fail workflow on non-zero exit
+  container 'pipeline-validation:dev'
+  errorStrategy 'ignore'
 
-    input:
-      path config_file
-      path validation_script
+  input:
+  path config_json       
+  path validation_script 
+  path all_files         
 
-    output:
-      path "validation.log", emit: log_file
-      stdout emit: log
+  output:
+  path "validation.log", emit: log_file
+  path "exit_code.txt", emit: exit_code
+  stdout emit: log
 
-    script:
-    """
-    echo "Starting validation"
-    python $validation_script $config_file > validation.log 2>&1
-    echo \$? > exit_code.txt
-    """
+  """
+  echo "Starting validation"
+  python "$validation_script" "$config_json" > validation.log 2>&1
+  """
 }
 
+
 workflow {
-    if (params.mode == 'test') {
-        // Test workflow: run validation for all test configs
-        def configs_ch = Channel.fromPath('./tests/*/config.json')
-        def script_ch = Channel.value('/EFSA_workspace/modules/validation/main.py')
-        validation(configs_ch, script_ch)
-    } else {
-        // Prod workflow: run validation for a single config (example)
-        def config_ch = Channel.fromPath('/EFSA_workspace/data/inputs/config.json')
-        def script_ch = Channel.value('/EFSA_workspace/modules/validation/main.py')
-        validation(config_ch, script_ch)
-        
-    }
+def all_files_ch = Channel
+    .fromPath("${input_dir}/*", type: 'file')
+    .filter { it.name != 'config.json' }
+    .ifEmpty { error "No files (except config.json) found in: ${input_dir}" }
+    .collect()
+
+  def config_ch = Channel
+      .fromPath("${input_dir}/config.json", type: 'file', followLinks: true)
+      .ifEmpty { error "Missing config.json in: ${input_dir}" }
+
+  def script_ch = Channel
+      .fromPath('/EFSA_workspace/modules/validation/main.py', type: 'file')
+      .ifEmpty { error "Script not found: /EFSA_workspace/modules/validation/main.py" }
+
+    
+  validation(config_ch, script_ch, all_files_ch)
 }
