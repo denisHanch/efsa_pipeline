@@ -4,10 +4,10 @@ import validation.format as r
 from validation.utils import *
 
 #   TODO  
-#       Validation of fasta raise Warning about deprecated comments - ??
-#       temporary file extension in config file?       
+#       zatim pridat gtf bez validace, ale aby prosel
+#       temporary file extension in config file? testovat pro fasta, fa, fna   
 #       test for duplicate filepath? (ref & mod same file?)
-#       
+#       jak rozlisit jestli je long nebo short read ?????
 
 #   //\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
 
@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
         #   Create tmp directory if not present
         print("INFO: Checking tmp directory.")
-        tmp_dir = create_tmp()
+        tmp_dir = create_tmp(base_path)
         print(f"    -   DONE: created on {tmp_dir}")
 
         # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -56,6 +56,16 @@ if __name__ == '__main__':
         print("INFO: Validating Reference genome.")
         ref_genome_filepath = os.path.join(base_path,cfg["ref_genome_filename"])
         ref_genome_ext = cfg["ref_genome_extension"].lower()    #   expected one of fasta or gbk
+
+        #   rename, save reference fasta file
+        save_file(ref_genome_filepath, f"{tmp_dir}/ref.{ref_genome_ext}")
+        ref_genome_filepath = f"{tmp_dir}/ref.{ref_genome_ext}"
+
+        #   decode gzip
+        if ref_genome_ext.endswith(".gz"):
+            r.gz_decode(ref_genome_filepath,ref_genome_filepath[:-3])
+            ref_genome_filepath = ref_genome_filepath[:-3]
+            ref_genome_ext = ref_genome_ext[:-3] 
 
         expected_fasta = (ref_genome_ext.lower() == "fasta") 
         expected_gbk = (ref_genome_ext.lower() == "gbk") 
@@ -82,9 +92,10 @@ if __name__ == '__main__':
                 # ref_genome_filepath = r.gbk_to_fasta(ref_genome_filepath)
                 TODO()
 
-        #   rename and save normalized reference fasta file
-        save_file(ref_genome_filepath, tmp_dir+"/ref_genome.fasta")
-        print(f"    -   DONE: Saved on {tmp_dir}ref_genome.fasta")
+        #   rename, save and edit normalized reference fasta file
+        v.edit_fasta(ref_genome_filepath)
+
+        print(f"    -   DONE: Saved on {tmp_dir}/ref.{ref_genome_ext}")
         
         # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
         
@@ -93,6 +104,16 @@ if __name__ == '__main__':
         print("INFO: Validating Modified genome.")
         mod_genome_filepath = os.path.join(base_path,cfg["mod_genome_filename"])
         mod_genome_ext = cfg["mod_genome_extension"].lower()    #   expected one of fasta or gbk
+
+        #   rename, save modified fasta file
+        save_file(mod_genome_filepath, f"{tmp_dir}/mod.{mod_genome_ext}")
+        mod_genome_filepath = f"{tmp_dir}/mod.{mod_genome_ext}"
+
+        #   decode gzip
+        if mod_genome_ext.endswith(".gz"):
+            r.gz_decode(mod_genome_filepath,mod_genome_filepath[:-3])
+            mod_genome_filepath = mod_genome_filepath[:-3]
+            mod_genome_ext = mod_genome_ext[:-3] 
 
         expected_fasta = (mod_genome_ext == "fasta") 
         expected_gbk = (mod_genome_ext == "gbk") 
@@ -119,9 +140,10 @@ if __name__ == '__main__':
                 # mod_genome_filepath = r.gbk_to_fasta(mod_genome_filepath)
                 TODO()
 
-        #   rename and save normalized reference fasta file
-        save_file(mod_genome_filepath, tmp_dir+"/mod_genome.fasta")
-        print(f"    -   DONE: Saved on {tmp_dir}mod_genome.fasta")
+        #   edit normalized reference fasta file
+        v.edit_fasta(mod_genome_filepath)
+
+        print(f"    -   DONE: Saved on {tmp_dir}/mod.{mod_genome_ext}")
         
         # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
@@ -129,43 +151,58 @@ if __name__ == '__main__':
         #       File with reference genome (in FASTA or geneBank format), keyed as mod_reads_filepath
         print("INFO: Validating Reads of modified genome.")
 
-        mod_reads_filepath = os.path.join(base_path,cfg["mod_reads_filename"])
-        mod_reads_ext = cfg["mod_reads_extension"].lower()  #   expected one of fastq or bam
+        for reads_file in cfg["reads"]:
+            
+            reads_filepath = os.path.join(base_path,reads_file["reads_filename"])
+            reads_ext = reads_file["reads_extension"].lower()  #   expected one of fastq or bam
 
-        expected_fastq = (mod_reads_ext == "fastq") 
-        expected_bam = (mod_reads_ext == "bam") 
+            #   rename, save reference fasta file
+            save_file(reads_filepath, f'{tmp_dir}/{reads_file["reads_filename"]}')
+            reads_filepath = f'{tmp_dir}/{reads_file["reads_filename"]}'
 
-        if not (expected_fastq ^ expected_bam):
-            error_message = (
-                    f"Invalid reads format "
-                    f"Expected one of: fastq, bam "
-                )
-            error("03",error_message)
+            #   decode gzip
+            if reads_ext.endswith(".gz"):
+                r.gz_decode(reads_filepath,reads_filepath[:-3])
+                reads_filepath = reads_filepath[:-3]
+                reads_ext = reads_ext[:-3] 
 
-        #   validate fasta format
-        if expected_fastq:
-            if not v.is_fastq(mod_reads_filepath):
-                error("06","Modified reads is not in FASTQ format as expected")
+            expected_fastq = (reads_ext == "fastq") 
+            expected_bam = (reads_ext == "bam") 
 
-        #   validate gbk format
-        if expected_bam:
-            if not v.is_bam(mod_reads_filepath):
-                error("06","Modified reads is not in BAM format as expected")
-            else:
-                #   reformat to FASTA
-                #   replace filepath
-                # mod_reads_filepath = r.gbk_to_fasta(mod_reads_filepath)
-                TODO()
+            if not (expected_fastq ^ expected_bam):
+                error_message = (
+                        f"Invalid reads format "
+                        f"Expected one of: fastq, bam "
+                    )
+                error("03",error_message)
 
-        #   rename and save normalized reference fasta file
-        save_file(mod_reads_filepath, tmp_dir+"/mod_reads.fastq")
-        print(f"    -   DONE: Saved on {tmp_dir}mod_reads.fastq")
-        
+            #   validate fasta format
+            if expected_fastq:
+                if not v.is_fastq(reads_filepath):
+                    error("06","Modified reads is not in FASTQ format as expected")
+
+            #   validate gbk format
+            if expected_bam:
+                if not v.is_bam(reads_filepath):
+                    error("06","Modified reads is not in BAM format as expected")
+                else:
+                    #   reformat to FASTA
+                    #   replace filepath
+                    # reads_filepath = r.gbk_to_fasta(reads_filepath)
+                    TODO()
+
+
+            #   encode gzip
+            r.gz_encode(reads_filepath,reads_filepath+".gz")
+            reads_filepath = reads_filepath+".gz"
+            reads_ext = reads_ext + ".gz"
+
+            print(f'    -   DONE: Saved on {reads_filepath}')
 
     except Exception as e:
-        print(e)
-        error("10","Unhandled main exception")
-
+        print("INFO: Cleaning tmp files")
+        os.removedirs(tmp_dir)
+        error("10",f"Unhandled main exception {e}")
 
 
 
