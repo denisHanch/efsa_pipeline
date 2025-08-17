@@ -14,7 +14,7 @@ process bwa_index {
     path fasta_file
 
     output:
-    path "${fasta_file}.*"
+    path "${fasta_file}.*" 
 
     script:
     """
@@ -33,8 +33,8 @@ process bwa_mapping {
     publishDir "${params.out_dir}/short-ref/bam", mode: 'copy'
 
     input:
-    path fasta_file
-    path fasta_index
+    each path(fasta_file)
+    each path(fasta_index)
     tuple val(pair_id), path(reads)
 
     output:
@@ -78,7 +78,7 @@ process picard {
     publishDir "${params.out_dir}/short-ref/picard", mode: 'copy'
     
     input:
-    path fasta_file
+    each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index)
 
 
@@ -129,7 +129,7 @@ container 'staphb/minimap2:latest'
 
     input:
     tuple val(pair_id), path(reads)
-    path fasta_file
+    each path(fasta_file)
 
     output:
     tuple val(pair_id), path("${pair_id}.sam")
@@ -147,7 +147,7 @@ container 'staphb/minimap2:latest'
 process samtools_sort {
 container 'staphb/samtools:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/minimap2", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/samtools", mode: 'copy'
 
     input:
     tuple val(pair_id), path(sam)

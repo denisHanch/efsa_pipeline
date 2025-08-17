@@ -50,9 +50,9 @@ process delly {
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index)
-    path fasta_file
-    path fai
-    path dict
+    each path(fasta_file)
+    each path(fai)
+    each path(dict)
 
     output:
     tuple val(pair_id),  path("${pair_id}_sv.bcf")
@@ -94,8 +94,8 @@ process svviz {
     input:
     tuple val(pair_id), path(vcf_file)
     tuple val(pair_id), path(bam_file), path(bam_index)
-    path fasta_file
-    path fai
+    each path(fasta_file)
+    each path(fai)
 
 
     output:
@@ -119,7 +119,7 @@ process cute_sv {
     publishDir "${params.out_dir}/long-ref/cutesv_out", mode: 'copy'
 
     input:
-    path fasta_file
+    each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index) 
 
     output:
@@ -144,7 +144,7 @@ process debreak {
     publishDir "${params.out_dir}/long-ref/debreak_out", mode: 'copy'
 
     input:
-    path fasta_file
+    each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index) 
 
     output:

@@ -12,7 +12,7 @@ workflow {
 
     // Processing inputs
     println("Processing  files in directory: ${params.in_dir}")
-    Channel.fromPath("$params.in_dir/*.fastq.gz") | set { fastqs }
+    Channel.fromPath("$params.in_dir/short-test-multiple/*.fastq.gz") | set { fastqs }
     
     Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
     Channel.fromPath("$params.in_dir/*ref.gtf") | set { gtf }
@@ -20,16 +20,14 @@ workflow {
     | map {[(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq.gz/)[0][1], it]}
     | groupTuple(sort: true)
     | set { fastqs }
-
     // fastqs.view()
 
     // QC and trimming module
     fastqs | trimgalore | set { trimmed }
     fastqc(trimmed) | set {fastqc_out}
-    // trimmed.view()
 
     // Mapping module
-    bwa_index(fasta) | set { fasta_index }
+    bwa_index(fasta) | set { fasta_index } 
     bwa_mapping(fasta, fasta_index, trimmed) | set { sam } 
     samtools_sort(sam, out_folder_name) | set { bam }
     samtool_stats(bam) | set { stats_out }
@@ -56,4 +54,4 @@ workflow {
     fastqc_out.mix(stats_out).mix(picard_out).mix(qc_vcf).mix(bcftools_out).collect() | multiqc
 }
 
-// fastqToVcf
+// // fastqToVcf

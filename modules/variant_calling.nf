@@ -7,8 +7,8 @@ process freebayes {
     publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
 
     input:
-    path fasta_file
-    path fasta_index
+    each path(fasta_file)
+    each path(fasta_index)
     tuple val(pair_id), path(bam_file), path(bam_index)
 
     output:
@@ -30,8 +30,8 @@ process build_config {
 
 
     input:
-    path fasta_file
-    path gtf_file
+    each path(fasta_file)
+    each path(gtf_file)
 
     output:
     tuple path("genome_id.txt"), path("snpEff.config")
