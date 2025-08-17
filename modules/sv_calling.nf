@@ -6,7 +6,7 @@
 */
 process samtools_index {
     container 'simonovaekat/bwa-samtools:latest'
-    publishDir "${params.out_dir}/samtools_index_dict", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/samtools_index_dict", mode: 'copy'
 
     input:
     path fasta_file
@@ -25,7 +25,7 @@ process samtools_index {
 */
 process picard_dict {
     container 'quay.io/biocontainers/picard:2.26.10--hdfd78af_0'
-    publishDir "${params.out_dir}/samtools_index_dict", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/samtools_index_dict", mode: 'copy'
     
     input:
     path fasta_file
@@ -46,7 +46,7 @@ process picard_dict {
 process delly {
     container 'biocontainers/delly:v0.8.1-2-deb_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index)
@@ -70,7 +70,7 @@ process delly {
 process convert_bcf_to_vcf {
     container 'biocontainers/bcftools:v1.9-1-deb_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
 
     input:
     tuple val(pair_id),  path(bcf_file)
@@ -89,7 +89,7 @@ process convert_bcf_to_vcf {
 process svviz {
     container 'simonovaekat/svviz2:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/svviz", mode: 'copy'
+    publishDir "${params.out_dir}/long-ref/svviz", mode: 'copy'
 
     input:
     tuple val(pair_id), path(vcf_file)
@@ -114,9 +114,9 @@ process svviz {
  * variant calling with cuteSV
 */
 process cute_sv {
-container 'simonovaekat/cutesv:latest'
+    container 'ghcr.io/kate-simonova/cutesv:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/cutesv_out", mode: 'copy'
+    publishDir "${params.out_dir}/long-ref/cutesv_out", mode: 'copy'
 
     input:
     path fasta_file
@@ -139,21 +139,21 @@ container 'simonovaekat/cutesv:latest'
  * variant calling with debreak
 */
 process debreak {
-container 'simonovaekat/debreak:latest'
+    container 'ghcr.io/kate-simonova/debreak:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/debreak_out", mode: 'copy'
-    cpus 4
+    publishDir "${params.out_dir}/long-ref/debreak_out", mode: 'copy'
 
     input:
     path fasta_file
     tuple val(pair_id), path(bam_file), path(bam_index) 
 
     output:
-    tuple val(pair_id), path("${pair_id}_debreak.vcf")
+    tuple val(pair_id), path("debreak_out/${pair_id}_debreak.vcf")
 
     script:
     """
-    debreak --bam $bam_file -r $fasta_file -o ${pair_id}_debreak.vcf -t ${task.cpus}
+    debreak --bam $bam_file -r $fasta_file -o debreak_out
+    mv debreak_out/debreak.vcf debreak_out/${pair_id}_debreak.vcf
     """
 }
 
@@ -162,10 +162,9 @@ container 'simonovaekat/debreak:latest'
  * variant calling with sniffles
 */
 process sniffles {
-container 'simonovaekat/sniffles:latest'
+    container 'ghcr.io/kate-simonova/sniffles:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/sniffles_out", mode: 'copy'
-    cpus 4
+    publishDir "${params.out_dir}/long-ref/sniffles_out", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index) 
@@ -175,7 +174,7 @@ container 'simonovaekat/sniffles:latest'
 
     script:
     """
-    sniffles --input $bam_file --vcf ${pair_id}_sniffles.vcf --threads ${task.cpus}
+    sniffles --input $bam_file --vcf ${pair_id}_sniffles.vcf
     """
 }
 
@@ -184,10 +183,9 @@ container 'simonovaekat/sniffles:latest'
  * merging SV
 */
 process survivor {
-container 'simonovaekat/survivor:latest'
+    container 'ghcr.io/kate-simonova/survivor:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/survivor_out", mode: 'copy'
-    cpus 4
+    publishDir "${params.out_dir}/long-ref/survivor_out", mode: 'copy'
 
     input:
     tuple val(pair_id), path(sniffles_vcf)
@@ -196,14 +194,17 @@ container 'simonovaekat/survivor:latest'
 
 
     output:
-    path "${pair_id}_merged.vcf"
+    tuple val(pair_id), path("${pair_id}_merged.vcf")
 
     script:
     """
     # Create or overwrite the vcf_list.txt with the VCF file paths
-    echo $sniffles_vcf > vcf_list.txt
-    echo $cute_vcf >> vcf_list.txt
-    echo $debreak_vcf >> vcf_list.txt
+    cp "${sniffles_vcf}" sniffles.vcf
+    cp "${cute_vcf}"     cute.vcf
+    cp "${debreak_vcf}"  debreak.vcf
+
+    # Create VCF list file for SURVIVOR
+    printf "%s\n" sniffles.vcf cute.vcf debreak.vcf > vcf_list.txt
 
     # Run the SURVIVOR merge command
     SURVIVOR merge vcf_list.txt 1000 1 1 1 0 30 ${pair_id}_merged.vcf

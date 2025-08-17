@@ -1,34 +1,35 @@
 #!/usr/bin/env nextflow
 
-include { nanoplot } from '../modules/qc.nf'
+include { nanoplot; multiqc } from '../modules/qc.nf'
 include { samtool_stats; minimap2; samtools_sort; samtool_index_bam } from '../modules/mapping.nf'
 include { sniffles; debreak; cute_sv; survivor } from '../modules/sv_calling.nf'
 include { bcftools_stats } from '../modules/variant_calling.nf'
 
+out_folder_name = "long-ref"
+
 
 workflow {
     // Processing inputs
-    Channel.fromPath("$params.fastqDir/ref.fa") | set { fasta }
+    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
 
-    if (!params.fastqDir) {
-            throw new IllegalArgumentException('--fastqDir must be provided')
-        } else {
+    println("Processing files in directory: ${params.in_dir}")
 
-        println("Processing  files in directory: ${params.fastqDir}")
-        Channel.fromPath("$params.fastqDir/*_subreads.fastq.gz")
+    Channel.fromPath("${params.in_dir}/tmp2/*_subreads.fastq.gz")
         .map { file -> 
-        def name = file.baseName.replaceFirst('.fastq', '')
-        return [name, file]
-    }
-    .set { fastqs }
+            def name = file.baseName.replaceFirst('.fastq', '')
+            return [name, file]
+        }
+        .set { fastqs }
+
 
     fastqs.view()
-     }
+    
     // QC
-    fastqs | nanoplot
+     nanoplot(fastqs)
 
     // mapping
-    minimap2(fastqs, fasta) | samtools_sort | samtool_index_bam | set { indexed_bam }
+    minimap2(fastqs, fasta) | set { sam }
+    samtools_sort(sam, out_folder_name) | samtool_index_bam | set { indexed_bam }
 
     // variant calling
     cute_sv(fasta, indexed_bam) | set { cute_vcf }
@@ -36,5 +37,5 @@ workflow {
     sniffles(indexed_bam) | set { sniffles_vcf }
 
     survivor(cute_vcf, debreak_vcf, sniffles_vcf) | set { merged_vcf }
-    bcftools_stats(merged_vcf) | multiqc
+    bcftools_stats(merged_vcf, out_folder_name) | multiqc
 }

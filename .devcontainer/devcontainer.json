@@ -43,4 +43,3 @@
     "source=${localWorkspaceFolder}/data/outputs,target=${containerWorkspaceFolder}/data/outputs,type=bind,consistency=cached",
   ]
 }
-  
