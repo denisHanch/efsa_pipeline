@@ -7,8 +7,6 @@ include { bwa_index; bwa_mapping; samtool_index_bam; samtools_sort; samtool_stat
 
 out_folder_name = "short-ref"
 
-new File("logs").mkdirs() 
-
 
 workflow {
 
