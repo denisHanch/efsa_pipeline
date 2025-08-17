@@ -59,7 +59,7 @@ process showCoords {
 }
 
 process syri {
-    container "simonovaekat/syri:latest"
+    container "ghcr.io/kate-simonova/syri:latest"
     publishDir "${params.out_dir}/ref_mod", mode: 'copy'
 
     input:
@@ -76,5 +76,4 @@ process syri {
     """
     syri -c $coords -d $filtered_delta  -r $ref -q $mod --prefix ${prefix} --nosnp
     """
-
 }
