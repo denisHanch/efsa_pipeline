@@ -1,112 +1,92 @@
 #!/usr/bin/env python3
 import os
-import sys
 import shutil
-import json
+import subprocess
 
-#   //\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
-#   ERROR HANDLING
 
-ERROR_CODES = {
-    "00": "Invalid number of arguments",
-    "01": "Missing arguments",
-    "02": "",
-    "03": "Unknown format",
-    "04": "",
-    "05": "File management failed",
-    "06": "File validation failed",
-    "07": "FASTA Editation failed",
-    "08": "",
-    "09": "",
-    "10": "Unknown Exception",
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+#   GLOBALS
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-}
 
-def error(code, msg=None):
-    print(f"ERROR_{code}: {msg or ERROR_CODES.get(code, 'Unknown error')}", file=sys.stderr)
-    sys.exit(1)
+#   the firts in tuple will be standard for naming all of such files
+GZIP_EXTS = ("GZ")
+BZIP_EXTS = ("BZ2")
+ENCODING_EXTS = GZIP_EXTS+BZIP_EXTS
+FASTA_FORMATS = ("FASTA","FA","FNA")
+GBK_FORMATS = ("GBK","GENE_BANK","GENE_BANK")
+FASTQ_FORMATS = ("FASTQ")
+BAM_FORMATS = ("BAM")
+GTF_FORMATS = ("GTF")
+GFF_FORMATS = ("GFF")
 
-def success():
-    print("SUCCESS")
-    sys.exit(0)
+def left_join_with_coding(what):
+    return what + tuple(f"{f}.{e}" for f in what for e in ENCODING_EXTS)
 
-#   //\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
-#   SYSTEM FILES MANAGEMENT
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+#   SYSTEM FILE MANAGEMENT
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-def check_cfg(cfg: dict):
+def split_filepath(filepath:str) -> list:
+    filepath = os.path.abspath(filepath)
+    basename = os.path.basename(filepath)
+    basedir = os.path.dirname(filepath)
+    tmp = basename.split('.')
+    if len(tmp) > 3 or len(tmp) < 2:
+        raise Exception(f"Unexpected file extension, allowed one for file format and one for coding type, got {len(tmp)}")
+    if len(tmp) == 3:
+        return basedir,tmp[0],tmp[1].upper(),tmp[2].upper()    
+    if len(tmp) == 2:
+        return basedir,tmp[0],tmp[1].upper(), None    
+
+
+def create_tmpdir(basepath = os.getcwd()):
+    tmpdir = os.path.join(basepath,"tmp")
+    os.makedirs(tmpdir,exist_ok=True)
+    return tmpdir
+
+
+def remove_dir(dirpath):
     """
-    Validate that all mandatory arguments exist in the configuration.
-
-    Args:
-        cfg (dict): Configuration dictionary parsed from JSON.
-
-    Raises:
-        SystemExit: If any mandatory argument is missing.
+    Remove a directory and all its contents.
+    If the directory does not exist, do nothing.
+    If removal fails, exit with error.
     """
-    mandatory_arguments = [
-        "ref_genome_filename",
-        "mod_genome_filename",
-        "ref_genome_extension", # data format specification - temporary?
-        "mod_genome_extension", # data format specification - temporary?
-        "reads"
-    ]
-    
-    missing = [arg for arg in mandatory_arguments if arg not in cfg]
-    
-    if missing:
-        error("01",f"Missing mandatory arguments: {', '.join(missing)}")
-    
-    if len(cfg["reads"]) == 0:
-        error("01",f"Missing Reads")
+    shutil.rmtree(dirpath)
 
 
+def file_exists(filepath:str):
+    if not os.path.isfile(filepath):
+        raise FileNotFoundError(f"file {filepath} not found")
 
-def read_cfg(cfg_path: str) -> dict:
+
+def move_file(src, dst):
     """
-    Load a JSON configuration file.
-
-    Args:
-        cfg_path (str): Path to the JSON config file.
-
-    Returns:
-        dict: Dictionary of input arguments
-    
-    Raises:
-        FileNotFoundError: If the file does not exist.
-        json.JSONDecodeError: If the file is not valid JSON.
+    Move a file from src to dst using subprocess and handle errors.
     """
-    try:
-        cfg = json.load(open(cfg_path))
-        return cfg
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        error("05",f"Reading configuration file failed: {e}")    
+    subprocess.run(['mv', src, dst], check=True)
 
-def create_tmp(base_path = os.getcwd()):
-    try:
-        # base_path = os.getcwd()
-        tmp_dir = os.path.join(base_path,"tmp")
-        os.makedirs(tmp_dir,exist_ok=True)
-        return tmp_dir
-    except (PermissionError, OSError) as e:
-        error("05",f"Creating tmp directory failed: {e}")
 
-def save_file(what, on):
-    try:
-        # Copy file to destination
-        shutil.copy2(what, on)
-    except Exception as e:
-        error("05", f"Failed to copy file from {what} to {on}: {e}")
+def copy_file(src, dst):
+    """
+    Copy a file from src to dst using subprocess and handle errors.
+    """
+    subprocess.run(['cp', src, dst], check=True)
 
-#   //\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 #   OTHER
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-def file_exists(func):
-    def inner(filepath, *args, **kwargs):
-        if not os.path.isfile(filepath):
-            error("05",f"Unable to open file on path {filepath}")
-        abs_path = os.path.abspath(filepath)
-        return func(abs_path, *args, **kwargs)
-    return inner
+def check_coding_format(coding_format):
+    if coding_format not in ENCODING_EXTS:
+        raise Exception(f"Unknown coding format")
 
-def TODO():
-    print("WARNING: This part is not implemented yet")
+
+def check_file_format(format, allowed):
+    if format not in allowed:
+        return False
+    return True
+
+
+def TODO(pref = None):
+    print(f"{pref}WARNING: This part is not implemented yet")
