@@ -1,65 +1,70 @@
 #!/usr/bin/env python3
-from validation.utils import file_exists, TODO, error
-import gzip
-import shutil
 import os
-
-@file_exists
-def gbk_to_fasta(filepath):
-    TODO()
+import subprocess
+import validation.utils as u
 
 
-@file_exists
-def bam_to_fastq(filepath):
-    TODO()
+def remove_coding(coding_type,**kwargs):
+    if coding_type in u.GZIP_EXTS:
+        gz_decode(**kwargs)
+    elif coding_type in u.BZIP_EXTS:
+        bz_decode(**kwargs)
+    
 
-@file_exists
-def gz_decode(filepath: str, outpath: str, replace:bool = True) -> str:
-    """Decompress a .gz file and save it without the .gz extension.
+def add_coding(coding_type,**kwargs):
+    if coding_type in u.GZIP_EXTS:
+        gz_encode(**kwargs)
+    elif coding_type in u.BZIP_EXTS:
+        bz_encode(**kwargs)
 
-    Args:
-        filepath (str): Path to the .gz file.
 
-    Returns:
-        str: Path to the decompressed file.
+def gz_decode(filepath: str, outpath: str, replace: bool = False):
+    """
+    Decompress a .gz file using subprocess and save it to outpath.
     """
     try:
-        with gzip.open(filepath, 'rb') as f_in:
-            with open(outpath, 'wb') as f_out:
-                shutil.copyfileobj(f_in, f_out)
-
-        if replace:
-            os.remove(filepath)
-
-    except Exception as e:
-        error("05",f"Unable to decode gzip file {filepath}")
-
-@file_exists
-def gz_encode(filepath: str, outpath: str, compresslevel: int = 6, replace: bool = True) -> str:
-    """
-    Compress a file with gzip.
-
-    Args:
-        filepath: Path to the source file to compress.
-        compresslevel: gzip compression level (0-9). 6 is default/good balance.
-
-    Returns:
-        The path to the created .gz file.
-    """
-    try:
-        # Prepare atomic write
-        tmppath = outpath + ".tmp"
-
-        # Compress streaming
-        with open(filepath, "rb") as f_in:
-            with gzip.open(tmppath, "wb", compresslevel=compresslevel) as f_out:
-                shutil.copyfileobj(f_in, f_out)
-
-        # Atomic move into place
-        os.replace(tmppath, outpath)
-
+        with open(outpath, 'wb') as f_out:
+            subprocess.run(['gzip', '-dc', filepath], stdout=f_out, check=True)
         if replace:
             os.remove(filepath)
     except Exception as e:
-        error("05",f"Unable to decode gzip file {filepath}")
+        raise RuntimeError(f"Failed to decompress {filepath}: {e}")
 
+
+def gz_encode(filepath: str, outpath: str, compresslevel: int = 6, replace: bool = False):
+    """
+    Compress a file with gzip using subprocess.
+    """
+    try:
+        with open(filepath, 'rb') as f_in, open(outpath, 'wb') as f_out:
+            subprocess.run(['gzip', f'-{compresslevel}'], stdin=f_in, stdout=f_out, check=True)
+        if replace:
+            os.remove(filepath)
+    except Exception as e:
+        raise RuntimeError(f"Failed to compress {filepath}: {e}")
+
+
+def bz_decode(filepath: str, outpath: str, replace: bool = False):
+    """
+    Decompress a .bz2 file using subprocess and save it to outpath.
+    """
+    try:
+        with open(outpath, 'wb') as f_out:
+            subprocess.run(['bzip2', '-dc', filepath], stdout=f_out, check=True)
+        if replace:
+            os.remove(filepath)
+    except Exception as e:
+        raise RuntimeError(f"Failed to decompress {filepath}: {e}")
+
+
+def bz_encode(filepath: str, outpath: str, compresslevel: int = 9, replace: bool = False):
+    """
+    Compress a file with bzip2 using subprocess.
+    """
+    try:
+        with open(filepath, 'rb') as f_in, open(outpath, 'wb') as f_out:
+            subprocess.run(['bzip2', f'-{compresslevel}'], stdin=f_in, stdout=f_out, check=True)
+        if replace:
+            os.remove(filepath)
+    except Exception as e:
+        raise RuntimeError(f"Failed to compress {filepath}: {e}")
