@@ -5,7 +5,7 @@
  * Index fasta file with samtools
 */
 process samtools_index {
-    container 'simonovaekat/bwa-samtools:latest'
+    container 'staphb/samtools:latest'
     publishDir "${params.out_dir}/short-ref/samtools_index_dict", mode: 'copy'
 
     input:
@@ -87,7 +87,7 @@ process convert_bcf_to_vcf {
 
 // not working currently - trying to find nice tool for visualization of SVs
 process svviz {
-    container 'simonovaekat/svviz2:latest'
+    container "${params.registry}/svviz2:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/long-ref/svviz", mode: 'copy'
 
@@ -114,7 +114,7 @@ process svviz {
  * variant calling with cuteSV
 */
 process cute_sv {
-    container 'ghcr.io/kate-simonova/cutesv:latest'
+    container "${params.registry}/cutesv:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/long-ref/cutesv_out", mode: 'copy'
 
@@ -139,7 +139,7 @@ process cute_sv {
  * variant calling with debreak
 */
 process debreak {
-    container 'ghcr.io/kate-simonova/debreak:latest'
+    container "${params.registry}/debreak:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/long-ref/debreak_out", mode: 'copy'
 
@@ -162,7 +162,7 @@ process debreak {
  * variant calling with sniffles
 */
 process sniffles {
-    container 'ghcr.io/kate-simonova/sniffles:latest'
+    container "${params.registry}/sniffles:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/long-ref/sniffles_out", mode: 'copy'
 
@@ -183,7 +183,7 @@ process sniffles {
  * merging SV
 */
 process survivor {
-    container 'ghcr.io/kate-simonova/survivor:latest'
+    container "${params.registry}/survivor:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/long-ref/survivor_out", mode: 'copy'
 
