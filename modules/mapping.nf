@@ -6,15 +6,15 @@
  * Index the genome
 */
 process bwa_index {
-    container 'simonovaekat/bwa-samtools:latest'
+    container 'biocontainers/bwa:v0.7.17_cv1'
     tag "$fasta_file"
-    publishDir "${params.out_dir}/bwa_index", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/bwa_index", mode: 'copy'
 
     input:
     path fasta_file
 
     output:
-    path "${fasta_file}.*"
+    path "${fasta_file}.*" 
 
     script:
     """
@@ -28,26 +28,23 @@ process bwa_index {
  * Mapping reads to the genome
 */
 process bwa_mapping {
-    container 'simonovaekat/bwa-samtools:latest'
+    container 'biocontainers/bwa:v0.7.17_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/bam", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/bam", mode: 'copy'
 
     input:
-    path fasta_file
-    path fasta_index
+    each path(fasta_file)
+    each path(fasta_index)
     tuple val(pair_id), path(reads)
 
     output:
-    tuple val(pair_id), path("${pair_id}.bam")
+    tuple val(pair_id), path("${pair_id}.sam")
 
     script:
     """
-    bwa mem ${fasta_file} ${reads} | \
-        samtools view -bS - | \
-        samtools sort -o ${pair_id}.bam
+    bwa mem ${fasta_file} ${reads} > ${pair_id}.sam
     """
 }
-
 
 
 
@@ -55,9 +52,9 @@ process bwa_mapping {
  * Indexing BAM file
 */
 process samtool_index_bam {
-    container 'simonovaekat/bwa-samtools:latest'
+    container 'staphb/samtools:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/bam", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/bam", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file)
@@ -78,10 +75,10 @@ process samtool_index_bam {
 process picard {
     container 'quay.io/biocontainers/picard:2.26.10--hdfd78af_0'
     tag "$pair_id"
-    publishDir "${params.out_dir}/picard", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/picard", mode: 'copy'
     
     input:
-    path fasta_file
+    each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index)
 
 
@@ -103,9 +100,9 @@ process picard {
  * Running samtools stats to get mapping statistics
 */
 process samtool_stats {
-    container 'simonovaekat/bwa-samtools:latest'
+    container 'staphb/samtools:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/samtools_stats", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/samtools_stats", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file)
@@ -128,11 +125,11 @@ process samtool_stats {
 process minimap2 {
 container 'staphb/minimap2:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/minimap2", mode: 'copy'
+    publishDir "${params.out_dir}/long-ref/minimap2", mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
-    path fasta_file
+    each path(fasta_file)
 
     output:
     tuple val(pair_id), path("${pair_id}.sam")
@@ -148,12 +145,13 @@ container 'staphb/minimap2:latest'
  * Sort reads with samtools
 */
 process samtools_sort {
-container 'simonovaekat/bwa-samtools:latest'
+container 'staphb/samtools:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/minimap2", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/samtools", mode: 'copy'
 
     input:
     tuple val(pair_id), path(sam)
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("${pair_id}.bam")

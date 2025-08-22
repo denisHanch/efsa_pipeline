@@ -4,11 +4,11 @@
 process freebayes {
     container 'biocontainers/freebayes:v1.2.0-2-deb_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
 
     input:
-    path fasta_file
-    path fasta_index
+    each path(fasta_file)
+    each path(fasta_index)
     tuple val(pair_id), path(bam_file), path(bam_index)
 
     output:
@@ -26,12 +26,12 @@ process freebayes {
 
 process build_config {
     container 'biocontainers/snpeff:v4.1k_cv3'
-    publishDir "${params.out_dir}/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
 
 
     input:
-    path fasta_file
-    path gtf_file
+    each path(fasta_file)
+    each path(gtf_file)
 
     output:
     tuple path("genome_id.txt"), path("snpEff.config")
@@ -64,7 +64,7 @@ process build_config {
 process snpeff {
     container 'biocontainers/snpeff:v4.1k_cv3'
     tag "$pair_id"
-    publishDir "${params.out_dir}/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
 
     input:
     tuple val(pair_id), path(vcf_file)
@@ -90,10 +90,11 @@ process snpeff {
 process bcftools_stats {
     container 'biocontainers/bcftools:v1.9-1-deb_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/bcftools_stats", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/bcftools_stats", mode: 'copy'
 
     input:
     tuple val(pair_id), path(vcf_file)
+    val out_folder_name
 
     output:
     path "${pair_id}.bcftools_stats.txt"

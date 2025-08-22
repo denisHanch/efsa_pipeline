@@ -9,7 +9,7 @@ process trimgalore {
 
     container 'vibsinglecellnf/trimgalore:trimgalore-0.6.7-cutadapt-4.1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/trimmed_reads", mode: 'copy'
+    publishDir "${params.out_dir}/short-ref/trimmed_reads", mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
@@ -31,10 +31,11 @@ process trimgalore {
 process fastqc {
     container 'biocontainers/fastqc:v0.11.9_cv8'
     tag "FASTQC on $pair_id"
-    publishDir "$params.out_dir/fastqc_out", mode: "link"
+    publishDir "$params.out_dir/short-ref/fastqc_out", mode: 'copy'
 
 
     input:
+
     tuple val(pair_id), path(reads)
 
     output:
@@ -52,7 +53,7 @@ process fastqc {
  */
 process multiqc {
     container 'staphb/multiqc'
-    publishDir "$params.out_dir/multiqc", mode: "copy"
+    publishDir "$params.out_dir/short-ref/multiqc", mode: "copy"
 
     input:
     file('fastq/*')
@@ -75,8 +76,7 @@ process multiqc {
 process nanoplot {
 container 'staphb/nanoplot:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/nanoplot", mode: 'copy'
-    cpus 6
+    publishDir "${params.out_dir}/long-ref/nanoplot", mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
@@ -86,6 +86,6 @@ container 'staphb/nanoplot:latest'
     
     script:
     """
-    NanoPlot --fastq $reads --outdir nanoplot_report --threads ${task.cpus}
+    NanoPlot --fastq $reads --outdir nanoplot_report
     """
 }
