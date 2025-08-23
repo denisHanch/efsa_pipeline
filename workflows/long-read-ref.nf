@@ -37,5 +37,5 @@ workflow {
     sniffles(indexed_bam) | set { sniffles_vcf }
 
     survivor(cute_vcf, debreak_vcf, sniffles_vcf) | set { merged_vcf }
-    bcftools_stats(merged_vcf, out_folder_name) | multiqc
+    bcftools_stats(merged_vcf, out_folder_name)
 }
