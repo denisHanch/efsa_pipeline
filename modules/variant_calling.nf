@@ -68,7 +68,8 @@ process snpeff {
 
     input:
     tuple val(pair_id), path(vcf_file)
-    tuple path(genome_id_file), path(snpeff_config)
+    each path(genome_id_file)
+    each path(snpeff_config)
 
 
     output:
