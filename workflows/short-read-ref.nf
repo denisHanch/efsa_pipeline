@@ -37,8 +37,10 @@ workflow {
 
     // SNPs variant calling
     freebayes(fasta, fasta_index, indexed_bam) | set { vcf }
-    build_config(fasta, gtf) | set { snpeff_config }
-    snpeff(vcf, snpeff_config) | set { snpeff_output }
+    build_config(fasta, gtf) | set { snpeff_out }
+    genome_id = snpeff_out.map {genome_id, snpeff_config -> genome_id}
+    snpeff_config = snpeff_out.map {genome_id, snpeff_config -> snpeff_config}
+    snpeff(vcf, genome_id, snpeff_config) | set { snpeff_output }
     bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
     annotated_vcfs = snpeff_output.map { id, vcf, html -> tuple(id, vcf) }
     qc_vcf = snpeff_output.map { id, vcf, html -> html }
