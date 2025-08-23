@@ -12,7 +12,7 @@ workflow {
 
     // Processing inputs
     println("Processing  files in directory: ${params.in_dir}")
-    Channel.fromPath("$params.in_dir/short-test-multiple/*.fastq.gz") | set { fastqs }
+    Channel.fromPath("$params.in_dir/*.fastq.gz") | set { fastqs }
     
     Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
     Channel.fromPath("$params.in_dir/*ref.gtf") | set { gtf }
