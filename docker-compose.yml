@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  efsa-pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: efsa-pipeline-dev
+    working_dir: /EFSA_workspace
+    volumes:
+      # Mount the entire project directory
+      - .:/EFSA_workspace
+      # Specifically mount data directories
+      - ./data/inputs:/EFSA_workspace/data/inputs
+      - ./data/outputs:/EFSA_workspace/data/outputs
+    stdin_open: true  # Keep STDIN open
+    tty: true         # Allocate a pseudo-TTY
+    command: /bin/bash
