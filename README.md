@@ -13,7 +13,7 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
 
 ### Option 1: Using the Run Script (Recommended)
 
-1. Make the script executable:
+1. Make sure the script is executable:
    ```bash
    chmod +x run_container.sh
    ```
@@ -54,11 +54,14 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
 2. Run interactively:
    ```bash
    docker run -it --rm \
-     --name efsa-pipeline-container \
-     -v "$(pwd):/EFSA_workspace" \
-     -v "$(pwd)/data/inputs:/EFSA_workspace/data/inputs" \
-     -v "$(pwd)/data/outputs:/EFSA_workspace/data/outputs" \
-     efsa-pipeline
+    --network=host \
+    -v /etc/ssl/certs:/etc/ssl/certs:ro \
+    -v /usr/share/ca-certificates:/usr/share/ca-certificates:ro \
+    --name efsa-pipeline-container \
+    -v "$(pwd):/EFSA_workspace" \
+    -v "$(pwd)/data/inputs:/EFSA_workspace/data/inputs" \
+    -v "$(pwd)/data/outputs:/EFSA_workspace/data/outputs" \
+    efsa-pipeline
    ```
 
 # Nextflow
