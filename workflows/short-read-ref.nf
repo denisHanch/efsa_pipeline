@@ -8,7 +8,7 @@ include { bwa_index; bwa_mapping; samtool_index_bam; samtools_sort; samtool_stat
 out_folder_name = "short-ref"
 
 
-workflow {
+workflow short_ref {
 
     // Processing inputs
     println("Processing  files in directory: ${params.in_dir}")
@@ -54,4 +54,7 @@ workflow {
     fastqc_out.mix(stats_out).mix(picard_out).mix(qc_vcf).mix(bcftools_out).collect() | multiqc
 }
 
-// // fastqToVcf
+
+workflow { 
+    short_ref()
+}

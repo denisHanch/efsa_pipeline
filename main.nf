@@ -2,9 +2,9 @@
 
 
 // Include workflows
-include { BASIC_ANALYSIS } from './workflows/basic.nf'
-include { ADVANCED_ANALYSIS } from './workflows/advanced.nf'
-include { fastqToVcf } from './workflows/short-read-ref.nf'
+include { ref_mod } from './workflows/fasta_ref_x_mod.nf'
+include { long_ref } from './workflows/long-read-ref.nf'
+include { short_ref } from './workflows/short-read-ref.nf'
 
 
 // Publishing process to copy final outputs
@@ -49,33 +49,49 @@ if (params.help) {
     exit 0
 }
 
+
+def long_ch = Channel.fromPath("$params.in_dir/tmp2/tmp2/*_subreads.fastq.gz")
+def short_ch = Channel.fromPath("$params.in_dir/*.fastq.gz")
+def fasta_ch = new File(params.in_dir).listFiles().findAll { it.name.endsWith('.fasta') || it.name.endsWith('.fa') }
+
+
+
 workflow {
+    def pipelines_running = 0
 
-    // 1) Load input FASTQ files & debug
-    Channel.fromPath("${params.in_dir}/*.fastq")
-           .set { samples_ch }
-    debugView(samples_ch, 'RAW_SAMPLES')
-
-    // Select workflow based on parameter
-    if (params.workflow == 'basic') {
-        log.info "Running BASIC analysis workflow"
-        results = BASIC_ANALYSIS(samples_ch)
-
-        // Combine all outputs into a single channel and publish once
-        all_outputs = results.fastqc_out.mix(results.trimm_report)
-        publish_results(all_outputs)
-        
-    } else if (params.workflow == 'advanced') {
-        log.info "Running ADVANCED analysis workflow"
-        results = ADVANCED_ANALYSIS(samples_ch)
-        
-        
-        all_outputs = results.val_out.mix(results.mq_out)
-        publish_results(all_outputs)
-        
-    } else {
-        error "Invalid workflow: ${params.workflow}. Choose 'basic' or 'advanced'"
+    if (long_ch) {
+        log.info "▶ Running pipeline processing long reads."
+        // long_ref()
+        pipelines_running++
     }
 
-    
+    if (short_ch) {
+        log.info "▶ Running pipeline processing short reads."
+        // short_ref()
+        pipelines_running++
+    }
+
+    if (fasta_ch.size() == 2) {
+        log.info "▶ Running pipeline comparing reference and modified fasta."
+        // ref_mod(fasta_ch)
+        pipelines_running++
+    }
+
+    if (pipelines_running == 0) {
+        log.warn "⚠ No valid inputs found. Skipping workflows."
+        exit 0
+    } else {
+        log.info "✅ Total workflows started: ${pipelines_running}"
+    }
+
+    if (pipelines_running > 2) {
+
+        log.info "✅ Comparing VCF files from pipelines: ${vcfs}"
+
+        vcfs
+        // sortVcf
+        // indexVcf
+        // truvari
+    }   
+
 }

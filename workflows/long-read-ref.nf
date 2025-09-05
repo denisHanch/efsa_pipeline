@@ -8,7 +8,7 @@ include { bcftools_stats } from '../modules/variant_calling.nf'
 out_folder_name = "long-ref"
 
 
-workflow {
+workflow long_ref {
     // Processing inputs
     Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
 
@@ -38,4 +38,8 @@ workflow {
 
     survivor(cute_vcf, debreak_vcf, sniffles_vcf) | set { merged_vcf }
     bcftools_stats(merged_vcf, out_folder_name)
+}
+
+workflow {
+ long_ref()
 }
