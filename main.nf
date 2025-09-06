@@ -4,6 +4,7 @@
 include { ref_mod } from './workflows/fasta_ref_x_mod.nf'
 include { long_ref } from './workflows/long-read-ref.nf'
 include { short_ref } from './workflows/short-read-ref.nf'
+include { sortVcf; indexVcf} from './modules/varian'
 
 
 def debugView = { ch, name ->
@@ -31,7 +32,7 @@ if (params.help) {
 }
 
 
-def long_ch = Channel.fromPath("$params.in_dir/tmp2/tmp2/*_subreads.fastq.gz")
+def long_ch = Channel.fromPath("$params.in_dir/tmp2/*_subreads.fastq.gz")
 def short_ch = Channel.fromPath("$params.in_dir/*.fastq.gz")
 def fasta_ch = new File(params.in_dir).listFiles().findAll { it.name.endsWith('.fasta') || it.name.endsWith('.fa') || it.name.endsWith('.fna') }
 
@@ -47,13 +48,13 @@ workflow {
 
     if (short_ch) {
         log.info "▶ Running pipeline processing short reads."
-        short_ref()
+        // short_ref()
         pipelines_running++
     }
 
     if (fasta_ch.size() == 2) {
         log.info "▶ Running pipeline comparing reference and modified fasta."
-        ref_mod()
+        // ref_mod()
         pipelines_running++
     }
 
@@ -66,11 +67,15 @@ workflow {
 
     if (pipelines_running > 2) {
 
-        log.info "✅ Comparing VCF files from pipelines:"
+        Channel.fromPath("$params.out_dir/final_vcf/*.vcf").map { file -> 
+            def name = file.baseName.replaceFirst('.vcf', '')
+            return [name, file]
+        }
+        .set { vcfs }
 
-        // vcfs
-        // sortVcf
-        // indexVcf
+        log.info "✅ Comparing VCF files from pipelines: ${vcfs.view()}"
+
+        sortVcf(vcfs) | indexVcf | set { indexed_vcfs }
         // truvari
     }   
 

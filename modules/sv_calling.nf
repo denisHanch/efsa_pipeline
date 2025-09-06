@@ -77,7 +77,7 @@ process convert_bcf_to_vcf {
     tuple val(pair_id),  path(bcf_file)
 
     output:
-    tuple val(pair_id),  path("*.vcf")
+    tuple val(pair_id),  path("${pair_id}_sv.vcf")
 
     script:
     """
