@@ -152,3 +152,24 @@ process indexVcf {
     """
 }
 
+/*
+ * Running comparision btw files
+*/
+process truvari {
+    container "${params.registry}/truvari:latest"
+    tag "$pair_id1 & $pair_id2"
+    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
+
+    input:
+    each path(fasta_file)
+    tuple val(pair_id1), path(vcf1), path(index1), val(pair_id2), path(vcf2), path(index2)
+
+    output:
+    path('truvari_out')
+
+
+    script:
+    """
+    truvari bench -b $vcf1 -c $vcf2 -f $fasta_file -o truvari_out --passonly
+    """
+}
