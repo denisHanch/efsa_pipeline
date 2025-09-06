@@ -81,7 +81,7 @@ workflow {
 
         Channel.fromPath("$params.in_dir/tmp/*ref.{fa,fna,fasta}") | set { ref_fasta }
 
-        log.info "✅ Comparing VCF files from pipelines"
+        log.info "▶ Comparing VCF files from pipelines"
 
         // Sorting and indexiing vcfs
         sortVcf(vcfs) | indexVcf | set { indexed_vcfs }
@@ -99,5 +99,8 @@ workflow {
 
         // Comparing vcf from short/read pipeline to vcf created by comparison of two fastas
         truvari(ref_fasta, vcf_pairs_ch)
+
+        log.info "✅ Truvari peformed ${pipelines_running-1} comparisons."
+
     }   
 }
