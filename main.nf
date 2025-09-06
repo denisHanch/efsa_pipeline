@@ -7,6 +7,7 @@ include { short_ref } from './workflows/short-read-ref.nf'
 include { sortVcf; indexVcf; truvari } from './modules/variant_calling.nf'
 include { multiqc } from './modules/qc.nf'
 
+
 def debugView = { ch, name ->
    ch
     .map { line -> "[${name}]: $line" }

@@ -6,7 +6,7 @@ include { sniffles; debreak; cute_sv; survivor } from '../modules/sv_calling.nf'
 include { bcftools_stats } from '../modules/variant_calling.nf'
 
 out_folder_name = "long-ref"
-
+out_folder = "${workflow.launchDir}/${params.out_dir}/${out_folder_name}"
 
 workflow long_ref {
     // Processing inputs
@@ -38,7 +38,7 @@ workflow long_ref {
 
     survivor(cute_vcf, debreak_vcf, sniffles_vcf) | set { merged_vcf }
     bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
-    multiqc(out_folder_name, bcftools_out)
+    multiqc(out_folder_name, out_folder)
 }
 
 workflow {
