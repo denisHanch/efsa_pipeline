@@ -8,21 +8,19 @@ include { sortVcf; indexVcf; truvari } from './modules/variant_calling.nf'
 include { multiqc } from './modules/qc.nf'
 
 
-def debugView = { ch, name ->
-   ch
-    .map { line -> "[${name}]: $line" }
-    .view()
-}
-
 // Help message
 def helpMessage() {
     log.info"""
     Usage:
-    nextflow run main.nf --workflow [basic|advanced]
+    nextflow run main.nf -resume
     
     Options:
-    --workflow     Choose workflow: 'basic' or 'advanced' (default: basic)
-    --outdir       Output directory (default: results)
+    -resume          Run pipeline from the point where it was interrupted or previously failed
+    --out_dir        Output directory            (default: ${params.out_dir})
+    --in_dir         Input directory             (default: ${params.in_dir})
+    --registry       Docker/Singularity registry (default: ${params.registry})
+    --log            Enable logging              (default: ${params.log})
+    --help           Show this help message
     """.stripIndent()
 }
 
