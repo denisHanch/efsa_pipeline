@@ -19,7 +19,11 @@ process trimgalore {
 
     script:
     """
-    trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 --paired -o out ${reads}
+    if [ \$(echo ${reads} | wc -w) -gt 1 ]; then
+        trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 --paired -o out ${reads}
+    else
+        trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 -o out ${reads}
+    fi
     """
 }
 
