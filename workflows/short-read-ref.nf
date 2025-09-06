@@ -53,7 +53,8 @@ workflow short_ref {
     convert_bcf_to_vcf(bcf) | set { sv_vcf }
 
     // running multiqc on all files
-    fastqc_out.mix(stats_out).mix(picard_out).mix(qc_vcf).mix(bcftools_out).collect() | multiqc
+    fastqc_out.mix(stats_out).mix(picard_out).mix(qc_vcf).mix(bcftools_out).collect() | set { qc_out }
+    multiqc(out_folder_name, qc_out)
 }
 
 

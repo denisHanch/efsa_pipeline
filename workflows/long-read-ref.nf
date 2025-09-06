@@ -22,7 +22,7 @@ workflow long_ref {
         .set { fastqs }
 
 
-    fastqs.view()
+    // fastqs.view()
     
     // QC
      nanoplot(fastqs)
@@ -37,7 +37,8 @@ workflow long_ref {
     sniffles(indexed_bam) | set { sniffles_vcf }
 
     survivor(cute_vcf, debreak_vcf, sniffles_vcf) | set { merged_vcf }
-    bcftools_stats(merged_vcf, out_folder_name)
+    bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
+    multiqc(out_folder_name, bcftools_out)
 }
 
 workflow {
