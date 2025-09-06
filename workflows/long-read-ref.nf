@@ -39,8 +39,10 @@ workflow long_ref {
     survivor(cute_vcf, debreak_vcf, sniffles_vcf) | set { merged_vcf }
     bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
     multiqc(out_folder_name, out_folder)
+
+    log.info "▶ The long read processing pipeline completed successfully."
 }
 
 workflow {
- long_ref()
+long_ref()
 }

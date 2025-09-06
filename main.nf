@@ -44,18 +44,22 @@ workflow {
     if (long_ch) {
         log.info "▶ Running pipeline processing long reads."
         long_ref()
+
         pipelines_running++
     }
 
     if (short_ch) {
         log.info "▶ Running pipeline processing short reads."
         short_ref()
+       
         pipelines_running++
     }
 
     if (fasta_ch.size() == 2) {
         log.info "▶ Running pipeline comparing reference and modified fasta."
         ref_mod()
+
+
         pipelines_running++
     }
 
@@ -93,7 +97,7 @@ workflow {
 
         vcf_pairs_ch = ref_mod_ch.combine(others_ch)
 
-
+        // Comparing vcf from short/read pipeline to vcf created by comparison of two fastas
         truvari(ref_fasta, vcf_pairs_ch)
     }   
 }

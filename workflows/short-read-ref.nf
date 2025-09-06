@@ -55,6 +55,8 @@ workflow short_ref {
     // running multiqc on all files
     fastqc_out.mix(stats_out).mix(picard_out).mix(qc_vcf).mix(bcftools_out).collect() | set { qc_out }
     multiqc(out_folder_name, qc_out)
+
+    log.info "▶ The short read processing pipeline completed successfully."
 }
 
 

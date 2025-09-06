@@ -11,6 +11,8 @@ workflow ref_mod {
     deltaFilter(prefix_name, delta) | set { filtered_delta }
     showCoords(prefix_name, filtered_delta) | set { coords }
     syri(ref_mod_fasta, coords, filtered_delta)
+
+    log.info "▶ The reference to modified fasta comparison pipeline completed successfully."
 }
 
 workflow {
