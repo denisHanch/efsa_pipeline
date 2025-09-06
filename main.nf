@@ -1,27 +1,10 @@
 #!/usr/bin/env nextflow
 
-
 // Include workflows
 include { ref_mod } from './workflows/fasta_ref_x_mod.nf'
 include { long_ref } from './workflows/long-read-ref.nf'
 include { short_ref } from './workflows/short-read-ref.nf'
 
-
-// Publishing process to copy final outputs
-process publish_results {
-    publishDir params.out_dir, mode: 'copy'
-    
-    input:
-    path files
-    
-    output:
-    path files
-    
-    script:
-    """
-    echo "Publishing files: ${files}"
-    """
-}
 
 def debugView = { ch, name ->
    ch
@@ -33,12 +16,10 @@ def debugView = { ch, name ->
 def helpMessage() {
     log.info"""
     Usage:
-    nextflow run main.nf --workflow [basic|advanced] --input <input_file> --reference <reference_file>
+    nextflow run main.nf --workflow [basic|advanced]
     
     Options:
     --workflow     Choose workflow: 'basic' or 'advanced' (default: basic)
-    --input        Input FASTQ file
-    --reference    Reference FASTA file
     --outdir       Output directory (default: results)
     """.stripIndent()
 }
@@ -52,8 +33,7 @@ if (params.help) {
 
 def long_ch = Channel.fromPath("$params.in_dir/tmp2/tmp2/*_subreads.fastq.gz")
 def short_ch = Channel.fromPath("$params.in_dir/*.fastq.gz")
-def fasta_ch = new File(params.in_dir).listFiles().findAll { it.name.endsWith('.fasta') || it.name.endsWith('.fa') }
-
+def fasta_ch = new File(params.in_dir).listFiles().findAll { it.name.endsWith('.fasta') || it.name.endsWith('.fa') || it.name.endsWith('.fna') }
 
 
 workflow {
@@ -67,13 +47,13 @@ workflow {
 
     if (short_ch) {
         log.info "▶ Running pipeline processing short reads."
-        // short_ref()
+        short_ref()
         pipelines_running++
     }
 
     if (fasta_ch.size() == 2) {
         log.info "▶ Running pipeline comparing reference and modified fasta."
-        // ref_mod(fasta_ch)
+        ref_mod()
         pipelines_running++
     }
 
@@ -86,9 +66,9 @@ workflow {
 
     if (pipelines_running > 2) {
 
-        log.info "✅ Comparing VCF files from pipelines: ${vcfs}"
+        log.info "✅ Comparing VCF files from pipelines:"
 
-        vcfs
+        // vcfs
         // sortVcf
         // indexVcf
         // truvari

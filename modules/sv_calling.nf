@@ -71,6 +71,7 @@ process convert_bcf_to_vcf {
     container 'biocontainers/bcftools:v1.9-1-deb_cv1'
     tag "$pair_id"
     publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
 
     input:
     tuple val(pair_id),  path(bcf_file)
