@@ -76,6 +76,4 @@ workflow {
     } else {
         error "Invalid workflow: ${params.workflow}. Choose 'basic' or 'advanced'"
     }
-
-    
 }
