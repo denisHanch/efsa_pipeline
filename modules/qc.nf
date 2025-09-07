@@ -57,10 +57,11 @@ process fastqc {
  */
 process multiqc {
     container 'staphb/multiqc'
-    publishDir "$params.out_dir/short-ref/multiqc", mode: "copy"
+    publishDir "$params.out_dir/${out_folder_name}/multiqc", mode: "copy"
 
     input:
-    file('fastq/*')
+    val out_folder_name
+    path files
 
     output:
     file('multiqc_report.html')

@@ -6,9 +6,9 @@ include { sniffles; debreak; cute_sv; survivor } from '../modules/sv_calling.nf'
 include { bcftools_stats } from '../modules/variant_calling.nf'
 
 out_folder_name = "long-ref"
+out_folder = "${workflow.launchDir}/${params.out_dir}/${out_folder_name}"
 
-
-workflow {
+workflow long_ref {
     // Processing inputs
     Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
 
@@ -22,7 +22,7 @@ workflow {
         .set { fastqs }
 
 
-    fastqs.view()
+    // fastqs.view()
     
     // QC
      nanoplot(fastqs)
@@ -38,5 +38,12 @@ workflow {
     sniffles(indexed_bam) | set { sniffles_vcf }
 
     survivor(cute_vcf, debreak_vcf, sniffles_vcf) | set { merged_vcf }
-    bcftools_stats(merged_vcf, out_folder_name)
+    bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
+    multiqc(out_folder_name, out_folder)
+
+    log.info "▶ The long read processing pipeline completed successfully."
+}
+
+workflow {
+long_ref()
 }

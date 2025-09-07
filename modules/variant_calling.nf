@@ -1,3 +1,6 @@
+
+// Processes for short-read pipeline
+
 /*
  * Calling short variants with FreeBayes
 */
@@ -103,5 +106,70 @@ process bcftools_stats {
     script:
     """
     bcftools stats ${vcf_file} > ${pair_id}.bcftools_stats.txt
+    """
+}
+
+// Processes for comparision of VCF files (in main.nf pipeline)
+
+/*
+ * Truvari requires sorted vcfs for comparision
+*/
+process sortVcf {
+    container 'biocontainers/bcftools:v1.9-1-deb_cv1'
+    tag "$pair_id"
+    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
+
+    input:
+    tuple val(pair_id),  path(vcf_file)
+
+    output:
+    tuple val(pair_id),  path("${pair_id}.vcf.gz")
+
+    script:
+    """
+    bcftools sort $vcf_file -Oz -o ${pair_id}.vcf.gz
+    """
+}
+
+/*
+ * Truvari require indexed vcfs for comparision
+*/
+process indexVcf {
+    container 'biocontainers/bcftools:v1.9-1-deb_cv1'
+    tag "$pair_id"
+    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
+
+    input:
+    tuple val(pair_id), path(vcf_file)
+
+    output:
+    tuple val(pair_id), path(vcf_file), path("${vcf_file}.csi")
+
+
+    script:
+    """
+    bcftools index $vcf_file
+    """
+}
+
+/*
+ * Running comparision btw files
+*/
+process truvari {
+    container "${params.registry}/truvari:latest"
+    tag "$pair_id1 & $pair_id2"
+    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
+
+    input:
+    each path(fasta_file)
+    tuple val(pair_id1), path(vcf1), path(index1), val(pair_id2), path(vcf2), path(index2)
+
+    output:
+    path("${pair_id2}_truvari")
+
+
+    script:
+    """
+    truvari bench -b $vcf1 -c $vcf2 -f $fasta_file -o ${pair_id2}_truvari --passonly
     """
 }
