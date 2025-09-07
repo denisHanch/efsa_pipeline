@@ -29,7 +29,8 @@ workflow long_ref {
 
     // mapping
     minimap2(fastqs, fasta) | set { sam }
-    samtools_sort(sam, out_folder_name) | samtool_index_bam | set { indexed_bam }
+    samtools_sort(sam, out_folder_name) | set { sorted_bam }
+    samtool_index_bam(sorted_bam, out_folder_name) | set { indexed_bam }
 
     // variant calling
     cute_sv(fasta, indexed_bam) | set { cute_vcf }
