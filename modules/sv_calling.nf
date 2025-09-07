@@ -71,16 +71,17 @@ process convert_bcf_to_vcf {
     container 'biocontainers/bcftools:v1.9-1-deb_cv1'
     tag "$pair_id"
     publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
 
     input:
     tuple val(pair_id),  path(bcf_file)
 
     output:
-    tuple val(pair_id),  path("*.vcf")
+    tuple val(pair_id),  path("${pair_id}_sv_short_read.vcf")
 
     script:
     """
-    bcftools view $bcf_file -Ov -o ${pair_id}_sv.vcf
+    bcftools view $bcf_file -Ov -o ${pair_id}_sv_short_read.vcf
     """
 
 }
@@ -186,6 +187,8 @@ process survivor {
     container "${params.registry}/survivor:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/long-ref/survivor_out", mode: 'copy'
+    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
+
 
     input:
     tuple val(pair_id), path(sniffles_vcf)
@@ -194,7 +197,7 @@ process survivor {
 
 
     output:
-    tuple val(pair_id), path("${pair_id}_merged.vcf")
+    tuple val(pair_id), path("${pair_id}_sv_long_read.vcf")
 
     script:
     """
@@ -207,6 +210,6 @@ process survivor {
     printf "%s\n" sniffles.vcf cute.vcf debreak.vcf > vcf_list.txt
 
     # Run the SURVIVOR merge command
-    SURVIVOR merge vcf_list.txt 1000 1 1 1 0 30 ${pair_id}_merged.vcf
+    SURVIVOR merge vcf_list.txt 1000 1 1 1 0 30 ${pair_id}_sv_long_read.vcf
     """
 }
