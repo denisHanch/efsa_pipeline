@@ -170,10 +170,10 @@ process calc_unmapped {
     tag "$pair_id"
 
     input:
-    tuple val(pair_id), path(bam_file), path(bam_index)
+    tuple val(pair_id), path(bam), path(bam_index)
 
     output:
-    val(pair_id), val(pct_unmapped)
+    env pct 
 
     script:
     """
@@ -183,14 +183,9 @@ process calc_unmapped {
     unmapped=\$(samtools view -c -f 4 "$bam")
 
     if [ "\$total" -gt 0 ]; then
-        pct=\$(echo "scale=2; \$unmapped*100/\$total" | bc)
+        pct=\$(( unmapped * 100 / total ))
     else
         pct=0
     fi
-
-    # Write result to a file
-    echo \$pct > ${pair_id}.unmapped.txt
     """
-
-    pct_unmapped = file("${pair_id}.unmapped.txt").text.trim().toFloat()
 }

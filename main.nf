@@ -65,40 +65,8 @@ workflow {
         log.warn "⚠ No valid inputs found. Skipping workflows."
         exit 0
     } else {
-        log.info "✅ Total workflows started: ${pipelines_running}"
+        error "Invalid workflow: ${params.workflow}. Choose 'basic' or 'advanced'"
     }
 
-    if (pipelines_running > 2) {
-
-        // Inputs
-        Channel.fromPath("$params.out_dir/final_vcf/*.vcf").map { file -> 
-            def name = file.baseName.replaceFirst('.vcf', '')
-            return [name, file]
-        }
-        .set { vcfs }
-
-        Channel.fromPath("$params.in_dir/tmp/*ref.{fa,fna,fasta}") | set { ref_fasta }
-
-        log.info "▶ Comparing VCF files from pipelines"
-
-        // Sorting and indexiing vcfs
-        sortVcf(vcfs) | indexVcf | set { indexed_vcfs }
-
-        // preprocessing Channel for truvari input
-        split_ch = indexed_vcfs.branch {
-            ref_mod: it[0] == "ref_x_modsyri"
-            others:  it[0] != "ref_x_modsyri"
-        }
-
-        ref_mod_ch = split_ch.ref_mod.collect()
-        others_ch  = split_ch.others
-
-        vcf_pairs_ch = ref_mod_ch.combine(others_ch)
-
-        // Comparing vcf from short/read pipeline to vcf created by comparison of two fastas
-        truvari(ref_fasta, vcf_pairs_ch)
-
-        log.info "✅ Truvari peformed ${pipelines_running-1} comparisons."
-
-    }   
+    
 }

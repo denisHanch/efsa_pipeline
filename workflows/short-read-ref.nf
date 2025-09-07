@@ -35,31 +35,31 @@ workflow short_ref {
     picard(fasta, indexed_bam) | set { picard_out }
 
     // Branch
-    calc_unmapped(indexed_bam) | set { id_pct }
-    pct = id_pct.map { id, pct -> pct }
-    if (pct < params.pct_threshold) {
-        pct.view()
-    }
+    calc_unmapped(indexed_bam) | set { pct }
+    pct.view()
+    // if (pct.first() < params.pct_threshold) {
+    //     pct.view()
+    // }
 
     // SNPs variant calling
-    freebayes(fasta, fasta_index, indexed_bam) | set { vcf }
-    build_config(fasta, gtf) | set { snpeff_out }
-    genome_id = snpeff_out.map {genome_id, snpeff_config -> genome_id}
-    snpeff_config = snpeff_out.map {genome_id, snpeff_config -> snpeff_config}
-    snpeff(vcf, genome_id, snpeff_config) | set { snpeff_output }
-    bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
-    annotated_vcfs = snpeff_output.map { id, vcf, html -> tuple(id, vcf) }
-    qc_vcf = snpeff_output.map { id, vcf, html -> html }
+    // freebayes(fasta, fasta_index, indexed_bam) | set { vcf }
+    // build_config(fasta, gtf) | set { snpeff_out }
+    // genome_id = snpeff_out.map {genome_id, snpeff_config -> genome_id}
+    // snpeff_config = snpeff_out.map {genome_id, snpeff_config -> snpeff_config}
+    // snpeff(vcf, genome_id, snpeff_config) | set { snpeff_output }
+    // bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
+    // annotated_vcfs = snpeff_output.map { id, vcf, html -> tuple(id, vcf) }
+    // qc_vcf = snpeff_output.map { id, vcf, html -> html }
 
-    // SVs variant calling
-    samtools_index(fasta) | set { fai }
-    picard_dict(fasta) | set { dict }
-    delly(indexed_bam, fasta, fai, dict) | set { bcf }
-    convert_bcf_to_vcf(bcf) | set { sv_vcf }
+    // // SVs variant calling
+    // samtools_index(fasta) | set { fai }
+    // picard_dict(fasta) | set { dict }
+    // delly(indexed_bam, fasta, fai, dict) | set { bcf }
+    // convert_bcf_to_vcf(bcf) | set { sv_vcf }
 
     // running multiqc on all files
-    fastqc_out.mix(stats_out).mix(picard_out).mix(qc_vcf).mix(bcftools_out).collect() | set { qc_out }
-    multiqc(out_folder_name, qc_out)
+    // fastqc_out.mix(stats_out).mix(picard_out).mix(qc_vcf).mix(bcftools_out).collect() | set { qc_out }
+    // multiqc(out_folder_name, qc_out)
 
     log.info "▶ The short read processing pipeline completed successfully."
 }
