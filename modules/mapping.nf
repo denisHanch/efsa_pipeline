@@ -124,7 +124,7 @@ process samtool_stats {
  * Map long reads
 */
 process minimap2 {
-container 'staphb/minimap2:latest'
+    container 'staphb/minimap2:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/long-ref/minimap2", mode: 'copy'
 
@@ -146,7 +146,7 @@ container 'staphb/minimap2:latest'
  * Sort reads with samtools
 */
 process samtools_sort {
-container 'staphb/samtools:latest'
+    container 'staphb/samtools:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/bam", mode: 'copy'
 
@@ -161,4 +161,36 @@ container 'staphb/samtools:latest'
     """
     samtools sort $sam -o ${pair_id}.bam
     """
+}
+
+
+
+process calc_unmapped {
+    container 'staphb/samtools:latest'
+    tag "$pair_id"
+
+    input:
+    tuple val(pair_id), path(bam_file), path(bam_index)
+
+    output:
+    val(pair_id), val(pct_unmapped)
+
+    script:
+    """
+    #!/usr/bin/env bash
+
+    total=\$(samtools view -c "$bam")
+    unmapped=\$(samtools view -c -f 4 "$bam")
+
+    if [ "\$total" -gt 0 ]; then
+        pct=\$(echo "scale=2; \$unmapped*100/\$total" | bc)
+    else
+        pct=0
+    fi
+
+    # Write result to a file
+    echo \$pct > ${pair_id}.unmapped.txt
+    """
+
+    pct_unmapped = file("${pair_id}.unmapped.txt").text.trim().toFloat()
 }
