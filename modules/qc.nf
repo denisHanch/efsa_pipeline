@@ -61,15 +61,16 @@ process multiqc {
     publishDir "${params.out_dir}/${out_folder_name}/multiqc", mode: "copy"
 
     input:
-    val out_folder_name
     path files
+    val out_folder_name
+    val filename
 
     output:
-    file('multiqc_report.html')
+    file('*.html')
 
     script:
     """
-    multiqc .
+    multiqc --filename ${filename} .
     """
 }
 
