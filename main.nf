@@ -4,9 +4,10 @@
 include { ref_mod } from './workflows/fasta_ref_x_mod.nf'
 include { long_ref } from './workflows/long-read-ref.nf'
 include { short_ref } from './workflows/short-read-ref.nf'
+include { mod_ref } from './workflows/short-read-mod.nf'
+include { qc } from './modules/subworkflow.nf'
 include { sortVcf; indexVcf; truvari } from './modules/variant_calling.nf'
-include { multiqc } from './modules/qc.nf'
-
+ 
 
 // Help message
 def helpMessage() {
@@ -41,22 +42,37 @@ workflow {
 
     if (long_ch) {
         log.info "▶ Running pipeline processing long reads."
-        long_ref()
+        // long_ref()
 
         pipelines_running++
     }
 
-    if (short_ch) {
-        log.info "▶ Running pipeline processing short reads."
-        short_ref()
-       
+    if (short_ch) {    
+        Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { ref_fasta }
+        Channel.fromPath("$params.in_dir/*mod.{fa,fna,fasta}") | set { mod_fasta }
+        
+        short_ch
+        | map {[(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq.gz/)[0][1], it]}
+        | groupTuple(sort: true)
+        | set { fastqs }
+
+        // QC and trimming module
+        qc(fastqs, out_folder_name) | set { trimmed }
+
+        // Running mapping to the reference or modified fasta 
+        if (params.map_to_mod_fa) {
+            log.info "▶ Running pipeline processing short reads - mapping to the reference fasta."
+            short_mod(trimmed, mod_fasta)
+        } else {
+            log.info "▶ Running pipeline processing short reads - mapping to the modified fasta."
+            short_ref(trimmed, ref_fasta)
+        }
         pipelines_running++
     }
 
     if (fasta_ch.size() == 2) {
         log.info "▶ Running pipeline comparing reference and modified fasta."
         ref_mod()
-
 
         pipelines_running++
     }
