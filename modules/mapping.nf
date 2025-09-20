@@ -8,10 +8,11 @@
 process bwa_index {
     container 'biocontainers/bwa:v0.7.17_cv1'
     tag "$fasta_file"
-    publishDir "${params.out_dir}/short-ref/bwa_index", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/bwa_index", mode: 'copy'
 
     input:
     path fasta_file
+    val out_folder_name
 
     output:
     path "${fasta_file}.*" 
@@ -30,12 +31,13 @@ process bwa_index {
 process bwa_mapping {
     container 'biocontainers/bwa:v0.7.17_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/bam", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/bam", mode: 'copy'
 
     input:
     each path(fasta_file)
     each path(fasta_index)
     tuple val(pair_id), path(reads)
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("${pair_id}.sam")
@@ -76,11 +78,12 @@ process samtool_index_bam {
 process picard {
     container 'quay.io/biocontainers/picard:2.26.10--hdfd78af_0'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/picard", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/picard", mode: 'copy'
     
     input:
     each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index)
+    val out_folder_name
 
 
     output:
@@ -103,10 +106,11 @@ process picard {
 process samtool_stats {
     container 'staphb/samtools:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/samtools_stats", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/samtools_stats", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file)
+    val out_folder_name
 
     output:
     path "*.stats"

@@ -64,9 +64,5 @@ workflow {
     if (pipelines_running == 0) {
         log.warn "⚠ No valid inputs found. Skipping workflows."
         exit 0
-    } else {
-        error "Invalid workflow: ${params.workflow}. Choose 'basic' or 'advanced'"
     }
-
-    
 }
