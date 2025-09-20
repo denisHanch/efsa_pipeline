@@ -6,10 +6,11 @@
 */
 process samtools_index {
     container 'staphb/samtools:latest'
-    publishDir "${params.out_dir}/short-ref/samtools_index_dict", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
 
     input:
     path fasta_file
+    val out_folder_name
 
     output:
     path("${fasta_file}.fai")
@@ -25,10 +26,11 @@ process samtools_index {
 */
 process picard_dict {
     container 'quay.io/biocontainers/picard:2.26.10--hdfd78af_0'
-    publishDir "${params.out_dir}/short-ref/samtools_index_dict", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
     
     input:
     path fasta_file
+    val out_folder_name
 
     output:
     path("*.dict")
@@ -46,13 +48,14 @@ process picard_dict {
 process delly {
     container 'biocontainers/delly:v0.8.1-2-deb_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index)
     each path(fasta_file)
     each path(fai)
     each path(dict)
+    val out_folder_name
 
     output:
     tuple val(pair_id),  path("${pair_id}_sv.bcf")
@@ -70,11 +73,12 @@ process delly {
 process convert_bcf_to_vcf {
     container 'biocontainers/bcftools:v1.9-1-deb_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
     publishDir "${params.out_dir}/final_vcf", mode: 'copy'
 
     input:
-    tuple val(pair_id),  path(bcf_file)
+    tuple val(pair_id), path(bcf_file)
+    val out_folder_name
 
     output:
     tuple val(pair_id),  path("${pair_id}_sv_short_read.vcf")
@@ -86,30 +90,8 @@ process convert_bcf_to_vcf {
 
 }
 
-// not working currently - trying to find nice tool for visualization of SVs
-process svviz {
-    container "${params.registry}/svviz2:latest"
-    tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/svviz", mode: 'copy'
-
-    input:
-    tuple val(pair_id), path(vcf_file)
-    tuple val(pair_id), path(bam_file), path(bam_index)
-    each path(fasta_file)
-    each path(fai)
-
-
-    output:
-    path "svviz2_output/index.html"
-
-    script:
-    """
-    svviz2 --ref $fasta_file --variants $vcf_file $bam_file
-    """
-}
 
 // Processes for long-read pipeline
-
 
 /*
  * variant calling with cuteSV

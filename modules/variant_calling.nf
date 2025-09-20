@@ -7,12 +7,13 @@
 process freebayes {
     container 'biocontainers/freebayes:v1.2.0-2-deb_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
     input:
     each path(fasta_file)
     each path(fasta_index)
     tuple val(pair_id), path(bam_file), path(bam_index)
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("${pair_id}.vcf")
