@@ -42,7 +42,7 @@ workflow {
 
     if (long_ch) {
         log.info "▶ Running pipeline processing long reads."
-        // long_ref()
+        long_ref()
 
         pipelines_running++
     }
@@ -78,7 +78,7 @@ workflow {
     }
 
     if (pipelines_running == 0) {
-        log.warn "⚠ No valid inputs found. Skipping workflows."
+        log.error "⚠ No valid inputs found. Skipping workflows."
         exit 0
     }
 }
