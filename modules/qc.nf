@@ -83,10 +83,11 @@ process multiqc {
 process nanoplot {
 container 'staphb/nanoplot:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/nanoplot", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/nanoplot", mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
+    val out_folder_name
     
     output:
     path('nanoplot_report')

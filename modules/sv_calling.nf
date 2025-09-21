@@ -99,11 +99,12 @@ process convert_bcf_to_vcf {
 process cute_sv {
     container "${params.registry}/cutesv:latest"
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/cutesv_out", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: 'copy'
 
     input:
     each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index) 
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("${pair_id}_cutesv.vcf")
@@ -124,11 +125,12 @@ process cute_sv {
 process debreak {
     container "${params.registry}/debreak:latest"
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/debreak_out", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: 'copy'
 
     input:
     each path(fasta_file)
-    tuple val(pair_id), path(bam_file), path(bam_index) 
+    tuple val(pair_id), path(bam_file), path(bam_index)
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("debreak_out/${pair_id}_debreak.vcf")
@@ -147,10 +149,11 @@ process debreak {
 process sniffles {
     container "${params.registry}/sniffles:latest"
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/sniffles_out", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index) 
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("${pair_id}_sniffles.vcf")
@@ -168,7 +171,7 @@ process sniffles {
 process survivor {
     container "${params.registry}/survivor:latest"
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/survivor_out", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: 'copy'
     publishDir "${params.out_dir}/final_vcf", mode: 'copy'
 
 
@@ -176,6 +179,7 @@ process survivor {
     tuple val(pair_id), path(sniffles_vcf)
     tuple val(pair_id), path(cute_vcf)
     tuple val(pair_id), path(debreak_vcf)
+    val out_folder_name
 
 
     output:

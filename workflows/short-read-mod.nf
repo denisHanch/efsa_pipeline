@@ -21,16 +21,16 @@ workflow mod_ref {
         bwa_index_ref(ref_fasta, out_folder_name) | set { ref_index } 
         mapping_ref(ref_fasta, ref_index, trimmed, out_folder_name) | set { indexed_bam }
 
+        // printout % unmapped reads
+        calc_unmapped(indexed_bam) | set { pct }
+        logUnmapped(pct, params.short_threshold, out_folder_name)
+
         // extract unmapped reads
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
 
         // map to modified fasta
         bwa_index(mod_fasta, out_folder_name) | set { mod_index } 
         mapping(mod_fasta, mod_index, unmapped_fastq, out_folder_name) | set { indexed_unmapped_bam }
-
-        // printout % unmapped reads
-        calc_unmapped(indexed_unmapped_bam) | set { pct }
-        logUnmapped(pct, out_folder_name)
 
         // SNPs variant calling
         freebayes(mod_fasta, mod_index, indexed_unmapped_bam, out_folder_name) | set { vcf }

@@ -2,9 +2,13 @@
 
 // Include workflows
 include { ref_mod } from './workflows/fasta_ref_x_mod.nf'
+
 include { long_ref } from './workflows/long-read-ref.nf'
+include { long_mod } from './workflows/long-read-mod.nf'
+
 include { short_ref } from './workflows/short-read-ref.nf'
 include { mod_ref } from './workflows/short-read-mod.nf'
+
 include { qc } from './modules/subworkflow.nf'
 include { sortVcf; indexVcf; truvari } from './modules/variant_calling.nf'
  
@@ -32,26 +36,42 @@ if (params.help) {
 }
 
 def pipelines_running = 0
-def long_ch = Channel.fromPath("$params.in_dir/tmp2/*_subreads.fastq.gz")
-def short_ch = Channel.fromPath("$params.in_dir/*.fastq.gz")
-def fasta_ch = new File(params.in_dir).listFiles().findAll { it.name.endsWith('.fasta') || it.name.endsWith('.fa') || it.name.endsWith('.fna') }
 
 out_folder_name = "final_vcf"
 
-workflow {
 
-    if (long_ch) {
+
+workflow {
+    // Inputs
+    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*mod.{fa,fna,fasta}") | set { mod_fasta }
+
+    Channel.fromPath("${params.in_dir}/tmp2/*_subreads.fastq.gz")
+        .map { file -> 
+            def name = file.baseName.replaceFirst('.fastq', '')
+            return [name, file]
+        }
+        .set { long_fastqs }
+
+    Channel.fromPath("$params.in_dir/*.fastq.gz") | set { short_fastqs }
+
+    if (long_fastqs) {
         log.info "▶ Running pipeline processing long reads."
-        // long_ref()
+    
+        if (params.map_to_mod_fa) {
+            log.info "▶ Running pipeline processing long reads - mapping unmapped reads to the modified fasta."
+            long_mod(long_fastqs, ref_fasta, mod_fasta)
+        } else {
+            log.info "▶ Running pipeline processing long reads - mapping to the reference fasta."
+            long_ref(long_fastqs, ref_fasta)
+        }
 
         pipelines_running++
     }
 
-    if (short_ch) {    
-        Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { ref_fasta }
-        Channel.fromPath("$params.in_dir/*mod.{fa,fna,fasta}") | set { mod_fasta }
-        
-        short_ch
+    if (short_fastqs) {    
+
+        short_fastqs
         | map {[(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq.gz/)[0][1], it]}
         | groupTuple(sort: true)
         | set { fastqs }
@@ -70,7 +90,7 @@ workflow {
         pipelines_running++
     }
 
-    if (fasta_ch.size() == 2) {
+    if (ref_fasta and mod_fasta) {
         log.info "▶ Running pipeline comparing reference and modified fasta."
         ref_mod()
 
