@@ -90,7 +90,7 @@ workflow {
         pipelines_running++
     }
 
-    if (ref_fasta and mod_fasta) {
+    if (ref_fasta && mod_fasta) {
         log.info "▶ Running pipeline comparing reference and modified fasta."
         ref_mod()
 
