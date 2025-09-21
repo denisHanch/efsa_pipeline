@@ -74,7 +74,7 @@ process convert_bcf_to_vcf {
     container 'biocontainers/bcftools:v1.9-1-deb_cv1'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
-    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
+    publishDir ( params.map_to_mod_fa ? null : "${params.out_dir}/final_vcf" ), mode: 'copy'
 
     input:
     tuple val(pair_id), path(bcf_file)
@@ -172,8 +172,7 @@ process survivor {
     container "${params.registry}/survivor:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: 'copy'
-    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
-
+    publishDir ( params.map_to_mod_fa ? null : "${params.out_dir}/final_vcf" ), mode: 'copy'
 
     input:
     tuple val(pair_id), path(sniffles_vcf)
