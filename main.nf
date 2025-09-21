@@ -29,6 +29,15 @@ def helpMessage() {
     """.stripIndent()
 }
 
+def describePipeline = { read_type, fasta_type, mod_fasta = null ->
+    def msg = "▶ Running pipeline processing ${read_type} reads - mapping "
+    if( mod_fasta )
+        msg += "unmapped reads to the ${fasta_type} fasta."
+    else
+        msg += "to the ${fasta_type} fasta."
+    return msg
+}
+
 // Show help
 if (params.help) {
     helpMessage()
@@ -56,13 +65,12 @@ workflow {
     Channel.fromPath("$params.in_dir/*.fastq.gz") | set { short_fastqs }
 
     if (long_fastqs) {
-        log.info "▶ Running pipeline processing long reads."
     
         if (params.map_to_mod_fa) {
-            log.info "▶ Running pipeline processing long reads - mapping unmapped reads to the modified fasta."
+            log.info describePipeline("long", "modified", mod_fasta)
             long_mod(long_fastqs, ref_fasta, mod_fasta)
         } else {
-            log.info "▶ Running pipeline processing long reads - mapping to the reference fasta."
+            log.info describePipeline("long", "reference")
             long_ref(long_fastqs, ref_fasta)
         }
 
@@ -81,10 +89,10 @@ workflow {
 
         // Running mapping to the reference or modified fasta 
         if (params.map_to_mod_fa) {
-            log.info "▶ Running pipeline processing short reads - mapping unmapped reads to the modified fasta."
+            log.info describePipeline("short", "modified", mod_fasta)
             mod_ref(trimmed, ref_fasta, mod_fasta)
         } else {
-            log.info "▶ Running pipeline processing short reads - mapping to the reference fasta."
+            log.info describePipeline("short", "reference")
             short_ref(trimmed, ref_fasta)
         }
         pipelines_running++

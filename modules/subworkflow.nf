@@ -1,11 +1,8 @@
 
 include { fastqc; multiqc; trimgalore } from './qc.nf'
-include { bwa_mapping; samtool_index_bam; samtools_sort; samtool_stats; picard; calc_unmapped } from './mapping.nf'
-include { convert_bcf_to_vcf; delly; samtools_index; picard_dict } from '../modules/sv_calling.nf'
-include { snpeff; build_config } from '../modules/variant_calling.nf'
-include { sniffles; debreak; cute_sv; survivor } from '../modules/sv_calling.nf'
-include { minimap2 } from '../modules/mapping.nf'
-include { bcftools_stats } from '../modules/variant_calling.nf'
+include { bwa_mapping; samtool_index_bam; samtools_sort; samtool_stats; picard; calc_unmapped; minimap2 } from './mapping.nf'
+include { convert_bcf_to_vcf; delly; samtools_index; picard_dict; sniffles; debreak; cute_sv; survivor } from '../modules/sv_calling.nf'
+include { snpeff; build_config; bcftools_stats } from '../modules/variant_calling.nf'
 
 // short-reads pipeline
 

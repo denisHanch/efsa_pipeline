@@ -33,7 +33,7 @@ workflow long_ref {
 
 workflow {
     // Processing inputs
-    println("Processing files in directory: ${params.in_dir}")
+    log.info  "Processing files in directory: ${params.in_dir}"
 
     Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
 
