@@ -2,11 +2,14 @@
 
 include { freebayes; bcftools_stats } from '../modules/variant_calling.nf'
 include { multiqc } from '../modules/qc.nf'
+include { logUnmapped } from '../modules/logs.nf'
+
 include { qc; mapping; sv } from '../modules/subworkflow.nf'
 include { mapping as mapping_ref } from '../modules/subworkflow.nf'
+
 include { calc_unmapped; bwa_index; get_unmapped_reads } from '../modules/mapping.nf'
 include { bwa_index as bwa_index_ref } from '../modules/mapping.nf'
-include { logUnmapped } from '../modules/logs.nf'
+
 
 out_folder_name = "short-mod"
 
