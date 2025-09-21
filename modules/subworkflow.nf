@@ -3,7 +3,11 @@ include { fastqc; multiqc; trimgalore } from './qc.nf'
 include { bwa_mapping; samtool_index_bam; samtools_sort; samtool_stats; picard; calc_unmapped } from './mapping.nf'
 include { convert_bcf_to_vcf; delly; samtools_index; picard_dict } from '../modules/sv_calling.nf'
 include { snpeff; build_config } from '../modules/variant_calling.nf'
+include { sniffles; debreak; cute_sv; survivor } from '../modules/sv_calling.nf'
+include { minimap2 } from '../modules/mapping.nf'
+include { bcftools_stats } from '../modules/variant_calling.nf'
 
+// short-reads pipeline
 
 workflow qc {
     take:
@@ -77,4 +81,39 @@ workflow annotate_vcf {
 
     emit:
         qc_vcf
+}
+
+// long-reads pipeline
+
+workflow mapping_long {
+    take:
+        fastqs
+        fasta
+        out_folder_name
+
+    main:
+        minimap2(fastqs, fasta, out_folder_name) | set { sam }
+        samtools_sort(sam, out_folder_name) | set { sorted_bam }
+        samtool_index_bam(sorted_bam, out_folder_name) | set { indexed_bam }
+
+    emit:
+        indexed_bam
+}
+
+workflow sv_long {
+    take:
+        fasta
+        indexed_bam
+        out_folder_name
+
+    main:
+        cute_sv(fasta, indexed_bam, out_folder_name) | set { cute_vcf }
+        debreak(fasta, indexed_bam, out_folder_name) | set { debreak_vcf }
+        sniffles(indexed_bam, out_folder_name) | set { sniffles_vcf }
+
+        survivor(cute_vcf, debreak_vcf, sniffles_vcf, out_folder_name) | set { merged_vcf }
+        bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
+
+    emit:
+        merged_vcf
 }

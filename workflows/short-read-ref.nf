@@ -20,7 +20,7 @@ workflow short_ref {
 
         // printout % unmapped reads
         calc_unmapped(indexed_bam) | set { pct }
-        logUnmapped(pct, out_folder_name)
+        logUnmapped(pct, params.short_threshold, out_folder_name)
 
         // SNPs variant calling
         freebayes(fasta, fasta_index, indexed_bam, out_folder_name) | set { vcf }

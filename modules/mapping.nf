@@ -130,11 +130,12 @@ process samtool_stats {
 process minimap2 {
     container 'staphb/minimap2:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/minimap2", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/minimap2", mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
     each path(fasta_file)
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("${pair_id}.sam")
