@@ -193,3 +193,24 @@ process calc_unmapped {
     fi
     """
 }
+
+
+process get_unmapped_reads {
+    container 'staphb/samtools:latest'
+    tag "$pair_id"
+    publishDir "${params.out_dir}/${out_folder_name}/unmapped", mode: 'copy'
+
+
+    input:
+    tuple val(pair_id), path(bam_file), path(bam_index)
+    val out_folder_name
+
+    output:
+    tuple val(pair_id), path("${pair_id}_unmapped.bam")
+
+    script:
+    """
+    samtools view -f 4 -b $bam_file | samtools fastq > ${pair_id}_unmapped.bam
+    """
+
+}

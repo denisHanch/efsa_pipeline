@@ -42,7 +42,7 @@ workflow {
 
     if (long_ch) {
         log.info "▶ Running pipeline processing long reads."
-        long_ref()
+        // long_ref()
 
         pipelines_running++
     }
@@ -61,10 +61,10 @@ workflow {
 
         // Running mapping to the reference or modified fasta 
         if (params.map_to_mod_fa) {
-            log.info "▶ Running pipeline processing short reads - mapping to the reference fasta."
-            short_mod(trimmed, mod_fasta)
+            log.info "▶ Running pipeline processing short reads - mapping unmapped reads to the modified fasta."
+            mod_ref(trimmed, ref_fasta, mod_fasta)
         } else {
-            log.info "▶ Running pipeline processing short reads - mapping to the modified fasta."
+            log.info "▶ Running pipeline processing short reads - mapping to the reference fasta."
             short_ref(trimmed, ref_fasta)
         }
         pipelines_running++
