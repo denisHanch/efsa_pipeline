@@ -8,10 +8,11 @@
 process bwa_index {
     container 'biocontainers/bwa:v0.7.17_cv1'
     tag "$fasta_file"
-    publishDir "${params.out_dir}/short-ref/bwa_index", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/bwa_index", mode: 'copy'
 
     input:
     path fasta_file
+    val out_folder_name
 
     output:
     path "${fasta_file}.*" 
@@ -30,12 +31,13 @@ process bwa_index {
 process bwa_mapping {
     container 'biocontainers/bwa:v0.7.17_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/bam", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/bam", mode: 'copy'
 
     input:
     each path(fasta_file)
     each path(fasta_index)
     tuple val(pair_id), path(reads)
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("${pair_id}.sam")
@@ -54,10 +56,11 @@ process bwa_mapping {
 process samtool_index_bam {
     container 'staphb/samtools:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/bam", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/bam", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file)
+    val out_folder_name
 
     output:
     tuple val(pair_id), path(bam_file), path("${bam_file}.bai")
@@ -75,11 +78,12 @@ process samtool_index_bam {
 process picard {
     container 'quay.io/biocontainers/picard:2.26.10--hdfd78af_0'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/picard", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/picard", mode: 'copy'
     
     input:
     each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index)
+    val out_folder_name
 
 
     output:
@@ -102,10 +106,11 @@ process picard {
 process samtool_stats {
     container 'staphb/samtools:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/samtools_stats", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/samtools_stats", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file)
+    val out_folder_name
 
     output:
     path "*.stats"
@@ -123,13 +128,14 @@ process samtool_stats {
  * Map long reads
 */
 process minimap2 {
-container 'staphb/minimap2:latest'
+    container 'staphb/minimap2:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/minimap2", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/minimap2", mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
     each path(fasta_file)
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("${pair_id}.sam")
@@ -145,9 +151,9 @@ container 'staphb/minimap2:latest'
  * Sort reads with samtools
 */
 process samtools_sort {
-container 'staphb/samtools:latest'
+    container 'staphb/samtools:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/samtools", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/bam", mode: 'copy'
 
     input:
     tuple val(pair_id), path(sam)
@@ -160,4 +166,52 @@ container 'staphb/samtools:latest'
     """
     samtools sort $sam -o ${pair_id}.bam
     """
+}
+
+
+
+process calc_unmapped {
+    container 'staphb/samtools:latest'
+    tag "$pair_id"
+
+    input:
+    tuple val(pair_id), path(bam), path(bam_index)
+
+    output:
+    env pct 
+
+    script:
+    """
+    #!/usr/bin/env bash
+
+    total=\$(samtools view -c "$bam")
+    unmapped=\$(samtools view -c -f 4 "$bam")
+
+    if [ "\$total" -gt 0 ]; then
+        pct=\$(( unmapped * 100 / total ))
+    else
+        pct=0
+    fi
+    """
+}
+
+
+process get_unmapped_reads {
+    container 'staphb/samtools:latest'
+    tag "$pair_id"
+    publishDir "${params.out_dir}/${out_folder_name}/unmapped", mode: 'copy'
+
+
+    input:
+    tuple val(pair_id), path(bam_file), path(bam_index)
+    val out_folder_name
+
+    output:
+    tuple val(pair_id), path("${pair_id}_unmapped.bam")
+
+    script:
+    """
+    samtools view -f 4 -b $bam_file | samtools fastq > ${pair_id}_unmapped.bam
+    """
+
 }

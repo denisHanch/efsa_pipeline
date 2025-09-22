@@ -9,20 +9,21 @@ process trimgalore {
 
     container 'vibsinglecellnf/trimgalore:trimgalore-0.6.7-cutadapt-4.1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/trimmed_reads", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/trimmed_reads", mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
+    val out_folder_name
 
     output:
-    tuple val(pair_id), path('out/*.fq.gz')
+    tuple val(pair_id), path('*.fq.gz')
 
     script:
     """
     if [ \$(echo ${reads} | wc -w) -gt 1 ]; then
-        trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 --paired -o out ${reads}
+        trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 --paired ${reads}
     else
-        trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 -o out ${reads}
+        trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 ${reads}
     fi
     """
 }
@@ -35,12 +36,12 @@ process trimgalore {
 process fastqc {
     container 'biocontainers/fastqc:v0.11.9_cv8'
     tag "FASTQC on $pair_id"
-    publishDir "$params.out_dir/short-ref/fastqc_out", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/fastqc_out", mode: 'copy'
 
 
     input:
-
     tuple val(pair_id), path(reads)
+    val out_folder_name
 
     output:
     file("results_fastqc_${pair_id}")
@@ -57,18 +58,19 @@ process fastqc {
  */
 process multiqc {
     container 'staphb/multiqc'
-    publishDir "$params.out_dir/${out_folder_name}/multiqc", mode: "copy"
+    publishDir "${params.out_dir}/${out_folder_name}/multiqc", mode: "copy"
 
     input:
-    val out_folder_name
     path files
+    val out_folder_name
+    val filename
 
     output:
-    file('multiqc_report.html')
+    file('*.html')
 
     script:
     """
-    multiqc .
+    multiqc --filename ${filename} .
     """
 }
 
@@ -81,10 +83,11 @@ process multiqc {
 process nanoplot {
 container 'staphb/nanoplot:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/nanoplot", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/nanoplot", mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
+    val out_folder_name
     
     output:
     path('nanoplot_report')

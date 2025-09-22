@@ -2,11 +2,16 @@
 
 // Include workflows
 include { ref_mod } from './workflows/fasta_ref_x_mod.nf'
-include { long_ref } from './workflows/long-read-ref.nf'
-include { short_ref } from './workflows/short-read-ref.nf'
-include { sortVcf; indexVcf; truvari } from './modules/variant_calling.nf'
-include { multiqc } from './modules/qc.nf'
 
+include { long_ref } from './workflows/long-read-ref.nf'
+include { long_mod } from './workflows/long-read-mod.nf'
+
+include { short_ref } from './workflows/short-read-ref.nf'
+include { mod_ref } from './workflows/short-read-mod.nf'
+
+include { qc } from './modules/subworkflow.nf'
+include { sortVcf; indexVcf; truvari } from './modules/variant_calling.nf'
+ 
 
 // Help message
 def helpMessage() {
@@ -24,6 +29,15 @@ def helpMessage() {
     """.stripIndent()
 }
 
+def describePipeline = { read_type, fasta_type, mod_fasta = null ->
+    def msg = "▶ Running pipeline processing ${read_type} reads - mapping "
+    if( mod_fasta )
+        msg += "unmapped reads to the ${fasta_type} fasta."
+    else
+        msg += "to the ${fasta_type} fasta."
+    return msg
+}
+
 // Show help
 if (params.help) {
     helpMessage()
@@ -31,74 +45,68 @@ if (params.help) {
 }
 
 def pipelines_running = 0
-def long_ch = Channel.fromPath("$params.in_dir/tmp2/*_subreads.fastq.gz")
-def short_ch = Channel.fromPath("$params.in_dir/*.fastq.gz")
-def fasta_ch = new File(params.in_dir).listFiles().findAll { it.name.endsWith('.fasta') || it.name.endsWith('.fa') || it.name.endsWith('.fna') }
 
 out_folder_name = "final_vcf"
 
+
+
 workflow {
+    // Inputs
+    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*mod.{fa,fna,fasta}") | set { mod_fasta }
 
-    if (long_ch) {
-        log.info "▶ Running pipeline processing long reads."
-        long_ref()
+    Channel.fromPath("${params.in_dir}/tmp2/*_subreads.fastq.gz")
+        .map { file -> 
+            def name = file.baseName.replaceFirst('.fastq', '')
+            return [name, file]
+        }
+        .set { long_fastqs }
+
+    Channel.fromPath("$params.in_dir/*.fastq.gz") | set { short_fastqs }
+
+    if (long_fastqs) {
+    
+        if (params.map_to_mod_fa) {
+            log.info describePipeline("long", "modified", mod_fasta)
+            long_mod(long_fastqs, ref_fasta, mod_fasta)
+        } else {
+            log.info describePipeline("long", "reference")
+            long_ref(long_fastqs, ref_fasta)
+        }
 
         pipelines_running++
     }
 
-    if (short_ch) {
-        log.info "▶ Running pipeline processing short reads."
-        short_ref()
-       
+    if (short_fastqs) {    
+
+        short_fastqs
+        | map {[(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq.gz/)[0][1], it]}
+        | groupTuple(sort: true)
+        | set { fastqs }
+
+        // QC and trimming module
+        qc(fastqs, out_folder_name) | set { trimmed }
+
+        // Running mapping to the reference or modified fasta 
+        if (params.map_to_mod_fa) {
+            log.info describePipeline("short", "modified", mod_fasta)
+            mod_ref(trimmed, ref_fasta, mod_fasta)
+        } else {
+            log.info describePipeline("short", "reference")
+            short_ref(trimmed, ref_fasta)
+        }
         pipelines_running++
     }
 
-    if (fasta_ch.size() == 2) {
+    if (ref_fasta && mod_fasta) {
         log.info "▶ Running pipeline comparing reference and modified fasta."
         ref_mod()
-
 
         pipelines_running++
     }
 
     if (pipelines_running == 0) {
-        log.warn "⚠ No valid inputs found. Skipping workflows."
+        log.error "⚠ No valid inputs found. Skipping workflows."
         exit 0
-    } else {
-        log.info "✅ Total workflows started: ${pipelines_running}"
     }
-
-    if (pipelines_running > 2) {
-
-        // Inputs
-        Channel.fromPath("$params.out_dir/final_vcf/*.vcf").map { file -> 
-            def name = file.baseName.replaceFirst('.vcf', '')
-            return [name, file]
-        }
-        .set { vcfs }
-
-        Channel.fromPath("$params.in_dir/tmp/*ref.{fa,fna,fasta}") | set { ref_fasta }
-
-        log.info "▶ Comparing VCF files from pipelines"
-
-        // Sorting and indexiing vcfs
-        sortVcf(vcfs) | indexVcf | set { indexed_vcfs }
-
-        // preprocessing Channel for truvari input
-        split_ch = indexed_vcfs.branch {
-            ref_mod: it[0] == "ref_x_modsyri"
-            others:  it[0] != "ref_x_modsyri"
-        }
-
-        ref_mod_ch = split_ch.ref_mod.collect()
-        others_ch  = split_ch.others
-
-        vcf_pairs_ch = ref_mod_ch.combine(others_ch)
-
-        // Comparing vcf from short/read pipeline to vcf created by comparison of two fastas
-        truvari(ref_fasta, vcf_pairs_ch)
-
-        log.info "✅ Truvari peformed ${pipelines_running-1} comparisons."
-
-    }   
 }

@@ -6,10 +6,11 @@
 */
 process samtools_index {
     container 'staphb/samtools:latest'
-    publishDir "${params.out_dir}/short-ref/samtools_index_dict", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
 
     input:
     path fasta_file
+    val out_folder_name
 
     output:
     path("${fasta_file}.fai")
@@ -25,10 +26,11 @@ process samtools_index {
 */
 process picard_dict {
     container 'quay.io/biocontainers/picard:2.26.10--hdfd78af_0'
-    publishDir "${params.out_dir}/short-ref/samtools_index_dict", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
     
     input:
     path fasta_file
+    val out_folder_name
 
     output:
     path("*.dict")
@@ -46,13 +48,14 @@ process picard_dict {
 process delly {
     container 'biocontainers/delly:v0.8.1-2-deb_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index)
     each path(fasta_file)
     each path(fai)
     each path(dict)
+    val out_folder_name
 
     output:
     tuple val(pair_id),  path("${pair_id}_sv.bcf")
@@ -70,11 +73,12 @@ process delly {
 process convert_bcf_to_vcf {
     container 'biocontainers/bcftools:v1.9-1-deb_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
-    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
+    publishDir ( params.map_to_mod_fa ? null : "${params.out_dir}/final_vcf" ), mode: 'copy'
 
     input:
-    tuple val(pair_id),  path(bcf_file)
+    tuple val(pair_id), path(bcf_file)
+    val out_folder_name
 
     output:
     tuple val(pair_id),  path("${pair_id}_sv_short_read.vcf")
@@ -86,30 +90,8 @@ process convert_bcf_to_vcf {
 
 }
 
-// not working currently - trying to find nice tool for visualization of SVs
-process svviz {
-    container "${params.registry}/svviz2:latest"
-    tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/svviz", mode: 'copy'
-
-    input:
-    tuple val(pair_id), path(vcf_file)
-    tuple val(pair_id), path(bam_file), path(bam_index)
-    each path(fasta_file)
-    each path(fai)
-
-
-    output:
-    path "svviz2_output/index.html"
-
-    script:
-    """
-    svviz2 --ref $fasta_file --variants $vcf_file $bam_file
-    """
-}
 
 // Processes for long-read pipeline
-
 
 /*
  * variant calling with cuteSV
@@ -117,11 +99,12 @@ process svviz {
 process cute_sv {
     container "${params.registry}/cutesv:latest"
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/cutesv_out", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: 'copy'
 
     input:
     each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index) 
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("${pair_id}_cutesv.vcf")
@@ -142,11 +125,12 @@ process cute_sv {
 process debreak {
     container "${params.registry}/debreak:latest"
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/debreak_out", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: 'copy'
 
     input:
     each path(fasta_file)
-    tuple val(pair_id), path(bam_file), path(bam_index) 
+    tuple val(pair_id), path(bam_file), path(bam_index)
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("debreak_out/${pair_id}_debreak.vcf")
@@ -165,10 +149,11 @@ process debreak {
 process sniffles {
     container "${params.registry}/sniffles:latest"
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/sniffles_out", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index) 
+    val out_folder_name
 
     output:
     tuple val(pair_id), path("${pair_id}_sniffles.vcf")
@@ -186,14 +171,14 @@ process sniffles {
 process survivor {
     container "${params.registry}/survivor:latest"
     tag "$pair_id"
-    publishDir "${params.out_dir}/long-ref/survivor_out", mode: 'copy'
-    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
-
+    publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: 'copy'
+    publishDir ( params.map_to_mod_fa ? null : "${params.out_dir}/final_vcf" ), mode: 'copy'
 
     input:
     tuple val(pair_id), path(sniffles_vcf)
     tuple val(pair_id), path(cute_vcf)
     tuple val(pair_id), path(debreak_vcf)
+    val out_folder_name
 
 
     output:
