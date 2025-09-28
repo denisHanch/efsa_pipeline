@@ -86,10 +86,11 @@ workflow mapping_long {
     take:
         fastqs
         fasta
+        mapping_tag
         out_folder_name
 
     main:
-        minimap2(fastqs, fasta, out_folder_name) | set { sam }
+        minimap2(fastqs, fasta, mapping_tag, out_folder_name) | set { sam }
         samtools_sort(sam, out_folder_name) | set { sorted_bam }
         samtool_index_bam(sorted_bam, out_folder_name) | set { indexed_bam }
 

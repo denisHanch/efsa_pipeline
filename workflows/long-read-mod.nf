@@ -13,13 +13,14 @@ workflow long_mod {
         fastqs
         ref_fasta
         mod_fasta
+        mapping_tag
 
     main:
         // qc
         nanoplot(fastqs, out_folder_name)
         
         // mapping to reference fasta
-        mapping_long(fastqs, ref_fasta, out_folder_name) | set { indexed_bam }
+        mapping_long(fastqs, ref_fasta, mapping_tag, out_folder_name) | set { indexed_bam }
 
          // printout % unmapped reads
         calc_unmapped(indexed_bam) | set { pct }
@@ -29,7 +30,7 @@ workflow long_mod {
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
 
         // mapping to modified fasta
-        mapping_long_mod(unmapped_fastq, mod_fasta, out_folder_name) | set { indexed_bam }
+        mapping_long_mod(unmapped_fastq, mod_fasta, mapping_tag, out_folder_name) | set { indexed_bam }
 
         // variant calling
         sv_long(mod_fasta, indexed_bam, out_folder_name)
@@ -51,5 +52,5 @@ workflow {
         }
         .set { fastqs }
     
-    long_mod(fastqs, ref_fasta, mod_fasta)
+    long_mod(fastqs, ref_fasta, mod_fasta, mapping_tag)
 }

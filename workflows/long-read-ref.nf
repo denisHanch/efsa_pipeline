@@ -11,13 +11,14 @@ workflow long_ref {
     take:
         fastqs
         fasta
+        mapping_tag
 
     main:
         // qc
         nanoplot(fastqs, out_folder_name)
         
         // mapping
-        mapping_long(fastqs, fasta, out_folder_name) | set { indexed_bam }
+        mapping_long(fastqs, fasta, mapping_tag, out_folder_name) | set { indexed_bam }
 
          // printout % unmapped reads
         calc_unmapped(indexed_bam) | set { pct }
@@ -35,6 +36,12 @@ workflow {
     // Processing inputs
     log.info  "Processing files in directory: ${params.in_dir}"
 
+    if (params.PacBio_reads) {
+        mapping_tag = "map-pb"
+    } else {
+        mapping_tag = "map-ont"
+    }
+
     Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
 
     Channel.fromPath("${params.in_dir}/tmp2/*_subreads.fastq.gz")
@@ -44,5 +51,5 @@ workflow {
         }
         .set { fastqs }
     
-    long_ref(fastqs, fasta)
+    long_ref(fastqs, fasta, mapping_tag)
 }
