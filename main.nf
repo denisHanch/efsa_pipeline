@@ -73,8 +73,8 @@ workflow {
         }
     
         if (params.map_to_mod_fa) {
-            log.info describePipeline("long", "modified", mod_fasta, mapping_tag)
-            long_mod(long_fastqs, ref_fasta, mod_fasta)
+            log.info describePipeline("long", "modified", mod_fasta)
+            long_mod(long_fastqs, ref_fasta, mod_fasta, mapping_tag)
         } else {
             log.info describePipeline("long", "reference")
             long_ref(long_fastqs, ref_fasta, mapping_tag)
