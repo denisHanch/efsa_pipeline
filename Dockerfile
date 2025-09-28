@@ -2,6 +2,8 @@ FROM python:3.10-slim-bookworm
 # Install necessary packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    docker.io \
+    vim less \
     openssh-client \
     git \
     curl \
