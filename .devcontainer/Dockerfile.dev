@@ -1,10 +1,21 @@
 FROM python:3.10-slim-bookworm
 
+# Install sudo and openssh-client, then create vscode user
 RUN apt-get update && \
-     apt-get install -y --no-install-recommends \
-       openssh-client
+    apt-get install -y --no-install-recommends\
+        sudo \
+        openssh-client \
+        vim less \
+    && useradd -ms /bin/bash -u 1000 vscode \
+    && mkdir -p /etc/sudoers.d \
+    && echo "vscode ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/vscode \
+    && chmod 0440 /etc/sudoers.d/vscode \
+    && chown -R vscode:vscode /home/vscode
 
 # history search 
 COPY .inputrc /root/
+
+# Switch to the vscode user by default
+USER vscode
 
 WORKDIR /EFSA_workspace

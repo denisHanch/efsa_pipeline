@@ -16,6 +16,10 @@
 
   "workspaceFolder": "/EFSA_workspace",
 
+  // Ensures the files we edit inside the devcontainer are created with the non-root dev user instead of root
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+
   // to avoid "fatal: detected dubious ownership in repository at" error
   "postCreateCommand": "git config --file .git/config --add safe.directory ${containerWorkspaceFolder}",
 
