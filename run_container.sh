@@ -78,6 +78,7 @@ docker run -it --rm \
     --network=host \
     -v /etc/ssl/certs:/etc/ssl/certs:ro \
     -v /usr/share/ca-certificates:/usr/share/ca-certificates:ro \
+    -v /var/run/docker.sock:/var/run/docker.sock \
     --name efsa-pipeline-container \
     -v "$(pwd):/EFSA_workspace" \
     $INPUT_MOUNT \

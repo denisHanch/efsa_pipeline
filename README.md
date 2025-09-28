@@ -23,6 +23,11 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
    ./run_container.sh
    ```
 
+   To provide path to input folder, which would be mounted onto `/EFSA_workspace/data/inputs` run:
+   ```
+   ./run_container.sh --input /path/to/inputs
+   ```
+
 3. You'll be dropped into the container shell where you can run CLI commands
 4. Type `exit` when done to return to your host system
 
