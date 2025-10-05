@@ -45,12 +45,25 @@ workflow {
     Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { ref_fasta }
     Channel.fromPath("$params.in_dir/*mod.{fa,fna,fasta}") | set { mod_fasta }
 
-    Channel.fromPath("${params.in_dir}/tmp2/*_subreads.fastq.gz")
+    Channel.fromPath("${params.in_dir}/pacbio/*_subreads.fastq.gz")
         .map { file -> 
             def name = file.baseName.replaceFirst('.fastq', '')
             return [name, file]
         }
-        .set { fastqs }
+        .set { pacbio_fastqs }
+
+    Channel.fromPath("${params.in_dir}/ont/*_subreads.fastq.gz")
+        .map { file -> 
+            def name = file.baseName.replaceFirst('.fastq', '')
+            return [name, file]
+        }
+        .set { ont_fastqs }
     
-    long_mod(fastqs, ref_fasta, mod_fasta, mapping_tag)
+    if (pacbio_fastqs) {
+        long_mod(fastqs, ref_fasta, mod_fasta,  "map-pb")
+    }
+
+    if (ont_fastqs) {  
+        long_mod(fastqs, ref_fasta, mod_fasta,  "map-ont")      
+    }
 }

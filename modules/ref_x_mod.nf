@@ -59,10 +59,10 @@ process showCoords {
 
 }
 
-process syri {
-    container "${params.registry}/syri:latest"
+process ${params.pipeline}/ {
+    container "${params.registry}/${params.pipeline}/:latest"
     publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
-        publishDir ( params.map_to_mod_fa ? null : "${params.out_dir}/final_vcf" ), mode: 'copy', saveAs: { filename -> filename.endsWith(".vcf") ? filename : null }
+    publishDir ( params.map_to_mod_fa ? "${params.out_dir}/${params.workflow_id}" : "${params.out_dir}/final_vcf" ), mode: 'copy', saveAs: { filename -> filename.endsWith(".vcf") ? filename : null }
 
 
     input:
@@ -72,11 +72,11 @@ process syri {
 
 
     output:
-    path("${prefix}syri*")
+    path("${prefix}${params.pipeline}/*")
 
 
     script:
     """
-    syri -c $coords -d $filtered_delta  -r $ref -q $mod --prefix ${prefix} --nosnp
+    ${params.pipeline}/ -c $coords -d $filtered_delta  -r $ref -q $mod --prefix ${prefix} --nosnp
     """
 }

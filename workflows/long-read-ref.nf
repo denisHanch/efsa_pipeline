@@ -63,7 +63,7 @@ workflow {
 
     Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
     
-     if (pacbio_fastqs) {
+    if (pacbio_fastqs) {
         long_ref(pacbio_fastqs, ref_fasta, "map-pb")
     }
 
