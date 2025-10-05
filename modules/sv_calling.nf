@@ -152,6 +152,7 @@ process sniffles {
     publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: 'copy'
 
     input:
+    each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index) 
     val out_folder_name
 
@@ -160,7 +161,7 @@ process sniffles {
 
     script:
     """
-    sniffles --input $bam_file --vcf ${pair_id}_sniffles.vcf
+    sniffles --input $bam_file --vcf ${pair_id}_sniffles.vcf --reference $fasta_file
     """
 }
 

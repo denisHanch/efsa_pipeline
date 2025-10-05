@@ -135,6 +135,7 @@ process minimap2 {
     input:
     tuple val(pair_id), path(reads)
     each path(fasta_file)
+    val mapping_tag
     val out_folder_name
 
     output:
@@ -143,7 +144,7 @@ process minimap2 {
 
     script:
     """
-    minimap2 -ax map-pb $fasta_file $reads > ${pair_id}.sam
+    minimap2 -ax $mapping_tag $fasta_file $reads > ${pair_id}.sam
     """
 }
 

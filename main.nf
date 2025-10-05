@@ -65,13 +65,19 @@ workflow {
     Channel.fromPath("$params.in_dir/*.fastq.gz") | set { short_fastqs }
 
     if (long_fastqs) {
+
+        if (params.PacBio_reads) {
+            mapping_tag = "map-pb"
+        } else {
+            mapping_tag = "map-ont"
+        }
     
         if (params.map_to_mod_fa) {
             log.info describePipeline("long", "modified", mod_fasta)
-            long_mod(long_fastqs, ref_fasta, mod_fasta)
+            long_mod(long_fastqs, ref_fasta, mod_fasta, mapping_tag)
         } else {
             log.info describePipeline("long", "reference")
-            long_ref(long_fastqs, ref_fasta)
+            long_ref(long_fastqs, ref_fasta, mapping_tag)
         }
 
         pipelines_running++

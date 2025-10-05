@@ -86,10 +86,11 @@ workflow mapping_long {
     take:
         fastqs
         fasta
+        mapping_tag
         out_folder_name
 
     main:
-        minimap2(fastqs, fasta, out_folder_name) | set { sam }
+        minimap2(fastqs, fasta, mapping_tag, out_folder_name) | set { sam }
         samtools_sort(sam, out_folder_name) | set { sorted_bam }
         samtool_index_bam(sorted_bam, out_folder_name) | set { indexed_bam }
 
@@ -106,7 +107,7 @@ workflow sv_long {
     main:
         cute_sv(fasta, indexed_bam, out_folder_name) | set { cute_vcf }
         debreak(fasta, indexed_bam, out_folder_name) | set { debreak_vcf }
-        sniffles(indexed_bam, out_folder_name) | set { sniffles_vcf }
+        sniffles(fasta, indexed_bam, out_folder_name) | set { sniffles_vcf }
 
         survivor(cute_vcf, debreak_vcf, sniffles_vcf, out_folder_name) | set { merged_vcf }
         bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
