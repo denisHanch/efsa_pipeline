@@ -3,8 +3,8 @@
 // Include workflows
 include { ref_mod } from './workflows/fasta_ref_x_mod.nf'
 
-include { long_ref } from './workflows/long-read-ref.nf'
-include { long_mod } from './workflows/long-read-mod.nf'
+include { long_ref; long_ref as long_ref_ont } from './workflows/long-read-ref.nf'
+include { long_mod; long_mod as long_mod_ont } from './workflows/long-read-mod.nf'
 
 include { short_ref } from './workflows/short-read-ref.nf'
 include { mod_ref } from './workflows/short-read-mod.nf'
@@ -52,36 +52,51 @@ out_folder_name = "final_vcf"
 
 workflow {
     // Inputs
-    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { ref_fasta }
-    Channel.fromPath("$params.in_dir/*mod.{fa,fna,fasta}") | set { mod_fasta }
+    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*mod.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
 
-    Channel.fromPath("${params.in_dir}/tmp2/*_subreads.fastq.gz")
+    Channel.fromPath("${params.in_dir}/pacbio/*_subreads.fastq.gz")
         .map { file -> 
             def name = file.baseName.replaceFirst('.fastq', '')
             return [name, file]
         }
-        .set { long_fastqs }
+        .set { pacbio_fastqs }
 
-    Channel.fromPath("$params.in_dir/*.fastq.gz") | set { short_fastqs }
+    Channel.fromPath("${params.in_dir}/ont/*_subreads.fastq.gz")
+        .map { file -> 
+            def name = file.baseName.replaceFirst('.fastq', '')
+            return [name, file]
+        }
+        .set { ont_fastqs }
 
-    if (long_fastqs) {
+    Channel.fromPath("$params.in_dir/illumina/*.fastq.gz") | set { short_fastqs }
 
-        if (params.PacBio_reads) {
+        if (pacbio_fastqs) {
             mapping_tag = "map-pb"
-        } else {
-            mapping_tag = "map-ont"
-        }
-    
-        if (params.map_to_mod_fa) {
-            log.info describePipeline("long", "modified", mod_fasta)
-            long_mod(long_fastqs, ref_fasta, mod_fasta, mapping_tag)
-        } else {
-            log.info describePipeline("long", "reference")
-            long_ref(long_fastqs, ref_fasta, mapping_tag)
-        }
 
-        pipelines_running++
-    }
+            if (params.map_to_mod_fa) {
+                log.info describePipeline("long-pacbio", "modified", mod_fasta)
+                long_mod(pacbio_fastqs, ref_fasta, mod_fasta, mapping_tag)
+            } else {
+                log.info describePipeline("long-pacbio", "reference")
+                long_ref(pacbio_fastqs, ref_fasta, mapping_tag)
+            }
+
+            pipelines_running++
+        }
+        if (ont_fastqs) {
+            mapping_tag = "map-ont"
+            
+            if (params.map_to_mod_fa) {
+                log.info describePipeline("long-ont", "modified", mod_fasta)
+                long_mod_ont(ont_fastqs, ref_fasta, mod_fasta, mapping_tag)
+            } else {
+                log.info describePipeline("long-ont", "reference")
+                long_ref_ont(ont_fastqs, ref_fasta, mapping_tag)
+            }
+
+            pipelines_running++
+        }
 
     if (short_fastqs) {    
 

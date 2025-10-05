@@ -1,10 +1,10 @@
 #!/usr/bin/env nextflow
 
 include { nanoplot; multiqc } from '../modules/qc.nf'
-include { sv_long; mapping_long }  from '../modules/subworkflow.nf'
-include { mapping_long as mapping_long_mod }  from '../modules/subworkflow.nf'
-include { logUnmapped } from '../modules/logs.nf'
 include { calc_unmapped; get_unmapped_reads } from '../modules/mapping.nf'
+include { sv_long; mapping_long; mapping_long as mapping_long_mod }  from '../modules/subworkflow.nf'
+include { logUnmapped } from '../modules/logs.nf'
+
 
 out_folder_name = "long-mod"
 
@@ -24,7 +24,7 @@ workflow long_mod {
 
          // printout % unmapped reads
         calc_unmapped(indexed_bam) | set { pct }
-        logUnmapped(pct, params.long_threshold, out_folder_name)
+        logUnmapped(pct, params.long_threshold,  "long-ref-${mapping_tag}")
 
         // extract unmapped reads
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }

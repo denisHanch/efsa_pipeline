@@ -1,9 +1,9 @@
 #!/usr/bin/env nextflow
 
-include { freebayes; bcftools_stats } from '../modules/variant_calling.nf'
 include { multiqc } from '../modules/qc.nf'
-include { qc; mapping; sv; annotate_vcf } from '../modules/subworkflow.nf'
-include { calc_unmapped; bwa_index } from '../modules/mapping.nf'
+include { calc_unmapped; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads } from '../modules/mapping.nf'
+include { freebayes; bcftools_stats; freebayes as freebayes_plasmid; bcftools_stats as bcftools_stats_plasmid } from '../modules/variant_calling.nf'
+include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid; sv as sv_plasmid } from '../modules/subworkflow.nf'
 include { logUnmapped } from '../modules/logs.nf'
 
 
@@ -14,7 +14,8 @@ workflow short_ref {
         trimmed
         fasta
 
-    main:
+    main:        
+        // mapping to the reference
         bwa_index(fasta, out_folder_name) | set { fasta_index } 
         mapping(fasta, fasta_index, trimmed, out_folder_name) | set { indexed_bam }
 
@@ -22,19 +23,33 @@ workflow short_ref {
         calc_unmapped(indexed_bam) | set { pct }
         logUnmapped(pct, params.short_threshold, out_folder_name)
 
-        // SNPs variant calling
+        // mapping reads to plasmid & variant calling
+        Channel.fromPath("$params.in_dir/*plasmid.{fa,fna,fasta}") | set { mod_plasmid_fasta }
+
+        if (mod_plasmid_fasta) {
+            get_unmapped_reads(indexed_bam, "short-ref-plasmid") | set { unmapped_fastq }
+            bwa_index_plasmid(mod_plasmid_fasta, out_folder_name) | set { unmapped_fasta_index } 
+            mapping_plasmid(mod_plasmid_fasta, unmapped_fasta_index, unmapped_fastq, "short-ref-plasmid") | set { unmapped_bam }
+            sv_plasmid(mod_plasmid_fasta, unmapped_bam, "short-ref-plasmid")
+            freebayes_plasmid(mod_plasmid_fasta, unmapped_fasta_index, unmapped_bam, "short-ref-plasmid") | set { vcf_plasmid }
+            bcftools_stats_plasmid(vcf_plasmid, "short-ref-plasmid")
+        }
+
+        // SNPs variant calling against the reference
         freebayes(fasta, fasta_index, indexed_bam, out_folder_name) | set { vcf }
         bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
         
-        // Annotate vcf
-        Channel.fromPath("$params.in_dir/*ref.gtf", checkIfExists: true) | set { gtf }
+        // Annotate SNPs & QC
+        Channel.fromPath("$params.in_dir/*ref.gtf") | set { gtf }
 
-        annotate_vcf(fasta, gtf, vcf) | set {qc_vcf}
+        if (gtf) {
+            annotate_vcf(fasta, gtf, vcf) | set {qc_vcf}
         
-        qc_vcf.mix(bcftools_out).collect() | set { qc_out }
-        multiqc(qc_out, out_folder_name, 'varint_calling')
-
-        // SVs variant calling
+            qc_vcf.mix(bcftools_out).collect() | set { qc_out }
+            multiqc(qc_out, out_folder_name, 'varint_calling')
+        }
+    
+        // SVs variant calling against the reference
         sv(fasta, indexed_bam, out_folder_name)
         
         emit:
@@ -45,8 +60,8 @@ workflow short_ref {
 workflow { 
     log.info  "Processing files in directory: ${params.in_dir}"
     
-    Channel.fromPath("$params.in_dir/*.fastq.gz") | set { fastqs }
-    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
+    Channel.fromPath("$params.in_dir/illumina/*.fastq.gz") | set { fastqs }
+    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}", checkIfExists: true) | set { fasta }
     
     fastqs
     | map {[(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq.gz/)[0][1], it]}

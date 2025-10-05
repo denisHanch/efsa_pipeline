@@ -1,14 +1,10 @@
 #!/usr/bin/env nextflow
 
-include { freebayes; bcftools_stats } from '../modules/variant_calling.nf'
 include { multiqc } from '../modules/qc.nf'
+include { calc_unmapped; bwa_index; get_unmapped_reads; bwa_index as bwa_index_ref } from '../modules/mapping.nf'
+include { freebayes; bcftools_stats } from '../modules/variant_calling.nf'
 include { logUnmapped } from '../modules/logs.nf'
-
-include { qc; mapping; sv } from '../modules/subworkflow.nf'
-include { mapping as mapping_ref } from '../modules/subworkflow.nf'
-
-include { calc_unmapped; bwa_index; get_unmapped_reads } from '../modules/mapping.nf'
-include { bwa_index as bwa_index_ref } from '../modules/mapping.nf'
+include { qc; mapping; sv; mapping as mapping_ref } from '../modules/subworkflow.nf'
 
 
 out_folder_name = "short-mod"
@@ -53,11 +49,11 @@ workflow mod_ref {
 workflow { 
     log.info  "Processing files in directory: ${params.in_dir}"
     
-    Channel.fromPath("$params.in_dir/*mod.{fa,fna,fasta}") | set { mod_fasta }
-    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*mod.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
+    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
 
     
-    Channel.fromPath("$params.in_dir/*.fastq.gz")
+    Channel.fromPath("$params.in_dir/illumina/*.fastq.gz")
     | map {[(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq.gz/)[0][1], it]}
     | groupTuple(sort: true)
     | set { fastqs }
