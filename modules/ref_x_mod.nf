@@ -59,8 +59,8 @@ process showCoords {
 
 }
 
-process ${params.pipeline}/ {
-    container "${params.registry}/${params.pipeline}/:latest"
+process syri {
+    container "${params.registry}/syri/:latest"
     publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
     publishDir ( params.map_to_mod_fa ? "${params.out_dir}/${params.workflow_id}" : "${params.out_dir}/final_vcf" ), mode: 'copy', saveAs: { filename -> filename.endsWith(".vcf") ? filename : null }
 
@@ -72,11 +72,11 @@ process ${params.pipeline}/ {
 
 
     output:
-    path("${prefix}${params.pipeline}/*")
+    path("${prefix}syri*")
 
 
     script:
     """
-    ${params.pipeline}/ -c $coords -d $filtered_delta  -r $ref -q $mod --prefix ${prefix} --nosnp
+    syri -c $coords -d $filtered_delta  -r $ref -q $mod --prefix ${prefix} --nosnp
     """
 }

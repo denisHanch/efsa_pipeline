@@ -52,18 +52,12 @@ workflow {
         }
         .set { pacbio_fastqs }
 
-    Channel.fromPath("${params.in_dir}/ont/*_subreads.fastq.gz")
+    Channel.fromPath("${params.in_dir}/nanopore/*_subreads.fastq.gz")
         .map { file -> 
             def name = file.baseName.replaceFirst('.fastq', '')
             return [name, file]
         }
         .set { ont_fastqs }
     
-    if (pacbio_fastqs) {
-        long_mod(fastqs, ref_fasta, mod_fasta,  "map-pb")
-    }
-
-    if (ont_fastqs) {  
-        long_mod(fastqs, ref_fasta, mod_fasta,  "map-ont")      
-    }
+    long_mod(ont_fastqs, ref_fasta, mod_fasta,  "map-ont") //pacbio_fastqs, "map-pb"
 }

@@ -62,7 +62,7 @@ workflow {
         }
         .set { pacbio_fastqs }
 
-    Channel.fromPath("${params.in_dir}/ont/*_subreads.fastq.gz")
+    Channel.fromPath("${params.in_dir}/nanopore/*_subreads.fastq.gz")
         .map { file -> 
             def name = file.baseName.replaceFirst('.fastq', '')
             return [name, file]
