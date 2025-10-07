@@ -53,6 +53,10 @@ rm -f nxf-tmp*
 # Check if data directories exist, create if they don't
 mkdir -p data/inputs data/outputs
 
+# Get the absolute path of the current directory
+# Mount to the same absolute path inside the container: to prevent mixed up paths, when processes run in separate docker containers
+WORKSPACE_PATH=$(pwd)
+
 # Determine input directory to mount
 if [ -n "$INPUT_DIR" ]; then
     # User provided custom input directory
@@ -60,16 +64,18 @@ if [ -n "$INPUT_DIR" ]; then
         echo "Error: Input directory '$INPUT_DIR' does not exist"
         exit 1
     fi
-    INPUT_MOUNT="-v $(realpath "$INPUT_DIR"):/EFSA_workspace/data/inputs"
-    echo "Using custom input directory: $INPUT_DIR"
+    INPUT_PATH=$(realpath "$INPUT_DIR")
+    INPUT_MOUNT="-v $INPUT_PATH:$INPUT_PATH"
+    echo "Using custom input directory: $INPUT_DIR (mounted at $INPUT_PATH)"
 else
-    # Use default input directory
-    INPUT_MOUNT="-v $(pwd)/data/inputs:/EFSA_workspace/data/inputs"
+    # Use default input directory - it will be part of the workspace mount
+    INPUT_MOUNT=""
     echo "Using default input directory: ./data/inputs"
 fi
 
 # Run the container interactively with volume mounts
 echo "Starting EFSA Pipeline container..."
+echo "Workspace mounted at: $WORKSPACE_PATH"
 echo "You will be dropped into the container shell."
 echo "Type 'exit' when you're done to return to your host system."
 echo ""
@@ -80,9 +86,9 @@ docker run -it --rm \
     -v /usr/share/ca-certificates:/usr/share/ca-certificates:ro \
     -v /var/run/docker.sock:/var/run/docker.sock \
     --name efsa-pipeline-container \
-    -v "$(pwd):/EFSA_workspace" \
+    -w "$WORKSPACE_PATH" \
+    -v "$WORKSPACE_PATH:$WORKSPACE_PATH" \
     $INPUT_MOUNT \
-    -v "$(pwd)/data/outputs:/EFSA_workspace/data/outputs" \
     efsa-pipeline
 
 echo "Container exited. You're back on your host system."

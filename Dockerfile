@@ -17,9 +17,6 @@ RUN chmod +x /usr/local/bin/nextflow
 # Copy shell configuration for better user experience
 COPY .devcontainer/.inputrc /root/
 
-# Set working directory
-WORKDIR /EFSA_workspace
-COPY . /EFSA_workspace/
 
 # Default command to bash for interactive use
 CMD ["/bin/bash"]
