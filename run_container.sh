@@ -16,6 +16,10 @@ fi
 # Check if data directories exist, create if they don't
 mkdir -p data/inputs data/outputs
 
+# Get the absolute path of the current directory
+# Mount to the same absolute path inside the container: to prevent mixed up paths, when processes run in separate docker containers
+WORKSPACE_PATH=$(pwd)
+
 # Use default input directory
 INPUT_MOUNT="-v $(pwd)/data/inputs:/EFSA_workspace/data/inputs"
 echo "Using default input directory: ./data/inputs"
@@ -23,6 +27,7 @@ echo "Using default input directory: ./data/inputs"
 
 # Run the container interactively with volume mounts
 echo "Starting EFSA Pipeline container..."
+echo "Workspace mounted at: $WORKSPACE_PATH"
 echo "You will be dropped into the container shell."
 echo "Type 'exit' when you're done to return to your host system."
 echo ""
@@ -32,9 +37,9 @@ docker run --privileged -d --rm \
     -v /etc/ssl/certs:/etc/ssl/certs:ro \
     -v /usr/share/ca-certificates:/usr/share/ca-certificates:ro \
     --name efsa-pipeline-container \
-    -v "$(pwd):/EFSA_workspace" \
+    -w "$WORKSPACE_PATH" \
+    -v "$WORKSPACE_PATH:$WORKSPACE_PATH" \
     $INPUT_MOUNT \
-    -v "$(pwd)/data/outputs:/EFSA_workspace/data/outputs" \
     efsa-pipeline
 
 docker exec -it efsa-pipeline-container /bin/sh
