@@ -1,14 +1,21 @@
-FROM python:3.10-slim-bookworm
+FROM docker:28.5.0-dind-alpine3.22
+
+RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
+    echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories && \
+    apk update --no-cache --allow-untrusted
+
+
 # Install necessary packages
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    docker.io \
-    vim less \
+RUN apk update && \
+    apk add --no-cache \
+    python3 \
+    py3-pip \
     openssh-client \
     git \
     curl \
-    openjdk-17-jre-headless \
-    && rm -rf /var/lib/apt/lists/*
+    bash \
+    openjdk17-jre-headless \
+    && rm -rf /var/cache/apk/*
 
 # Copy the Nextflow binary from VM and make it executable
 COPY nextflow /usr/local/bin/nextflow
@@ -16,10 +23,3 @@ RUN chmod +x /usr/local/bin/nextflow
 
 # Copy shell configuration for better user experience
 COPY .devcontainer/.inputrc /root/
-
-# Set working directory
-WORKDIR /EFSA_workspace
-COPY . /EFSA_workspace/
-
-# Default command to bash for interactive use
-CMD ["/bin/bash"]
