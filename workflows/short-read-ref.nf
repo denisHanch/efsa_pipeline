@@ -27,7 +27,7 @@ workflow short_ref {
         bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
         
         // Annotate vcf
-        Channel.fromPath("$params.in_dir/*ref.gtf", checkIfExists: true) | set { gtf }
+        Channel.fromPath("$params.in_dir/*ref.gtf") | set { gtf }
 
         annotate_vcf(fasta, gtf, vcf) | set {qc_vcf}
         
@@ -45,8 +45,8 @@ workflow short_ref {
 workflow { 
     log.info  "Processing files in directory: ${params.in_dir}"
     
-    Channel.fromPath("$params.in_dir/*.fastq.gz") | set { fastqs }
-    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
+    Channel.fromPath("$params.in_dir/*.fastq.gz", deep: true) | set { fastqs }
+    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", deep: true) | set { fasta }
     
     fastqs
     | map {[(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq.gz/)[0][1], it]}

@@ -42,7 +42,7 @@ workflow {
         mapping_tag = "map-ont"
     }
 
-    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
+    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", deep: true) | set { fasta }
 
     Channel.fromPath("${params.in_dir}/tmp2/*_subreads.fastq.gz")
         .map { file -> 

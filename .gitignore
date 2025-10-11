@@ -87,6 +87,9 @@ data/outputs/*
 .nextflow*
 work/*
 
+# Nextflow download run_container.sh tmp files
+nxtf-tmp.*
+
 output/
 
 .DS_Store
