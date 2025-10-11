@@ -23,11 +23,6 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
    ./run_container.sh
    ```
 
-   To provide path to input folder, which would be mounted onto `/EFSA_workspace/data/inputs` run:
-   ```
-   ./run_container.sh --input /path/to/inputs
-   ```
-
 3. You'll be dropped into the container shell where you can run CLI commands
 4. Type `exit` when done to return to your host system
 
@@ -70,7 +65,12 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
    ```
 
 # Nextflow
-From within dev container:  
+From within dev container:
+
+Please run the `docker login` command that is given in the efsa Slack channel - Nextflow notes.
+
+Run pipeline for all the pipelines:
+`nextflow run main.nf -resume`
 
 Run pipeline for short-read processing:
 `nextflow run workflows/short-read-ref.nf -resume`
@@ -80,4 +80,3 @@ Run pipeline for long-read processing:
 
 Run pipeline for ref & mod fasta comparisons:
 `nextflow run workflows/fasta_ref_x_mod.nf -resume`
-
