@@ -26,5 +26,7 @@ RUN apk update && \
 COPY nextflow /usr/local/bin/nextflow
 RUN chmod +x /usr/local/bin/nextflow
 
+WORKDIR /EFSA_workspace
+
 # Copy shell configuration for better user experience
 COPY .devcontainer/.inputrc /root/
