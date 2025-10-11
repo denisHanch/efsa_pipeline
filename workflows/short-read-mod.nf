@@ -53,8 +53,8 @@ workflow mod_ref {
 workflow { 
     log.info  "Processing files in directory: ${params.in_dir}"
     
-    Channel.fromPath("$params.in_dir/*mod.{fa,fna,fasta}") | set { mod_fasta }
-    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", deep: true) | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", deep: true) | set { mod_fasta }
 
     
     Channel.fromPath("$params.in_dir/*.fastq.gz")
