@@ -3,7 +3,7 @@
 include { nanoplot; multiqc } from '../modules/qc.nf'
 include { calc_unmapped; get_unmapped_reads } from '../modules/mapping.nf'
 include { sv_long; mapping_long; mapping_long as mapping_long_mod }  from '../modules/subworkflow.nf'
-include { logUnmapped } from '../modules/logs.nf'
+include { logUnmapped; logWorkflowCompletion } from '../modules/logs.nf'
 
 
 out_folder_name = "long-mod"
@@ -34,10 +34,7 @@ workflow long_mod {
 
         // variant calling
         sv_long(mod_fasta, indexed_bam, out_folder_name)
-
-    emit:
-        log.info "▶ The long read processing pipeline completed successfully."
-    }
+}
 
 
 workflow {
@@ -61,3 +58,5 @@ workflow {
     
     long_mod(ont_fastqs, ref_fasta, mod_fasta,  "map-ont") //pacbio_fastqs, "map-pb"
 }
+
+logWorkflowCompletion(out_folder_name, params.map_to_mod_fa)

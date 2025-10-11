@@ -3,13 +3,13 @@
 include { multiqc } from '../modules/qc.nf'
 include { calc_unmapped; bwa_index; get_unmapped_reads; bwa_index as bwa_index_ref } from '../modules/mapping.nf'
 include { freebayes; bcftools_stats } from '../modules/variant_calling.nf'
-include { logUnmapped } from '../modules/logs.nf'
+include { logUnmapped; logWorkflowCompletion } from '../modules/logs.nf'
 include { qc; mapping; sv; mapping as mapping_ref } from '../modules/subworkflow.nf'
 
 
 out_folder_name = "short-mod"
 
-workflow mod_ref {
+workflow short_mod {
     take:
         trimmed
         ref_fasta
@@ -39,9 +39,6 @@ workflow mod_ref {
 
         // SVs variant calling
         sv(mod_fasta, indexed_unmapped_bam, out_folder_name)
-        
-        emit:
-            log.info "▶ The ${out_folder_name} processing pipeline completed successfully."
 }
 
 
@@ -61,5 +58,7 @@ workflow {
     // QC and trimming module
     qc(fastqs, out_folder_name) | set { trimmed }
 
-    mod_ref(trimmed, ref_fasta, mod_fasta)
+    short_mod(trimmed, ref_fasta, mod_fasta)
 }
+
+logWorkflowCompletion(out_folder_name, params.map_to_mod_fa)

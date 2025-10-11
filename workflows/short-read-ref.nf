@@ -4,7 +4,7 @@ include { multiqc } from '../modules/qc.nf'
 include { calc_unmapped; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads } from '../modules/mapping.nf'
 include { freebayes; bcftools_stats; freebayes as freebayes_plasmid; bcftools_stats as bcftools_stats_plasmid } from '../modules/variant_calling.nf'
 include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid; sv as sv_plasmid } from '../modules/subworkflow.nf'
-include { logUnmapped } from '../modules/logs.nf'
+include { logUnmapped; logWorkflowCompletion } from '../modules/logs.nf'
 
 
 out_folder_name = "short-ref"
@@ -51,9 +51,6 @@ workflow short_ref {
     
         // SVs variant calling against the reference
         sv(fasta, indexed_bam, out_folder_name)
-        
-        emit:
-            log.info "▶ The ${out_folder_name} processing pipeline completed successfully."
 }
 
 
@@ -73,3 +70,5 @@ workflow {
 
     short_ref(trimmed, fasta)
 }
+
+logWorkflowCompletion(out_folder_name, !params.map_to_mod_fa)

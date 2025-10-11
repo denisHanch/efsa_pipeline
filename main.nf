@@ -3,11 +3,11 @@
 // Include workflows
 include { ref_mod } from './workflows/fasta_ref_x_mod.nf'
 
-include { long_ref; long_ref as long_ref_ont } from './workflows/long-read-ref.nf'
-include { long_mod; long_mod as long_mod_ont } from './workflows/long-read-mod.nf'
+include { long_ref as long_ref_pacbio; long_ref as long_ref_ont } from './workflows/long-read-ref.nf'
+include { long_mod as long_mod_pacbio; long_mod as long_mod_ont } from './workflows/long-read-mod.nf'
 
 include { short_ref } from './workflows/short-read-ref.nf'
-include { mod_ref } from './workflows/short-read-mod.nf'
+include { short_mod } from './workflows/short-read-mod.nf'
 
 include { qc } from './modules/subworkflow.nf'
 include { sortVcf; indexVcf; truvari } from './modules/variant_calling.nf'
@@ -76,10 +76,10 @@ workflow {
 
             if (params.map_to_mod_fa) {
                 log.info describePipeline("long-pacbio", "modified", mod_fasta)
-                long_mod(pacbio_fastqs, ref_fasta, mod_fasta, mapping_tag)
+                long_mod_pacbio(pacbio_fastqs, ref_fasta, mod_fasta, mapping_tag)
             } else {
                 log.info describePipeline("long-pacbio", "reference")
-                long_ref(pacbio_fastqs, ref_fasta, mapping_tag)
+                long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag)
             }
 
             pipelines_running++
@@ -111,7 +111,7 @@ workflow {
         // Running mapping to the reference or modified fasta 
         if (params.map_to_mod_fa) {
             log.info describePipeline("short", "modified", mod_fasta)
-            mod_ref(trimmed, ref_fasta, mod_fasta)
+            short_mod(trimmed, ref_fasta, mod_fasta)
         } else {
             log.info describePipeline("short", "reference")
             short_ref(trimmed, ref_fasta)
@@ -130,4 +130,9 @@ workflow {
         log.error "⚠ No valid inputs found. Skipping workflows."
         exit 0
     }
+}
+
+workflow.onComplete {
+    if (workflow.success)
+        log.info "✅ Exections of pipelines in main.nf finished successfully at ${workflow.complete}\n"
 }

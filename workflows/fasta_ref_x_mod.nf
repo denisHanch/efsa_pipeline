@@ -1,6 +1,8 @@
 #!/usr/bin/env nextflow
 
 include { nucmer; deltaFilter; showCoords; syri } from '../modules/ref_x_mod.nf'
+include { logWorkflowCompletion } from '../modules/logs.nf'
+
 
 workflow ref_mod {
     main:
@@ -11,11 +13,10 @@ workflow ref_mod {
         deltaFilter(prefix_name, delta) | set { filtered_delta }
         showCoords(prefix_name, filtered_delta) | set { coords }
         syri(ref_mod_fasta, coords, filtered_delta)
-
-    emit:
-        log.info "▶ The reference to modified fasta comparison pipeline completed successfully."
 }
 
 workflow {
     ref_mod()
 }
+
+logWorkflowCompletion("referece to modified fasta comparision", true)

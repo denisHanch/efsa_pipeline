@@ -60,7 +60,7 @@ process showCoords {
 }
 
 process syri {
-    container "${params.registry}/syri/:latest"
+    container "${params.registry}/syri:latest"
     publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
     publishDir ( params.map_to_mod_fa ? "${params.out_dir}/${params.workflow_id}" : "${params.out_dir}/final_vcf" ), mode: 'copy', saveAs: { filename -> filename.endsWith(".vcf") ? filename : null }
 
