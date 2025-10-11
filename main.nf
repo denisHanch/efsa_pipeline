@@ -52,8 +52,8 @@ out_folder_name = "final_vcf"
 
 workflow {
     // Inputs
-    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
-    Channel.fromPath("$params.in_dir/*mod.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
+    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", deep: true) | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", deep: true) | set { mod_fasta }
 
     Channel.fromPath("${params.in_dir}/pacbio/*_subreads.fastq.gz")
         .map { file -> 
