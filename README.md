@@ -69,8 +69,12 @@ From within dev container:
 
 Please run the `docker login` command that is given in the efsa Slack channel - Nextflow notes.
 
+Please also check if you have pacbio/nanopore reads in the folder, and set a parameter in nextflow.config based on this - PacBio_reads = true/false.
+
+The current setting suggests that all data were copied into data/inputs subdirectory in the /EFSA_workspace.
+
 Run pipeline for all the pipelines:
-`nextflow run main.nf -process.containerOptions "-u $(id -u):$(id -g)"-resume`
+`nextflow run main.nf -process.containerOptions "-u $(id -u):$(id -g)" -resume`
 
 Run pipeline for short-read processing:
 `nextflow run workflows/short-read-ref.nf -process.containerOptions "-u $(id -u):$(id -g)" -resume`
