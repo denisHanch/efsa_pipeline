@@ -70,13 +70,13 @@ From within dev container:
 Please run the `docker login` command that is given in the efsa Slack channel - Nextflow notes.
 
 Run pipeline for all the pipelines:
-`nextflow run main.nf -resume`
+`nextflow run main.nf -process.containerOptions "-u $(id -u):$(id -g)"-resume`
 
 Run pipeline for short-read processing:
-`nextflow run workflows/short-read-ref.nf -resume`
+`nextflow run workflows/short-read-ref.nf -process.containerOptions "-u $(id -u):$(id -g)" -resume`
 
 Run pipeline for long-read processing:
-`nextflow run workflows/long-read-ref.nf -resume`
+`nextflow run workflows/long-read-ref.nf -process.containerOptions "-u $(id -u):$(id -g)" -resume`
 
 Run pipeline for ref & mod fasta comparisons:
-`nextflow run workflows/fasta_ref_x_mod.nf -resume`
+`nextflow run workflows/fasta_ref_x_mod.nf -process.containerOptions "-u $(id -u):$(id -g)" -resume`
