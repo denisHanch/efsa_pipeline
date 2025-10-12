@@ -16,8 +16,10 @@ fi
 mkdir -p data/inputs data/outputs
 
 # Use default input directory
-INPUT_MOUNT="-v $(pwd)/data/inputs:/EFSA_workspace/data/inputs"
+WORKSPACE_PATH=$(pwd)
+INPUT_MOUNT="-v $WORKSPACE_PATH/data/inputs:/EFSA_workspace/data/inputs"
 echo "Using default input directory: ./data/inputs"
+
 
 # Run the container interactively with volume mounts
 echo "Starting EFSA Pipeline container..."

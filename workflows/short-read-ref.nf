@@ -24,9 +24,11 @@ workflow short_ref {
         logUnmapped(pct, params.short_threshold, out_folder_name)
 
         // mapping reads to plasmid & variant calling
-        Channel.fromPath("$params.in_dir/*plasmid.{fa,fna,fasta}") | set { mod_plasmid_fasta }
+        def plasmid_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /plasmid\.(fa|fna|fasta)$/ } ?: []
 
-        if (mod_plasmid_fasta) {
+        if (plasmid_files) {
+            Channel.from(plasmid_files) | set { mod_plasmid_fasta }
+
             get_unmapped_reads(indexed_bam, "short-ref-plasmid") | set { unmapped_fastq }
             bwa_index_plasmid(mod_plasmid_fasta, out_folder_name) | set { unmapped_fasta_index } 
             mapping_plasmid(mod_plasmid_fasta, unmapped_fasta_index, unmapped_fastq, "short-ref-plasmid") | set { unmapped_bam }
@@ -58,7 +60,7 @@ workflow {
     log.info  "Processing files in directory: ${params.in_dir}"
     
     Channel.fromPath("$params.in_dir/illumina/*.fastq.gz") | set { fastqs }
-    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", deep: true) | set { fasta }
+    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}") | set { fasta }
     
     fastqs
     | map {[(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq.gz/)[0][1], it]}

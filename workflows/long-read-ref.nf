@@ -27,9 +27,11 @@ workflow long_ref {
         logUnmapped(pct, params.long_threshold,  "long-ref-${mapping_tag}")
         
         // mapping reads to plasmid & variant calling
-        Channel.fromPath("$params.in_dir/*plasmid.{fa,fna,fasta}") | set { mod_plasmid_fasta }
+        def plasmid_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /plasmid\.(fa|fna|fasta)$/ } ?: []
 
-        if (mod_plasmid_fasta) {
+        if (plasmid_files) {
+            Channel.from(plasmid_files) | set { mod_plasmid_fasta }
+
             get_unmapped_reads(indexed_bam, "long-ref-plasmid") | set { unmapped_fastq }
             mapping_long_plasmid(unmapped_fastq, mod_plasmid_fasta, mapping_tag, "long-ref-plasmid") | set { unmapped_bam }
             sv_long_plasmid(mod_plasmid_fasta, unmapped_bam,  "long-ref-plasmid")
