@@ -71,4 +71,5 @@ workflow {
     short_ref(trimmed, fasta)
 }
 
+
 logWorkflowCompletion(out_folder_name, !params.map_to_mod_fa)

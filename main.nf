@@ -11,6 +11,7 @@ include { short_mod } from './workflows/short-read-mod.nf'
 
 include { qc } from './modules/subworkflow.nf'
 include { sortVcf; indexVcf; truvari } from './modules/variant_calling.nf'
+include { describePipeline; logWorkflowCompletion } from './modules/logs.nf'
  
 
 // Help message
@@ -29,15 +30,6 @@ def helpMessage() {
     """.stripIndent()
 }
 
-def describePipeline = { read_type, fasta_type, mod_fasta = null ->
-    def msg = "▶ Running pipeline processing ${read_type} reads - mapping "
-    if( mod_fasta )
-        msg += "unmapped reads to the ${fasta_type} fasta."
-    else
-        msg += "to the ${fasta_type} fasta."
-    return msg
-}
-
 // Show help
 if (params.help) {
     helpMessage()
@@ -52,8 +44,8 @@ out_folder_name = "final_vcf"
 
 workflow {
     // Inputs
-    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", deep: true) | set { ref_fasta }
-    Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", deep: true) | set { mod_fasta }
+    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
 
     Channel.fromPath("${params.in_dir}/pacbio/*_subreads.fastq.gz")
         .map { file -> 
@@ -130,9 +122,38 @@ workflow {
         log.error "⚠ No valid inputs found. Skipping workflows."
         exit 0
     }
-}
 
-workflow.onComplete {
-    if (workflow.success)
-        log.info "✅ Exections of pipelines in main.nf finished successfully at ${workflow.complete}\n"
-}
+    if (pipelines_running > 2) {
+
+            // Inputs
+            Channel.fromPath("$params.out_dir/final_vcf/*.vcf").map { file -> 
+                def name = file.baseName.replaceFirst('.vcf', '')
+                return [name, file]
+            }
+            .set { vcfs }
+
+            log.info "▶ Comparing VCF files from pipelines"
+
+            // Sorting and indexiing vcfs
+            sortVcf(vcfs) | indexVcf | set { indexed_vcfs }
+
+            // preprocessing Channel for truvari input
+            split_ch = indexed_vcfs.branch {
+                ref_mod: it[0] == "ref_x_modsyri"
+                others:  it[0] != "ref_x_modsyri"
+            }
+
+            ref_mod_ch = split_ch.ref_mod.collect()
+            others_ch  = split_ch.others
+
+            vcf_pairs_ch = ref_mod_ch.combine(others_ch)
+
+            // Comparing vcf from short/read pipeline to vcf created by comparison of two fastas
+            truvari(ref_fasta, vcf_pairs_ch)
+
+            log.info "✅ Truvari peformed ${pipelines_running-1} comparisons."
+
+        }
+    }
+
+logWorkflowCompletion("execution of main.nf", true)

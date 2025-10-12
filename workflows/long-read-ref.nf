@@ -6,6 +6,7 @@ include { logUnmapped; logWorkflowCompletion } from '../modules/logs.nf'
 include { calc_unmapped; get_unmapped_reads } from '../modules/mapping.nf'
 
 out_folder_name = "long-ref"
+var = false
 
 workflow long_ref {
 
