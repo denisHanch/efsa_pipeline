@@ -42,9 +42,11 @@ workflow short_ref {
         bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
         
         // Annotate SNPs & QC
-        Channel.fromPath("$params.in_dir/*ref.gtf") | set { gtf }
 
-        if (gtf) {
+        def gtf_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref\.gtf$/ } ?: []
+
+        if (gtf_files) {
+            Channel.fromPath(gtf_files) | set { gtf }
             annotate_vcf(fasta, gtf, vcf) | set {qc_vcf}
         
             qc_vcf.mix(bcftools_out).collect() | set { qc_out }
