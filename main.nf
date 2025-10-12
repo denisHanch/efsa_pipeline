@@ -39,10 +39,6 @@ if (params.help) {
 
 def pipelines_running = 0
 
-out_folder_name = "final_vcf"
-
-
-
 workflow {
     // Inputs
     Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
@@ -101,7 +97,7 @@ workflow {
         .set { fastqs }
 
         // QC and trimming module
-        qc(fastqs, out_folder_name) | set { trimmed }
+        qc(fastqs, "short-ref") | set { trimmed }
 
         // Running mapping to the reference or modified fasta 
         if (params.map_to_mod_fa) {
@@ -117,13 +113,15 @@ workflow {
     if (ref_fasta && mod_fasta) {
         log.info "▶ Running pipeline comparing reference and modified fasta."
         ref_mod()
-
+        
         pipelines_running++
     }
 
     if (pipelines_running == 0) {
         log.error "⚠ No valid inputs found. Skipping workflows."
         exit 0
+    } else {
+        log.info "Performing ${pipelines_running - 1} truvari comparison(s)."
     }
 
     if (pipelines_running >= 2) {
