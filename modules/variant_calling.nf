@@ -118,7 +118,7 @@ process bcftools_stats {
 process sortVcf {
     container 'biocontainers/bcftools:v1.9-1-deb_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
+    publishDir "${params.out_dir}/truvari", mode: 'copy'
 
     input:
     tuple val(pair_id),  path(vcf_file)
@@ -138,7 +138,7 @@ process sortVcf {
 process indexVcf {
     container 'biocontainers/bcftools:v1.9-1-deb_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
+    publishDir "${params.out_dir}/truvari", mode: 'copy'
 
     input:
     tuple val(pair_id), path(vcf_file)
@@ -159,7 +159,7 @@ process indexVcf {
 process truvari {
     container "${params.registry}/truvari:latest"
     tag "$pair_id1 & $pair_id2"
-    publishDir "${params.out_dir}/final_vcf", mode: 'copy'
+    publishDir "${params.out_dir}/truvari", mode: 'copy'
 
     input:
     each path(fasta_file)

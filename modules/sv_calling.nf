@@ -74,14 +74,13 @@ process convert_bcf_to_vcf {
     container 'biocontainers/bcftools:v1.9-1-deb_cv1'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
-    publishDir ( params.map_to_mod_fa ? "${params.out_dir}/${out_folder_name}/vcf" : "${params.out_dir}/final_vcf" ), mode: 'copy'
 
     input:
     tuple val(pair_id), path(bcf_file)
     val out_folder_name
 
     output:
-    tuple val(pair_id),  path("${pair_id}_sv_short_read.vcf")
+    path("${pair_id}_sv_short_read.vcf")
 
     script:
     """
@@ -173,17 +172,17 @@ process survivor {
     container "${params.registry}/survivor:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: 'copy'
-    publishDir ( params.map_to_mod_fa ? "${params.out_dir}/${out_folder_name}/survivor_out" : "${params.out_dir}/final_vcf" ), mode: 'copy'
 
     input:
     tuple val(pair_id), path(sniffles_vcf)
     tuple val(pair_id), path(cute_vcf)
     tuple val(pair_id), path(debreak_vcf)
+    val mapping_tag
     val out_folder_name
 
 
     output:
-    tuple val(pair_id), path("${pair_id}_sv_long_read.vcf")
+    tuple val(pair_id), path("${pair_id}_${mapping_tag}_sv_long_read.vcf")
 
     script:
     """
@@ -196,6 +195,6 @@ process survivor {
     printf "%s\n" sniffles.vcf cute.vcf debreak.vcf > vcf_list.txt
 
     # Run the SURVIVOR merge command
-    SURVIVOR merge vcf_list.txt 1000 1 1 1 0 30 ${pair_id}_sv_long_read.vcf
+    SURVIVOR merge vcf_list.txt 1000 1 1 1 0 30 ${pair_id}_${mapping_tag}_sv_long_read.vcf
     """
 }

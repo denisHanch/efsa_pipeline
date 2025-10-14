@@ -5,17 +5,29 @@ include { logWorkflowCompletion } from '../modules/logs.nf'
 
 
 workflow ref_mod {
+    take:
+        ref_fasta
+        mod_fasta
     main:
         def prefix_name = "ref_x_mod"
-        ref_mod_fasta = Channel.of(tuple(prefix_name, file("$params.in_dir/*ref*.{fa,fna,fasta}"), file("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}")))
+
+        ref_mod_fasta = ref_fasta
+            .combine(mod_fasta)
+            .map { ref, mod -> tuple(prefix_name, ref, mod) }
+
         ref_mod_fasta | nucmer | set { delta }
         deltaFilter(prefix_name, delta) | set { filtered_delta }
         showCoords(prefix_name, filtered_delta) | set { coords }
-        syri(ref_mod_fasta, coords, filtered_delta)
+        syri(ref_mod_fasta, coords, filtered_delta) | set { sv_vcf }
+    emit: 
+        sv_vcf
 }
 
 workflow {
-    ref_mod()
+    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
+
+    ref_mod(ref_fasta, mod_fasta)
 }
 
 

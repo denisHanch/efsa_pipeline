@@ -34,11 +34,13 @@ workflow long_ref {
 
             get_unmapped_reads(indexed_bam, "long-ref-plasmid") | set { unmapped_fastq }
             mapping_long_plasmid(unmapped_fastq, mod_plasmid_fasta, mapping_tag, "long-ref-plasmid") | set { unmapped_bam }
-            sv_long_plasmid(mod_plasmid_fasta, unmapped_bam,  "long-ref-plasmid")
+            sv_long_plasmid(mod_plasmid_fasta, unmapped_bam, mapping_tag, "long-ref-plasmid")
         }
 
         // SV calling against the reference
-        sv_long(fasta, indexed_bam, out_folder_name)
+        sv_long(fasta, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
+    emit:
+        sv_vcf
 }
 
 

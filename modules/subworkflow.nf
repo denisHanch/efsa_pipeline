@@ -103,6 +103,7 @@ workflow sv_long {
     take:
         fasta
         indexed_bam
+        mapping_tag
         out_folder_name
 
     main:
@@ -110,7 +111,7 @@ workflow sv_long {
         debreak(fasta, indexed_bam, out_folder_name) | set { debreak_vcf }
         sniffles(fasta, indexed_bam, out_folder_name) | set { sniffles_vcf }
 
-        survivor(cute_vcf, debreak_vcf, sniffles_vcf, out_folder_name) | set { merged_vcf }
+        survivor(cute_vcf, debreak_vcf, sniffles_vcf, mapping_tag, out_folder_name) | set { merged_vcf }
         bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
 
     emit:
