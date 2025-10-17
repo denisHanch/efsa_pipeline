@@ -87,6 +87,7 @@ output/
 
 # Ignore contents of the data dirs, but keep the folders themselves
 data/inputs/*
+data/valid/*
 data/outputs/*
 data/valid/*
 !data/inputs/.gitkeep
@@ -99,3 +100,7 @@ data/valid/*
 *report*.html
 work*
 *dag*
+
+
+# Logs
+**/logs/**
