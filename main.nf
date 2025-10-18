@@ -38,7 +38,6 @@ if (params.help) {
 }
 
 def pipelines_running = 0
-def vcfs = Channel.empty()
 
 workflow {
     // Inputs
@@ -51,14 +50,12 @@ workflow {
 
     def short_read_files = file("$params.in_dir/illumina/").listFiles()?.findAll { it.name =~ /\.(fastq|fq)(\.gz)?$/ } ?: []
 
-    if (ref_fasta && mod_fasta) {
-        log.info "▶ Running pipeline comparing reference and modified fasta."
-        ref_mod(ref_fasta, mod_fasta)
-        
-        vcfs = ref_mod.out.sv_vcf
+    log.info "▶ Running pipeline comparing reference and modified fasta."
+    ref_mod(ref_fasta, mod_fasta)
+    
+    def vcfs = ref_mod.out.sv_vcf
 
-        pipelines_running++
-    }
+    pipelines_running++
 
     if (pacbio_files) {
         mapping_tag = "map-pb"
@@ -75,8 +72,12 @@ workflow {
             log.info describePipeline("long-pacbio", "reference")
             long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag) 
         }
+        
+        long_ref_pacbio.out.sv_vcf
+            .map { it[1] }  
+            .set { sv_pacbio_vcf }
 
-        vcfs = vcfs.mix(long_ref_pacbio.out.sv_vcf)
+        vcfs = vcfs.mix(sv_pacbio_vcf)
 
         pipelines_running++
     }
@@ -98,7 +99,11 @@ workflow {
             long_ref_ont(ont_fastqs, ref_fasta, mapping_tag)
         }
 
-        vcfs = vcfs.mix(long_ref_ont.out.sv_vcf)
+        long_ref_ont.out.sv_vcf
+            .map { it[1] }  
+            .set { sv_ont_vcf }
+
+        vcfs = vcfs.mix(sv_ont_vcf)
 
         pipelines_running++
     }
@@ -121,7 +126,6 @@ workflow {
             log.info describePipeline("short", "reference")
             short_ref(trimmed, ref_fasta) 
         }
-
         vcfs = vcfs.mix(short_ref.out.sv_vcf)
 
         pipelines_running++
@@ -136,14 +140,14 @@ workflow {
 
     if (pipelines_running >= 2) {
         vcfs.view()
-        // vcfs = vcfs
-        // .flatten()
-        // .map { file ->
-        //     def name = file.getFileName().toString().replaceFirst(/\.vcf$/, '')
-        //     return [name, file]
-        // }
+        vcfs = vcfs
+        .flatten()
+        .map { file ->
+            def name = file.getFileName().toString().replaceFirst(/\.vcf$/, '')
+            return [name, file]
+        }
 
-        // truvari_comparison(ref_fasta, vcfs)
+        truvari_comparison(ref_fasta, vcfs)
     }
 }
 

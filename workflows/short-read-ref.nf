@@ -39,6 +39,7 @@ workflow short_ref {
 
         // SNPs variant calling against the reference
         freebayes(fasta, fasta_index, indexed_bam, out_folder_name) | set { vcf }
+        bcftools_stats(vcf, out_folder_name)
         
         // Annotate SNPs & QC
 
