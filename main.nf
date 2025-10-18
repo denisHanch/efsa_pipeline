@@ -139,7 +139,7 @@ workflow {
     }
 
     if (pipelines_running >= 2) {
-        vcfs.view()
+
         vcfs = vcfs
         .flatten()
         .map { file ->
