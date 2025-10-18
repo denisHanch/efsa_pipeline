@@ -1,16 +1,29 @@
 #   How to run
 
-required config.json configuration file together with input files. Description of config bellow.
+download or update submodule validation package
+```
+git submodule update --init --recursive
+```
+
+install package and its dependencies
+```
+pip install -e /EFSA_workspace/modules/validation/validation_pkg
+pip install -r /EFSA_workspace/modules/validation/validation_pkg/requirements.txt
+```
+
+Load your data and configuration file into `/EFSA_workspace/data/inputs/` (description of config.json bellow)
+
 Run validation as 
 ```
 python3 main.py /EFSA_workspace/data/inputs/config.json
 ```
  - may take a lot of time - since the reads are still validated read by read.
- 
+
+output of the validation is on `/EFSA_workspace/data/valid/` 
+logs are on `.logs/`
 #   What to export
+
 - in directory, where the python script runs, the directory /logs will be created. Please ZIP and share with me.
-
-
 
 # Configuration File — Specification & Guide
 
