@@ -35,7 +35,9 @@ process build_config {
 
     input:
     each path(fasta_file)
-    each path(gtf_file)
+    each path(feature_file)
+    val feature_tag
+    val build_setting
 
     output:
     tuple path("genome_id.txt"), path("snpEff.config")
@@ -43,7 +45,7 @@ process build_config {
     script:
     """
     fasta_path='${fasta_file}'
-    gtf_path='${gtf_file}'
+    feature_path='${feature_file}'
 
     # Extract genome ID from first header line
     genome_id=\$(grep '^>' \$fasta_path | head -n 1 | cut -d ' ' -f1 | sed 's/^>//' | tr -cd '[:alnum:]_')
@@ -51,11 +53,11 @@ process build_config {
 
     mkdir -p data/\$genome_id
     cp \$fasta_path data/\$genome_id/sequences.fa
-    cp \$gtf_path data/\$genome_id/genes.gtf
+    cp \$feature_path data/\$genome_id/genes.${feature_tag}
 
     echo "\$genome_id.genome : Custom Genome" > snpEff.config
 
-    snpEff build -gtf22 -v \$genome_id -c snpEff.config
+    snpEff build -${build_setting} -v \$genome_id -c snpEff.config
 
     echo \$genome_id > genome_id.txt
     """

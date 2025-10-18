@@ -67,10 +67,12 @@ workflow annotate_vcf {
         fasta
         gtf
         vcf
+        feature_tag
+        build_setting
 
 
     main:
-        build_config(fasta, gtf) | set { snpeff_out }
+        build_config(fasta, gtf, feature_tag, build_setting) | set { snpeff_out }
         genome_id = snpeff_out.map { genome_id, snpeff_config -> genome_id }
         snpeff_config = snpeff_out.map { genome_id, snpeff_config -> snpeff_config }
         snpeff(vcf, genome_id, snpeff_config) | set { snpeff_output }

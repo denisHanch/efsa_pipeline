@@ -39,18 +39,27 @@ workflow short_ref {
 
         // SNPs variant calling against the reference
         freebayes(fasta, fasta_index, indexed_bam, out_folder_name) | set { vcf }
-        bcftools_stats(vcf, out_folder_name)
+        bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
         
         // Annotate SNPs & QC
 
         def gtf_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref\.gtf$/ } ?: []
+        def gff_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref\.gff$/ } ?: []
 
         if (gtf_files) {
             Channel.fromPath(gtf_files) | set { gtf }
-            annotate_vcf(fasta, gtf, vcf) | set {qc_vcf}
+            annotate_vcf(fasta, gtf, vcf, "gtf", "gtf22") | set {qc_vcf}
         
             qc_vcf.mix(bcftools_out).collect() | set { qc_out }
             multiqc(qc_out, out_folder_name, 'varint_calling')
+        } else if (gff_files) {
+            Channel.fromPath(gff_files) | set { gff }
+            annotate_vcf(fasta, gff, vcf, "gff", "gff3") | set {qc_vcf}
+        
+            qc_vcf.mix(bcftools_out).collect() | set { qc_out }
+            multiqc(qc_out, out_folder_name, 'varint_calling')
+        } else {
+            multiqc(qc_vcf, out_folder_name, 'varint_calling')
         }
     
         // SVs variant calling against the reference
