@@ -3,8 +3,6 @@ name: "AUTOMATION: PR Open Notification"
 on:
   pull_request:
     types: [opened]
-    branches-ignore:
-      - 'no-issue*'
 
 env:
   IGNORE_PREFIX: ${{ vars.IGNORE_PREFIX }}
