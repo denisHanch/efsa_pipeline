@@ -24,7 +24,7 @@ workflow short_ref {
         logUnmapped(pct, params.short_threshold, out_folder_name)
 
         // mapping reads to plasmid & variant calling
-        def plasmid_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /plasmid\.(fa|fna|fasta)$/ } ?: []
+        def plasmid_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
 
         if (plasmid_files) {
             Channel.from(plasmid_files) | set { mod_plasmid_fasta }

@@ -9,7 +9,7 @@ include { long_mod as long_mod_pacbio; long_mod as long_mod_ont } from './workfl
 include { short_ref } from './workflows/short-read-ref.nf'
 include { short_mod } from './workflows/short-read-mod.nf'
 
-include { truvari_comparison } from './workflows/compare_vcfs.nf'
+include { truvari_comparison } from './modules/compare_vcfs.nf'
 
 include { qc } from './modules/subworkflow.nf'
 include { describePipeline; logWorkflowCompletion } from './modules/logs.nf'
@@ -44,9 +44,9 @@ workflow {
     Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
     Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
 
-    def pacbio_files = file("${params.in_dir}/pacbio/").listFiles()?.findAll { it.name =~ /_subreads\.fastq\.gz$/ } ?: []
+    def pacbio_files = file("${params.in_dir}/pacbio/").listFiles()?.findAll { it.name =~ /\.fastq\.gz$/ } ?: []
 
-    def ont_files = file("${params.in_dir}/nanopore/").listFiles()?.findAll { it.name =~ /_subreads\.fastq\.gz$/ } ?: []
+    def ont_files = file("${params.in_dir}/ont/").listFiles()?.findAll { it.name =~ /\.fastq\.gz$/ } ?: []
 
     def short_read_files = file("$params.in_dir/illumina/").listFiles()?.findAll { it.name =~ /\.(fastq|fq)(\.gz)?$/ } ?: []
 

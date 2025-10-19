@@ -42,14 +42,14 @@ workflow {
     Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", deep: true) | set { ref_fasta }
     Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", deep: true) | set { mod_fasta }
 
-    Channel.fromPath("${params.in_dir}/pacbio/*_subreads.fastq.gz")
+    Channel.fromPath("${params.in_dir}/pacbio/*.fastq.gz")
         .map { file -> 
             def name = file.baseName.replaceFirst('.fastq', '')
             return [name, file]
         }
         .set { pacbio_fastqs }
 
-    Channel.fromPath("${params.in_dir}/nanopore/*_subreads.fastq.gz")
+    Channel.fromPath("${params.in_dir}/ont/*.fastq.gz")
         .map { file -> 
             def name = file.baseName.replaceFirst('.fastq', '')
             return [name, file]

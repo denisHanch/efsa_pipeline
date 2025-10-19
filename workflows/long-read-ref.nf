@@ -27,7 +27,7 @@ workflow long_ref {
         logUnmapped(pct, params.long_threshold,  "long-ref-${mapping_tag}")
         
         // mapping reads to plasmid & variant calling
-        def plasmid_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /plasmid\.(fa|fna|fasta)$/ } ?: []
+        def plasmid_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
 
         if (plasmid_files) {
             Channel.from(plasmid_files) | set { mod_plasmid_fasta }
@@ -48,14 +48,14 @@ workflow {
     // Processing inputs
     log.info  "Processing files in directory: ${params.in_dir}"
 
-    Channel.fromPath("${params.in_dir}/pacbio/*_subreads.fastq.gz")
+    Channel.fromPath("${params.in_dir}/pacbio/*.fastq.gz")
         .map { file -> 
             def name = file.baseName.replaceFirst('.fastq', '')
             return [name, file]
         }
         .set { pacbio_fastqs }
 
-    Channel.fromPath("${params.in_dir}/nanopore/*_subreads.fastq.gz")
+    Channel.fromPath("${params.in_dir}/ont/*.fastq.gz")
         .map { file -> 
             def name = file.baseName.replaceFirst('.fastq', '')
             return [name, file]
