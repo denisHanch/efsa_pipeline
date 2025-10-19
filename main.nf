@@ -111,7 +111,7 @@ workflow {
     if (short_read_files) {    
         
         Channel.from(short_read_files)
-        .map { [(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq.gz/)[0][1], it] }
+        .map { [(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.f(ast)?q\.gz/)[0][1], it] } 
         .groupTuple(sort: true)
         .set { fastqs }
 

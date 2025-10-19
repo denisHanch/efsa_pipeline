@@ -80,9 +80,10 @@ dmypy.json
 # Ignore contents of the data dirs, but keep the folders themselves
 data/inputs/*
 data/outputs/*
+data/valid/*
 !data/inputs/.gitkeep
 !data/outputs/.gitkeep
-
+!data/inputs/.gitkeep
 # Nextflow specific ignores
 .nextflow*
 .DS_Store
