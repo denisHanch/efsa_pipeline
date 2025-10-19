@@ -30,6 +30,6 @@ workflow.onComplete {
     if (workflow.success) {
         log.info "✅ Truvari stage finished successfully after comparing pipelines.\n"
     } else {
-        log.err " ❌ Truvari failed to finish the comparision."
+        log.err "❌ Truvari failed to finish the comparision."
     }
 }
