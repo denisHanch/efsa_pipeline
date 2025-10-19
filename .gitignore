@@ -83,7 +83,7 @@ data/outputs/*
 data/valid/*
 !data/inputs/.gitkeep
 !data/outputs/.gitkeep
-!data/inputs/.gitkeep
+!data/valid/.gitkeep
 # Nextflow specific ignores
 .nextflow*
 .DS_Store
