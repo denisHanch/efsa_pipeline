@@ -62,7 +62,8 @@ def main():
     # Settings for reference genome
     ref_genome_settings = GenomeValidator.Settings()
     ref_genome_settings = ref_genome_settings.update(
-        plasmid_split=True,
+        plasmids_to_one=True,
+        main_longest=True,
         coding_type=None,
         output_filename_suffix='ref',
         replace_id_with='chr',
@@ -72,18 +73,19 @@ def main():
     # Settings for modified genome
     mod_genome_settings = GenomeValidator.Settings()
     mod_genome_settings = mod_genome_settings.update(
-        plasmid_split=True,
+        plasmids_to_one=True,
+        main_longest=True,
         coding_type=None,
         output_filename_suffix='mod',
         replace_id_with='chr',
-        min_sequence_length=100
+        min_sequence_length=100,
     )
 
     # Settings for plasmid genomes (if you have them)
     plasmid_settings = GenomeValidator.Settings()
     plasmid_settings = plasmid_settings.update(
-        plasmid_split=False,  # Don't split plasmids from plasmid file
-        # TODO: longest == main bool option
+        is_plasmid=True,
+        plasmids_to_one=True,
         coding_type=None,
         output_filename_suffix='plasmid'
     )
@@ -91,7 +93,8 @@ def main():
     # Settings for reads
     reads_settings = ReadValidator.Settings()
     reads_settings = reads_settings.update(
-        coding_type='gz'
+        coding_type='gz',
+        outdir_by_ngs_type=True
     )
 
     # Settings for features
@@ -100,7 +103,7 @@ def main():
         sort_by_position=True,
         check_coordinates=True,
         allow_zero_length=False,
-        # replace_id_with='chr',
+        replace_id_with='chr',
         coding_type=None,
         output_filename_suffix='ref'
     )
@@ -111,11 +114,10 @@ def main():
         sort_by_position=True,
         check_coordinates=True,
         allow_zero_length=False,
-        # replace_id_with='chr',
+        replace_id_with='chr',
         coding_type=None,
         output_filename_suffix='mod'
     )
-
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
@@ -128,44 +130,34 @@ def main():
     if config.ref_genome:
         print(f"\n[1/4] Validating reference genome: {config.ref_genome.filename}")
         stats = validate_genome(config.ref_genome, config.output_dir, ref_genome_settings)
-        # print(f"      ✓ Success: {stats['total_sequences']} sequences, {stats['total_length']} bp")
 
     # Validate modified genome
     if config.mod_genome:
         print(f"\n[2/4] Validating modified genome: {config.mod_genome.filename}")
         stats = validate_genome(config.mod_genome, config.output_dir, mod_genome_settings)
-        # print(f"      ✓ Success: {stats['total_sequences']} sequences, {stats['total_length']} bp")
 
     # Validate plasmid genomes (if present in config)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
         print(f"\n[2.1/4] Validating reference plasmid: {config.ref_plasmid.filename}")
         stats = validate_genome(config.ref_plasmid, config.output_dir, plasmid_settings)
-        print(f"        ✓ Success: {stats['total_sequences']} sequences, {stats['total_length']} bp")
 
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
         print(f"\n[2.2/4] Validating modified plasmid: {config.mod_plasmid.filename}")
         stats = validate_genome(config.mod_plasmid, config.output_dir, plasmid_settings)
-        print(f"        ✓ Success: {stats['total_sequences']} sequences, {stats['total_length']} bp")
 
     # Validate reads
     if config.reads:
         print(f"\n[3/4] Validating {len(config.reads)} read file(s)...")
         stats_list = validate_reads(config.reads, config.output_dir, reads_settings)
-        # for idx, (read_config, stats) in enumerate(zip(config.reads, stats_list), 1):
-            # print(f"      ✓ Read {idx}/{len(config.reads)}: {read_config.filename} - "
-                #   f"{stats['total_reads']} reads")
 
     # Validate features
     if config.ref_feature:
-        print(f"\n[4.1/4] Validating feature file: {config.ref_feature.filename}")
+        print(f"\n[4/4] Validating feature file: {config.ref_feature.filename}")
         stats = validate_feature(config.ref_feature, config.output_dir, ref_feature_settings)
-        # print(f"      ✓ Success: {stats['total_features']} features")
 
-    # Validate features
     if config.mod_feature:
-        print(f"\n[4.2/4] Validating feature file: {config.mod_feature.filename}")
+        print(f"\n[4/4] Validating feature file: {config.mod_feature.filename}")
         stats = validate_feature(config.mod_feature, config.output_dir, mod_feature_settings)
-        # print(f"      ✓ Success: {stats['total_features']} features")
 
     # ========================================================================
     # Done!
