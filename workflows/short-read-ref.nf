@@ -59,7 +59,7 @@ workflow short_ref {
             qc_vcf.mix(bcftools_out).collect() | set { qc_out }
             multiqc(qc_out, out_folder_name, 'varint_calling')
         } else {
-            multiqc(qc_vcf, out_folder_name, 'varint_calling')
+            multiqc(bcftools_out, out_folder_name, 'varint_calling')
         }
     
         // SVs variant calling against the reference
