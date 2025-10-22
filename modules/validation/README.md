@@ -1,33 +1,22 @@
 #   How to run
 
-download and initiate submodule validation package
-```
-git submodule update --init --recursive
-```
-update submodule package
-```
-git submodule update --remote --merge
-```
-
 install package and its dependencies
 ```
-pip install -e /EFSA_workspace/modules/validation/validation_pkg
-pip install -r /EFSA_workspace/modules/validation/validation_pkg/requirements.txt
+pip install -e /EFSA_workspace/modules/validation/validation_pkg/
 ```
 
 Load your data and configuration file into `/EFSA_workspace/data/inputs/` (description of config.json bellow)
 
 Run validation as 
 ```
-python3 main.py /EFSA_workspace/data/inputs/config.json > validation.log
+python3 /EFSA_workspace/modules/validation/main.py /EFSA_workspace/data/inputs/config.json > stdout.log
 ```
- - may take a lot of time - since the reads are still validated read by read.
 
 output of the validation is on `/EFSA_workspace/data/valid/` 
-logs are on `.logs/`
-#   What to export
 
-- in directory, where the python script runs, a file validation.log will be created. Please share with me.
+#   What to export
+logs are on `.logs/` and `./stdout.log`
+Please share them with me.
 
 # Configuration File — Specification & Guide
 

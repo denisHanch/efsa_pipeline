@@ -1,3 +1,0 @@
-[submodule "modules/validation/validation-pkg"]
-	path = modules/validation/validation-pkg
-	url = git@github.com:draessld/validation-pkg.git

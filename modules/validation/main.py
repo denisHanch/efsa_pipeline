@@ -33,7 +33,7 @@ from validation_pkg import (
     validate_feature,
     setup_logging
 )
-
+from pathlib import Path
 
 def main():
     # Check command line arguments
@@ -52,8 +52,8 @@ def main():
     print(f"Configuration loaded from: {config_path}")
     print(f"Output directory: {config.output_dir}\n")
 
-    # Setup logging
-    setup_logging(console_level='INFO')
+    # Setup logging,
+    setup_logging(console_level='DEBUG',log_file=Path("logs/validation.log"),report_file=Path("logs/report.txt"))
 
     # ========================================================================
     # Step 2: Edit settings for each validator
@@ -90,19 +90,22 @@ def main():
         output_filename_suffix='plasmid'
     )
 
+    
     # Settings for reads
     reads_settings = ReadValidator.Settings()
     reads_settings = reads_settings.update(
+        validation_level = "trust",
         coding_type='gz',
-        outdir_by_ngs_type=True
+        outdir_by_ngs_type = True,
+        #   TODO: on minimal - at least check if in .gz format and raise error if not
     )
 
     # Settings for features
     ref_feature_settings = FeatureValidator.Settings()
     ref_feature_settings = ref_feature_settings.update(
-        sort_by_position=True,
+        validation_level="trust",
         check_coordinates=True,
-        allow_zero_length=False,
+        sort_by_position=False,
         replace_id_with='chr',
         coding_type=None,
         output_filename_suffix='ref'
@@ -111,9 +114,9 @@ def main():
         # Settings for features
     mod_feature_settings = FeatureValidator.Settings()
     mod_feature_settings = mod_feature_settings.update(
-        sort_by_position=True,
+        validation_level="trust",
+        sort_by_position=False,
         check_coordinates=True,
-        allow_zero_length=False,
         replace_id_with='chr',
         coding_type=None,
         output_filename_suffix='mod'
@@ -121,43 +124,63 @@ def main():
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
+    import time
 
     print("="*70)
     print("Starting Validation Workflow")
     print("="*70)
 
     # Validate reference genome
-    if config.ref_genome:
-        print(f"\n[1/4] Validating reference genome: {config.ref_genome.filename}")
-        stats = validate_genome(config.ref_genome, config.output_dir, ref_genome_settings)
+    start_time = time.time()
+    print(f"\n[1/4] Validating reference genome: {config.ref_genome.filename}")
+    validate_genome(config.ref_genome, config.output_dir, ref_genome_settings)
+    end_time = time.time()
+    print(f"Execution time: {end_time - start_time:.6f} seconds")
 
     # Validate modified genome
-    if config.mod_genome:
-        print(f"\n[2/4] Validating modified genome: {config.mod_genome.filename}")
-        stats = validate_genome(config.mod_genome, config.output_dir, mod_genome_settings)
+    start_time = time.time()
+    print(f"\n[2/4] Validating modified genome: {config.mod_genome.filename}")
+    validate_genome(config.mod_genome, config.output_dir, mod_genome_settings)
+    end_time = time.time()
+    print(f"Execution time: {end_time - start_time:.6f} seconds")
 
     # Validate plasmid genomes (if present in config)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
+        start_time = time.time()
         print(f"\n[2.1/4] Validating reference plasmid: {config.ref_plasmid.filename}")
-        stats = validate_genome(config.ref_plasmid, config.output_dir, plasmid_settings)
+        validate_genome(config.ref_plasmid, config.output_dir, plasmid_settings)
+        end_time = time.time()
+        print(f"Execution time: {end_time - start_time:.6f} seconds")
 
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
+        start_time = time.time()
         print(f"\n[2.2/4] Validating modified plasmid: {config.mod_plasmid.filename}")
-        stats = validate_genome(config.mod_plasmid, config.output_dir, plasmid_settings)
+        validate_genome(config.mod_plasmid, config.output_dir, plasmid_settings)
+        end_time = time.time()
+        print(f"Execution time: {end_time - start_time:.6f} seconds")
 
     # Validate reads
+    start_time = time.time()
     if config.reads:
         print(f"\n[3/4] Validating {len(config.reads)} read file(s)...")
         stats_list = validate_reads(config.reads, config.output_dir, reads_settings)
+    end_time = time.time()
+    print(f"Execution time: {end_time - start_time:.6f} seconds")
 
     # Validate features
     if config.ref_feature:
+        start_time = time.time()
         print(f"\n[4/4] Validating feature file: {config.ref_feature.filename}")
-        stats = validate_feature(config.ref_feature, config.output_dir, ref_feature_settings)
+        validate_feature(config.ref_feature, config.output_dir, ref_feature_settings)
+        end_time = time.time()
+        print(f"Execution time: {end_time - start_time:.6f} seconds")
 
     if config.mod_feature:
+        start_time = time.time()
         print(f"\n[4/4] Validating feature file: {config.mod_feature.filename}")
-        stats = validate_feature(config.mod_feature, config.output_dir, mod_feature_settings)
+        validate_feature(config.mod_feature, config.output_dir, mod_feature_settings)
+        end_time = time.time()
+        print(f"Execution time: {end_time - start_time:.6f} seconds")
 
     # ========================================================================
     # Done!

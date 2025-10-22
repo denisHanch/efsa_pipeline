@@ -96,3 +96,4 @@ work*
 
 # Logs
 **/logs/**
+*.log
