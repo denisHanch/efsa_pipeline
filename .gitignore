@@ -80,22 +80,14 @@ dmypy.json
 # Ignore contents of the data dirs, but keep the folders themselves
 data/inputs/*
 data/outputs/*
+data/valid/*
 !data/inputs/.gitkeep
 !data/outputs/.gitkeep
-
+!data/valid/.gitkeep
 # Nextflow specific ignores
 .nextflow*
-work/*
-
-# Nextflow download run_container.sh tmp files
-nxtf-tmp.*
-
-output/
-
 .DS_Store
-.nextflow
-.nextflow.log.*
-timeline*.html
-report*.html
-work/
-dag*
+*timeline*.html
+*report*.html
+work*
+*dag*

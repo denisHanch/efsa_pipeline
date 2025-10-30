@@ -8,7 +8,6 @@ docker build -t efsa-pipeline .
 # Check if build was successful
 if [ $? -ne 0 ]; then
     echo "Error: Docker build failed"
-    # Clean up the nextflow binary even if build failed
     exit 1
 fi
 
@@ -16,12 +15,9 @@ fi
 # Check if data directories exist, create if they don't
 mkdir -p data/inputs data/outputs
 
-# Get the absolute path of the current directory
-# Mount to the same absolute path inside the container: to prevent mixed up paths, when processes run in separate docker containers
-WORKSPACE_PATH=$(pwd)
-
 # Use default input directory
-INPUT_MOUNT="-v $(pwd)/data/inputs:/EFSA_workspace/data/inputs"
+WORKSPACE_PATH=$(pwd)
+INPUT_MOUNT="-v $WORKSPACE_PATH/data/inputs:/EFSA_workspace/data/inputs"
 echo "Using default input directory: ./data/inputs"
 
 
@@ -43,5 +39,6 @@ docker run --privileged -d --rm \
     efsa-pipeline
 
 docker exec -it efsa-pipeline-container /bin/sh
+docker stop efsa-pipeline-container
 
 echo "Container exited. You're back on your host system."

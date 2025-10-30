@@ -2,7 +2,8 @@
 include { fastqc; multiqc; trimgalore } from './qc.nf'
 include { bwa_mapping; samtool_index_bam; samtools_sort; samtool_stats; picard; calc_unmapped; minimap2 } from './mapping.nf'
 include { convert_bcf_to_vcf; delly; samtools_index; picard_dict; sniffles; debreak; cute_sv; survivor } from '../modules/sv_calling.nf'
-include { snpeff; build_config; bcftools_stats } from '../modules/variant_calling.nf'
+include { snpeff; build_config; bcftools_stats; sortVcf; indexVcf; truvari } from '../modules/variant_calling.nf'
+
 
 // short-reads pipeline
 
@@ -66,10 +67,12 @@ workflow annotate_vcf {
         fasta
         gtf
         vcf
+        feature_tag
+        build_setting
 
 
     main:
-        build_config(fasta, gtf) | set { snpeff_out }
+        build_config(fasta, gtf, feature_tag, build_setting) | set { snpeff_out }
         genome_id = snpeff_out.map { genome_id, snpeff_config -> genome_id }
         snpeff_config = snpeff_out.map { genome_id, snpeff_config -> snpeff_config }
         snpeff(vcf, genome_id, snpeff_config) | set { snpeff_output }
@@ -102,6 +105,7 @@ workflow sv_long {
     take:
         fasta
         indexed_bam
+        mapping_tag
         out_folder_name
 
     main:
@@ -109,7 +113,7 @@ workflow sv_long {
         debreak(fasta, indexed_bam, out_folder_name) | set { debreak_vcf }
         sniffles(fasta, indexed_bam, out_folder_name) | set { sniffles_vcf }
 
-        survivor(cute_vcf, debreak_vcf, sniffles_vcf, out_folder_name) | set { merged_vcf }
+        survivor(cute_vcf, debreak_vcf, sniffles_vcf, mapping_tag, out_folder_name) | set { merged_vcf }
         bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
 
     emit:

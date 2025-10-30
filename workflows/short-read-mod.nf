@@ -1,19 +1,15 @@
 #!/usr/bin/env nextflow
 
-include { freebayes; bcftools_stats } from '../modules/variant_calling.nf'
 include { multiqc } from '../modules/qc.nf'
-include { logUnmapped } from '../modules/logs.nf'
-
-include { qc; mapping; sv } from '../modules/subworkflow.nf'
-include { mapping as mapping_ref } from '../modules/subworkflow.nf'
-
-include { calc_unmapped; bwa_index; get_unmapped_reads } from '../modules/mapping.nf'
-include { bwa_index as bwa_index_ref } from '../modules/mapping.nf'
+include { calc_unmapped; bwa_index; get_unmapped_reads; bwa_index as bwa_index_ref } from '../modules/mapping.nf'
+include { freebayes; bcftools_stats } from '../modules/variant_calling.nf'
+include { logUnmapped; logWorkflowCompletion } from '../modules/logs.nf'
+include { qc; mapping; sv; mapping as mapping_ref } from '../modules/subworkflow.nf'
 
 
 out_folder_name = "short-mod"
 
-workflow mod_ref {
+workflow short_mod {
     take:
         trimmed
         ref_fasta
@@ -43,9 +39,6 @@ workflow mod_ref {
 
         // SVs variant calling
         sv(mod_fasta, indexed_unmapped_bam, out_folder_name)
-        
-        emit:
-            log.info "▶ The ${out_folder_name} processing pipeline completed successfully."
 }
 
 
@@ -53,17 +46,19 @@ workflow mod_ref {
 workflow { 
     log.info  "Processing files in directory: ${params.in_dir}"
     
-    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", deep: true) | set { ref_fasta }
-    Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", deep: true) | set { mod_fasta }
+    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
 
     
-    Channel.fromPath("$params.in_dir/*.fastq.gz")
-    | map {[(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.fastq.gz/)[0][1], it]}
+    Channel.fromPath("$params.in_dir/illumina/*.fastq.gz")
+    .map { [(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.f(ast)?q\.gz/)[0][1], it] } 
     | groupTuple(sort: true)
     | set { fastqs }
 
     // QC and trimming module
     qc(fastqs, out_folder_name) | set { trimmed }
 
-    mod_ref(trimmed, ref_fasta, mod_fasta)
+    short_mod(trimmed, ref_fasta, mod_fasta)
 }
+
+logWorkflowCompletion(out_folder_name, params.map_to_mod_fa)

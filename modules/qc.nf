@@ -90,10 +90,10 @@ container 'staphb/nanoplot:latest'
     val out_folder_name
     
     output:
-    path('nanoplot_report')
+    path("${pair_id}_report")
     
     script:
     """
-    NanoPlot --fastq $reads --outdir nanoplot_report
+    NanoPlot --fastq $reads --outdir ${pair_id}_report
     """
 }

@@ -1,10 +1,10 @@
 #!/usr/bin/env nextflow
 
 include { nanoplot; multiqc } from '../modules/qc.nf'
-include { sv_long; mapping_long }  from '../modules/subworkflow.nf'
-include { mapping_long as mapping_long_mod }  from '../modules/subworkflow.nf'
-include { logUnmapped } from '../modules/logs.nf'
 include { calc_unmapped; get_unmapped_reads } from '../modules/mapping.nf'
+include { sv_long; mapping_long; mapping_long as mapping_long_mod }  from '../modules/subworkflow.nf'
+include { logUnmapped; logWorkflowCompletion } from '../modules/logs.nf'
+
 
 out_folder_name = "long-mod"
 
@@ -24,7 +24,7 @@ workflow long_mod {
 
          // printout % unmapped reads
         calc_unmapped(indexed_bam) | set { pct }
-        logUnmapped(pct, params.long_threshold, out_folder_name)
+        logUnmapped(pct, params.long_threshold,  "long-ref-${mapping_tag}")
 
         // extract unmapped reads
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
@@ -34,10 +34,7 @@ workflow long_mod {
 
         // variant calling
         sv_long(mod_fasta, indexed_bam, out_folder_name)
-
-    emit:
-        log.info "▶ The long read processing pipeline completed successfully."
-    }
+}
 
 
 workflow {
@@ -45,12 +42,21 @@ workflow {
     Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", deep: true) | set { ref_fasta }
     Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", deep: true) | set { mod_fasta }
 
-    Channel.fromPath("${params.in_dir}/tmp2/*_subreads.fastq.gz")
+    Channel.fromPath("${params.in_dir}/pacbio/*.fastq.gz")
         .map { file -> 
             def name = file.baseName.replaceFirst('.fastq', '')
             return [name, file]
         }
-        .set { fastqs }
+        .set { pacbio_fastqs }
+
+    Channel.fromPath("${params.in_dir}/ont/*.fastq.gz")
+        .map { file -> 
+            def name = file.baseName.replaceFirst('.fastq', '')
+            return [name, file]
+        }
+        .set { ont_fastqs }
     
-    long_mod(fastqs, ref_fasta, mod_fasta, mapping_tag)
+    long_mod(ont_fastqs, ref_fasta, mod_fasta,  "map-ont") //pacbio_fastqs, "map-pb"
 }
+
+logWorkflowCompletion(out_folder_name, params.map_to_mod_fa)
