@@ -1,26 +1,4 @@
 #!/usr/bin/env python3
-"""
-Simple Usage Script - Exactly matching your desired API
-========================================================
-
-This script demonstrates the EXACT usage pattern you proposed:
-
-    # read and valid config
-    config_path = sys.argv[1]
-    config = ConfigManager.load(config_path)
-
-    # edit settings
-    ref_genome_settings = GenomeValidator.Settings()
-    ref_genome_settings = ref_genome_settings.update(<my settings>)
-    ...same for mod_genome, plasmid_genomes, features and reads
-
-    # run validation
-    validate_genome(config.ref_genome, config.output_dir, ref_genome_settings)
-    ...same for others
-
-Usage:
-    python simple_usage.py config.json
-"""
 
 import sys
 from validation_pkg import (
@@ -31,6 +9,7 @@ from validation_pkg import (
     validate_genome,
     validate_reads,
     validate_feature,
+    validate_reads,
     setup_logging
 )
 from pathlib import Path
@@ -38,22 +17,20 @@ from pathlib import Path
 def main():
     # Check command line arguments
     if len(sys.argv) < 2:
-        print("Usage: python simple_usage.py <config_path>")
+        print("Usage: python main.py <config_path>")
         print("\nExample:")
-        print("  python simple_usage.py config.json")
+        print("  python main.py config.json")
         return 1
+
+    # Setup logging,
+    setup_logging(console_level='DEBUG',log_file=Path("logs/validation.log"),report_file=Path("logs/report.txt"))
 
     # ========================================================================
     # Step 1: Read and validate config
     # ========================================================================
     config_path = sys.argv[1]
     config = ConfigManager.load(config_path)
-
     print(f"Configuration loaded from: {config_path}")
-    print(f"Output directory: {config.output_dir}\n")
-
-    # Setup logging,
-    setup_logging(console_level='DEBUG',log_file=Path("logs/validation.log"),report_file=Path("logs/report.txt"))
 
     # ========================================================================
     # Step 2: Edit settings for each validator
@@ -94,33 +71,31 @@ def main():
     # Settings for reads
     reads_settings = ReadValidator.Settings()
     reads_settings = reads_settings.update(
-        validation_level = "trust",
         coding_type='gz',
         outdir_by_ngs_type = True,
-        #   TODO: on minimal - at least check if in .gz format and raise error if not
     )
 
     # Settings for features
     ref_feature_settings = FeatureValidator.Settings()
     ref_feature_settings = ref_feature_settings.update(
-        validation_level="trust",
-        check_coordinates=True,
         sort_by_position=False,
+        check_coordinates=False,
         replace_id_with='chr',
         coding_type=None,
         output_filename_suffix='ref'
     )
 
         # Settings for features
+    
     mod_feature_settings = FeatureValidator.Settings()
     mod_feature_settings = mod_feature_settings.update(
-        validation_level="trust",
         sort_by_position=False,
-        check_coordinates=True,
+        check_coordinates=False,
         replace_id_with='chr',
         coding_type=None,
         output_filename_suffix='mod'
     )
+    
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
@@ -133,14 +108,14 @@ def main():
     # Validate reference genome
     start_time = time.time()
     print(f"\n[1/4] Validating reference genome: {config.ref_genome.filename}")
-    validate_genome(config.ref_genome, config.output_dir, ref_genome_settings)
+    validate_genome(config.ref_genome, ref_genome_settings)
     end_time = time.time()
     print(f"Execution time: {end_time - start_time:.6f} seconds")
 
     # Validate modified genome
     start_time = time.time()
     print(f"\n[2/4] Validating modified genome: {config.mod_genome.filename}")
-    validate_genome(config.mod_genome, config.output_dir, mod_genome_settings)
+    validate_genome(config.mod_genome, mod_genome_settings)
     end_time = time.time()
     print(f"Execution time: {end_time - start_time:.6f} seconds")
 
@@ -148,22 +123,21 @@ def main():
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
         start_time = time.time()
         print(f"\n[2.1/4] Validating reference plasmid: {config.ref_plasmid.filename}")
-        validate_genome(config.ref_plasmid, config.output_dir, plasmid_settings)
+        validate_genome(config.ref_plasmid, plasmid_settings)
         end_time = time.time()
         print(f"Execution time: {end_time - start_time:.6f} seconds")
 
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
         start_time = time.time()
         print(f"\n[2.2/4] Validating modified plasmid: {config.mod_plasmid.filename}")
-        validate_genome(config.mod_plasmid, config.output_dir, plasmid_settings)
+        validate_genome(config.mod_plasmid, plasmid_settings)
         end_time = time.time()
         print(f"Execution time: {end_time - start_time:.6f} seconds")
 
     # Validate reads
     start_time = time.time()
-    if config.reads:
-        print(f"\n[3/4] Validating {len(config.reads)} read file(s)...")
-        stats_list = validate_reads(config.reads, config.output_dir, reads_settings)
+    print(f"\n[3/4] Validating {len(config.reads)} read file(s)...")
+    validate_reads(config.reads, reads_settings)
     end_time = time.time()
     print(f"Execution time: {end_time - start_time:.6f} seconds")
 
@@ -171,14 +145,14 @@ def main():
     if config.ref_feature:
         start_time = time.time()
         print(f"\n[4/4] Validating feature file: {config.ref_feature.filename}")
-        validate_feature(config.ref_feature, config.output_dir, ref_feature_settings)
+        validate_feature(config.ref_feature, ref_feature_settings)
         end_time = time.time()
         print(f"Execution time: {end_time - start_time:.6f} seconds")
 
     if config.mod_feature:
         start_time = time.time()
         print(f"\n[4/4] Validating feature file: {config.mod_feature.filename}")
-        validate_feature(config.mod_feature, config.output_dir, mod_feature_settings)
+        validate_feature(config.mod_feature, mod_feature_settings)
         end_time = time.time()
         print(f"Execution time: {end_time - start_time:.6f} seconds")
 
