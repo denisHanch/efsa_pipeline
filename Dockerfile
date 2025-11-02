@@ -15,13 +15,26 @@ RUN apk update && \
         openssh-client \
         git \
         curl \
+        ca-certificates \
         tree \
         openjdk17-jre-headless \
         gzip \
         bzip2 \
         pigz \
-        pbzip2 \
+    && update-ca-certificates \
     && rm -rf /var/cache/apk/*
+
+# Install build dependencies and build pbzip2 from Debian source as pbzip2 is not available in Alpine
+RUN apk add --no-cache build-base bzip2-dev ca-certificates && \
+    cd /tmp && \
+    wget http://ftp.debian.org/debian/pool/main/p/pbzip2/pbzip2_1.1.13.orig.tar.gz -O pbzip2.tar.gz && \
+    tar xzf pbzip2.tar.gz && \
+    cd pbzip2-1.1.13 && \
+    make && \
+    make install && \
+    cd / && \
+    rm -rf /tmp/pbzip2* && \
+    apk del build-base bzip2-dev
 
 # Copy the Nextflow binary from VM and make it executable
 COPY nextflow /usr/local/bin/nextflow
