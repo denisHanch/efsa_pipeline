@@ -1,10 +1,10 @@
 #!/usr/bin/env nextflow
 
 include { multiqc } from '../modules/qc.nf'
-include { calc_unmapped; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid } from '../modules/mapping.nf'
+include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid } from '../modules/mapping.nf'
 include { freebayes; bcftools_stats; bcftools_stats as bcftools_stats_plasmid } from '../modules/variant_calling.nf'
 include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from '../modules/subworkflow.nf'
-include { logUnmapped; logWorkflowCompletion } from '../modules/logs.nf'
+include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadShortFastqFiles } from '../modules/logs.nf'
 
 
 workflow short_ref {
@@ -14,30 +14,33 @@ workflow short_ref {
         out_folder_name
         plasmid_fasta
 
-    main:
+    main:        
         // mapping to the reference
         bwa_index(fasta, out_folder_name) | set { fasta_index } 
         mapping(fasta, fasta_index, trimmed, out_folder_name) | set { indexed_bam }
 
-        // printout % unmapped reads
-        calc_unmapped(indexed_bam) | set { pct }
-        logUnmapped(pct, params.short_threshold, out_folder_name)
-
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
+        
+        // printout % unmapped reads
+        calc_total_reads(indexed_bam) | set { total_reads }
+        calc_unmapped(unmapped_fastq) | set { nreads }
+        logUnmapped(nreads, total_reads, out_folder_name, "reference")
 
-        // mapping reads to plasmid & variant calling
+        // mapping reads to plasmid
         if (plasmid_fasta) {
-            Channel.from(plasmid_fasta) | set { mod_plasmid_fasta }
+            Channel.from(plasmid_fasta) | set { plasmid_fasta }
 
-            bwa_index_plasmid(mod_plasmid_fasta, "${out_folder_name}-plasmid") | set { unmapped_fasta_index } 
-            mapping_plasmid(mod_plasmid_fasta, unmapped_fasta_index, unmapped_fastq, "${out_folder_name}-plasmid") | set { unmapped_bam }
+            bwa_index_plasmid(plasmid_fasta, "${out_folder_name}-plasmid") | set { unmapped_fasta_index } 
+            mapping_plasmid(plasmid_fasta, unmapped_fasta_index, unmapped_fastq, "${out_folder_name}-plasmid") | set { unmapped_bam }
             get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq }
 
+            calc_unmapped_plasmid(unmapped_fastq) | set { nreads }
+            logUnmapped_plasmid(nreads, total_reads, out_folder_name, "plasmid")
         }
 
          if (out_folder_name == "short-ref") { 
             // SNP & variant calling
-            freebayes(fasta, fasta_index, indexed_bam, out_folder_name) | set { vcf }
+            freebayes(fasta, indexed_bam, out_folder_name) | set { vcf }
             bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
             
             // Optional annotation of vcf files
@@ -78,21 +81,11 @@ workflow {
     log.info  "Processing files in directory: ${params.in_dir}"
     
     def plasmid_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
+    def short_read_files = file("$params.in_dir/illumina/").listFiles()?.findAll { it.name =~ /\.(fastq|fq)(\.gz)?$/ } ?: []
 
-    Channel.fromPath("$params.in_dir/illumina/*.fastq.gz") | set { fastqs }
-    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}") | set { fasta }
-    
-    
-    Channel.from(short_read_files).map { file ->
-    def matcher = file.name =~ /^(.+?)(?:[_\.](S[0-9]+_L[0-9]+_)?(R[12]|[12]))?\.f(ast)?q\.gz$/
-    if( matcher.matches() ) {
-        [ matcher[0][1], file ]
-        }
-    }
-    | filter { it }
-    | groupTuple(sort: true)
-    | set { fastqs }
-
+    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
+        
+    fastqs = loadShortFastqFiles(short_read_files)
 
     // QC and trimming module
     qc(fastqs, out_folder_name) | set { trimmed }
@@ -101,4 +94,4 @@ workflow {
 }
 
 
-logWorkflowCompletion(out_folder_name, !params.map_to_mod_fa)
+logWorkflowCompletion(out_folder_name)

@@ -11,7 +11,6 @@ process freebayes {
 
     input:
     each path(fasta_file)
-    each path(fasta_index)
     tuple val(pair_id), path(bam_file), path(bam_index)
     val out_folder_name
 

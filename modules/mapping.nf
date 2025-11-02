@@ -169,9 +169,7 @@ process samtools_sort {
     """
 }
 
-
-
-process calc_unmapped {
+process calc_total_reads {
     container 'staphb/samtools:latest'
     tag "$pair_id"
 
@@ -179,20 +177,46 @@ process calc_unmapped {
     tuple val(pair_id), path(bam), path(bam_index)
 
     output:
-    env pct 
+    env total
 
     script:
     """
     #!/usr/bin/env bash
 
     total=\$(samtools view -c "$bam")
-    unmapped=\$(samtools view -c -f 4 "$bam")
 
-    if [ "\$total" -gt 0 ]; then
-        pct=\$(( unmapped * 100 / total ))
+    export total
+    """
+}
+
+
+process calc_unmapped {
+    tag "$pair_id"
+
+    input:
+    tuple val(pair_id), path(fastq)
+
+    output:
+    env reads 
+
+    script:
+    """
+    #!/usr/bin/env bash
+    if [[ "$fastq" == *.gz ]]; then
+        total_lines=\$(zcat "$fastq" | wc -l)
     else
-        pct=0
+        total_lines=\$(wc -l < "$fastq")
     fi
+    
+    reads=\$((total_lines / 4))
+
+    num_files=\$(echo $fastq | wc -w)
+
+    if [[ num_files -eq 2 ]]; then
+        reads=\$((reads * 2))
+    fi
+
+    export reads
     """
 }
 

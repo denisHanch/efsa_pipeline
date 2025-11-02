@@ -9,7 +9,7 @@ include { short_ref; short_ref as short_mod } from './workflows/short-read-ref.n
 include { truvari_comparison } from './modules/compare_vcfs.nf'
 
 include { qc } from './modules/subworkflow.nf'
-include { describePipeline; logWorkflowCompletion } from './modules/logs.nf'
+include { describePipeline; logWorkflowCompletion; loadFastqFiles; loadShortFastqFiles } from './modules/logs.nf'
 
 
 // Help message
@@ -38,7 +38,7 @@ def pipelines_running = 0
 
 workflow {
     // Inputs
-    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
     Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
     
     def ref_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
@@ -60,10 +60,7 @@ workflow {
     if (pacbio_files) {
         mapping_tag = "map-pb"
 
-        Channel.from(pacbio_files).map { file ->
-                def name = file.baseName.replaceFirst(/\.fastq$/, '')
-                return [name, file]
-            }.set { pacbio_fastqs }
+        pacbio_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
 
         log.info describePipeline("long-pacbio", "modified")
         long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")
@@ -80,11 +77,8 @@ workflow {
     if (ont_files) {
         mapping_tag = "map-ont"
         
-        Channel.from(ont_files).map { file ->
-                def name = file.baseName.replaceFirst(/\.fastq$/, '')
-                return [name, file]
-            }
-            .set { ont_fastqs }
+        ont_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
+
 
         log.info describePipeline("long-ont", "modified")
         long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")
@@ -100,16 +94,7 @@ workflow {
     // short reads pipeline
     if (short_read_files) {    
         
-        Channel.from(short_read_files).map { file ->
-        def matcher = file.name =~ /^(.+?)(?:[_\.](S[0-9]+_L[0-9]+_)?(R[12]|[12]))?\.f(ast)?q\.gz$/
-        if( matcher.matches() ) {
-            [ matcher[0][1], file ]
-            }
-        }
-        | filter { it }
-        | groupTuple(sort: true)
-        | set { fastqs }
-
+        fastqs = loadShortFastqFiles(short_read_files)
 
         // QC and trimming module
         qc(fastqs, "short-ref") | set { trimmed }
