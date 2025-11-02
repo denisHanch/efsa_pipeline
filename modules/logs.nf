@@ -6,7 +6,7 @@ def logUnmapped(reads, total_reads, out_folder_name, reference) {
     reads.combine(total_reads).map { r, total ->
     def percentage = r.toInteger() * 100.0 / total.toInteger()
     def pctStr = String.format('%.2f', percentage)
-    log.info "The number of unmapped reads in ${out_folder_name} pipeline against ${reference}: ${r} (${pctStr} %). Total input: ${total})\n"
+    log.info "ℹ️ The number of unmapped reads in ${out_folder_name} pipeline ${reference}: ${r} (${pctStr} %). Total input: ${total})\n"
     }
 }
 

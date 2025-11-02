@@ -114,8 +114,6 @@ workflow {
 
         vcfs = vcfs.mix(short_ref.out.sv_vcf)
 
-        // compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq)
-
         pipelines_running++
     }
 
@@ -123,7 +121,7 @@ workflow {
         log.error "⚠ No valid inputs found. Skipping workflows."
         exit 0
     } else {
-        log.info "Performing ${pipelines_running - 1} truvari comparison(s)."
+        log.info "▶ Performing ${pipelines_running - 1} truvari comparison(s)."
     }
 
     if (pipelines_running >= 2) {
