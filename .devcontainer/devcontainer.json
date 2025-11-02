@@ -21,7 +21,7 @@
   "updateRemoteUserUID": true,
 
   // to avoid "fatal: detected dubious ownership in repository at" error
-  "postCreateCommand": "git config --file .git/config --add safe.directory ${containerWorkspaceFolder}",
+  "postCreateCommand": "git config --file .git/config --add safe.directory ${containerWorkspaceFolder} && pip install -e modules/validation/validation-pkg/",
 
   // VS Code–specific customizations
   "customizations": {

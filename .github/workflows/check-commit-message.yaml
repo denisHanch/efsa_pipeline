@@ -1,46 +1,22 @@
-name: "CHECK Commit Message Format"
-
-on:
-  push:
-    branches-ignore:
-      - main
-
-jobs:
-  commit-message-check:
-    runs-on: ubuntu-latest
-
-    env:
-      ISSUE_PREFIX: ${{ vars.PROJECT_PREFIX }}
-      IGNORE_PREFIX: ${{ vars.IGNORE_PREFIX }}
-      
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check commit message format
-        run: |
-          ISSUE_PREFIX="${{ vars.PROJECT_PREFIX }}"
-
-          # Determine the range of commits
-          if git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null; then
-            commit_range="${{ github.event.before }}..${{ github.sha }}"
-          else
-            commit_range="${{ github.sha }}"
-          fi
-
-          # Allow either no-issue* OR ISSUE_PREFIX-<number>: <message>
-          invalid_msgs=$(
-            git log --no-merges --format="%s" $commit_range \
-            | grep -vE "^(${IGNORE_PREFIX}|${ISSUE_PREFIX}-[0-9]+: .+)" \
-            || true
-          )
-
-          if [ -n "$invalid_msgs" ] ; then
-            echo "🚨 Invalid commit message(s) detected:"
-            echo "$invalid_msgs"
-            echo "❗ Expected format: '${ISSUE_PREFIX}-<#ISSUE>: Your commit message' or start with '${IGNORE_PREFIX}'"
-            exit 1
-          else
-            echo "✅ All commit messages are valid!"
-          fi
+- name: Check commit message format
+  run: |
+    ISSUE_PREFIX="${{ vars.PROJECT_PREFIX }}"
+    
+    # Fetch main branch
+    git fetch origin main:main
+    
+    # Check only commits not in main
+    invalid_msgs=$(
+      git log --no-merges --format="%s" main..HEAD \
+      | grep -vE "^(${IGNORE_PREFIX}|${ISSUE_PREFIX}-[0-9]+: .+)" \
+      || true
+    )
+    
+    if [ -n "$invalid_msgs" ]; then
+      echo "🚨 Invalid commit message(s) detected:"
+      echo "$invalid_msgs"
+      echo "❗ Expected format: '${ISSUE_PREFIX}-<#ISSUE>: Your commit message' or start with '${IGNORE_PREFIX}'"
+      exit 1
+    else
+      echo "✅ All commit messages are valid!"
+    fi
