@@ -2,8 +2,8 @@
 
 include { nanoplot; multiqc } from '../modules/qc.nf'
 include { sv_long; mapping_long; mapping_long as mapping_long_plasmid; sv_long as sv_long_plasmid }  from '../modules/subworkflow.nf'
-include { logUnmapped; logWorkflowCompletion; loadFastqFiles } from '../modules/logs.nf'
-include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; get_unmapped_reads;get_unmapped_reads as get_unmapped_reads_plasmid } from '../modules/mapping.nf'
+include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadFastqFiles } from '../modules/logs.nf'
+include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads;get_unmapped_reads as get_unmapped_reads_plasmid } from '../modules/mapping.nf'
 
 
 workflow long_ref {
@@ -22,10 +22,13 @@ workflow long_ref {
         // mapping to the reference
         mapping_long(fastqs, fasta, mapping_tag, out_folder_name) | set { indexed_bam }
 
-         // printout % unmapped reads
-        calc_unmapped(indexed_bam) | set { pct }
-        logUnmapped(pct, params.long_threshold,  "${out_folder_name}-${mapping_tag}")
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
+        
+        // printout % unmapped reads
+        calc_total_reads(indexed_bam) | set { total_reads }
+        calc_unmapped(unmapped_fastq) | set { nreads }
+        logUnmapped(nreads, total_reads, out_folder_name, "reference")
+
         
         // mapping reads to plasmid & variant calling
         if (plasmid_fasta) {
@@ -33,6 +36,9 @@ workflow long_ref {
 
             mapping_long_plasmid(unmapped_fastq, plasmid_fasta, mapping_tag, "${out_folder_name}-plasmid") | set { unmapped_bam }
             get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq }
+
+            calc_unmapped_plasmid(unmapped_fastq) | set { nreads }
+            logUnmapped_plasmid(nreads, total_reads, out_folder_name, "plasmid")
         }
 
         // SV calling against the reference

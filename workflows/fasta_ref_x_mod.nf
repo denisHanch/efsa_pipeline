@@ -10,7 +10,7 @@ workflow ref_mod {
         mod_fasta
     main:
         log.info "▶ Running pipeline comparing reference and modified fasta."
-        
+
         def prefix_name = "ref_x_mod"
 
         ref_mod_fasta = ref_fasta
@@ -33,4 +33,4 @@ workflow {
 }
 
 
-logWorkflowCompletion("referece to modified fasta comparision", true)
+logWorkflowCompletion("referece to modified fasta comparision")

@@ -238,5 +238,40 @@ process get_unmapped_reads {
     """
     samtools view -f 4 -b $bam_file | samtools fastq > ${pair_id}_unmapped.fastq
     """
+}
 
+process compare_unmapped {
+    tag "$pair_id1"
+    publishDir "${params.out_dir}/unmapped", mode: 'copy'
+
+    input:
+    tuple val(pair_id1), path(unmapped_1, stageAs: "unmapped_ref.fastq")
+    tuple val(pair_id2), path(unmapped_2, stageAs: "unmapped_mod.fastq")
+    val prefix
+
+    output:
+    path "${pair_id1}_read_stats.txt"
+
+    script:
+    """
+    # Extract headers
+    awk 'NR%4==1 {gsub(/^@/, "", \$0); print \$0}' unmapped_ref.fastq > ${pair_id1}_ref_headers.txt
+    awk 'NR%4==1 {gsub(/^@/, "", \$0); print \$0}' unmapped_mod.fastq > ${pair_id2}_mod_headers.txt
+
+    # Find intersection and unique reads
+    comm -12 <(sort ${pair_id1}_ref_headers.txt) <(sort ${pair_id2}_mod_headers.txt) > intersect_ref_mod.txt
+    comm -23 <(sort ${pair_id1}_ref_headers.txt) <(sort ${pair_id2}_mod_headers.txt) > unique_${pair_id1}_ref.txt
+    comm -13 <(sort ${pair_id1}_ref_headers.txt) <(sort ${pair_id2}_mod_headers.txt) > unique_${pair_id2}_mod.txt
+
+    # Count reads
+    intersect_count=\$(wc -l < intersect_ref_mod.txt)
+    unique_1_count=\$(wc -l < unique_${pair_id1}_ref.txt)
+    unique_2_count=\$(wc -l < unique_${pair_id2}_mod.txt)
+
+    # Output stats
+    echo -e "Pair IDs: ${pair_id1} reference vs ${pair_id2} modified" > ${pair_id1}_${prefix}_read_stats.txt
+    echo -e "Intersected Reads: \$intersect_count" >> ${pair_id1}_${prefix}_read_stats.txt
+    echo -e "Unique Reads ${pair_id1} reference: \$unique_1_count" >> ${pair_id1}_${prefix}_read_stats.txt
+    echo -e "Unique Reads ${pair_id2} modified: \$unique_2_count" >> ${pair_id1}_${prefix}_read_stats.txt
+    """
 }

@@ -6,6 +6,7 @@ include { ref_mod } from './workflows/fasta_ref_x_mod.nf'
 include { long_ref as long_ref_pacbio; long_ref as long_ref_ont; long_ref as long_mod_pacbio; long_ref as long_mod_ont} from './workflows/long-read-ref.nf'
 include { short_ref; short_ref as short_mod } from './workflows/short-read-ref.nf'
 
+include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_unmapped as compare_unmapped_pacbio } from './modules/mapping.nf'
 include { truvari_comparison } from './modules/compare_vcfs.nf'
 
 include { qc } from './modules/subworkflow.nf'
@@ -68,6 +69,8 @@ workflow {
         log.info describePipeline("long-pacbio", "reference")
         long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag, ref_plasmid, "long-ref") 
 
+        compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
+
         vcfs = vcfs.mix(long_ref_pacbio.out.sv_vcf.map { it[1] })
 
         pipelines_running++
@@ -79,12 +82,13 @@ workflow {
         
         ont_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
 
-
         log.info describePipeline("long-ont", "modified")
         long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")
 
         log.info describePipeline("long-ont", "reference")
         long_ref_ont(ont_fastqs, ref_fasta, mapping_tag, ref_plasmid, "long-ref")
+
+        compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
 
         vcfs = vcfs.mix(long_ref_ont.out.sv_vcf.map { it[1] })
 
@@ -105,6 +109,8 @@ workflow {
     
         log.info describePipeline("short", "reference")
         short_ref(trimmed, ref_fasta, "short-ref", ref_plasmid) 
+        
+        compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
 
         vcfs = vcfs.mix(short_ref.out.sv_vcf)
 
@@ -133,7 +139,7 @@ workflow {
     }
 }
 
-logWorkflowCompletion("execution of main.nf", true)
+logWorkflowCompletion("execution of main.nf")
 
 workflow.onError {
     println "Error: Pipeline execution stopped with the following message: ${workflow.errorMessage}"
