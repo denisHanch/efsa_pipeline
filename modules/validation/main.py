@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import time
 import sys
 from validation_pkg import (
     ConfigManager,
@@ -99,7 +100,6 @@ def main():
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
-    import time
 
     print("="*70)
     print("Starting Validation Workflow")
