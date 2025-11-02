@@ -208,11 +208,11 @@ process get_unmapped_reads {
     val out_folder_name
 
     output:
-    tuple val(pair_id), path("${pair_id}_unmapped.bam")
+    tuple val(pair_id), path("${pair_id}_unmapped.fastq")
 
     script:
     """
-    samtools view -f 4 -b $bam_file | samtools fastq > ${pair_id}_unmapped.bam
+    samtools view -f 4 -b $bam_file | samtools fastq > ${pair_id}_unmapped.fastq
     """
 
 }

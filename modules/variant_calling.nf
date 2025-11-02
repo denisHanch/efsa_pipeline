@@ -168,11 +168,11 @@ process truvari {
     tuple val(pair_id1), path(vcf1), path(index1), val(pair_id2), path(vcf2), path(index2)
 
     output:
-    path("${pair_id2}_truvari")
+    path("${pair_id1}_${pair_id2}_truvari")
 
 
     script:
     """
-    truvari bench -b $vcf1 -c $vcf2 -f $fasta_file -o ${pair_id2}_truvari --passonly
+    truvari bench -b $vcf1 -c $vcf2 -f $fasta_file -o ${pair_id1}_${pair_id2}_truvari --passonly
     """
 }

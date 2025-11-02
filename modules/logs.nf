@@ -16,13 +16,8 @@ def logUnmapped(pct, threshold, out_folder_name) {
     }
 }
 
-def describePipeline(read_type, fasta_type, mod_fasta = null) {
-    def msg = "▶ Running pipeline processing ${read_type} reads - mapping "
-    if (mod_fasta)
-        msg += "unmapped reads to the ${fasta_type} fasta."
-    else
-        msg += "to the ${fasta_type} fasta."
-    return msg
+def describePipeline(read_type, fasta_type) {
+    return "▶ Running pipeline processing ${read_type} reads - mapping to the ${fasta_type} fasta."
 }
 
 
