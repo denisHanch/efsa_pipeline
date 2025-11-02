@@ -4,24 +4,25 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositori
     echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories && \
     apk update --no-cache --allow-untrusted
 
-
-# Install necessary packages
+# Install necessary packages including compression tools
 RUN apk update && \
     apk add --no-cache \
-    bash \
-    emacs-nox \
-    mc \
-    python3 \
-    py3-pip \
-    openssh-client \
-    git \
-    curl \
-    tree \
-    openjdk17-jre-headless \
+        bash \
+        emacs-nox \
+        mc \
+        python3 \
+        py3-pip \
+        openssh-client \
+        git \
+        curl \
+        tree \
+        openjdk17-jre-headless \
+        gzip \
+        bzip2 \
+        pigz \
+        pbzip2 \
     && rm -rf /var/cache/apk/*
 
-
-    
 # Copy the Nextflow binary from VM and make it executable
 COPY nextflow /usr/local/bin/nextflow
 RUN chmod +x /usr/local/bin/nextflow
