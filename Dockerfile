@@ -1,5 +1,4 @@
 FROM docker:28.5.0-dind-alpine3.22
-
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories && \
     apk update --no-cache --allow-untrusted
@@ -35,6 +34,19 @@ RUN apk add --no-cache build-base bzip2-dev ca-certificates && \
     cd / && \
     rm -rf /tmp/pbzip2* && \
     apk del build-base bzip2-dev
+
+# Copy and install validation package
+COPY modules/validation/ /tmp/validation/
+# Install build dependencies for Python packages
+RUN apk add --no-cache --virtual .build-deps \
+        gcc \
+        g++ \
+        python3-dev \
+        musl-dev \
+        linux-headers \
+    && pip3 install --no-cache-dir --break-system-packages /tmp/validation/validation-pkg/ \
+    && rm -rf /tmp/validation/ \
+    && apk del .build-deps
 
 # Copy the Nextflow binary from VM and make it executable
 COPY nextflow /usr/local/bin/nextflow
