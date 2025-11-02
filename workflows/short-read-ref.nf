@@ -83,7 +83,7 @@ workflow {
     def plasmid_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
     def short_read_files = file("$params.in_dir/illumina/").listFiles()?.findAll { it.name =~ /\.(fastq|fq)(\.gz)?$/ } ?: []
 
-    Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}") | set { fasta }
+    Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true) | set { fasta }
         
     fastqs = loadShortFastqFiles(short_read_files)
 
