@@ -513,3 +513,144 @@ class TestSecurityCommandInjectionFileHandler:
             # Should not contain shell syntax
             assert "sh -c" not in error_msg
             assert "set -o pipefail" not in error_msg
+
+
+class TestDetectCompressionType:
+    """Test compression type detection from file paths."""
+
+    def test_detect_compression_type_none(self):
+        """Test detecting no compression."""
+        from validation_pkg.utils.file_handler import detect_compression_type
+        filepath = Path("genome.fasta")
+        coding_type = detect_compression_type(filepath)
+        assert coding_type == CodingType.NONE
+
+    def test_detect_compression_type_gzip(self):
+        """Test detecting gzip compression."""
+        from validation_pkg.utils.file_handler import detect_compression_type
+        filepath = Path("genome.fasta.gz")
+        coding_type = detect_compression_type(filepath)
+        assert coding_type == CodingType.GZIP
+
+    def test_detect_compression_type_gzip_alt(self):
+        """Test detecting gzip with .gzip extension."""
+        from validation_pkg.utils.file_handler import detect_compression_type
+        filepath = Path("genome.fasta.gzip")
+        coding_type = detect_compression_type(filepath)
+        assert coding_type == CodingType.GZIP
+
+    def test_detect_compression_type_bzip2(self):
+        """Test detecting bzip2 compression."""
+        from validation_pkg.utils.file_handler import detect_compression_type
+        filepath = Path("genome.fasta.bz2")
+        coding_type = detect_compression_type(filepath)
+        assert coding_type == CodingType.BZIP2
+
+    def test_detect_compression_type_bzip2_alt(self):
+        """Test detecting bzip2 with .bzip2 extension."""
+        from validation_pkg.utils.file_handler import detect_compression_type
+        filepath = Path("genome.fasta.bzip2")
+        coding_type = detect_compression_type(filepath)
+        assert coding_type == CodingType.BZIP2
+
+    def test_detect_compression_case_insensitive(self):
+        """Test that compression detection is case insensitive."""
+        from validation_pkg.utils.file_handler import detect_compression_type
+        filepath = Path("genome.fasta.GZ")
+        coding_type = detect_compression_type(filepath)
+        assert coding_type == CodingType.GZIP
+
+
+class TestDetectFileFormat:
+    """Test file format detection from file paths."""
+
+    def test_detect_file_format_fasta(self):
+        """Test detecting FASTA format."""
+        from validation_pkg.utils.file_handler import detect_file_format
+        from validation_pkg.utils.formats import GenomeFormat
+        filepath = Path("genome.fasta")
+        file_format = detect_file_format(filepath, GenomeFormat)
+        assert file_format == GenomeFormat.FASTA
+
+    def test_detect_file_format_fasta_compressed(self):
+        """Test detecting FASTA format from compressed file."""
+        from validation_pkg.utils.file_handler import detect_file_format
+        from validation_pkg.utils.formats import GenomeFormat
+        filepath = Path("genome.fasta.gz")
+        file_format = detect_file_format(filepath, GenomeFormat)
+        assert file_format == GenomeFormat.FASTA
+
+    def test_detect_file_format_genbank(self):
+        """Test detecting GenBank format."""
+        from validation_pkg.utils.file_handler import detect_file_format
+        from validation_pkg.utils.formats import GenomeFormat
+        filepath = Path("genome.gbk")
+        file_format = detect_file_format(filepath, GenomeFormat)
+        assert file_format == GenomeFormat.GENBANK
+
+    def test_detect_file_format_fastq(self):
+        """Test detecting FASTQ format."""
+        from validation_pkg.utils.file_handler import detect_file_format
+        from validation_pkg.utils.formats import ReadFormat
+        filepath = Path("reads.fastq.gz")
+        file_format = detect_file_format(filepath, ReadFormat)
+        assert file_format == ReadFormat.FASTQ
+
+    def test_detect_file_format_gff(self):
+        """Test detecting GFF format."""
+        from validation_pkg.utils.file_handler import detect_file_format
+        from validation_pkg.utils.formats import FeatureFormat
+        filepath = Path("features.gff")
+        file_format = detect_file_format(filepath, FeatureFormat)
+        assert file_format == FeatureFormat.GFF
+
+    def test_detect_file_format_no_extension(self):
+        """Test error when no extension found."""
+        from validation_pkg.utils.file_handler import detect_file_format
+        from validation_pkg.utils.formats import GenomeFormat
+        filepath = Path("genome")
+        with pytest.raises(ValueError, match="no extension found"):
+            detect_file_format(filepath, GenomeFormat)
+
+
+class TestParseConfigFileValue:
+    """Test parsing of configuration file values."""
+
+    def test_parse_config_file_value_dict(self):
+        """Test parsing config value as dict."""
+        from validation_pkg.utils.file_handler import parse_config_file_value
+        value = {"filename": "genome.fasta", "extra_key": "value"}
+        filename, extra = parse_config_file_value(value, "ref_genome")
+        assert filename == "genome.fasta"
+        assert extra == {"extra_key": "value"}
+
+    def test_parse_config_file_value_string(self):
+        """Test parsing config value as string."""
+        from validation_pkg.utils.file_handler import parse_config_file_value
+        value = "genome.fasta"
+        filename, extra = parse_config_file_value(value, "ref_genome")
+        assert filename == "genome.fasta"
+        assert extra == {}
+
+    def test_parse_config_file_value_missing_filename(self):
+        """Test error when dict missing filename field."""
+        from validation_pkg.utils.file_handler import parse_config_file_value
+        value = {"other_key": "value"}
+        with pytest.raises(ValueError, match="must contain 'filename' field"):
+            parse_config_file_value(value, "ref_genome")
+
+    def test_parse_config_file_value_invalid_type(self):
+        """Test error with invalid value type."""
+        from validation_pkg.utils.file_handler import parse_config_file_value
+        value = 123  # Not a dict or string
+        with pytest.raises(ValueError, match="must be a dict or string"):
+            parse_config_file_value(value, "ref_genome")
+
+    def test_parse_config_file_value_dict_excludes_filename(self):
+        """Test that filename is excluded from extra dict."""
+        from validation_pkg.utils.file_handler import parse_config_file_value
+        value = {"filename": "genome.fasta", "key1": "val1", "key2": "val2"}
+        filename, extra = parse_config_file_value(value, "ref_genome")
+        assert filename == "genome.fasta"
+        assert "filename" not in extra
+        assert extra == {"key1": "val1", "key2": "val2"}
