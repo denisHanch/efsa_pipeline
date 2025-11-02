@@ -250,7 +250,7 @@ process compare_unmapped {
     val prefix
 
     output:
-    path "${pair_id1}_read_stats.txt"
+    path "${pair_id1}_${prefix}_read_stats.txt"
 
     script:
     """
