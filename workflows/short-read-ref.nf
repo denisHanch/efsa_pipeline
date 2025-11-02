@@ -4,7 +4,7 @@ include { multiqc } from '../modules/qc.nf'
 include { calc_unmapped; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid } from '../modules/mapping.nf'
 include { freebayes; bcftools_stats; bcftools_stats as bcftools_stats_plasmid } from '../modules/variant_calling.nf'
 include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from '../modules/subworkflow.nf'
-include { logUnmapped; logWorkflowCompletion; describePipeline } from '../modules/logs.nf'
+include { logUnmapped; logWorkflowCompletion } from '../modules/logs.nf'
 
 
 workflow short_ref {

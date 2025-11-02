@@ -5,8 +5,6 @@ include { sv_long; mapping_long; mapping_long as mapping_long_plasmid; sv_long a
 include { logUnmapped; logWorkflowCompletion } from '../modules/logs.nf'
 include { calc_unmapped; get_unmapped_reads } from '../modules/mapping.nf'
 
-out_folder_name = "long-ref"
-var = false
 
 workflow long_ref {
 
@@ -14,6 +12,8 @@ workflow long_ref {
         fastqs
         fasta
         mapping_tag
+        plasmid_fasta
+        out_folder_name
 
     main:
         // qc
@@ -25,24 +25,29 @@ workflow long_ref {
          // printout % unmapped reads
         calc_unmapped(indexed_bam) | set { pct }
         logUnmapped(pct, params.long_threshold,  "long-ref-${mapping_tag}")
+        get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
         
         // mapping reads to plasmid & variant calling
-        def plasmid_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
-
-        if (plasmid_files) {
+        if (plasmid_fasta) {
             Channel.from(plasmid_files) | set { mod_plasmid_fasta }
 
-            get_unmapped_reads(indexed_bam, "long-ref-plasmid") | set { unmapped_fastq }
             mapping_long_plasmid(unmapped_fastq, mod_plasmid_fasta, mapping_tag, "long-ref-plasmid") | set { unmapped_bam }
-            sv_long_plasmid(mod_plasmid_fasta, unmapped_bam, mapping_tag, "long-ref-plasmid")
+            get_unmapped_reads(unmapped_bam, "long-ref-plasmid") | set { unmapped_fastq }
         }
 
         // SV calling against the reference
-        sv_long(fasta, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
+        if (out_folder_name == "long-ref") { 
+            sv_long(fasta, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
+        } else {
+            sv_vcf = Channel.empty()
+        }
+
     emit:
         sv_vcf
+        unmapped_fastq
 }
 
+out_folder_name = "long-ref"
 
 workflow {
     // Processing inputs
@@ -62,15 +67,14 @@ workflow {
         }
         .set { ont_fastqs }
 
+    def ref_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
+    def mod_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /mod_plasmid\.(fa|fna|fasta)$/ } ?: []
 
+    
     Channel.fromPath("$params.in_dir/*ref.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
     
     if (pacbio_fastqs) {
-        long_ref(pacbio_fastqs, ref_fasta, "map-pb")
-    }
-
-    if (ont_fastqs) {        
-        long_ref(ont_fastqs, ref_fasta,  "map-ont")
+        long_ref(pacbio_fastqs, ref_fasta, "map-pb", ref_plasmid, out_folder_name)
     }
 }
 
