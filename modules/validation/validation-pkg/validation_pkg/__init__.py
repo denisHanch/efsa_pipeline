@@ -106,7 +106,7 @@ Version Information
 
 __version__ = "0.1.0"
 __author__ = "Dominika Bohuslavova"
-__license__ = "MIT"
+__license__ = "EUPL-1.2 license"
 
 # Public API exports
 from validation_pkg.config_manager import ConfigManager, Config

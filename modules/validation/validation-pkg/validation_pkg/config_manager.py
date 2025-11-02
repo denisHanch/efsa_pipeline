@@ -21,10 +21,11 @@ Key Features:
 
 import json
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Union, Type, Tuple
+from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
 from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, FeatureFormat
+from validation_pkg.utils import file_handler, path_utils
 from validation_pkg.logger import get_logger
 from validation_pkg.exceptions import (
     ConfigurationError,
@@ -265,10 +266,10 @@ class ConfigManager:
             logger.error(error_msg)
             raise ConfigurationError(error_msg) from e
         
-    
+
     @staticmethod
     def _validate_required_fields(data: dict):
-        """Validate that required top-level fields exist."""
+        """Validate that required top-level fields exist (internal method)."""
         required = ['ref_genome_filename', 'mod_genome_filename', 'reads']
         
         for field in required:
@@ -278,10 +279,10 @@ class ConfigManager:
         # Reads must be non-empty
         if not data['reads']:
             raise ValueError("'reads' must be a non-empty list")
-    
+
     @staticmethod
     def _parse_genome_configs(data: dict, config: Config):
-        """Parse genome and plasmid configurations."""
+        """Parse genome and plasmid configurations (internal method)."""
         # Required genomes
         config.ref_genome = ConfigManager._parse_genome_config(
             data['ref_genome_filename'], 'ref_genome_filename', config.config_dir, config.output_dir, config.options
@@ -300,7 +301,7 @@ class ConfigManager:
             config.mod_plasmid = ConfigManager._parse_genome_config(
                 data['mod_plasmid_filename'], 'mod_plasmid_filename', config.config_dir, config.output_dir, config.options
             )
-    
+
     @staticmethod
     def _parse_genome_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> GenomeConfig:
         """
@@ -319,21 +320,21 @@ class ConfigManager:
         logger = get_logger()
 
         # Parse filename and extra fields using unified utility
-        filename, extra = ConfigManager._parse_config_file_value(value, field_name)
+        filename, extra = file_handler.parse_config_file_value(value, field_name)
 
         # Extract file-level global options (threads, validation_level only)
         filelvl_options = ConfigManager._merge_options(field_name, global_options, extra)
 
         # Resolve absolute path with security validation
-        filepath = ConfigManager._resolve_filepath(config_dir, filename)
+        filepath = path_utils.resolve_filepath(config_dir, filename)
 
         if not filepath.exists():
             raise ValidationFileNotFoundError(
                 f"The following file was not found: {filepath}\n")
 
         # Detect compression and format using unified utilities
-        coding_type = ConfigManager._detect_compression_type(filepath)
-        detected_format = ConfigManager._detect_file_format(filepath, GenomeFormat)
+        coding_type = file_handler.detect_compression_type(filepath)
+        detected_format = file_handler.detect_file_format(filepath, GenomeFormat)
 
         return GenomeConfig(
             filename=filepath.name,
@@ -343,10 +344,10 @@ class ConfigManager:
             output_dir=output_dir,
             global_options=filelvl_options,
         )
-    
+
     @staticmethod
     def _parse_reads_configs(data: dict, config: Config):
-        """Parse reads configuration."""
+        """Parse reads configuration (internal method)."""
         logger = get_logger()
         reads_data = data['reads']
 
@@ -403,10 +404,10 @@ class ConfigManager:
                                 file_entry[key] = value
 
                         config.reads.append(ConfigManager._parse_read_config(file_entry, "", config.config_dir, config.output_dir, config.options))
-            
+
             except ValueError as e:
                 raise ValueError(f"Invalid reads[{idx}]: {e}")
-    
+
     @staticmethod
     def _parse_read_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> ReadConfig:
         """
@@ -425,7 +426,7 @@ class ConfigManager:
         logger = get_logger()
 
         # Parse filename and extra fields using unified utility
-        filename, extra = ConfigManager._parse_config_file_value(value, field_name)
+        filename, extra = file_handler.parse_config_file_value(value, field_name)
 
         # Extract ngs_type first (it's a required field, not a global option)
         ngs_type = extra.pop('ngs_type', 'illumina')
@@ -435,17 +436,17 @@ class ConfigManager:
 
         # Extract file-level global options (threads, validation_level only)
         filelvl_options = ConfigManager._merge_options(field_name,global_options,extra)
-        
+
         # Resolve absolute path with security validation
-        filepath = ConfigManager._resolve_filepath(config_dir, filename)
+        filepath = path_utils.resolve_filepath(config_dir, filename)
 
         if not filepath.exists():
             raise ValidationFileNotFoundError(
                 f"The following file was not found: {filepath}\n")
 
         # Detect compression and format using unified utilities
-        coding_type = ConfigManager._detect_compression_type(filepath)
-        detected_format = ConfigManager._detect_file_format(filepath, ReadFormat)
+        coding_type = file_handler.detect_compression_type(filepath)
+        detected_format = file_handler.detect_file_format(filepath, ReadFormat)
 
         return ReadConfig(
             filename=filepath.name,
@@ -459,7 +460,7 @@ class ConfigManager:
 
     @staticmethod
     def _parse_feature_configs(data: dict, config: Config):
-        """Parse feature configurations."""
+        """Parse feature configurations (internal method)."""
         if 'ref_feature_filename' in data and data['ref_feature_filename']:
             config.ref_feature = ConfigManager._parse_feature_config(
                 data['ref_feature_filename'], 'ref_feature_filename', config.config_dir, config.output_dir, config.options
@@ -469,7 +470,7 @@ class ConfigManager:
             config.mod_feature = ConfigManager._parse_feature_config(
                 data['mod_feature_filename'], 'mod_feature_filename', config.config_dir, config.output_dir, config.options
             )
-    
+
     @staticmethod
     def _parse_feature_config(value: Any, field_name: str, config_dir: Path, output_dir : Path, global_options: Dict[str, Any] = None) -> FeatureConfig:
         """
@@ -493,20 +494,20 @@ class ConfigManager:
         logger = get_logger()
 
         # Parse filename and extra fields using unified utility
-        filename, extra = ConfigManager._parse_config_file_value(value, field_name)
+        filename, extra = file_handler.parse_config_file_value(value, field_name)
 
         # Extract file-level global options (threads, validation_level only)
         filelvl_options = ConfigManager._merge_options(field_name,global_options,extra)
-        
+
         # Resolve absolute path with security validation
-        filepath = ConfigManager._resolve_filepath(config_dir, filename)
+        filepath = path_utils.resolve_filepath(config_dir, filename)
         if not filepath.exists():
             raise ValidationFileNotFoundError(
                 f"The following file was not found: {filepath}\n")
 
         # Detect compression and format using unified utilities
-        coding_type = ConfigManager._detect_compression_type(filepath)
-        detected_format = ConfigManager._detect_file_format(filepath, FeatureFormat)
+        coding_type = file_handler.detect_compression_type(filepath)
+        detected_format = file_handler.detect_file_format(filepath, FeatureFormat)
 
         return FeatureConfig(
             filename=filepath.name,
@@ -516,7 +517,8 @@ class ConfigManager:
             output_dir=output_dir,
             global_options=filelvl_options
         )
-        
+
+
     @staticmethod
     def _parse_options(data: dict, config: Config):
         """
@@ -677,188 +679,3 @@ class ConfigManager:
             error_msg = f"Failed to create output directory: {e}"
             logger.error(error_msg)
             raise ConfigurationError(error_msg) from e
-
-    @staticmethod
-    def _resolve_filepath(base_dir: Path, filename: str) -> Path:
-        """
-        Resolve filepath relative to base directory with path traversal protection.
-
-        This method prevents path traversal attacks by ensuring the resolved path
-        stays within the base directory. It handles relative paths with '..' and
-        symlinks by resolving to absolute canonical paths, then validating the
-        resolved path is still within the allowed base directory.
-
-        Args:
-            base_dir: Base directory (e.g., config_dir) - files must be under this
-            filename: Filename or relative path from config file
-
-        Returns:
-            Resolved absolute Path object
-
-        Raises:
-            ConfigurationError: If path traverses outside base directory
-
-        Examples:
-            >>> _resolve_filepath(Path("/home/user/project"), "genome.fasta")
-            Path("/home/user/project/genome.fasta")
-
-            >>> _resolve_filepath(Path("/home/user/project"), "../../../etc/passwd")
-            ConfigurationError: Path traversal detected
-
-        Security:
-            - Prevents directory traversal attacks (../..)
-            - Resolves symlinks to their targets
-            - Validates resolved path is within base_dir
-        """
-        # Resolve to absolute canonical paths
-        filepath = (base_dir / filename).resolve()
-        base_dir_resolved = base_dir.resolve()
-
-        # Check if filepath is within base_dir
-        # Use try/except for Python 3.7/3.8 compatibility (is_relative_to added in 3.9)
-        try:
-            filepath.relative_to(base_dir_resolved)
-        except ValueError:
-            # Path is outside base directory - security violation
-            raise ConfigurationError(
-                f"Path traversal detected: '{filename}' resolves outside config directory.\n"
-                f"Resolved path: {filepath}\n"
-                f"Config directory: {base_dir_resolved}\n"
-                f"Only files within the config directory are allowed."
-            )
-
-        return filepath
-
-    @staticmethod
-    def _detect_compression_type(filepath: Path) -> CodingType:
-        """
-        Detect compression type from file path and return CodingType enum.
-
-        Checks the last extension to determine compression:
-        - .gz or .gzip → CodingType.GZIP
-        - .bz2 or .bzip2 → CodingType.BZIP2
-        - other → CodingType.NONE
-
-        Args:
-            filepath: Path to file
-
-        Returns:
-            CodingType enum indicating compression
-
-        Examples:
-            >>> detect_compression_type(Path('genome.fasta'))
-            CodingType.NONE
-            >>> detect_compression_type(Path('genome.fasta.gz'))
-            CodingType.GZIP
-            >>> detect_compression_type(Path('genome.fasta.gzip'))
-            CodingType.GZIP
-            >>> detect_compression_type(Path('reads.fastq.bz2'))
-            CodingType.BZIP2
-
-        Note:
-            The function will detect .gz from file.tar.gz, which will
-            cause issues since validators do not handle TAR extraction.
-            Users must extract TAR archives before processing.
-        """
-        suffixes = Path(filepath).suffixes
-
-        if not suffixes:
-            return CodingType.NONE
-
-        # Check last extension for compression
-        last_ext = suffixes[-1].lower()
-
-        if last_ext in ['.gz', '.gzip']:
-            return CodingType.GZIP
-        elif last_ext in ['.bz2', '.bzip2']:
-            return CodingType.BZIP2
-        else:
-            return CodingType.NONE
-
-    @staticmethod
-    def _detect_file_format(filepath: Path, format_enum: Type[Union[GenomeFormat, ReadFormat, FeatureFormat]]) -> Union[GenomeFormat, ReadFormat, FeatureFormat]:
-        """
-        Detect file format from file path and return appropriate enum.
-
-        Checks the first extension (before compression) to determine format.
-
-        Args:
-            filepath: Path to file
-            format_enum: Format enum class (GenomeFormat, ReadFormat, or FeatureFormat)
-
-        Returns:
-            Format enum member
-
-        Raises:
-            ValueError: If format cannot be determined
-
-        Examples:
-            >>> detect_file_format(Path('genome.fasta'), GenomeFormat)
-            GenomeFormat.FASTA
-            >>> detect_file_format(Path('genome.fasta.gz'), GenomeFormat)
-            GenomeFormat.FASTA
-            >>> detect_file_format(Path('reads.fastq.bz2'), ReadFormat)
-            ReadFormat.FASTQ
-            >>> detect_file_format(Path('features.gff'), FeatureFormat)
-            FeatureFormat.GFF
-        """
-        suffixes = Path(filepath).suffixes
-
-        if not suffixes:
-            raise ValueError(f"Cannot determine format: no extension found in {filepath.name}")
-
-        # Get first extension (the format, before compression)
-        format_ext = suffixes[0]
-
-        # Let the format enum's _missing_ method handle the conversion
-        return format_enum(format_ext)
-
-    @staticmethod
-    def _parse_config_file_value(
-        value: Any,
-        field_name: str
-    ) -> Tuple[str, Dict[str, Any]]:
-        """
-        Parse file configuration value from JSON config.
-
-        Handles both dict and string formats:
-        - Dict: {"filename": "genome.fasta", "extra_key": "value"}
-        - String: "genome.fasta" (backwards compatibility)
-
-        Args:
-            value: Configuration value (dict or string)
-            field_name: Name of configuration field (for error messages)
-
-        Returns:
-            Tuple of (filename, extra_fields_dict)
-
-        Raises:
-            ValueError: If value is invalid format
-
-        Examples:
-            >>> _parse_config_file_value({"filename": "genome.fasta"}, "ref_genome")
-            ("genome.fasta", {})
-            >>> _parse_config_file_value({"filename": "reads.fastq", "ngs_type": "illumina"}, "reads")
-            ("reads.fastq", {"ngs_type": "illumina"})
-            >>> _parse_config_file_value("genome.fasta", "ref_genome")
-            ("genome.fasta", {})
-        """
-        filename = None
-        extra = {}
-
-        if isinstance(value, dict):
-            if 'filename' not in value:
-                raise ValueError(f"{field_name} must contain 'filename' field")
-            filename = value['filename']
-
-            # Extract extra keys (excluding 'filename')
-            extra = {k: v for k, v in value.items() if k != 'filename'}
-                    # Warn about extra fields
-
-        elif isinstance(value, str):
-            # Accept plain string for backwards compatibility
-            filename = value
-        else:
-            raise ValueError(f"{field_name} must be a dict or string, got {type(value).__name__}")
-
-        return filename, extra

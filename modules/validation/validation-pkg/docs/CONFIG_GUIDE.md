@@ -35,10 +35,10 @@ This document defines the **JSON** configuration file that `ConfigManager` uses 
 | Key | Type | Required | Description |
 |---|---|:---:|---|
 | `ref_genome_filename` | GenomeConfig | ✅ | Reference genome (FASTA or GenBank) |
-| `mod_genome_filename` | GenomeConfig | ❌ | Modified genome (FASTA or GenBank) |
+| `mod_genome_filename` | GenomeConfig | ✅ | Modified genome (FASTA or GenBank) |
 | `ref_plasmid_filename` | GenomeConfig | ❌ | Reference plasmid (FASTA or GenBank) |
 | `mod_plasmid_filename` | GenomeConfig | ❌ | Modified plasmid (FASTA or GenBank) |
-| `reads` | List[ReadConfig] | ❌ | Read files (FASTQ/BAM), minimum one if provided |
+| `reads` | List[ReadConfig] | ✅ | Read files (FASTQ/BAM), minimum one if provided |
 | `ref_feature_filename` | FeatureConfig | ❌ | Features for reference genome (BED, GFF, GTF) |
 | `mod_feature_filename` | FeatureConfig | ❌ | Features for modified genome (BED, GFF, GTF) |
 | `options` | dict | ❌ | Additional options (e.g., `{"threads": 8}`) |

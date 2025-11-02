@@ -15,6 +15,7 @@ from typing import Optional
 from threading import Lock
 import structlog
 from contextvars import ContextVar
+import logging
 
 # Context variable to track when parallel validation is active
 _parallel_validation_active: ContextVar[bool] = ContextVar('parallel_validation_active', default=False)
@@ -173,9 +174,6 @@ class ValidationLogger:
         if report_file:
             self.report_file = Path(report_file)
             self.report_file.parent.mkdir(parents=True, exist_ok=True)
-
-        # File logging setup (if requested)
-        import logging
 
         # Setup stdlib logging first (if file logging is requested)
         if log_file:
