@@ -9,6 +9,8 @@ workflow ref_mod {
         ref_fasta
         mod_fasta
     main:
+        log.info "▶ Running pipeline comparing reference and modified fasta."
+
         def prefix_name = "ref_x_mod"
 
         ref_mod_fasta = ref_fasta
@@ -24,11 +26,11 @@ workflow ref_mod {
 }
 
 workflow {
-    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
     Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
 
     ref_mod(ref_fasta, mod_fasta)
 }
 
 
-logWorkflowCompletion("referece to modified fasta comparision", true)
+logWorkflowCompletion("referece to modified fasta comparision")

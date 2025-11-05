@@ -3,16 +3,14 @@
 // Include workflows
 include { ref_mod } from './workflows/fasta_ref_x_mod.nf'
 
-include { long_ref as long_ref_pacbio; long_ref as long_ref_ont } from './workflows/long-read-ref.nf'
-include { long_mod as long_mod_pacbio; long_mod as long_mod_ont } from './workflows/long-read-mod.nf'
+include { long_ref as long_ref_pacbio; long_ref as long_ref_ont; long_ref as long_mod_pacbio; long_ref as long_mod_ont} from './workflows/long-read-ref.nf'
+include { short_ref; short_ref as short_mod } from './workflows/short-read-ref.nf'
 
-include { short_ref } from './workflows/short-read-ref.nf'
-include { short_mod } from './workflows/short-read-mod.nf'
-
+include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_unmapped as compare_unmapped_pacbio } from './modules/mapping.nf'
 include { truvari_comparison } from './modules/compare_vcfs.nf'
 
 include { qc } from './modules/subworkflow.nf'
-include { describePipeline; logWorkflowCompletion } from './modules/logs.nf'
+include { describePipeline; logWorkflowCompletion; loadFastqFiles; loadShortFastqFiles } from './modules/logs.nf'
 
 
 // Help message
@@ -41,91 +39,79 @@ def pipelines_running = 0
 
 workflow {
     // Inputs
-    Channel.fromPath("$params.in_dir/*ref*.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
+    Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
     Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
+    
+    def ref_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
+    def mod_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /mod_plasmid\.(fa|fna|fasta)$/ } ?: []
 
     def pacbio_files = file("${params.in_dir}/pacbio/").listFiles()?.findAll { it.name =~ /\.fastq\.gz$/ } ?: []
-
     def ont_files = file("${params.in_dir}/ont/").listFiles()?.findAll { it.name =~ /\.fastq\.gz$/ } ?: []
-
     def short_read_files = file("$params.in_dir/illumina/").listFiles()?.findAll { it.name =~ /\.(fastq|fq)(\.gz)?$/ } ?: []
 
-    log.info "▶ Running pipeline comparing reference and modified fasta."
+
+    // Reference to modified fasta comparison
     ref_mod(ref_fasta, mod_fasta)
     
     def vcfs = ref_mod.out.sv_vcf
 
     pipelines_running++
 
+    // pacbio reads pipeline
     if (pacbio_files) {
         mapping_tag = "map-pb"
 
-        Channel.from(pacbio_files).map { file ->
-                def name = file.baseName.replaceFirst(/\.fastq$/, '')
-                return [name, file]
-            }.set { pacbio_fastqs }
+        pacbio_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
 
-        if (params.map_to_mod_fa) {
-            log.info describePipeline("long-pacbio", "modified", mod_fasta)
-            long_mod_pacbio(pacbio_fastqs, ref_fasta, mod_fasta, mapping_tag)
-        } else {
-            log.info describePipeline("long-pacbio", "reference")
-            long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag) 
-        }
-        
-        long_ref_pacbio.out.sv_vcf
-            .map { it[1] }  
-            .set { sv_pacbio_vcf }
+        log.info describePipeline("long-pacbio", "modified")
+        long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")
 
-        vcfs = vcfs.mix(sv_pacbio_vcf)
+        log.info describePipeline("long-pacbio", "reference")
+        long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag, ref_plasmid, "long-ref") 
+
+        compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
+
+        vcfs = vcfs.mix(long_ref_pacbio.out.sv_vcf.map { it[1] })
 
         pipelines_running++
     }
+
+    // nanopore reads pipeline
     if (ont_files) {
         mapping_tag = "map-ont"
         
-        Channel.from(ont_files).map { file ->
-                def name = file.baseName.replaceFirst(/\.fastq$/, '')
-                return [name, file]
-            }
-            .set { ont_fastqs }
+        ont_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
 
+        log.info describePipeline("long-ont", "modified")
+        long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")
 
-        if (params.map_to_mod_fa) {
-            log.info describePipeline("long-ont", "modified", mod_fasta)
-            long_mod_ont(ont_fastqs, ref_fasta, mod_fasta, mapping_tag)
-        } else {
-            log.info describePipeline("long-ont", "reference")
-            long_ref_ont(ont_fastqs, ref_fasta, mapping_tag)
-        }
+        log.info describePipeline("long-ont", "reference")
+        long_ref_ont(ont_fastqs, ref_fasta, mapping_tag, ref_plasmid, "long-ref")
 
-        long_ref_ont.out.sv_vcf
-            .map { it[1] }  
-            .set { sv_ont_vcf }
+        compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
 
-        vcfs = vcfs.mix(sv_ont_vcf)
+        vcfs = vcfs.mix(long_ref_ont.out.sv_vcf.map { it[1] })
 
         pipelines_running++
     }
 
+    // short reads pipeline
     if (short_read_files) {    
         
-        Channel.from(short_read_files)
-        .map { [(it.name =~ /^([^_]+)(_((S[0-9]+_L[0-9]+_)?R[12]_001|[12]))?\.f(ast)?q\.gz/)[0][1], it] } 
-        .groupTuple(sort: true)
-        .set { fastqs }
+        fastqs = loadShortFastqFiles(short_read_files)
 
         // QC and trimming module
         qc(fastqs, "short-ref") | set { trimmed }
 
-        // Running mapping to the reference or modified fasta 
-        if (params.map_to_mod_fa) {
-            log.info describePipeline("short", "modified", mod_fasta)
-            short_mod(trimmed, ref_fasta, mod_fasta)
-        } else {
-            log.info describePipeline("short", "reference")
-            short_ref(trimmed, ref_fasta) 
-        }
+        // Running mapping to the reference and modified fasta
+        log.info describePipeline("short", "modified")
+        short_mod(trimmed, mod_fasta, "short-mod", mod_plasmid)
+    
+        log.info describePipeline("short", "reference")
+        short_ref(trimmed, ref_fasta, "short-ref", ref_plasmid) 
+        
+        compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
+
         vcfs = vcfs.mix(short_ref.out.sv_vcf)
 
         pipelines_running++
@@ -135,7 +121,7 @@ workflow {
         log.error "⚠ No valid inputs found. Skipping workflows."
         exit 0
     } else {
-        log.info "Performing ${pipelines_running - 1} truvari comparison(s)."
+        log.info "▶ Performing ${pipelines_running - 1} truvari comparison(s)."
     }
 
     if (pipelines_running >= 2) {
@@ -151,7 +137,7 @@ workflow {
     }
 }
 
-logWorkflowCompletion("execution of main.nf", true)
+logWorkflowCompletion("execution of main.nf")
 
 workflow.onError {
     println "Error: Pipeline execution stopped with the following message: ${workflow.errorMessage}"
