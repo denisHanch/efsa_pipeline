@@ -19,6 +19,8 @@ def logWorkflowCompletion(out_folder_name) {
     workflow.onComplete {
 
         if (workflow.success) {
+            def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault())
+            def readableTime = formatter.format(workflow.complete)
 
             log.info "✅ The ${out_folder_name} processing pipeline completed successfully."
 

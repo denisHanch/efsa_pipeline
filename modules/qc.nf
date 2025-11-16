@@ -10,6 +10,7 @@ process trimgalore {
     container 'vibsinglecellnf/trimgalore:trimgalore-0.6.7-cutadapt-4.1'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/trimmed_reads", mode: 'copy'
+    cpus = 4
 
     input:
     tuple val(pair_id), path(reads)

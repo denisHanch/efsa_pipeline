@@ -59,7 +59,7 @@ workflow {
     def vcfs = ref_mod.out.sv_vcf
 
     pipelines_running++
-    
+
     // pacbio reads pipeline
     if (pacbio_files) {
         mapping_tag = "map-pb"
@@ -67,8 +67,8 @@ workflow {
         pacbio_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
         
         // qc
-        nanoplot(pacbio_fastqs, "long-pacbio")
-
+        nanoplot(pacbio_fastqs, "long-ont")
+        
         log.info describePipeline("long-pacbio", "modified")
         long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")
 

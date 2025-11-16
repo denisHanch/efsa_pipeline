@@ -1,21 +1,26 @@
 FROM python:3.10-slim-bookworm
 
-# Install sudo and openssh-client, then create vscode user
+# Install system packages including compression tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends\
         sudo \
         openssh-client \
         vim less \
+        gzip \
+        bzip2 \
+        pigz \
+        pbzip2 \
     && useradd -ms /bin/bash -u 1000 vscode \
     && mkdir -p /etc/sudoers.d \
     && echo "vscode ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/vscode \
     && chmod 0440 /etc/sudoers.d/vscode \
-    && chown -R vscode:vscode /home/vscode
+    && chown -R vscode:vscode /home/vscode \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # history search 
 COPY .inputrc /root/
 
 # Switch to the vscode user by default
 USER vscode
-
 WORKDIR /EFSA_workspace
