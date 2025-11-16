@@ -17,6 +17,10 @@ from copy import deepcopy
 from typing import Dict, Any
 from abc import ABC
 
+__all__ = [
+    'BaseSettings',
+]
+
 # ===== Base Settings Class =====
 class BaseSettings(ABC):
     """
@@ -101,27 +105,18 @@ class BaseSettings(ABC):
 
         return new_settings
 
-    def to_dict(self, include_unset: bool = True) -> Dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """
         Convert settings to dictionary for serialization.
 
-        Args:
-            include_unset: If False, exclude fields with UNSET values
-
         Returns:
-            Dictionary with all settings (or only set values if include_unset=False)
+            Dictionary with all settings
 
         Example:
             >>> settings.to_dict()
             {'plasmid_split': True, 'sequence_prefix': None, ...}
-            >>> settings.to_dict(include_unset=False)
-            {'plasmid_split': True}  # Excludes UNSET fields
         """
-        result = asdict(self)
-        if not include_unset:
-            # Filter out UNSET values
-            result = {k: v for k, v in result.items() if not isinstance(v, _UnsetType)}
-        return result
+        return asdict(self)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]):
@@ -185,3 +180,4 @@ class BaseSettings(ABC):
         """
         params = ', '.join(f"{k}={v!r}" for k, v in self.to_dict().items())
         return f"{self.__class__.__name__}({params})"
+    

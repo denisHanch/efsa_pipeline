@@ -4,21 +4,26 @@ Logging configuration for the bioinformatics validation package.
 Provides structured logging with multiple outputs:
 - Console output (colored, user-friendly)
 - File output (detailed, for debugging)
-- Validation report (summary of all issues found)
 """
 
 import sys
 import os
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, List
 from threading import Lock
+from dataclasses import dataclass
 import structlog
-from contextvars import ContextVar
 import logging
+import time
 
-# Context variable to track when parallel validation is active
-_parallel_validation_active: ContextVar[bool] = ContextVar('parallel_validation_active', default=False)
+
+@dataclass
+class FileTimingSummary:
+    """Simple timing summary for a single file."""
+    input_file: str
+    validator_type: str  # "genome", "read", "feature"
+    elapsed_time: float
 
 
 # ANSI color codes for console output
@@ -55,34 +60,16 @@ def add_log_level_colors(_, level: str, event_dict: dict) -> dict:
     return event_dict
 
 
-def add_process_info(logger, method_name, event_dict: dict) -> dict:
-    """
-    Add process ID to log entries (only when parallel validation is active).
-
-    This processor conditionally adds:
-    - process_id: The OS process ID (PID) of the coordinating process
-
-    This field only appears during parallel validation to identify the main
-    coordinating process. Worker processes don't log directly - they return
-    results to the main process.
-    """
-    # Only add process info during parallel validation
-    if _parallel_validation_active.get(False):
-        event_dict["process_id"] = os.getpid()
-
-    return event_dict
-
-
 def format_process_info(logger, method_name, event_dict: dict) -> dict:
     """
     Format process/worker information for display in console logs.
 
-    Creates a formatted prefix like: [Worker-1 PID:12345]
+    Creates a formatted prefix like: [Worker-1] or [file.fastq]
     This appears before the log message for easy identification.
-    Only shows PID during parallel validation to keep sequential logs clean.
     """
     worker_id = event_dict.get("worker_id")
     file_context = event_dict.get("file_context")
+    category = event_dict.get("category")
 
     # Build the context prefix
     context_parts = []
@@ -90,16 +77,21 @@ def format_process_info(logger, method_name, event_dict: dict) -> dict:
     if worker_id:
         context_parts.append(f"{Colors.CYAN}Worker-{worker_id}{Colors.RESET}")
 
-    # Only show PID during parallel validation
-    if _parallel_validation_active.get(False):
-        pid = event_dict.get("process_id", os.getpid())
-        context_parts.append(f"{Colors.GRAY}PID:{pid}{Colors.RESET}")
-
     if file_context:
         # Shorten long file paths
         if len(file_context) > 40:
             file_context = "..." + file_context[-37:]
         context_parts.append(f"{Colors.MAGENTA}{file_context}{Colors.RESET}")
+
+    # Add category badge if present (e.g., [genome], [read], [feature])
+    if category and category not in ['validation_pipeline']:
+        category_color = {
+            'genome': Colors.GREEN,
+            'read': Colors.BLUE,
+            'feature': Colors.YELLOW,
+            'inter-file': Colors.CYAN
+        }.get(category, Colors.GRAY)
+        context_parts.append(f"{category_color}{category}{Colors.RESET}")
 
     if context_parts:
         event_dict["context"] = f"[{' '.join(context_parts)}]"
@@ -114,7 +106,6 @@ class ValidationLogger:
     Features:
     - Console output (colored, user-friendly)
     - File output (detailed debug log)
-    - Validation report (summary of issues)
     """
 
     _instance = None
@@ -140,8 +131,13 @@ class ValidationLogger:
         # Will hold the structlog logger instance
         self.logger = None
 
-        # Store report file path
-        self.report_file = None
+        # Storage for timing measurements
+        self._timers: Dict[str, float] = {}
+        self._timers_lock = Lock()
+
+        # Storage for per-file timing information
+        self.file_timings: List[FileTimingSummary] = []
+        self._timings_lock = Lock()
 
         self._initialized = True
 
@@ -149,7 +145,6 @@ class ValidationLogger:
         self,
         console_level: str = "INFO",
         log_file: Optional[Path] = None,
-        report_file: Optional[Path] = None,
         clear_previous_issues: bool = True
     ):
         """
@@ -158,7 +153,6 @@ class ValidationLogger:
         Args:
             console_level: Level for console output (DEBUG, INFO, WARNING, ERROR)
             log_file: Path to detailed log file (optional)
-            report_file: Path to validation report file (optional)
             clear_previous_issues: Clear validation issues from previous runs (default: True)
 
         Note:
@@ -168,22 +162,21 @@ class ValidationLogger:
         # Clear validation issues from previous runs (prevents contamination)
         if clear_previous_issues:
             self.clear_issues()
-
-        # Store report file path
-        self.report_file = report_file
-        if report_file:
-            self.report_file = Path(report_file)
-            self.report_file.parent.mkdir(parents=True, exist_ok=True)
+            self.clear_file_timings()
 
         # Setup stdlib logging first (if file logging is requested)
         if log_file:
+            from validation_pkg.utils.file_handler import get_incremented_path
+
             log_file = Path(log_file)
             log_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Auto-increment if file exists
+            log_file = get_incremented_path(log_file)
 
             # Use stdlib logging with structlog
             processors = [
                 structlog.contextvars.merge_contextvars,
-                add_process_info,  # Add PID and thread ID
                 structlog.stdlib.add_log_level,
                 structlog.stdlib.add_logger_name,
                 structlog.processors.TimeStamper(fmt="iso"),
@@ -202,7 +195,7 @@ class ValidationLogger:
             )
 
             # Setup stdlib logger for file and console output
-            stdlib_logger = logging.getLogger("bioinformatics_validator")
+            stdlib_logger = logging.getLogger("validation_pipeline")
             stdlib_logger.handlers.clear()  # Clear any existing handlers
             stdlib_logger.setLevel(logging.DEBUG)
             stdlib_logger.propagate = False
@@ -233,16 +226,15 @@ class ValidationLogger:
             # No file logging - use PrintLogger for simplicity
             processors = [
                 structlog.contextvars.merge_contextvars,
-                add_process_info,  # Add PID and thread ID
                 structlog.processors.add_log_level,
                 structlog.processors.TimeStamper(fmt="iso"),
                 structlog.processors.StackInfoRenderer(),
                 structlog.processors.format_exc_info,
             ]
 
-            # Console renderer with colors and process info
+            # Console renderer with colors and context info
             console_processors = processors + [
-                format_process_info,  # Format worker/PID/file context
+                format_process_info,  # Format worker/file context
                 add_log_level_colors,
                 structlog.dev.ConsoleRenderer(colors=True)
             ]
@@ -259,13 +251,80 @@ class ValidationLogger:
             )
 
         # Get logger instance
-        self.logger = structlog.get_logger("bioinformatics_validator")
+        self.logger = structlog.get_logger("validation_pipeline")
 
         if log_file:
             self.info(f"Detailed log file: {log_file}")
 
-        if report_file:
-            self.info(f"Validation report will be saved to: {report_file}")
+
+    def reconfigure_level(
+        self,
+        console_level: str = "INFO",
+        enable_file_logging: bool = True,
+        log_file: Optional[Path] = None
+    ):
+        """
+        Reconfigure logging level after initial setup.
+
+        This method allows changing the logging level after the logger has been
+        initially configured, useful for applying user-specified logging levels
+        from config files.
+
+        Args:
+            console_level: New console logging level (DEBUG, INFO, WARNING, ERROR)
+            enable_file_logging: Whether to enable file logging
+            log_file: Path to log file (if enabling file logging and not already set)
+
+        Note:
+            This updates existing handlers rather than recreating the entire logger.
+        """
+        console_level_upper = console_level.upper()
+
+        # Check if we're using stdlib logging (has handlers)
+        stdlib_logger = logging.getLogger("validation_pipeline")
+
+        if stdlib_logger.handlers:
+            # Update existing handlers
+            for handler in stdlib_logger.handlers:
+                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                    # Console handler
+                    handler.setLevel(getattr(logging, console_level_upper))
+                    self.debug(f"Updated console logging level to {console_level_upper}")
+
+            # If file logging should be disabled, remove file handler
+            if not enable_file_logging:
+                stdlib_logger.handlers = [
+                    h for h in stdlib_logger.handlers
+                    if not isinstance(h, logging.FileHandler)
+                ]
+        else:
+            # Using PrintLogger - need to reconfigure structlog
+            processors = [
+                structlog.contextvars.merge_contextvars,
+                structlog.processors.add_log_level,
+                structlog.processors.TimeStamper(fmt="iso"),
+                structlog.processors.StackInfoRenderer(),
+                structlog.processors.format_exc_info,
+            ]
+
+            console_processors = processors + [
+                format_process_info,
+                add_log_level_colors,
+                structlog.dev.ConsoleRenderer(colors=True)
+            ]
+
+            structlog.configure(
+                processors=console_processors,
+                wrapper_class=structlog.make_filtering_bound_logger(
+                    getattr(structlog.stdlib.logging, console_level_upper, structlog.stdlib.logging.INFO)
+                ),
+                context_class=dict,
+                logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
+                cache_logger_on_first_use=False,
+            )
+
+            # Get new logger instance
+            self.logger = structlog.get_logger("validation_pipeline")
 
     def debug(self, message: str, **kwargs):
         """Log debug message with optional structured context."""
@@ -335,89 +394,136 @@ class ValidationLogger:
             else:
                 self.logger.info(log_message, **log_kwargs)
 
-    def generate_report(self):
+    def start_timer(self, name: str):
         """
-        Generate validation report and save to file (thread-safe).
+        Start a named timer for performance measurement (thread-safe).
+
+        Args:
+            name: Unique identifier for this timer
+
+        Example:
+            >>> logger = get_logger()
+            >>> logger.start_timer("validation")
+            >>> # do some work
+            >>> elapsed = logger.stop_timer("validation")
+        """
+        with self._timers_lock:
+            self._timers[name] = time.time()
+
+    def stop_timer(self, name: str) -> float:
+        """
+        Stop a named timer and return elapsed time in seconds (thread-safe).
+
+        Args:
+            name: Identifier for the timer to stop
 
         Returns:
-            str: Report content
+            float: Elapsed time in seconds
+
+        Raises:
+            KeyError: If timer with given name was never started
+
+        Example:
+            >>> logger = get_logger()
+            >>> logger.start_timer("validation")
+            >>> # do some work
+            >>> elapsed = logger.stop_timer("validation")
+            >>> print(f"Took {elapsed:.2f}s")
         """
-        if not self.report_file:
-            return None
+        end_time = time.time()
+        with self._timers_lock:
+            if name not in self._timers:
+                raise KeyError(f"Timer '{name}' was never started")
+            start_time = self._timers[name]
+            elapsed = end_time - start_time
+            # Store the elapsed time instead of start time
+            self._timers[name] = elapsed
+            return elapsed
 
-        # Copy issues list to avoid holding lock during file I/O
-        with self._issues_lock:
-            issues_copy = self.validation_issues.copy()
-
-        # Count issues by level
-        errors = sum(1 for issue in issues_copy
-                    if isinstance(issue, dict) and issue.get('level') == 'ERROR')
-        warnings = sum(1 for issue in issues_copy
-                      if isinstance(issue, dict) and issue.get('level') == 'WARNING')
-
-        # Generate report
-        report_lines = [
-            "=" * 80,
-            "BIOINFORMATICS VALIDATION REPORT",
-            "=" * 80,
-            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            "",
-            "SUMMARY",
-            "-" * 80,
-            f"Total Issues: {len(issues_copy)}",
-            f"  Errors:   {errors}",
-            f"  Warnings: {warnings}",
-            "",
-            "DETAILS",
-            "-" * 80,
-        ]
-
-        if not issues_copy:
-            report_lines.append("✓ No issues found - all validations passed!")
-        else:
-            for idx, issue in enumerate(issues_copy, 1):
-                if isinstance(issue, dict):
-                    report_lines.append(f"\n{idx}. [{issue['level']}] {issue['category']}")
-                    report_lines.append(f"   {issue['message']}")
-                    if issue.get('details'):
-                        for key, value in issue['details'].items():
-                            report_lines.append(f"   - {key}: {value}")
-                else:
-                    # Old format (tuple)
-                    level, message = issue
-                    report_lines.append(f"\n{idx}. [{level}] {message}")
-
-        report_lines.append("\n" + "=" * 80)
-
-        report_content = "\n".join(report_lines)
-
-        # Write to file
-        self.report_file.write_text(report_content, encoding='utf-8')
-        self.info(f"Validation report saved to: {self.report_file}")
-
-        return report_content
-
-    def get_summary(self) -> dict:
+    def get_timers(self) -> Dict[str, float]:
         """
-        Get summary of validation results (thread-safe).
+        Get all recorded timers (thread-safe).
 
         Returns:
-            dict: Summary statistics
+            dict: Copy of timers dictionary with elapsed times
         """
-        with self._issues_lock:
-            issues_copy = self.validation_issues.copy()
+        with self._timers_lock:
+            return self._timers.copy()
 
-        errors = sum(1 for issue in issues_copy
-                    if isinstance(issue, dict) and issue.get('level') == 'ERROR')
-        warnings = sum(1 for issue in issues_copy
-                      if isinstance(issue, dict) and issue.get('level') == 'WARNING')
+    def add_file_timing(self, input_file: str, validator_type: str, elapsed_time: float):
+        """
+        Add file timing information (thread-safe).
 
-        return {
-            'total_issues': len(issues_copy),
-            'errors': errors,
-            'warnings': warnings,
-            'passed': errors == 0
-        }
+        Args:
+            input_file: Name of the input file
+            validator_type: Type of validator ("genome", "read", "feature")
+            elapsed_time: Time taken to process the file in seconds
+        """
+        timing = FileTimingSummary(
+            input_file=input_file,
+            validator_type=validator_type,
+            elapsed_time=elapsed_time
+        )
+        with self._timings_lock:
+            self.file_timings.append(timing)
+
+    def clear_file_timings(self):
+        """Clear all file timing information (thread-safe)."""
+        with self._timings_lock:
+            self.file_timings.clear()
+
+    def display_file_timings_summary(self):
+        """
+        Display a nice summary of file processing times.
+
+        Creates a formatted table showing:
+        - File name
+        - Validator type
+        - Processing time
+        - Total time
+        """
+        if not self.file_timings:
+            return
+
+        with self._timings_lock:
+            timings_copy = self.file_timings.copy()
+
+        # Calculate total time
+        total_time = sum(t.elapsed_time for t in timings_copy)
+
+        # Print header
+        self.info("")
+        self.info("=" * 80)
+        self.info("FILE PROCESSING SUMMARY")
+        self.info("=" * 80)
+
+        # Find longest filename for formatting
+        max_filename_len = max(len(t.input_file) for t in timings_copy) if timings_copy else 20
+        max_filename_len = min(max_filename_len, 50)  # Cap at 50 chars
+
+        # Print each file
+        for timing in timings_copy:
+            # Truncate long filenames
+            filename = timing.input_file
+            if len(filename) > max_filename_len:
+                filename = "..." + filename[-(max_filename_len-3):]
+
+            # Format time
+            time_str = f"{timing.elapsed_time:.2f}s"
+
+            # Format validator type with color
+            type_label = timing.validator_type.upper()
+
+            self.info(
+                f"  {filename:<{max_filename_len}}  [{type_label:>7}]  {time_str:>8}",
+                category=timing.validator_type
+            )
+
+        # Print total
+        self.info("-" * 80)
+        self.info(f"  {'TOTAL':<{max_filename_len}}             {total_time:>8.2f}s")
+        self.info("=" * 80)
+        self.info("")
 
     def clear_issues(self):
         """
@@ -426,7 +532,6 @@ class ValidationLogger:
         This is useful for:
         - Starting a new validation run with clean state
         - Test isolation (preventing contamination between tests)
-        - Resetting after generating a report
 
         Example:
             >>> logger = get_logger()
@@ -436,57 +541,11 @@ class ValidationLogger:
         with self._issues_lock:
             self.validation_issues.clear()
 
-    def enable_parallel_logging(self):
-        """
-        Enable parallel validation logging mode.
-
-        When enabled, process_id will be added to all log entries from the
-        coordinating process. This helps identify which process is managing
-        the parallel validation work.
-
-        Example:
-            >>> logger = get_logger()
-            >>> logger.enable_parallel_logging()
-            >>> # Now process_id appears in logs
-            >>> logger.info("Starting parallel validation")
-        """
-        _parallel_validation_active.set(True)
-
-    def disable_parallel_logging(self):
-        """
-        Disable parallel validation logging mode.
-
-        When disabled, process_id will NOT be added to log entries.
-        This should be called after parallel validation completes.
-
-        Example:
-            >>> logger = get_logger()
-            >>> logger.disable_parallel_logging()
-            >>> # Now process_id is hidden from logs
-            >>> logger.info("Parallel validation complete")
-        """
-        _parallel_validation_active.set(False)
-
-    def is_parallel_logging_enabled(self) -> bool:
-        """
-        Check if parallel validation logging mode is currently enabled.
-
-        Returns:
-            bool: True if parallel logging is enabled, False otherwise
-        """
-        return _parallel_validation_active.get(False)
-
     def __enter__(self):
         """
         Context manager entry - clear issues at start.
 
         This enables using the logger with 'with' statement for automatic isolation:
-
-        Example:
-            >>> with get_logger() as logger:
-            ...     logger.info("Starting validation")
-            ...     # validation_issues starts empty
-            ...     # and will be available throughout this block
         """
         self.clear_issues()
         return self
@@ -517,7 +576,6 @@ def get_logger() -> ValidationLogger:
 def setup_logging(
     console_level: str = "INFO",
     log_file: Optional[Path] = None,
-    report_file: Optional[Path] = None
 ):
     """
     Set up logging for the package.
@@ -525,8 +583,11 @@ def setup_logging(
     Args:
         console_level: Console output level (DEBUG, INFO, WARNING, ERROR)
         log_file: Path to detailed log file
-        report_file: Path to validation report
     """
     logger = get_logger()
-    logger.setup(console_level, log_file, report_file)
+    logger.setup(console_level, log_file)
     return logger
+
+
+# Export for backwards compatibility
+__all__ = ['ValidationLogger', 'get_logger', 'setup_logging']

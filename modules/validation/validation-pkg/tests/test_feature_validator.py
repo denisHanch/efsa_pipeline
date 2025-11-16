@@ -58,6 +58,7 @@ class TestFeatureValidatorInitialization:
         """Test initialization with default settings."""
         feature_config = FeatureConfig(
             filename="features.gff",
+            basename="features",
             filepath=simple_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -81,6 +82,7 @@ class TestFeatureValidatorInitialization:
 
         feature_config = FeatureConfig(
             filename="features.gff",
+            basename="features",
             filepath=simple_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -120,6 +122,7 @@ class TestFeatureValidatorParsing:
 
         feature_config = FeatureConfig(
             filename="test.gff",
+            basename="test",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -146,6 +149,7 @@ class TestFeatureValidatorParsing:
 
         feature_config = FeatureConfig(
             filename="test.bed",
+            basename="test",
             filepath=bed_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.BED,
@@ -173,6 +177,7 @@ class TestFeatureValidatorParsing:
 
         feature_config = FeatureConfig(
             filename="empty.gff",
+            basename="empty",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -196,6 +201,7 @@ class TestFeatureValidatorParsing:
 
         feature_config = FeatureConfig(
             filename="malformed.gff",
+            basename="malformed",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -237,6 +243,7 @@ class TestFeatureValidatorCompression:
 
         feature_config = FeatureConfig(
             filename="test.gff.gz",
+            basename="test",
             filepath=gff_file,
             coding_type=CodingType.GZIP,
             detected_format=FeatureFormat.GFF,
@@ -260,6 +267,7 @@ class TestFeatureValidatorCompression:
 
         feature_config = FeatureConfig(
             filename="test.bed.bz2",
+            basename="test",
             filepath=bed_file,
             coding_type=CodingType.BZIP2,
             detected_format=FeatureFormat.BED,
@@ -299,6 +307,7 @@ class TestFeatureValidatorValidation:
 
         feature_config = FeatureConfig(
             filename="invalid.gff",
+            basename="invalid",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -321,6 +330,7 @@ class TestFeatureValidatorValidation:
 
         feature_config = FeatureConfig(
             filename="zero_length.gff",
+            basename="zero_length",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -331,7 +341,7 @@ class TestFeatureValidatorValidation:
         settings = FeatureValidator.Settings(check_coordinates=True)
         validator = FeatureValidator(feature_config, settings)
 
-        with pytest.raises(FeatureValidationError, match="Zero-length feature"):
+        with pytest.raises(FeatureValidationError, match="zero-length"):
             validator.run()
 
     def test_negative_coordinates(self, temp_dir, output_dir):
@@ -343,6 +353,7 @@ class TestFeatureValidatorValidation:
 
         feature_config = FeatureConfig(
             filename="negative.gff",
+            basename="negative",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -353,7 +364,7 @@ class TestFeatureValidatorValidation:
         settings = FeatureValidator.Settings(check_coordinates=True)
         validator = FeatureValidator(feature_config, settings)
 
-        with pytest.raises(FeatureValidationError, match="Negative coordinates"):
+        with pytest.raises(FeatureValidationError, match="negative coordinates"):
             validator.run()
 
 
@@ -384,6 +395,7 @@ class TestFeatureValidatorEditing:
 
         feature_config = FeatureConfig(
             filename="unsorted.gff",
+            basename="unsorted",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -412,6 +424,7 @@ class TestFeatureValidatorEditing:
 
         feature_config = FeatureConfig(
             filename="unsorted.gff",
+            basename="unsorted",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -453,6 +466,7 @@ class TestFeatureValidatorFormatConversion:
 
         feature_config = FeatureConfig(
             filename="test.bed",
+            basename="test",
             filepath=bed_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.BED,
@@ -505,6 +519,7 @@ class TestFeatureValidatorOutput:
 
         feature_config = FeatureConfig(
             filename="test.gff",
+            basename="test",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -529,6 +544,7 @@ class TestFeatureValidatorOutput:
 
         feature_config = FeatureConfig(
             filename="test.gff",
+            basename="test",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -557,6 +573,7 @@ class TestFeatureValidatorOutput:
 
         feature_config = FeatureConfig(
             filename="test.gff",
+            basename="test",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -585,6 +602,7 @@ class TestFeatureValidatorOutput:
 
         feature_config = FeatureConfig(
             filename="test.gff",
+            basename="test",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -608,6 +626,7 @@ class TestFeatureValidatorOutput:
 
         feature_config = FeatureConfig(
             filename="test.gff",
+            basename="test",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -664,6 +683,7 @@ class TestFeatureValidatorValidationLevels:
         settings = FeatureValidator.Settings()
         feature_config = FeatureConfig(
             filename="features.gff",
+            basename="features",
             filepath=multi_feature_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -686,6 +706,7 @@ class TestFeatureValidatorValidationLevels:
         )
         feature_config = FeatureConfig(
             filename="damaged.gff",
+            basename="damaged",
             filepath=damaged_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -704,6 +725,7 @@ class TestFeatureValidatorValidationLevels:
         )
         feature_config = FeatureConfig(
             filename="features.gff",
+            basename="features",
             filepath=multi_feature_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -725,6 +747,7 @@ class TestFeatureValidatorValidationLevels:
         settings = FeatureValidator.Settings()
         feature_config = FeatureConfig(
             filename="features.gff",
+            basename="features",
             filepath=multi_feature_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -747,6 +770,7 @@ class TestFeatureValidatorValidationLevels:
         )
         feature_config = FeatureConfig(
             filename="damaged.gff",
+            basename="damaged",
             filepath=damaged_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -766,6 +790,7 @@ class TestFeatureValidatorValidationLevels:
         )
         feature_config = FeatureConfig(
             filename="features.gff",
+            basename="features",
             filepath=multi_feature_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -789,6 +814,7 @@ class TestFeatureValidatorValidationLevels:
         settings = FeatureValidator.Settings()
         feature_config = FeatureConfig(
             filename="features.gff",
+            basename="features",
             filepath=multi_feature_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -811,6 +837,7 @@ class TestFeatureValidatorValidationLevels:
         )
         feature_config = FeatureConfig(
             filename="damaged.gff",
+            basename="damaged",
             filepath=damaged_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -831,6 +858,7 @@ class TestFeatureValidatorValidationLevels:
         settings = FeatureValidator.Settings()
         feature_config = FeatureConfig(
             filename="features.gff",
+            basename="features",
             filepath=multi_feature_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -855,6 +883,7 @@ class TestFeatureValidatorValidationLevels:
         )
         feature_config = FeatureConfig(
             filename="features.gff",
+            basename="features",
             filepath=multi_feature_gff,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -883,6 +912,7 @@ class TestFeatureValidatorValidationLevels:
         settings = FeatureValidator.Settings()
         feature_config = FeatureConfig(
             filename="features.gff.gz",
+            basename="features",
             filepath=gff_file,
             coding_type=CodingType.GZIP,
             detected_format=FeatureFormat.GFF,
@@ -906,6 +936,7 @@ class TestFeatureValidatorValidationLevels:
         settings = FeatureValidator.Settings()
         feature_config = FeatureConfig(
             filename="features.gff.bz2",
+            basename="features",
             filepath=gff_file,
             coding_type=CodingType.BZIP2,
             detected_format=FeatureFormat.GFF,
@@ -942,6 +973,7 @@ class TestFeatureValidatorEdgeCases:
 
         feature_config = FeatureConfig(
             filename="minimal.bed",
+            basename="minimal",
             filepath=bed_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.BED,
@@ -972,6 +1004,7 @@ class TestFeatureValidatorEdgeCases:
 
         feature_config = FeatureConfig(
             filename="comments.gff",
+            basename="comments",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
@@ -997,6 +1030,7 @@ class TestFeatureValidatorEdgeCases:
 
         feature_config = FeatureConfig(
             filename="strand.gff",
+            basename="strand",
             filepath=gff_file,
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,

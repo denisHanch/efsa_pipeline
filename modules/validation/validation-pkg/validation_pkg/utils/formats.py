@@ -14,6 +14,13 @@ extensions, filenames, and format names as input.
 from enum import Enum
 from pathlib import Path
 
+__all__ = [
+    'CodingType',
+    'GenomeFormat',
+    'ReadFormat',
+    'FeatureFormat',
+]
+
 
 class CodingType(Enum):
     """

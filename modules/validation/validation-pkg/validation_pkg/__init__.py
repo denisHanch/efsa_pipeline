@@ -111,9 +111,15 @@ __license__ = "EUPL-1.2 license"
 # Public API exports
 from validation_pkg.config_manager import ConfigManager, Config
 from validation_pkg.validators.genome_validator import GenomeValidator
+from validation_pkg.validators.genome_validator import OutputMetadata as GenomeOutputMetadata
 from validation_pkg.validators.read_validator import ReadValidator
+from validation_pkg.validators.read_validator import OutputMetadata as ReadOutputMetadata
 from validation_pkg.validators.feature_validator import FeatureValidator
+from validation_pkg.validators.feature_validator import OutputMetadata as FeatureOutputMetadata
+from validation_pkg.validators.interfile_read import ReadXReadSettings, readxread_validation
+from validation_pkg.validators.interfile_genome import GenomeXGenomeSettings, genomexgenome_validation
 from validation_pkg.logger import setup_logging, get_logger
+from validation_pkg.report import ValidationReport
 
 # Functional API imports
 from typing import Optional, List
@@ -125,7 +131,7 @@ from typing import Optional, List
 def validate_genome(
     genome_config,
     settings: Optional[GenomeValidator.Settings] = None
-) -> dict:
+) -> GenomeOutputMetadata:
     """
     Validate a genome file with optional custom settings.
 
@@ -134,17 +140,17 @@ def validate_genome(
     Args:
         genome_config: GenomeConfig object (from ConfigManager)
         settings: Optional GenomeValidator.Settings object (uses defaults if None)
+
+    Returns:
+        GenomeOutputMetadata: Metadata about the validated genome file
     """
     validator = GenomeValidator(genome_config, settings)
-    validator.run()
-    logger = get_logger()
-    if logger.report_file is not None:
-        logger.generate_report()
+    return validator.run()
 
 def validate_read(
     read_config,
     settings: Optional[ReadValidator.Settings] = None
-) -> dict:
+) -> ReadOutputMetadata:
     """
     Validate a single read file with optional custom settings.
 
@@ -153,17 +159,18 @@ def validate_read(
     Args:
         read_config: ReadConfig object (from ConfigManager)
         settings: Optional ReadValidator.Settings object (uses defaults if None)
+
+    Returns:
+        ReadOutputMetadata: Metadata about the validated read file
     """
     validator = ReadValidator(read_config, settings)
-    validator.run()
-    logger = get_logger()
-    if logger.report_file is not None:
-        logger.generate_report()
+    output_metadata = validator.run()
+    return output_metadata
 
 def validate_reads(
     read_configs: List,
     settings: Optional[ReadValidator.Settings] = None
-) -> List[dict]:
+) -> List[ReadOutputMetadata]:
     """
     Validate multiple read files with optional custom settings.
 
@@ -172,71 +179,47 @@ def validate_reads(
         settings: Optional ReadValidator.Settings object (uses defaults if None)
 
     Returns:
-        List of validation results (dicts with 'success', 'filename', 'error' keys)
+        List[ReadOutputMetadata]: List of metadata objects for each validated read file
     """
     results = []
     for read_config in read_configs:
-        try:
-            validator = ReadValidator(read_config, settings)
-            validator.run()
-            results.append({
-                'success': True,
-                'filename': read_config.filename,
-                'error': None
-            })
-        except Exception as e:
-            results.append({
-                'success': False,
-                'filename': read_config.filename,
-                'error': str(e)
-            })
+        validator = ReadValidator(read_config, settings)
+        result = validator.run()
+        results.append(result)
     return results
 
 def validate_genomes(
     genome_configs: List,
     settings: Optional[GenomeValidator.Settings] = None
-) -> List[dict]:
+) -> List[GenomeOutputMetadata]:
     """
     Validate multiple genome files with optional custom settings.
 
     Args:
         genome_configs: List of GenomeConfig objects (from ConfigManager)
-        output_dir: Directory for output files
         settings: Optional GenomeValidator.Settings object (uses defaults if None)
 
     Returns:
-        List of validation results (dicts with 'success', 'filename', 'error' keys)
+        List[GenomeOutputMetadata]: List of metadata objects for each validated genome file
 
     Example:
         >>> config = ConfigManager.load("config.json")
         >>> settings = GenomeValidator.Settings()
-        >>> settings = settings.update(coding_type='gz', max_workers=2)
+        >>> settings = settings.update(coding_type='gz')
         >>> genome_list = [config.ref_genome, config.mod_genome]
-        >>> results = validate_genomes(genome_list, config.output_dir, settings)
+        >>> results = validate_genomes(genome_list, settings)
     """
-
     results = []
     for genome_config in genome_configs:
-        try:
-            validator = GenomeValidator(genome_config, settings)
-            validator.run()
-            results.append({
-                'success': True,
-                'filename': genome_config.filename,
-                'error': None
-            })
-        except Exception as e:
-            results.append({
-                'success': False,
-                'filename': genome_config.filename,
-                'error': str(e)
-            })
+        validator = GenomeValidator(genome_config, settings)
+        result = validator.run()
+        results.append(result)
     return results
 
 def validate_feature(
     feature_config,
     settings: Optional[FeatureValidator.Settings] = None
-) -> dict:
+) -> FeatureOutputMetadata:
     """
     Validate a feature annotation file with optional custom settings.
 
@@ -245,18 +228,17 @@ def validate_feature(
     Args:
         feature_config: FeatureConfig object (from ConfigManager)
         settings: Optional FeatureValidator.Settings object (uses defaults if None)
-    """
 
+    Returns:
+        FeatureOutputMetadata: Metadata about the validated feature file
+    """
     validator = FeatureValidator(feature_config, settings)
-    validator.run()
-    logger = get_logger()
-    if logger.report_file is not None:
-        logger.generate_report()
+    return validator.run()
 
 def validate_features(
     feature_configs: List,
     settings: Optional[FeatureValidator.Settings] = None
-) -> List[dict]:
+) -> List[FeatureOutputMetadata]:
     """
     Validate multiple feature annotation files with optional custom settings.
 
@@ -265,24 +247,13 @@ def validate_features(
         settings: Optional FeatureValidator.Settings object (uses defaults if None)
 
     Returns:
-        List of validation results (dicts with 'success', 'filename', 'error' keys)
+        List[FeatureOutputMetadata]: List of metadata objects for each validated feature file
     """
     results = []
     for feature_config in feature_configs:
-        try:
-            validator = GenomeValidator(feature_config, settings)
-            validator.run()
-            results.append({
-                'success': True,
-                'filename': feature_config.filename,
-                'error': None
-            })
-        except Exception as e:
-            results.append({
-                'success': False,
-                'filename': feature_config.filename,
-                'error': str(e)
-            })
+        validator = FeatureValidator(feature_config, settings)
+        result = validator.run()
+        results.append(result)
     return results
 
 __all__ = [
@@ -303,9 +274,16 @@ __all__ = [
     'validate_feature',
     'validate_features',
 
+    # Inter-file Validation
+    'ReadXReadSettings',
+    'readxread_validation',
+    'GenomeXGenomeSettings',
+    'genomexgenome_validation',
+
     # Logging
     'setup_logging',
     'get_logger',
+    'ValidationReport'
 
     # Version info
     '__version__',

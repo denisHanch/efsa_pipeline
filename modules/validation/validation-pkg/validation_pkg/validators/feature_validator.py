@@ -39,6 +39,51 @@ from validation_pkg.utils.formats import CodingType as CT
 from validation_pkg.utils.formats import FeatureFormat
 from validation_pkg.utils.file_handler import open_compressed_writer
 
+
+@dataclass
+class OutputMetadata:
+    """
+    Metadata returned from feature validation.
+
+    Attributes:
+        input_file: Full path to input file
+        output_file: Full path to main output file
+        output_filename: Name of output file
+        num_features: Total number of features in output
+        feature_types: List of unique feature types (gene, CDS, exon, etc.)
+        sequence_ids: List of sequence IDs referenced by features (for inter-file validation)
+        validation_level: Validation level used ('strict'/'trust'/'minimal')
+        elapsed_time: Time taken for validation in seconds
+    """
+    input_file: str = None
+    output_file: str = None
+    output_filename: str = None
+    num_features: int = None
+    feature_types: List[str] = None
+    sequence_ids: List[str] = None
+    validation_level: str = None
+    elapsed_time: float = None
+
+    def __str__(self):
+        parts = [f"Validation Level: {self.validation_level or 'N/A'}"]
+        parts.append(f"Output File: {self.output_file or 'N/A'}")
+        parts.append(f"Output Filename: {self.output_filename or 'N/A'}")
+
+        if self.num_features is not None:
+            parts.append(f"Number of Features: {self.num_features}")
+
+        if self.feature_types:
+            parts.append(f"Feature Types: {', '.join(self.feature_types)}")
+
+        if self.sequence_ids:
+            parts.append(f"Sequence IDs: {len(self.sequence_ids)} sequences referenced")
+
+        if self.elapsed_time is not None:
+            parts.append(f"Elapsed Time: {self.elapsed_time:.2f} seconds")
+
+        return "\n".join(parts)
+    
+    
 @dataclass
 class Feature:
     """
@@ -169,7 +214,8 @@ class FeatureValidator:
         self.input_path = feature_config.filepath
 
         # From settings
-        self.settings = settings if not None else self.Settings() 
+        self.settings = settings if settings is not None else self.Settings() 
+        self.output_metadata = OutputMetadata()
 
         # Parsed data
         self.features: List[Feature] = []
@@ -178,17 +224,44 @@ class FeatureValidator:
             self.validation_level = 'strict'    #   default global value
 
         if not self.threads:
-            self.threads = 1    #   default global value
+            from validation_pkg.config_manager import DEFAULT_THREADS
+            self.threads = DEFAULT_THREADS    #   default global value
 
-    def run(self) -> None:
+    def _fill_output_metadata(self, output_path: Path) -> None:
+        """
+        Create OutputMetadata object based on validation level.
+
+        Args:
+            output_path: Path to the main output file
+
+        """
+        self.output_metadata.input_file = self.feature_config.filename
+        self.output_metadata.output_file = str(output_path) if output_path else None
+        self.output_metadata.output_filename = output_path.name if output_path else None
+        self.output_metadata.num_features = len(self.features)
+        self.output_metadata.feature_types = list(set(f.feature_type for f in self.features))
+        self.output_metadata.sequence_ids = list(set(f.seqname for f in self.features))
+        self.output_metadata.validation_level = self.validation_level
+
+    def run(self) -> OutputMetadata:
         """
         Main validation and processing workflow.
 
         Uses feature_config data (format, compression) provided by ConfigManager.
 
+        Returns:
+            OutputMetadata: Metadata object containing:
+                - output_file: Full path to output file
+                - output_filename: Name of output file
+                - num_features: Total number of features
+                - feature_types: List of unique feature types
+                - sequence_ids: List of sequence IDs (for inter-file validation)
+                - validation_level: Validation mode used
+
         Raises:
             FeatureValidationError: If validation fails
         """
+        self.logger.start_timer("feature_validation")
         self.logger.info(f"Processing feature file: {self.feature_config.filename}")
         self.logger.debug(f"Format: {self.feature_config.detected_format}, Compression: {self.feature_config.coding_type}")
 
@@ -201,9 +274,22 @@ class FeatureValidator:
 
             self._apply_edits()
 
-            self._save_output()
+            output_path = self._save_output()
 
-            self.logger.info(f"✓ Feature validation completed")
+            elapsed = self.logger.stop_timer("feature_validation")
+            self.logger.info(f"✓ Feature validation completed in {elapsed:.2f}s")
+
+            # Record file timing for report
+            self.logger.add_file_timing(
+                self.feature_config.filename,
+                "feature",
+                elapsed
+            )
+
+            # Create and return OutputMetadata
+            self._fill_output_metadata(output_path)
+            self.output_metadata.elapsed_time = elapsed
+            return self.output_metadata
 
         except Exception as e:
             self.logger.error(f"Feature validation failed: {e}")
@@ -488,32 +574,32 @@ class FeatureValidator:
             FeatureValidationError: If any validation check fails
         """
         if feature.start > feature.end:
-            error_message = f"Feature has start > end: {feature.seqname}:{feature.start}-{feature.end}"
+            error_message = f"Feature #{idx}: start > end ({feature.seqname}:{feature.start}-{feature.end})"
             self.logger.add_validation_issue(
                 level='ERROR',
                 category='feature',
                 message=error_message,
-                details={'feature_index': idx, 'seqname': feature.seqname, 'start': feature.start, 'end': feature.end}
+                details={'index': idx}
             )
             raise FeatureValidationError(error_message)
 
         if feature.start < 0 or feature.end < 0:
-            error_message = f"Negative coordinates not allowed: {feature.seqname}:{feature.start}-{feature.end}"
+            error_message = f"Feature #{idx}: negative coordinates ({feature.seqname}:{feature.start}-{feature.end})"
             self.logger.add_validation_issue(
                 level='ERROR',
                 category='feature',
                 message=error_message,
-                details={'feature_index': idx, 'seqname': feature.seqname}
+                details={'index': idx}
             )
             raise FeatureValidationError(error_message)
 
         if feature.start == feature.end:
-            error_message = f"Zero-length feature not allowed: {feature.seqname}:{feature.start}-{feature.end}"
+            error_message = f"Feature #{idx}: zero-length ({feature.seqname}:{feature.start})"
             self.logger.add_validation_issue(
                 level='ERROR',
                 category='feature',
                 message=error_message,
-                details={'feature_index': idx, 'seqname': feature.seqname, 'position': feature.start}
+                details={'index': idx}
             )
             raise FeatureValidationError(error_message)
 
