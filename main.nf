@@ -24,6 +24,7 @@ def helpMessage() {
     --out_dir        Output directory            (default: ${params.out_dir})
     --in_dir         Input directory             (default: ${params.in_dir})
     --registry       Docker/Singularity registry (default: ${params.registry})
+    --max_cpu        Maximum CPUs per process    (default: ${params.max_cpu})
     --log            Enable logging              (default: ${params.log})
     --help           Show this help message
     """.stripIndent()

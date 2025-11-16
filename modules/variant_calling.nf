@@ -94,7 +94,7 @@ process snpeff {
  * Getting variants statistics with bcftools stats
 */
 process bcftools_stats {
-    container 'biocontainers/bcftools:v1.9-1-deb_cv1'
+    container 'staphb/bcftools:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/bcftools_stats", mode: 'copy'
 
@@ -117,7 +117,7 @@ process bcftools_stats {
  * Truvari requires sorted vcfs for comparision
 */
 process sortVcf {
-    container 'biocontainers/bcftools:v1.9-1-deb_cv1'
+    container 'staphb/bcftools:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 
@@ -137,7 +137,7 @@ process sortVcf {
  * Truvari require indexed vcfs for comparision
 */
 process indexVcf {
-    container 'biocontainers/bcftools:v1.9-1-deb_cv1'
+    container 'staphb/bcftools:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 

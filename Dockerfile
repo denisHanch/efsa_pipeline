@@ -8,6 +8,7 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositori
 # Install necessary packages
 RUN apk update && \
     apk add --no-cache \
+    procps \
     bash \
     emacs-nox \
     mc \

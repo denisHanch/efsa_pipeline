@@ -10,7 +10,6 @@ process trimgalore {
     container 'vibsinglecellnf/trimgalore:trimgalore-0.6.7-cutadapt-4.1'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/trimmed_reads", mode: 'copy'
-    cpus = 4
 
     input:
     tuple val(pair_id), path(reads)
@@ -22,9 +21,9 @@ process trimgalore {
     script:
     """
     if [ \$(echo ${reads} | wc -w) -gt 1 ]; then
-        trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 --paired ${reads}
+        trim_galore --gzip --cores ${params.max_cpu} -q 20 --illumina --phred33 --paired ${reads}
     else
-        trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 ${reads}
+        trim_galore --gzip --cores ${params.max_cpu} -q 20 --illumina --phred33 ${reads}
     fi
     """
 }
@@ -95,6 +94,6 @@ container 'staphb/nanoplot:latest'
     
     script:
     """
-    NanoPlot --fastq $reads --outdir ${pair_id}_report
+    NanoPlot --fastq $reads --outdir ${pair_id}_report --threads ${params.max_cpu}
     """
 }

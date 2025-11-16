@@ -1,7 +1,7 @@
 params.workflow_id = "fasta_ref_mod"
 
 process nucmer {
-    container "biocontainers/mummer:v3.23dfsg-4-deb_cv1"
+    container "staphb/mummer:4.0.1"
     containerOptions = "--user root"
     publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
 
@@ -22,7 +22,7 @@ process nucmer {
 }
 
 process deltaFilter {
-    container "biocontainers/mummer:v3.23dfsg-4-deb_cv1"
+    container "staphb/mummer:4.0.1"
     publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
 
     input:
@@ -40,7 +40,7 @@ process deltaFilter {
 
 
 process showCoords {
-    container "biocontainers/mummer:v3.23dfsg-4-deb_cv1"
+    container "staphb/mummer:4.0.1"
     publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
 
     input:

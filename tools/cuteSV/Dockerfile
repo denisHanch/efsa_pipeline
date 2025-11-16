@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     libbz2-dev \
     build-essential \
     python3-dev \
+    procps \
     gcc \
     libbz2-dev \
  && rm -rf /var/lib/apt/lists/*
