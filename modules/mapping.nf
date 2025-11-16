@@ -234,7 +234,7 @@ process get_unmapped_reads {
 
     script:
     """
-    samtools view -t ${params.max_cpu} -f 4 -b $bam_file | samtools fastq > ${pair_id}_unmapped.fastq
+    samtools view -@ ${params.max_cpu} -f 4 -b $bam_file | samtools fastq > ${pair_id}_unmapped.fastq
     """
 }
 

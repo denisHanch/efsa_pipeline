@@ -16,9 +16,6 @@ workflow long_ref {
         out_folder_name
 
     main:
-        // qc
-        nanoplot(fastqs, out_folder_name)
-        
         // mapping to the reference
         mapping_long(fastqs, fasta, mapping_tag, out_folder_name) | set { indexed_bam }
 

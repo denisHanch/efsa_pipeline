@@ -94,6 +94,6 @@ container 'staphb/nanoplot:latest'
     
     script:
     """
-    NanoPlot --fastq $reads --outdir ${pair_id}_report --threads ${params.max_cpu}
+    NanoPlot --huge --fastq $reads --outdir ${pair_id}_report --threads ${params.max_cpu}
     """
 }

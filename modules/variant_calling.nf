@@ -150,7 +150,7 @@ process indexVcf {
 
     script:
     """
-    bcftools index $vcf_file
+    bcftools index --threads ${params.max_cpu} $vcf_file
     """
 }
 
