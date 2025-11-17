@@ -46,7 +46,7 @@ process picard_dict {
  * Running delly SV caller
 */
 process delly {
-    container 'biocontainers/delly:v0.8.1-2-deb_cv1'
+    container 'dellytools/delly:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -71,7 +71,7 @@ process delly {
  * Convert bcf (default delly output) to vcf
 */
 process convert_bcf_to_vcf {
-    container 'biocontainers/bcftools:v1.9-1-deb_cv1'
+    container 'staphb/bcftools:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -112,7 +112,7 @@ process cute_sv {
     script:
     """
     mkdir ${pair_id}_out
-    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out
+    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t ${params.max_cpu}
     """
 }
 
@@ -136,7 +136,7 @@ process debreak {
 
     script:
     """
-    debreak --bam $bam_file -r $fasta_file -o debreak_out
+    debreak --bam $bam_file -r $fasta_file -o debreak_out -t ${params.max_cpu}
     mv debreak_out/debreak.vcf debreak_out/${pair_id}_debreak.vcf
     """
 }
@@ -160,7 +160,7 @@ process sniffles {
 
     script:
     """
-    sniffles --input $bam_file --vcf ${pair_id}_sniffles.vcf --reference $fasta_file
+    sniffles --input $bam_file --vcf ${pair_id}_sniffles.vcf --reference $fasta_file --threads ${params.max_cpu}
     """
 }
 

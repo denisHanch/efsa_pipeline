@@ -7,6 +7,7 @@ include { long_ref as long_ref_pacbio; long_ref as long_ref_ont; long_ref as lon
 include { short_ref; short_ref as short_mod } from './workflows/short-read-ref.nf'
 
 include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_unmapped as compare_unmapped_pacbio } from './modules/mapping.nf'
+include { nanoplot } from './modules/qc.nf'
 include { truvari_comparison } from './modules/compare_vcfs.nf'
 
 include { qc } from './modules/subworkflow.nf'
@@ -21,10 +22,12 @@ def helpMessage() {
     
     Options:
     -resume          Run pipeline from the point where it was interrupted or previously failed
-    --out_dir        Output directory            (default: ${params.out_dir})
-    --in_dir         Input directory             (default: ${params.in_dir})
-    --registry       Docker/Singularity registry (default: ${params.registry})
-    --log            Enable logging              (default: ${params.log})
+    --out_dir        Output directory             (default: ${params.out_dir})
+    --in_dir         Input directory              (default: ${params.in_dir})
+    --registry       Docker/Singularity registry  (default: ${params.registry})
+    --max_cpu        Maximum CPUs per process     (default: ${params.max_cpu})
+    --log            Enable logging               (default: ${params.log})
+    --clean_work     Remove workdir after success (default: ${params.clean_work})
     --help           Show this help message
     """.stripIndent()
 }
@@ -62,7 +65,10 @@ workflow {
         mapping_tag = "map-pb"
 
         pacbio_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
-
+        
+        // qc
+        nanoplot(pacbio_fastqs, "long-ont")
+        
         log.info describePipeline("long-pacbio", "modified")
         long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")
 
@@ -81,6 +87,9 @@ workflow {
         mapping_tag = "map-ont"
         
         ont_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
+
+        // qc
+        nanoplot(ont_fastqs, "long-ont")
 
         log.info describePipeline("long-ont", "modified")
         long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")

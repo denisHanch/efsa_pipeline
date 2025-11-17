@@ -18,17 +18,40 @@ def describePipeline(read_type, fasta_type) {
 def logWorkflowCompletion(out_folder_name) {
     workflow.onComplete {
 
-        def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                                    .withZone(ZoneId.systemDefault())
-        def readableTime = formatter.format(workflow.complete)
-
         if (workflow.success) {
-            log.info "✅ The ${out_folder_name} processing pipeline completed successfully. ${readableTime}\n"
+            def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault())
+            def readableTime = formatter.format(workflow.complete)
+
+            log.info "✅ The ${out_folder_name} processing pipeline completed successfully."
+
+            def workDir = new File("${workflow.workDir}")
+            def launchDir = new File("${workflow.launchDir}")
+            def logDir = new File("${params.log_dir}")
+            logDir.mkdirs()
+
+            workDir.eachFileRecurse(groovy.io.FileType.ANY) { f ->
+            if( f.name ==~ /^(\.command).*/ ) {
+                
+                def relPath = workDir.toPath().relativize(f.toPath()).toString()
+                def dest = new File(logDir, relPath)
+                dest.parentFile.mkdirs()
+                f.withInputStream { ins -> dest.withOutputStream { out -> out << ins } }
+                }
+            }
+
+            if (params.clean_work && out_folder_name == "execution of main.nf") {
+                if( workDir.exists() ) {
+                    workDir.deleteDir()
+                    log.info "ℹ️ Nextflow work/ directory was removed."
+                }
+            }
+
         } else {
-            log.error "❌ The ${out_folder_name} processing pipeline failed: ${workflow.errorReport}\n"
+            log.error "❌ The ${out_folder_name} processing pipeline failed: ${workflow.errorReport}"
         }
     }
 }
+
 
 def loadFastqFiles(pathPattern) { 
     return Channel.fromPath(pathPattern)

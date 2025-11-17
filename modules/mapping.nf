@@ -44,7 +44,7 @@ process bwa_mapping {
 
     script:
     """
-    bwa mem ${fasta_file} ${reads} > ${pair_id}.sam
+    bwa mem ${fasta_file} ${reads} -t ${params.max_cpu} > ${pair_id}.sam
     """
 }
 
@@ -84,7 +84,6 @@ process picard {
     each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index)
     val out_folder_name
-
 
     output:
     path "${pair_id}_alignment_metrics.txt"
@@ -144,7 +143,7 @@ process minimap2 {
 
     script:
     """
-    minimap2 -ax $mapping_tag $fasta_file $reads > ${pair_id}.sam
+    minimap2 -t ${params.max_cpu} -ax $mapping_tag $fasta_file $reads > ${pair_id}.sam
     """
 }
 
@@ -165,7 +164,7 @@ process samtools_sort {
 
     script:
     """
-    samtools sort $sam -o ${pair_id}.bam
+    samtools sort --threads ${params.max_cpu} $sam -o ${pair_id}.bam
     """
 }
 
@@ -226,7 +225,6 @@ process get_unmapped_reads {
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/unmapped", mode: 'copy'
 
-
     input:
     tuple val(pair_id), path(bam_file), path(bam_index)
     val out_folder_name
@@ -236,7 +234,7 @@ process get_unmapped_reads {
 
     script:
     """
-    samtools view -f 4 -b $bam_file | samtools fastq > ${pair_id}_unmapped.fastq
+    samtools view -@ ${params.max_cpu} -f 4 -b $bam_file | samtools fastq > ${pair_id}_unmapped.fastq
     """
 }
 
