@@ -29,7 +29,7 @@ def main():
         return 1
 
     # Setup logging,
-    setup_logging(console_level='DEBUG',log_file=Path("logs/validation.log"))
+    setup_logging(console_level='DEBUG',log_file=Path("/EFSA_workspace/data/outputs/validation.log"))
 
     # ========================================================================
     # Step 1: Read and validate config
