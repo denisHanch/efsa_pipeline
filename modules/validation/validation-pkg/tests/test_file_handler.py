@@ -661,6 +661,7 @@ class TestPairedEndFormatDetection:
     def test_user_provided_examples(self, temp_dir):
         """Test all user-provided filename examples."""
         test_cases = [
+            'sample_S1_L001_R1_001.fastq.gz'
             'Bacillus_toyonensis_LE1_S1_L001_R1.fastq.gz',
             'Bacillus_toyonensis_LE1_S1_L001_R2.fastq.gz',
             'Bacillus-toyonensis-LE1-sequence_1.fastq.gz',
