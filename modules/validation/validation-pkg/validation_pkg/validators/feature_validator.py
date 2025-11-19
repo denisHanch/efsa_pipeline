@@ -41,7 +41,7 @@ from validation_pkg.utils.file_handler import open_compressed_writer
 
 
 @dataclass
-class OutputMetadata:
+class OutputMetadata(BaseSettings):
     """
     Metadata returned from feature validation.
 
