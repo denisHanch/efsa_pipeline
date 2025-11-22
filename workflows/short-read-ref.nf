@@ -35,7 +35,7 @@ workflow short_ref {
             get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq }
 
             calc_unmapped_plasmid(unmapped_fastq) | set { nreads }
-            logUnmapped_plasmid(nreads, total_reads, "${out_folder_name}-plasmid", "against plasmid")
+            logUnmapped_plasmid(nreads, total_reads, "${out_folder_name}-plasmid", " against plasmid")
         }
 
          if (out_folder_name == "short-ref") { 
