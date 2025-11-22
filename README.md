@@ -10,7 +10,7 @@
       - [Runtime Status Messages](#runtime-status-messages)
       - [📊 Unmapped Reads Statistics](#-unmapped-reads-statistics)
       - [✅ Pipeline Execution Summary](#-pipeline-execution-summary)
-      - [Removal of Nextflow Work Directory](#removal-of-nextflow-work-directory)(#-removal-of-the-nextflow-directory-work)
+      - [Removal of Nextflow Work Directory](#removal-of-nextflow-work-directory)
    - [📁 `data/valid` Directory Structure](#-datavalid-directory-structure)
    - [📁 `data/outputs` Directory Structure](#-dataoutputs-directory-structure)
       - [`fasta_ref_mod/`](#fasta_ref_mod)
