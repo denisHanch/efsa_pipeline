@@ -33,4 +33,4 @@ workflow {
 }
 
 
-logWorkflowCompletion("referece to modified fasta comparision")
+logWorkflowCompletion("reference to modified fasta comparision")

@@ -38,7 +38,7 @@ workflow short_ref {
             logUnmapped_plasmid(nreads, total_reads, "${out_folder_name}-plasmid", " against plasmid")
         }
 
-         if (out_folder_name == "short-ref") { 
+         if (out_folder_name == "illumina/short-ref") { 
             // SNP & variant calling
             freebayes(fasta, indexed_bam, out_folder_name) | set { vcf }
             bcftools_stats(vcf, out_folder_name) | set { bcftools_out }

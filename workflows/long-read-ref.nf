@@ -39,7 +39,7 @@ workflow long_ref {
         }
 
         // SV calling against the reference
-        if (out_folder_name == "long-ref") { 
+        if (out_folder_name == "ont/long-ref" || out_folder_name == "pacbio/long-ref") { 
             sv_long(fasta, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
         } else {
             sv_vcf = Channel.empty()
