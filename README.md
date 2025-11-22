@@ -18,7 +18,7 @@
       - [`pacbio/ and ont/ — Long-Read Processing Outputs`](#pacbio-and-ont-—-long-read-processing-outputs)
       - [`truvari/ — Structural Variant Comparison Results`](#truvari-—-structural-variant-comparison-results)
       - [`unmapped_stats — Unmapped Read Statistics`](#unmapped_stats-—-unmapped-read-statistics)
-
+  - [Graphical Representation of the Pipeline](#-graphical-representation-of-the-pipeline)
       
 
 
@@ -724,7 +724,7 @@ The `logs/` folder contains **detailed logs and command scripts** for each Nextf
 * **`.command.run`** — Metadata about process execution (e.g., exit code, runtime, resource usage).
 * **`.command.sh`** — The shell script that Nextflow runs; contains the exact commands for the process.
 
-## Gaphical representation of the pipeline
+## Gaphical Representation of the Pipeline
 
 ```mermaid
 flowchart TD
@@ -785,5 +785,5 @@ flowchart TD
         syri_vcf --> truvari
         truvari --> final_report["Truvari Reports / Summary"]
     end
-    style Truvari fill:95D980,stroke:#2E7D32,stroke-width:2px
+    style Truvari fill:#D0F0C0,stroke:#2E7D32,stroke-width:2px
 ```
