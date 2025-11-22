@@ -1,4 +1,4 @@
-# EFSA Pipeline
+# Docker Container
 
 ## Docker Setup for Users
 
@@ -52,7 +52,9 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
 # Input Validation
 
 > **Important**
+> 
 > When container is build please follow the steps to preprocess the data with a validation package.
+>
 
 The input validation module preprocesses and verifies all input data to ensure it meets the required format and structure before the Nextflow pipeline is executed.
 
@@ -174,15 +176,12 @@ nextflow run workflows/fasta_ref_x_mod.nf \
   -resume
 ```
 
-Here’s a **README-ready section** that cleanly incorporates your runtime messages *and* the unmapped read statistics, with clear structure and consistent terminology.
-
-You can paste this directly into your documentation.
 
 ## 🔄 Pipeline Runtime Messages & Mapping Summary
 
 During execution, the pipeline prints progress messages indicating which workflow is currently running and what type of reads are being processed.
 
-### ▶ Runtime Status Messages
+### Runtime Status Messages
 
 When the pipeline is running, you will see real-time messages like:
 
@@ -219,6 +218,22 @@ This is useful for assessing mapping efficiency and data quality.
 📊 short-ref-plasmid mapping against plasmid:
     Unmapped reads: 4,677 (0.49%)
     Total input reads: 963,362
+
+📊 ont/long-ref mapping:
+    Unmapped reads: 52,745 (3.04%)
+    Total input reads: 1,732,734
+
+📊 ont/long-mod mapping:
+    Unmapped reads: 48,145 (2.64%)
+    Total input reads: 1,825,876
+
+📊 pacbio/long-mod mapping:
+    Unmapped reads: 41,596 (2.28%)
+    Total input reads: 1,826,736
+
+📊 pacbio/long-ref mapping:
+    Unmapped reads: 47,472 (2.74%)
+    Total input reads: 1,733,973
 ```
 
 ### Interpretation
@@ -240,4 +255,56 @@ If the percentage of unmapped reads is unusually high, this may indicate:
 
 ## 📁 `data/outputs` Directory Structure
 
-This directory contains all input data used by the Nextflow pipeline.
+After successful pipeline execution, the outputs are organized as follows:
+
+```
+data/outputs
+├── fasta_ref_mod       → Results from reference vs modified FASTA comparison
+├── illumina            → Short-read (Illumina) mapping results
+├── logs                → Pipeline logs and Nextflow reports
+├── ont                 → Long-read (Oxford Nanopore) mapping results
+├── pacbio              → Long-read (PacBio) mapping results
+├── truvari             → Variant comparison results from Truvari
+└── unmapped_stats      → Summary statistics of unmapped reads for each workflow
+
+```
+
+---
+
+## ✅ Pipeline Execution Summary
+
+The Nextflow pipelines ran successfully and produced the expected outputs. Each step completed without errors:
+
+```text
+✅ The referece to modified fasta comparision processing pipeline completed successfully.
+
+✅ The long-ref processing pipeline completed successfully.
+
+✅ The short-ref processing pipeline completed successfully.
+
+✅ Truvari: the comparison of vcf files finished successfully.
+
+✅ Execution of main.nf processing pipeline completed successfully.
+```
+
+---
+
+### ℹ️ Removal of the Nextflow `work/` Directory
+
+When the pipeline is executed with the parameter:
+
+```text
+params.clean_work = true
+```
+
+Nextflow automatically removes the temporary `work/` directory after successful completion.
+
+```text
+ℹ️ Nextflow `work/` directory was removed.
+```
+
+**Notes:**
+
+* The `work/` directory contains intermediate files and temporary outputs generated during pipeline execution.
+* Removing it saves disk space while retaining all final results in the `out_dir`.
+* If you want to keep intermediate files for debugging or inspection, set: `params.clean_work = false`

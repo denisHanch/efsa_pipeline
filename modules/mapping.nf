@@ -240,7 +240,7 @@ process get_unmapped_reads {
 
 process compare_unmapped {
     tag "$pair_id1"
-    publishDir "${params.out_dir}/unmapped", mode: 'copy'
+    publishDir "${params.out_dir}/unmapped_stats", mode: 'copy'
 
     input:
     tuple val(pair_id1), path(unmapped_1, stageAs: "unmapped_ref.fastq")

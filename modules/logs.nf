@@ -35,7 +35,7 @@ def logWorkflowCompletion(out_folder_name) {
             def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault())
             def readableTime = formatter.format(workflow.complete)
 
-            log.info "✅ The ${out_folder_name} processing pipeline completed successfully."
+            log.info "✅ The ${out_folder_name} processing pipeline completed successfully.\n"
 
             def workDir = new File("${workflow.workDir}")
             def launchDir = new File("${workflow.launchDir}")
@@ -55,7 +55,7 @@ def logWorkflowCompletion(out_folder_name) {
             if (params.clean_work && out_folder_name == "execution of main.nf") {
                 if( workDir.exists() ) {
                     workDir.deleteDir()
-                    log.info "ℹ️ Nextflow work/ directory was removed."
+                    log.info "ℹ️  Nextflow work/ directory was removed.\n"
                 }
             }
 

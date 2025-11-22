@@ -68,12 +68,12 @@ workflow {
         pacbio_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
         
         // qc
-        nanoplot_pacbio(pacbio_fastqs, "long-ont")
+        nanoplot_pacbio(pacbio_fastqs, "pacbio")
         
         describePipeline("long-pacbio", "reference & modified")
-        long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")
+        long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "pacbio/long-mod")
 
-        long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag, ref_plasmid, "long-ref") 
+        long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag, ref_plasmid, "pacbio/long-ref") 
 
         compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
 
@@ -86,15 +86,15 @@ workflow {
     if (ont_files) {
         mapping_tag = "map-ont"
         
-        ont_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
+        ont_fastqs = loadFastqFiles("${params.in_dir}/ont/*.fastq.gz")
 
         // qc
-        nanoplot_ont(ont_fastqs, "long-ont")
+        nanoplot_ont(ont_fastqs, "ont")
 
         describePipeline("long-ont", "reference & modified")
-        long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")
+        long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "ont/long-mod")
 
-        long_ref_ont(ont_fastqs, ref_fasta, mapping_tag, ref_plasmid, "long-ref")
+        long_ref_ont(ont_fastqs, ref_fasta, mapping_tag, ref_plasmid, "ont/long-ref")
 
         compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
 
@@ -109,13 +109,13 @@ workflow {
         fastqs = loadShortFastqFiles(short_read_files)
 
         // QC and trimming module
-        qc(fastqs, "short-ref") | set { trimmed }
+        qc(fastqs, "illumina/qc_trimming") | set { trimmed }
 
         // Running mapping to the reference and modified fasta
         describePipeline("short", "reference & modified")
-        short_mod(trimmed, mod_fasta, "short-mod", mod_plasmid)
+        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
 
-        short_ref(trimmed, ref_fasta, "short-ref", ref_plasmid) 
+        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid) 
         
         compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
 

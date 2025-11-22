@@ -2,7 +2,6 @@ params.workflow_id = "fasta_ref_mod"
 
 process nucmer {
     container "staphb/mummer:4.0.1"
-    containerOptions = "--user root"
     publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
 
     input:
