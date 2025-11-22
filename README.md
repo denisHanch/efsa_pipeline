@@ -10,7 +10,7 @@
       - [Runtime Status Messages](#runtime-status-messages)
       - [📊 Unmapped Reads Statistics](#-unmapped-reads-statistics)
       - [✅ Pipeline Execution Summary](#-pipeline-execution-summary)
-      - [ℹ️ Removal of the Nextflow Directory `work/`](#-removal-of-the-nextflow-directory-work)
+      - [Removal of Nextflow Work Directory](#removal-of-nextflow-work-directory)(#-removal-of-the-nextflow-directory-work)
    - [📁 `data/valid` Directory Structure](#-datavalid-directory-structure)
    - [📁 `data/outputs` Directory Structure](#-dataoutputs-directory-structure)
       - [`fasta_ref_mod/`](#fasta_ref_mod)
@@ -251,7 +251,7 @@ The Nextflow pipelines ran successfully and produced the expected outputs. Each 
 ```
 
 
-### ℹ️ Removal of the Nextflow Directory `work/`
+### Removal of Nextflow Work Directory
 
 When the pipeline is executed with the parameter:
 
