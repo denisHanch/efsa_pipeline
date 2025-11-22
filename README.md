@@ -5,20 +5,20 @@
 - [Docker Container](#docker-container)
 - [Input Validation](#input-validation)
 - [Nextflow](#nextflow)
-   - [Running the Pipeline](#pipeline-details)
+   - [Running the Pipeline](#running-the-pipeline)
    - [🔄 Pipeline Runtime Messages & Mapping Summary](#-pipeline-runtime-messages--mapping-summary)
       - [Runtime Status Messages](#runtime-status-messages)
       - [📊 Unmapped Reads Statistics](#-unmapped-reads-statistics)
       - [✅ Pipeline Execution Summary](#-pipeline-execution-summary)
-      - [ℹ️ Removal of the Nextflow `work/` Directory](#-removal-of-the-nextflow-work-directory)
+      - [ℹ️ Removal of the Nextflow `work/` Directory](#removal-of-the-nextflow-work-directory)
    - [📁 `data/valid` Directory Structure](#-datavalid-directory-structure)
    - [📁 `data/outputs` Directory Structure](#-dataoutputs-directory-structure)
       - [`fasta_ref_mod/`](#fasta_ref_mod)
       - [`illumina/`](#illumina)
-      - [`pacbio/ and ont/ — Long-Read Processing Outputs`](#pacbio-and-ont-—-long-read-processing-outputs)
-      - [`truvari/ — Structural Variant Comparison Results`](#truvari-—-structural-variant-comparison-results)
-      - [`unmapped_stats — Unmapped Read Statistics`](#unmapped_stats-—-unmapped-read-statistics)
-  - [Graphical Representation of the Pipeline](#-graphical-representation-of-the-pipeline)
+      - [`pacbio/ and ont/`](#pacbio-and-ont)
+      - [`truvari/`](#truvari)
+      - [`unmapped_stats/`](#unmapped_stats)
+  - [Graphical Representation of the Pipeline](#graphical-representation-of-the-pipeline)
       
 
 
@@ -460,7 +460,7 @@ Includes:
 * `multiqc/` — Combined reports
 * `unmapped/` — Reads that failed to align to the modified genome
 
-### `pacbio/` and `ont/` — Long-Read Processing Outputs
+### `pacbio/` and `ont/`
 
 These two folders contain the complete results from the **long-read analysis pipeline** using:
 
@@ -577,7 +577,7 @@ Sure — here is your **Truvari section rewritten using `SampleName` placeholder
 
 ---
 
-### `truvari/` — Structural Variant Comparison Results
+### `truvari/`
 
 #### Folder Structure
 
@@ -643,7 +643,7 @@ Each Truvari output folder usually contains:
 * Comparison summary statistics
 
 
-### `unmapped_stats` — Unmapped Read Statistics
+### `unmapped_stats/`
 
 #### Folder Structure
 
@@ -724,7 +724,7 @@ The `logs/` folder contains **detailed logs and command scripts** for each Nextf
 * **`.command.run`** — Metadata about process execution (e.g., exit code, runtime, resource usage).
 * **`.command.sh`** — The shell script that Nextflow runs; contains the exact commands for the process.
 
-## Gaphical Representation of the Pipeline
+## Graphical Representation of the Pipeline
 
 ```mermaid
 flowchart TD
