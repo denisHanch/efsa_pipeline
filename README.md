@@ -357,6 +357,8 @@ fasta_ref_mod/
 
 ### `illumina/`
 
+The flowchart below summarizes the pipeline for processing short reads. VCF annotation is performed only when a GFF/GTF annotation file is provided. Delly and Freebayes are run exclusively for reference genome mapping; these steps are skipped when reads are mapped to a modified genome.
+
 ```mermaid
 %%{init: {
   "theme": "base",
@@ -502,8 +504,6 @@ data/outputs/illumina/
     └── unmapped
 ```
 
-
-
 #### Subfolder Structure
 
 #### `qc_trimming/`
@@ -570,6 +570,8 @@ Includes:
 * `unmapped/` — Reads that failed to align to the modified genome
 
 ### `pacbio/` and `ont/`
+
+
 
 These two folders contain the complete results from the **long-read analysis pipeline** using:
 
@@ -688,6 +690,56 @@ Sure — here is your **Truvari section rewritten using `SampleName` placeholder
 
 ### `truvari/`
 
+The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Ref vs Modified VCF serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sortVcf), indexing them (indexVcf), and then performing the Truvari comparison to generate the final comparison results.
+
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#B6ECE2",
+    "primaryTextColor": "#160F26",
+    "primaryBorderColor": "#065647",
+    "lineColor": "#545555",
+    "clusterBkg": "#BABCBD22",
+    "clusterBorder": "#DDDEDE",
+    "fontFamily": "arial"
+  }
+}}%%
+flowchart TB
+
+%% ===== TRUVARI COMPARISON PIPELINE =====
+subgraph TRUVARI_PIPELINE
+    %% Inputs
+    REF_MOD_VCF["Ref vs Modified VCF (Baseline / Truth-set)"]:::truthset
+    PB_VCF["PacBio VCF"]:::input
+    ONT_VCF["Nanopore VCF"]:::input
+    IL_VCF["Illumina VCF"]:::input
+
+    %% Processes
+    SORT_VCF["sortVcf"]:::process
+    INDEX_VCF["indexVcf"]:::process
+    TRUVARI["truvari"]:::process
+
+    %% Output
+    TRUVARI_OUT["Truvari comparison results"]:::output
+
+    %% Connections
+    PB_VCF --> SORT_VCF
+    ONT_VCF --> SORT_VCF
+    IL_VCF --> SORT_VCF
+    REF_MOD_VCF --> SORT_VCF
+
+    SORT_VCF --> INDEX_VCF --> TRUVARI --> TRUVARI_OUT
+end
+
+%% ===== STYLING =====
+classDef input fill:#E3F2FD,stroke:#1565C0
+classDef truthset fill:#FFF3B0,stroke:#FFB300,stroke-width:2px
+classDef process fill:#B6ECE2,stroke:#065647
+classDef output fill:#E8F5E9,stroke:#2E7D32
+
+```
+
 #### Folder Structure
 
 ```
@@ -732,6 +784,7 @@ All `.csi` files represent index files for fast querying of VCF contents.
 ---
 
 ### Truvari Comparison Result Folders
+
 
 Each Truvari output directory contains benchmarking results comparing the **SyRI structural variants** against sequencing-based SV calls:
 

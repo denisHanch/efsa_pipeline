@@ -65,6 +65,9 @@ workflow {
     Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
     
     if (pacbio_fastqs) {
+
+        nanoplot(pacbio_fastqs, "pacbio")
+
         long_ref(pacbio_fastqs, ref_fasta, "map-pb", ref_plasmid, out_folder_name)
     }
 }
