@@ -166,11 +166,11 @@ All files in the directory inherit the same settings:
 
 #### NGS Type Values
 
-| Value |  
-|-------|
-| `"illumina"` |
-| `"ont"` | 
-| `"pacbio"` | 
+| Value | Description | Typical Read Length |
+|-------|-------------|-------------------|
+| `"illumina"` | Illumina short reads (SE or PE) | 50-300 bp |
+| `"ont"` | Oxford Nanopore long reads | 1-100+ kb |
+| `"pacbio"` | PacBio long reads | 10-50+ kb |
 
 <!-- **Note:** BAM files are automatically detected and converted to FASTQ. Default NGS type for BAM: `pacbio`. -->
 
