@@ -400,6 +400,8 @@ fasta_ref_mod/
   Structural variants and genome rearrangements detected by **SyRI**, stored in VCF format.
 
 
+---
+
 ### `illumina/`
 
 The flowchart below summarizes the pipeline for processing short reads. VCF annotation is performed only when a GFF/GTF annotation file is provided. Delly and Freebayes are run exclusively for reference genome mapping; these steps are skipped when reads are mapped to a modified genome or a plasmid.
@@ -549,8 +551,6 @@ data/outputs/illumina/
     └── unmapped
 ```
 
-#### Subfolder Structure
-
 #### `qc_trimming/`
 
 This directory contains all quality control and preprocessing outputs generated from raw Illumina reads.
@@ -564,7 +564,6 @@ This directory contains all quality control and preprocessing outputs generated 
 * `trimmed_reads/`
   Quality-filtered and adapter-trimmed reads used for downstream mapping.
 
----
 
 #### `short-ref/`
 
@@ -582,7 +581,6 @@ Includes:
 * `multiqc/` — Combined QC report from mapping and alignment metrics
 * `unmapped/` — fastq file with reads that failed to align to the reference genome
 
----
 
 #### `short-ref-plasmid/`
 
@@ -599,7 +597,6 @@ Includes:
 
 This folder allows evaluation of plasmid presence and coverage independently of the main genome.
 
----
 
 #### `short-mod/`
 
@@ -613,6 +610,8 @@ Includes:
 * `picard/` — Alignment QC metrics
 * `multiqc/` — Combined reports
 * `unmapped/` — Reads that failed to align to the modified genome
+
+---
 
 ### `pacbio/` and `ont/`
 
@@ -713,7 +712,6 @@ subgraph LEGEND["Legend"]
     L2["Process"]:::process
     L3["Output file"]:::output
 end
-
 ```
 
 These two folders contain the complete results from the **long-read analysis pipeline** using:
@@ -746,7 +744,6 @@ data/outputs/pacbio/
 └── nanoplot
     └── SampleName_report
 ```
-
 
 #### `long-ref/`
 
@@ -791,8 +788,6 @@ Includes:
 * `unmapped/` — Reads that did not map to the plasmid
 
 
----
-
 #### `long-mod/`
 
 Contains alignments of long reads mapped to the **modified/assembled genome**.
@@ -804,8 +799,6 @@ Includes:
 * `unmapped/` — Reads that failed to align to the modified genome
 
 This enables comparison between mapping reads on reference vs modified assemblies.
-
----
 
 #### `nanoplot/`
 
@@ -906,7 +899,6 @@ truvari
 
 This folder contains all structural variant (SV) callsets and their **Truvari benchmarking results** comparing SVs detected from sequencing data with the structural variants derived from the **reference vs modified genome comparison (SyRI)**.
 
----
 
 #### Reference SV Callsets
 
@@ -924,7 +916,6 @@ This folder contains all structural variant (SV) callsets and their **Truvari be
 
 All `.csi` files represent index files for fast querying of VCF contents.
 
----
 
 ### Truvari Comparison Result Folders
 
@@ -947,6 +938,7 @@ Each Truvari output folder usually contains:
 * Precision, recall, and F1 scores
 * Comparison summary statistics
 
+---
 
 ### `unmapped_stats/`
 
