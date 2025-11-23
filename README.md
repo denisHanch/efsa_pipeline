@@ -330,6 +330,51 @@ data/outputs
 
 ### `fasta_ref_mod/`
 
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#B6ECE2",
+    "primaryTextColor": "#160F26",
+    "primaryBorderColor": "#065647",
+    "lineColor": "#545555",
+    "clusterBkg": "#BABCBD22",
+    "clusterBorder": "#DDDEDE",
+    "fontFamily": "arial"
+  }
+}}%%
+flowchart TB
+
+%% ===== REF_X_MOD PIPELINE =====
+subgraph REF_X_MOD["Reference vs Modified Fasta Comparison Pipeline"]
+
+    %% Inputs
+    REF_FASTA["Reference FASTA"]:::input
+    MOD_FASTA["Modified FASTA"]:::input
+
+    %% Processes
+    NUCMER["nucmer"]:::process
+    DELTA["deltaFilter"]:::process
+    SHOWCOORDS["showCoords"]:::process
+    SYRI["syri"]:::process
+
+    %% Output
+    VCF_OUT["Structural Variant VCF"]:::output
+
+    %% Connections
+    REF_FASTA --> NUCMER
+    MOD_FASTA --> NUCMER
+    NUCMER --> DELTA --> SHOWCOORDS --> SYRI --> VCF_OUT
+
+end
+
+%% ===== STYLING =====
+classDef input fill:#E3F2FD,stroke:#1565C0
+classDef process fill:#B6ECE2,stroke:#065647
+classDef output fill:#E8F5E9,stroke:#2E7D32
+
+```
+
 This folder contains results from the **reference vs modified FASTA comparison pipeline**:
 
 ```
@@ -357,7 +402,7 @@ fasta_ref_mod/
 
 ### `illumina/`
 
-The flowchart below summarizes the pipeline for processing short reads. VCF annotation is performed only when a GFF/GTF annotation file is provided. Delly and Freebayes are run exclusively for reference genome mapping; these steps are skipped when reads are mapped to a modified genome.
+The flowchart below summarizes the pipeline for processing short reads. VCF annotation is performed only when a GFF/GTF annotation file is provided. Delly and Freebayes are run exclusively for reference genome mapping; these steps are skipped when reads are mapped to a modified genome or a plasmid.
 
 ```mermaid
 %%{init: {
@@ -571,7 +616,105 @@ Includes:
 
 ### `pacbio/` and `ont/`
 
+This workflow shows the processing of raw long-read sequencing data (PacBio or Nanopore) from quality control to mapping. Reads undergo NanoPlot QC, then mapped to the reference or modified genome with minimap2, followed by sorting, indexing, and calculation of unmapped reads. Structural variant calling using cute_sv, debreak, and sniffles is performed only for reads mapped to the reference genome, and results are merged with SURVIVOR and summarized with bcftools stats, producing the final long-read VCF. Reads mapped to modified or plasmid sequences skip structural variant calling.
 
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#B6ECE2",
+    "primaryTextColor": "#160F26",
+    "primaryBorderColor": "#065647",
+    "lineColor": "#545555",
+    "clusterBkg": "#BABCBD22",
+    "clusterBorder": "#DDDEDE",
+    "fontFamily": "arial"
+  }
+}}%%
+flowchart TB
+
+%% ===== INPUTS =====
+LONG_READS["Raw Long Reads (PacBio / Nanopore)"]
+REF["Reference FASTA"]
+PLASMID_REF["Plasmid FASTA"]
+
+style LONG_READS fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
+style REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
+style PLASMID_REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
+
+%% ===== QC =====
+NANO_PLOT["NanoPlot QC"]
+MULTIQC_QC["MultiQC (QC)"]
+NANO_PLOT_OUT["NanoPlot QC report"]:::output
+MULTIQC_QC_OUT["MultiQC QC report"]:::output
+
+LONG_READS --> NANO_PLOT --> MULTIQC_QC
+NANO_PLOT --> NANO_PLOT_OUT
+MULTIQC_QC --> MULTIQC_QC_OUT
+
+%% ===== LONG REF MAPPING PIPELINE =====
+MINIMAP2["minimap2 mapping"]
+SORT_BAM["Samtools sort"]
+SORTED_BAM["Sorted BAM"]:::output
+BAM_IDX["Samtools index BAM"]
+BAM_IDX_OUT["BAM index"]:::output
+GET_UNMAPPED["Get unmapped reads"]
+UNMAPPED_OUT["Unmapped reads FASTQ"]:::output
+CALC_TOTAL["Calculate total reads"]
+TOTAL_READS["Total reads"]:::output
+CALC_UNMAPPED["Calculate unmapped reads"]
+UNMAPPED_STATS["Unmapped reads stats"]:::output
+
+REF --> MINIMAP2
+LONG_READS --> MINIMAP2
+MINIMAP2 --> SORT_BAM --> SORTED_BAM
+SORT_BAM --> BAM_IDX --> BAM_IDX_OUT
+BAM_IDX --> GET_UNMAPPED --> UNMAPPED_OUT
+GET_UNMAPPED --> CALC_TOTAL --> TOTAL_READS
+CALC_TOTAL --> CALC_UNMAPPED --> UNMAPPED_STATS
+
+%% ===== PLASMID PIPELINE =====
+MINIMAP2_PLASMID["minimap2 mapping (plasmid)"]
+SORT_BAM_PLASMID["Samtools sort (plasmid)"]
+SORTED_BAM_PLASMID["Sorted BAM (plasmid)"]:::output
+BAM_IDX_PLASMID["Samtools index BAM (plasmid)"]
+BAM_IDX_PLASMID_OUT["BAM index (plasmid)"]:::output
+GET_UNMAPPED_PL["Get unmapped plasmid reads"]
+UNMAPPED_PL_OUT["Unmapped plasmid reads FASTQ"]:::output
+
+PLASMID_REF --> MINIMAP2_PLASMID
+UNMAPPED_OUT --> MINIMAP2_PLASMID
+MINIMAP2_PLASMID --> SORT_BAM_PLASMID --> BAM_IDX_PLASMID --> GET_UNMAPPED_PL
+SORT_BAM_PLASMID --> SORTED_BAM_PLASMID
+BAM_IDX_PLASMID --> BAM_IDX_PLASMID_OUT
+GET_UNMAPPED_PL --> UNMAPPED_PL_OUT
+
+%% ===== SV CALLING PIPELINE =====
+CUTE_SV["cute_sv"]
+DEBREAK["debreak"]
+SNIFFLES["sniffles"]
+SURVIVOR["survivor"]
+BCFTOOLS_STATS["bcftools stats"]
+LONG_VCF["Long-read VCF"]:::output
+
+BAM_IDX --> CUTE_SV --> SURVIVOR 
+BAM_IDX --> DEBREAK --> SURVIVOR
+BAM_IDX --> SNIFFLES --> SURVIVOR
+SURVIVOR --> BCFTOOLS_STATS --> LONG_VCF
+
+%% ===== STYLING =====
+classDef input fill:#E3F2FD,stroke:#1565C0
+classDef process fill:#B6ECE2,stroke:#065647
+classDef output fill:#E8F5E9,stroke:#2E7D32
+
+%% ===== LEGEND =====
+subgraph LEGEND["Legend"]
+    L1["Input"]:::input
+    L2["Process"]:::process
+    L3["Output file"]:::output
+end
+
+```
 
 These two folders contain the complete results from the **long-read analysis pipeline** using:
 
@@ -708,7 +851,7 @@ The flowchart illustrates the Truvari comparison pipeline for structural variant
 flowchart TB
 
 %% ===== TRUVARI COMPARISON PIPELINE =====
-subgraph TRUVARI_PIPELINE
+subgraph Truvari_Comparision_Pipeline["Truvari Comparison Pipeline"]
     %% Inputs
     REF_MOD_VCF["Ref vs Modified VCF (Baseline / Truth-set)"]:::truthset
     PB_VCF["PacBio VCF"]:::input
