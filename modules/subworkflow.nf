@@ -69,13 +69,14 @@ workflow annotate_vcf {
         vcf
         feature_tag
         build_setting
+        out_folder_name
 
 
     main:
-        build_config(fasta, gtf, feature_tag, build_setting) | set { snpeff_out }
+        build_config(fasta, gtf, feature_tag, build_setting, out_folder_name) | set { snpeff_out }
         genome_id = snpeff_out.map { genome_id, snpeff_config -> genome_id }
         snpeff_config = snpeff_out.map { genome_id, snpeff_config -> snpeff_config }
-        snpeff(vcf, genome_id, snpeff_config) | set { snpeff_output }
+        snpeff(vcf, genome_id, snpeff_config, out_folder_name) | set { snpeff_output }
         annotated_vcfs = snpeff_output.map { id, vcf, html -> tuple(id, vcf) }
         qc_vcf = snpeff_output.map { id, vcf, html -> html }
 

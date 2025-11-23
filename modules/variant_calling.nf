@@ -29,7 +29,7 @@ process freebayes {
 
 process build_config {
     container 'biocontainers/snpeff:v4.1k_cv3'
-    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
 
     input:
@@ -37,6 +37,7 @@ process build_config {
     each path(feature_file)
     val feature_tag
     val build_setting
+    val out_folder_name
 
     output:
     tuple path("genome_id.txt"), path("snpEff.config")
@@ -69,12 +70,13 @@ process build_config {
 process snpeff {
     container 'biocontainers/snpeff:v4.1k_cv3'
     tag "$pair_id"
-    publishDir "${params.out_dir}/short-ref/vcf", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
     input:
     tuple val(pair_id), path(vcf_file)
     each path(genome_id_file)
     each path(snpeff_config)
+    val out_folder_name
 
 
     output:

@@ -35,11 +35,11 @@ workflow long_ref {
             get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq }
 
             calc_unmapped_plasmid(unmapped_fastq) | set { nreads }
-            logUnmapped_plasmid(nreads, total_reads, "${out_folder_name}-plasmid", "against plasmid")
+            logUnmapped_plasmid(nreads, total_reads, "${out_folder_name}-plasmid", " against plasmid")
         }
 
         // SV calling against the reference
-        if (out_folder_name == "long-ref") { 
+        if (out_folder_name == "ont/long-ref" || out_folder_name == "pacbio/long-ref") { 
             sv_long(fasta, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
         } else {
             sv_vcf = Channel.empty()
@@ -50,7 +50,7 @@ workflow long_ref {
         unmapped_fastq
 }
 
-out_folder_name = "long-ref"
+out_folder_name = "pacbio/long-ref"
 
 workflow {
     // Processing inputs
@@ -65,6 +65,9 @@ workflow {
     Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
     
     if (pacbio_fastqs) {
+
+        nanoplot(pacbio_fastqs, "pacbio")
+
         long_ref(pacbio_fastqs, ref_fasta, "map-pb", ref_plasmid, out_folder_name)
     }
 }

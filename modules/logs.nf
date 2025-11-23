@@ -3,16 +3,29 @@ import java.time.format.DateTimeFormatter
 import java.time.ZoneId
 
 def logUnmapped(reads, total_reads, out_folder_name, reference) {
-    reads.combine(total_reads).map { r, total ->
-    def percentage = r.toInteger() * 100.0 / total.toInteger()
-    def pctStr = String.format('%.2f', percentage)
-    log.info "ℹ️ The number of unmapped reads in ${out_folder_name} pipeline ${reference}: ${r} (${pctStr} %). Total input: ${total})\n"
+
+    reads.combine(total_reads).subscribe { r, total ->
+
+        long unmapped = r as long
+        long totalInput = total as long
+
+        def percentage = (unmapped * 100.0) / totalInput
+        def pctStr = String.format('%.2f', percentage)
+
+        // Build a plain String
+        String msg = "📊 ${out_folder_name} mapping${reference}:\n" +
+                     "    Unmapped reads: ${String.format('%,d', unmapped)} (${pctStr}%)\n" +
+                     "    Total input reads: ${String.format('%,d', totalInput)}\n"
+
+        log.info(msg)
     }
 }
 
+
 def describePipeline(read_type, fasta_type) {
-    return "▶ Running pipeline processing ${read_type} reads - mapping to the ${fasta_type} fasta."
+    log.info "ℹ️  Running pipeline: processing ${read_type} reads → mapping to the ${fasta_type} fasta.\n"
 }
+
 
 
 def logWorkflowCompletion(out_folder_name) {
@@ -22,7 +35,7 @@ def logWorkflowCompletion(out_folder_name) {
             def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault())
             def readableTime = formatter.format(workflow.complete)
 
-            log.info "✅ The ${out_folder_name} processing pipeline completed successfully."
+            log.info "✅ The ${out_folder_name} processing pipeline completed successfully.\n"
 
             def workDir = new File("${workflow.workDir}")
             def launchDir = new File("${workflow.launchDir}")
@@ -42,7 +55,7 @@ def logWorkflowCompletion(out_folder_name) {
             if (params.clean_work && out_folder_name == "execution of main.nf") {
                 if( workDir.exists() ) {
                     workDir.deleteDir()
-                    log.info "ℹ️ Nextflow work/ directory was removed."
+                    log.info "ℹ️  Nextflow work/ directory was removed.\n"
                 }
             }
 

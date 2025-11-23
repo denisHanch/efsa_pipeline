@@ -9,6 +9,7 @@ workflow truvari_comparison {
 
     main:
         // Sorting and indexing VCFs
+        vcfs_ch.view()
         sortVcf(vcfs_ch) | indexVcf | set { indexed_vcfs }
 
         // Preprocessing channel for Truvari input
@@ -28,8 +29,8 @@ workflow truvari_comparison {
 
 workflow.onComplete {
     if (workflow.success) {
-        log.info "✅ Truvari stage finished successfully after comparing pipelines.\n"
+        log.info "✅ Truvari: the comparison of vcf files finished successfully.\n"
     } else {
-        log.err "❌ Truvari failed to finish the comparision.\n"
+        log.err "❌ Truvari: the comparison of vcf files failed.\n"
     }
 }

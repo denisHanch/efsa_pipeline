@@ -7,7 +7,8 @@ include { long_ref as long_ref_pacbio; long_ref as long_ref_ont; long_ref as lon
 include { short_ref; short_ref as short_mod } from './workflows/short-read-ref.nf'
 
 include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_unmapped as compare_unmapped_pacbio } from './modules/mapping.nf'
-include { nanoplot } from './modules/qc.nf'
+include { nanoplot as nanoplo_pacbio } from './modules/qc.nf'
+include { nanoplot as nanoplot_pacbio; nanoplot as nanoplot_ont } from './modules/qc.nf'
 include { truvari_comparison } from './modules/compare_vcfs.nf'
 
 include { qc } from './modules/subworkflow.nf'
@@ -67,13 +68,12 @@ workflow {
         pacbio_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
         
         // qc
-        nanoplot(pacbio_fastqs, "long-ont")
+        nanoplot_pacbio(pacbio_fastqs, "pacbio")
         
-        log.info describePipeline("long-pacbio", "modified")
-        long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")
+        describePipeline("long-pacbio", "reference & modified")
+        long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "pacbio/long-mod")
 
-        log.info describePipeline("long-pacbio", "reference")
-        long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag, ref_plasmid, "long-ref") 
+        long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag, ref_plasmid, "pacbio/long-ref") 
 
         compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
 
@@ -86,16 +86,15 @@ workflow {
     if (ont_files) {
         mapping_tag = "map-ont"
         
-        ont_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
+        ont_fastqs = loadFastqFiles("${params.in_dir}/ont/*.fastq.gz")
 
         // qc
-        nanoplot(ont_fastqs, "long-ont")
+        nanoplot_ont(ont_fastqs, "ont")
 
-        log.info describePipeline("long-ont", "modified")
-        long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "long-mod")
+        describePipeline("long-ont", "reference & modified")
+        long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "ont/long-mod")
 
-        log.info describePipeline("long-ont", "reference")
-        long_ref_ont(ont_fastqs, ref_fasta, mapping_tag, ref_plasmid, "long-ref")
+        long_ref_ont(ont_fastqs, ref_fasta, mapping_tag, ref_plasmid, "ont/long-ref")
 
         compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
 
@@ -110,14 +109,13 @@ workflow {
         fastqs = loadShortFastqFiles(short_read_files)
 
         // QC and trimming module
-        qc(fastqs, "short-ref") | set { trimmed }
+        qc(fastqs, "illumina/qc_trimming") | set { trimmed }
 
         // Running mapping to the reference and modified fasta
-        log.info describePipeline("short", "modified")
-        short_mod(trimmed, mod_fasta, "short-mod", mod_plasmid)
-    
-        log.info describePipeline("short", "reference")
-        short_ref(trimmed, ref_fasta, "short-ref", ref_plasmid) 
+        describePipeline("short", "reference & modified")
+        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
+
+        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid) 
         
         compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
 
@@ -127,10 +125,12 @@ workflow {
     }
 
     if (pipelines_running == 0) {
-        log.error "⚠ No valid inputs found. Skipping workflows."
+        log.error "❌  No valid inputs found. Skipping workflows.\n"
         exit 0
     } else {
-        log.info "▶ Performing ${pipelines_running - 1} truvari comparison(s)."
+         int comparisons = pipelines_running - 1
+        String plural = comparisons == 1 ? "" : "s"
+        log.info "ℹ️  Truvari: performing ${comparisons} comparison${plural}.\n"
     }
 
     if (pipelines_running >= 2) {
