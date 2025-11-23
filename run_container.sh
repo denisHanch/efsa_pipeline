@@ -40,7 +40,7 @@ docker run --privileged -d --rm \
     -v "$WORKSPACE_PATH:$WORKSPACE_PATH" \
     $INPUT_MOUNT \
     efsa-pipeline \
-    tail -f /dev/null
+    dockerd-entrypoint.sh
 
 docker exec -it "$CONTAINER_NAME" /bin/sh
 docker stop "$CONTAINER_NAME"
