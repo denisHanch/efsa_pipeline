@@ -44,18 +44,18 @@ workflow short_ref {
             bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
             
             // Optional annotation of vcf files
-            def gtf_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref\.gtf$/ } ?: []
-            def gff_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref\.gff$/ } ?: []
+            def gtf_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref*\.gtf$/ } ?: []
+            def gff_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref*\.gff$/ } ?: []
 
             if (gtf_files) {
                 Channel.fromPath(gtf_files) | set { gtf }
-                annotate_vcf(fasta, gtf, vcf, "gtf", "gtf22") | set {qc_vcf}
+                annotate_vcf(fasta, gtf, vcf, "gtf", "gtf22", out_folder_name) | set {qc_vcf}
             
                 qc_vcf.mix(bcftools_out).collect() | set { qc_out }
                 multiqc(qc_out, out_folder_name, 'varint_calling')
             } else if (gff_files) {
                 Channel.fromPath(gff_files) | set { gff }
-                annotate_vcf(fasta, gff, vcf, "gff", "gff3") | set {qc_vcf}
+                annotate_vcf(fasta, gff, vcf, "gff", "gff3", out_folder_name) | set {qc_vcf}
             
                 qc_vcf.mix(bcftools_out).collect() | set { qc_out }
                 multiqc(qc_out, out_folder_name, 'varint_calling')
@@ -74,7 +74,7 @@ workflow short_ref {
 
 }
 
-out_folder_name = "short-ref"
+out_folder_name = "illumina/short-ref"
 
 workflow { 
 
@@ -88,9 +88,9 @@ workflow {
     fastqs = loadShortFastqFiles(short_read_files)
 
     // QC and trimming module
-    qc(fastqs, out_folder_name) | set { trimmed }
+    qc(fastqs, "illumina/qc_trimming") | set { trimmed }
 
-    short_ref(trimmed, fasta, "short-ref", plasmid_files)
+    short_ref(trimmed, fasta, out_folder_name, plasmid_files)
 }
 
 

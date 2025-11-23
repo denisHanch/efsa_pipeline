@@ -50,7 +50,7 @@ workflow long_ref {
         unmapped_fastq
 }
 
-out_folder_name = "long-ref"
+out_folder_name = "pacbio/long-ref"
 
 workflow {
     // Processing inputs

@@ -65,9 +65,8 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
     -v /etc/ssl/certs:/etc/ssl/certs:ro \
     -v /usr/share/ca-certificates:/usr/share/ca-certificates:ro \
     --name efsa-pipeline-container \
-    -w "$WORKSPACE_PATH" \
-    -v "$WORKSPACE_PATH:$WORKSPACE_PATH" \
-    $INPUT_MOUNT \
+    -w $(pwd) \
+    -v "$(pwd)/data/inputs:/EFSA_workspace/data/inputs" \
     efsa-pipeline
 
    docker exec -it efsa-pipeline-container /bin/sh
@@ -95,7 +94,7 @@ Each workflow can also be executed individually if required.
 
 ### Running Main Workflow
 
-This executes **short-read processing**, **long-read processing**, and **reference vs modified genome comparison**:
+This executes **short-read processing**, **long-read processing**, and **reference vs modified genome comparison** pipelines:
 
 ```bash
 nextflow run main.nf \
@@ -269,8 +268,7 @@ Nextflow automatically removes the temporary `work/` directory after successful 
 
 * The `work/` directory contains intermediate files and temporary outputs generated during pipeline execution.
 * Removing it saves disk space while retaining all final results in the `out_dir`.
-* If you want to keep intermediate files for debugging or inspection, set: `params.clean_work = false`
-
+* If you want to keep intermediate files for debugging or inspection, set: `params.clean_work = false` in nextflow.config or use `--clean_work false` when running the pipeline.
 
 
 ## 📁 `data/valid` Directory Structure
@@ -359,6 +357,117 @@ fasta_ref_mod/
 
 ### `illumina/`
 
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#B6ECE2",
+    "primaryTextColor": "#160F26",
+    "primaryBorderColor": "#065647",
+    "lineColor": "#545555",
+    "clusterBkg": "#BABCBD22",
+    "clusterBorder": "#DDDEDE",
+    "fontFamily": "arial"
+  }
+}}%%
+flowchart TB
+
+%% ===== INPUTS =====
+RAW["Raw Illumina Reads"]
+REF["Reference FASTA"]
+PLASMID_REF["Plasmid FASTA"]
+GFF["GFF / GTF Annotation"]
+CONFIG["SnpEff Config"]
+
+style RAW fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
+style REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
+style PLASMID_REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
+style GFF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
+style CONFIG fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
+
+%% ===== QC =====
+TRIM["TrimGalore"]
+FASTQC["FastQC"]
+MULTIQC_QC["MultiQC (QC)"]
+
+RAW --> TRIM --> FASTQC --> MULTIQC_QC
+
+%% ===== QC OUTPUTS =====
+TRIMMED["Trimmed FASTQ"]:::output
+FASTQC_OUT["FastQC report"]:::output
+MULTIQC_QC_OUT["MultiQC QC report"]:::output
+
+TRIM --> TRIMMED
+FASTQC --> FASTQC_OUT
+MULTIQC_QC --> MULTIQC_QC_OUT
+
+%% ===== SHORT REF PIPELINE =====
+BWA_INDEX["BWA index"]
+BWA["BWA mapping"]
+SORT["Samtools sort"]
+STATS["Samtools stats"]
+BAM_IDX["BAM index"]
+PICARD["Picard metrics"]
+FREEBAYES["Freebayes variant calling"]
+BCFTOOLS["BCFtools stats"]
+BUILD_CFG["Build snpEff config"]
+SNPEFF["snpEff annotation"]
+GET_UNMAPPED["Get unmapped reads"]
+
+REF --> BWA_INDEX --> BWA
+TRIMMED --> BWA
+BWA --> SORT --> SORTED_BAM["Sorted BAM"]:::output
+SORT --> STATS --> STATS_OUT["Samtools stats"]:::output
+SORT --> BAM_IDX --> BAM_INDEX_OUT["BAM index"]:::output
+
+%% ===== SHORT REF SV PIPELINE (Delly) =====
+DELLY["Delly (SV calling)"]
+BCF2VCF["Convert BCF to VCF"]
+BAM_IDX --> DELLY --> BCF2VCF --> SV_VCF["SV VCF"]:::output
+
+BAM_IDX --> GET_UNMAPPED --> UNMAPPED_OUT["Unmapped reads FASTQ"]:::output
+
+BAM_IDX --> FREEBAYES --> VCF_RAW["Raw VCF"]:::output
+VCF_RAW --> BCFTOOLS --> BCF_STATS["BCFtools stats"]:::output
+GFF --> BUILD_CFG --> SNPEFF
+CONFIG --> BUILD_CFG
+VCF_RAW --> SNPEFF --> VCF_ANNOT["Annotated VCF"]:::output
+
+BAM_IDX --> PICARD --> PICARD_OUT["Picard metrics"]:::output
+
+
+%% ===== PLASMID PIPELINE =====
+PL_INDEX["BWA index"]
+PL_BWA["BWA mapping"]
+PL_SORT["Samtools sort"]
+PL_STATS["Samtools stats"]
+PL_BAM_IDX["BAM index"]
+PL_PICARD["Picard metrics"]
+GET_UNMAPPED_PL["Get unmapped reads plasmid"]
+
+PLASMID_REF --> PL_INDEX --> PL_BWA
+UNMAPPED_OUT --> PL_BWA
+PL_BWA --> PL_SORT --> PL_SORTED_BAM["Sorted BAM (plasmid)"]:::output
+PL_SORT --> PL_STATS --> PL_STATS_OUT["Samtools stats (plasmid)"]:::output
+PL_SORT --> PL_BAM_IDX --> PL_BAM_INDEX_OUT["BAM index"]:::output
+PL_BAM_IDX --> PL_PICARD --> PL_PICARD_OUT["Picard metrics (plasmid)"]:::output
+PL_BAM_IDX --> GET_UNMAPPED_PL --> PL_UNMAPPED_OUT["Unmapped reads FASTQ (plasmid)"]:::output
+
+%% ===== STYLING =====
+classDef input fill:#E3F2FD,stroke:#1565C0
+classDef process fill:#B6ECE2,stroke:#065647
+classDef output fill:#E8F5E9,stroke:#2E7D32
+class TRIMMED,FASTQC_OUT,MULTIQC_QC_OUT,SORTED_BAM,STATS_OUT,BAM_INDEX_OUT,PICARD_OUT,MULTIQC_MAP_OUT,UNMAPPED_OUT,VCF_RAW,BCF_STATS,VCF_ANNOT,SV_VCF,PL_SORTED_BAM,PL_STATS_OUT,PL_PICARD_OUT,PL_MULTIQC_OUT,PL_UNMAPPED_OUT output
+
+%% ===== LEGEND =====
+subgraph LEGEND["Legend"]
+    L1["Input"]:::input
+    L2["Process"]:::process
+    L3["Output file"]:::output
+end
+
+```
+
 This folder contains the full output of the **Illumina short-read processing pipeline**, including read quality control, trimming, genome mapping, and variant analysis.
 
 ```
@@ -418,15 +527,15 @@ This folder contains Illumina reads mapped to the **reference genome**.
 
 Includes:
 
-* `bam/` — Sorted and indexed BAM alignment files
+* `bam/` — Sorted and indexed BAM alignment files (& SAM)
 * `bwa_index/` — Precomputed BWA reference genome indices
 * `samtools_index_dict/` — FASTA index and sequence dictionary files
 * `samtools_stats/` — Alignment and coverage statistics
-* `picard/` — Insert size, duplication, and library QC metrics
+* `picard/` — Alignment QC metrics
 * `bcftools_stats/` — Variant calling summary statistics
-* `vcf/` — Variant calls generated from short reads
+* `vcf/` — Variant calls generated by Delly and FreeBayes
 * `multiqc/` — Combined QC report from mapping and alignment metrics
-* `unmapped/` — Reads that failed to align to the reference genome
+* `unmapped/` — fastq file with reads that failed to align to the reference genome
 
 ---
 
@@ -439,9 +548,9 @@ Includes:
 * `bam/` — Aligned reads mapped to the plasmid
 * `bwa_index/` — Plasmid reference index files
 * `samtools_stats/` — Mapping statistics
-* `picard/` — Alignment and library QC
+* `picard/` — Alignment QC metrics
 * `multiqc/` — Summary report
-* `unmapped/` — Reads not mapping to the plasmid
+* `unmapped/` — Reads not mapping to the plasmid and not mapped to the reference genome
 
 This folder allows evaluation of plasmid presence and coverage independently of the main genome.
 
