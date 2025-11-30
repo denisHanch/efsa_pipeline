@@ -9,7 +9,6 @@ workflow truvari_comparison {
 
     main:
         // Sorting and indexing VCFs
-        vcfs_ch.view()
         sortVcf(vcfs_ch) | indexVcf | set { indexed_vcfs }
 
         // Preprocessing channel for Truvari input

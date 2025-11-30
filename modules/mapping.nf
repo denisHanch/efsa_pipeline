@@ -31,7 +31,6 @@ process bwa_index {
 process bwa_mapping {
     container 'biocontainers/bwa:v0.7.17_cv1'
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/bam", mode: 'copy'
 
     input:
     each path(fasta_file)
@@ -129,7 +128,6 @@ process samtool_stats {
 process minimap2 {
     container 'staphb/minimap2:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/minimap2", mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
@@ -223,7 +221,7 @@ process calc_unmapped {
 process get_unmapped_reads {
     container 'staphb/samtools:latest'
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/unmapped", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/unmapped_fastq", mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index)
