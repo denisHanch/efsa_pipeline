@@ -27,8 +27,10 @@ from validation_pkg.utils.file_handler import (
     check_compression_tool_available,
     get_compression_command,
     open_compressed_writer,
+    detect_compression_type,
+    detect_file_format
 )
-from validation_pkg.utils.formats import CodingType
+from validation_pkg.utils.formats import CodingType,ReadFormat,FeatureFormat,GenomeFormat
 from validation_pkg.exceptions import CompressionError
 
 
@@ -561,6 +563,132 @@ class TestDetectCompressionType:
         assert coding_type == CodingType.GZIP
 
 
+class TestPairedEndFormatDetection:
+    """Test format detection with paired-end indicators."""
+    
+    @pytest.fixture
+    def temp_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+    
+    def test_standard_naming(self, temp_dir):
+        """Test format detection for standard filenames."""
+        # Standard 2-extension files
+        test_cases = [
+            ('sample.fastq.gz', CodingType.GZIP, ReadFormat.FASTQ),
+            ('sample.fq.bz2', CodingType.BZIP2, ReadFormat.FASTQ),
+            ('sample.bam', CodingType.NONE, ReadFormat.BAM),
+            ('genome.fasta.gz', CodingType.GZIP, GenomeFormat.FASTA),
+            ('features.gff.gz', CodingType.GZIP, FeatureFormat.GFF),
+        ]
+
+        for filename, expected_coding, expected_format in test_cases:
+            filepath = temp_dir / filename
+            filepath.touch()
+
+            coding = detect_compression_type(filepath)
+            # Determine correct format enum based on expected format type
+            if expected_format in [ReadFormat.FASTQ, ReadFormat.BAM]:
+                format_enum = ReadFormat
+            elif expected_format in [GenomeFormat.FASTA, GenomeFormat.GENBANK]:
+                format_enum = GenomeFormat
+            else:  # FeatureFormat
+                format_enum = FeatureFormat
+            fmt = detect_file_format(filepath, format_enum)
+
+            assert coding == expected_coding, f"Wrong compression for {filename}"
+            assert fmt == expected_format, f"Wrong format for {filename}"
+    
+    def test_paired_end_dot_separator(self, temp_dir):
+        """Test format detection for dot-separated paired-end files (.R1, .R2, .1, .2)."""
+        test_cases = [
+            ('sample.R1.fastq.gz', CodingType.GZIP, ReadFormat.FASTQ),
+            ('sample.R2.fastq.gz', CodingType.GZIP, ReadFormat.FASTQ),
+            ('sample.1.fq.bz2', CodingType.BZIP2, ReadFormat.FASTQ),
+            ('sample.2.fq.bz2', CodingType.BZIP2, ReadFormat.FASTQ),
+            ('sample.R1.fastq', CodingType.NONE, ReadFormat.FASTQ),
+            ('sample.R2.fq', CodingType.NONE, ReadFormat.FASTQ),
+        ]
+        
+        for filename, expected_coding, expected_format in test_cases:
+            filepath = temp_dir / filename
+            filepath.touch()
+            
+            coding = detect_compression_type(filepath)
+            fmt = detect_file_format(filepath, ReadFormat)
+            
+            assert coding == expected_coding, f"Wrong compression for {filename}"
+            assert fmt == expected_format, f"Wrong format for {filename}"
+    
+    def test_paired_end_underscore_separator(self, temp_dir):
+        """Test format detection for underscore-separated paired-end files (_R1, _R2, _1, _2)."""
+        # These should work without any changes (underscore is not a dot separator)
+        test_cases = [
+            ('sample_R1.fastq.gz', CodingType.GZIP, ReadFormat.FASTQ),
+            ('sample_R2.fastq.gz', CodingType.GZIP, ReadFormat.FASTQ),
+            ('sample_1.fq.bz2', CodingType.BZIP2, ReadFormat.FASTQ),
+            ('sample_2.fq.bz2', CodingType.BZIP2, ReadFormat.FASTQ),
+        ]
+        
+        for filename, expected_coding, expected_format in test_cases:
+            filepath = temp_dir / filename
+            filepath.touch()
+            
+            coding = detect_compression_type(filepath)
+            fmt = detect_file_format(filepath, ReadFormat)
+            
+            assert coding == expected_coding, f"Wrong compression for {filename}"
+            assert fmt == expected_format, f"Wrong format for {filename}"
+    
+    def test_arbitrary_prefixes(self, temp_dir):
+        """Test that arbitrary prefix extensions are ignored."""
+        test_cases = [
+            ('sample.processed.fastq.gz', CodingType.GZIP, ReadFormat.FASTQ),
+            ('sample.v2.final.fastq.gz', CodingType.GZIP, ReadFormat.FASTQ),
+            ('sample.filtered.R1.fastq.gz', CodingType.GZIP, ReadFormat.FASTQ),
+        ]
+        
+        for filename, expected_coding, expected_format in test_cases:
+            filepath = temp_dir / filename
+            filepath.touch()
+            
+            coding = detect_compression_type(filepath)
+            fmt = detect_file_format(filepath, ReadFormat)
+            
+            assert coding == expected_coding, f"Wrong compression for {filename}"
+            assert fmt == expected_format, f"Wrong format for {filename}"
+    
+    def test_user_provided_examples(self, temp_dir):
+        """Test all user-provided filename examples."""
+        test_cases = [
+            'sample_S1_L001_R1_001.fastq.gz'
+            'Bacillus_toyonensis_LE1_S1_L001_R1.fastq.gz',
+            'Bacillus_toyonensis_LE1_S1_L001_R2.fastq.gz',
+            'Bacillus-toyonensis-LE1-sequence_1.fastq.gz',
+            'Bacillus-toyonensis-LE1-sequence_2.fastq.gz',
+            'Bacillus_toyonensis_LE1_sequence.R1.fastq.gz',  # Dot separator
+            'SRR834393.fq.gz',
+            'SRR834394_1.fq.gz',
+            'SRR837394_1.fastq.gz',
+            'SRR837394_1_001.fastq.gz',
+            'SRR837394_2_001.fastq.gz',
+            'SRR834393R1_combined.fq.gz',
+            'SRR834393R2_combined.fq.gz',
+        ]
+        
+        for filename in test_cases:
+            filepath = temp_dir / filename
+            filepath.touch()
+            
+            # Should not raise any exceptions
+            coding = detect_compression_type(filepath)
+            fmt = detect_file_format(filepath, ReadFormat)
+            
+            # All should be FASTQ with GZIP compression
+            assert coding == CodingType.GZIP, f"Wrong compression for {filename}"
+            assert fmt == ReadFormat.FASTQ, f"Wrong format for {filename}"
+
+
 class TestDetectFileFormat:
     """Test file format detection from file paths."""
 
@@ -654,3 +782,130 @@ class TestParseConfigFileValue:
         assert filename == "genome.fasta"
         assert "filename" not in extra
         assert extra == {"key1": "val1", "key2": "val2"}
+
+
+class TestPathIncrement:
+    """Test suite for get_incremented_path() function."""
+
+    def test_increment_nonexistent_file(self):
+        """Test that original path is returned if file doesn't exist."""
+        from validation_pkg.utils.file_handler import get_incremented_path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "report.txt"
+            result = get_incremented_path(path)
+            assert result == path
+            assert str(result) == str(path)
+
+    def test_increment_existing_file(self):
+        """Test that _001 suffix is added if file exists."""
+        from validation_pkg.utils.file_handler import get_incremented_path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "report.txt"
+            path.write_text("test")
+
+            result = get_incremented_path(path)
+            assert result.name == "report_001.txt"
+            assert result.parent == path.parent
+            assert not result.exists()
+
+    def test_increment_multiple_times(self):
+        """Test correct incrementing: 001 → 002 → 003."""
+        from validation_pkg.utils.file_handler import get_incremented_path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_path = Path(tmpdir) / "report.txt"
+            base_path.write_text("test")
+
+            # First increment
+            path1 = get_incremented_path(base_path)
+            assert path1.name == "report_001.txt"
+            path1.write_text("test1")
+
+            # Second increment from base
+            path2 = get_incremented_path(base_path)
+            assert path2.name == "report_002.txt"
+            path2.write_text("test2")
+
+            # Third increment from base
+            path3 = get_incremented_path(base_path)
+            assert path3.name == "report_003.txt"
+
+    def test_increment_preserves_extension(self):
+        """Test that file extension is preserved correctly."""
+        from validation_pkg.utils.file_handler import get_incremented_path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Test .txt
+            txt_path = Path(tmpdir) / "report.txt"
+            txt_path.write_text("test")
+            result = get_incremented_path(txt_path)
+            assert result.suffix == ".txt"
+            assert result.name == "report_001.txt"
+
+            # Test .log
+            log_path = Path(tmpdir) / "validation.log"
+            log_path.write_text("test")
+            result = get_incremented_path(log_path)
+            assert result.suffix == ".log"
+            assert result.name == "validation_001.log"
+
+    def test_increment_with_existing_number(self):
+        """Test incrementing a file that already has a number."""
+        from validation_pkg.utils.file_handler import get_incremented_path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create report_001.txt
+            path1 = Path(tmpdir) / "report_001.txt"
+            path1.write_text("test")
+
+            # Incrementing it should give report_002.txt
+            result = get_incremented_path(path1)
+            assert result.name == "report_002.txt"
+
+    def test_increment_with_custom_separator(self):
+        """Test using a custom separator."""
+        from validation_pkg.utils.file_handler import get_incremented_path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "report.txt"
+            path.write_text("test")
+
+            result = get_incremented_path(path, separator="-")
+            assert result.name == "report-001.txt"
+
+    def test_increment_no_extension(self):
+        """Test incrementing a file without extension."""
+        from validation_pkg.utils.file_handler import get_incremented_path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "report"
+            path.write_text("test")
+
+            result = get_incremented_path(path)
+            assert result.name == "report_001"
+
+    def test_increment_multiple_dots(self):
+        """Test with files that have multiple dots in name."""
+        from validation_pkg.utils.file_handler import get_incremented_path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "my.report.txt"
+            path.write_text("test")
+
+            result = get_incremented_path(path)
+            # Should preserve stem and only last extension
+            assert result.name == "my.report_001.txt"
+
+    def test_increment_safety_limit(self):
+        """Test that function raises error after reaching counter limit."""
+        from validation_pkg.utils.file_handler import get_incremented_path
+        import unittest.mock as mock
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "report.txt"
+            path.write_text("test")
+
+            # Mock Path.exists to always return True, simulating all files exist
+            # This will cause the counter to keep incrementing until it hits 10000
+            original_exists = Path.exists
+            def mock_exists(self):
+                # Allow the original path to exist, but all numbered paths also exist
+                return True
+
+            with mock.patch.object(Path, 'exists', mock_exists):
+                with pytest.raises(RuntimeError, match="Too many incremented files"):
+                    get_incremented_path(path)

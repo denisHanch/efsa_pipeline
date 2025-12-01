@@ -11,6 +11,8 @@ Provides unified utilities for:
 
 import gzip
 import bz2
+import re
+import threading
 from pathlib import Path
 from typing import Union, TextIO, Type, Tuple, Any, Dict
 
@@ -20,9 +22,39 @@ from validation_pkg.exceptions import CompressionError
 import subprocess
 import shutil
 
+__all__ = [
+    # Tool availability and compression commands
+    'check_compression_tool_available',
+    'get_compression_command',
+
+    # File operations
+    'open_file_with_coding_type',
+    'open_compressed_writer',
+
+    # Detection functions
+    'detect_compression_type',
+    'detect_file_format',
+
+    # ConfigManager helpers
+    'parse_config_file_value',
+
+    # Compression conversion functions
+    'gz_to_bz2',
+    'bz2_to_gz',
+    'none_to_gz',
+    'gz_to_none',
+    'bz2_to_none',
+    'none_to_bz2',
+
+    # Path utilities
+    'get_incremented_path',
+]
+
 
 # Cache for tool availability checks to avoid repeated subprocess calls
+# Protected by _TOOL_CACHE_LOCK for thread-safe access
 _TOOL_CACHE = {}
+_TOOL_CACHE_LOCK = threading.Lock()
 _LOGGER_INITIALIZED = False
 
 # Compression tool configuration mapping
@@ -61,6 +93,7 @@ def check_compression_tool_available(tool_name: str) -> bool:
     Check if a compression tool is available on the system.
 
     Results are cached to avoid repeated subprocess calls.
+    Thread-safe: uses lock to protect cache access.
 
     Args:
         tool_name: Name of the tool to check ('pigz', 'pbzip2', 'gzip', 'bzip2')
@@ -72,14 +105,21 @@ def check_compression_tool_available(tool_name: str) -> bool:
         >>> if check_compression_tool_available('pigz'):
         ...     print("pigz is available for faster compression")
     """
+    # Fast path: check cache without lock (safe for reads)
     if tool_name in _TOOL_CACHE:
         return _TOOL_CACHE[tool_name]
 
-    # Check if tool exists using shutil.which
-    available = shutil.which(tool_name) is not None
-    _TOOL_CACHE[tool_name] = available
+    # Slow path: check tool and update cache with lock
+    with _TOOL_CACHE_LOCK:
+        # Double-check inside lock (another thread might have updated it)
+        if tool_name in _TOOL_CACHE:
+            return _TOOL_CACHE[tool_name]
 
-    return available
+        # Check if tool exists using shutil.which
+        available = shutil.which(tool_name) is not None
+        _TOOL_CACHE[tool_name] = available
+
+        return available
 
 
 def _log_compression_tool(tool_name: str, threads: int, is_parallel: bool, install_msg: str = None):
@@ -107,7 +147,9 @@ def _log_compression_tool(tool_name: str, threads: int, is_parallel: bool, insta
             logger.info(f"Using standard {tool_name} (install parallel tool for better performance: {install_msg})")
 
         _LOGGER_INITIALIZED = True
-    except:
+    except Exception:
+        # If logger initialization fails, continue without logging
+        # (This allows the module to work even if logger is unavailable)
         pass
 
 
@@ -145,8 +187,9 @@ def get_compression_command(coding_type: CodingType, mode: str = 'compress', thr
     """
     Get the best available compression command for the given coding type.
 
-    Prefers parallel tools (pigz, pbzip2) over standard tools (gzip, bzip2).
-    Falls back gracefully if parallel tools are not available.
+    Prefers parallel tools (pigz, pbzip2) over standard tools (gzip, bzip2)
+    ONLY when threads > 1. With threads=1, uses standard tools for better performance
+    (pigz/pbzip2 have overhead even with 1 thread).
 
     Args:
         coding_type: CodingType enum (GZIP, BZIP2, or NONE)
@@ -159,14 +202,29 @@ def get_compression_command(coding_type: CodingType, mode: str = 'compress', thr
     Example:
         >>> cmd, args = get_compression_command(CodingType.GZIP, 'compress', threads=4)
         >>> # Returns ('pigz', ['-c', '-p', '4']) if pigz available
-        >>> # Otherwise ('gzip', ['-c'])
+        >>> cmd, args = get_compression_command(CodingType.GZIP, 'compress', threads=1)
+        >>> # Returns ('gzip', ['-c']) - standard tool for single thread
     """
     # Default to 1 thread if not specified
     if threads is None:
         threads = 1
 
-    # Select the best available tool
-    tool_name, is_parallel, install_msg = _select_compression_tool(coding_type)
+    # For single thread, always use standard tools (better performance)
+    # Parallel tools have overhead that makes them slower with threads=1
+    if threads == 1:
+        if coding_type == CodingType.GZIP:
+            tool_name = 'gzip'
+            is_parallel = False
+        elif coding_type == CodingType.BZIP2:
+            tool_name = 'bzip2'
+            is_parallel = False
+        else:
+            tool_name = 'cat'
+            is_parallel = False
+        install_msg = None
+    else:
+        # Select the best available tool for multi-threading
+        tool_name, is_parallel, install_msg = _select_compression_tool(coding_type)
 
     # Log tool selection (one-time initialization)
     _log_compression_tool(tool_name, threads, is_parallel, install_msg)
@@ -273,40 +331,65 @@ def detect_compression_type(filepath: Path) -> CodingType:
 
 def detect_file_format(filepath: Path, format_enum: Type[Union[GenomeFormat, ReadFormat, FeatureFormat]]) -> Union[GenomeFormat, ReadFormat, FeatureFormat]:
     """
-    Detect file format from file path and return appropriate enum.
+    Detect file format from extension.
 
-    Checks the first extension (before compression) to determine format.
+    Only examines the last 2 extensions:
+    - Last extension: Compression (.gz, .bz2, or none)
+    - Second-to-last extension: Format (.fastq, .fq, .bam, etc.)
+
+    This approach ignores any prefix extensions like .R1, .R2, .1, .2, etc.
+
+    Examples:
+        sample.fastq.gz       → format: .fastq
+        sample.R1.fastq.gz    → format: .fastq
+        sample.1.fq.bz2       → format: .fq
+        sample.bam            → format: .bam
+        sample.R1.fastq       → format: .fastq (no compression)
 
     Args:
         filepath: Path to file
-        format_enum: Format enum class (GenomeFormat, ReadFormat, or FeatureFormat)
+        format_enum: Format enum class (ReadFormat, GenomeFormat, FeatureFormat)
 
     Returns:
-        Format enum member
+        Format enum value
 
     Raises:
         ValueError: If format cannot be determined
-
-    Examples:
-        >>> detect_file_format(Path('genome.fasta'), GenomeFormat)
-        GenomeFormat.FASTA
-        >>> detect_file_format(Path('genome.fasta.gz'), GenomeFormat)
-        GenomeFormat.FASTA
-        >>> detect_file_format(Path('reads.fastq.bz2'), ReadFormat)
-        ReadFormat.FASTQ
-        >>> detect_file_format(Path('features.gff'), FeatureFormat)
-        FeatureFormat.GFF
     """
     suffixes = Path(filepath).suffixes
 
     if not suffixes:
         raise ValueError(f"Cannot determine format: no extension found in {filepath.name}")
 
-    # Get first extension (the format, before compression)
-    format_ext = suffixes[0]
+    # Check if last extension is a known compression type
+    compression_extensions = {'.gz', '.gzip', '.bz2', '.bzip2'}
+    last_ext_lower = suffixes[-1].lower()
+    has_compression = last_ext_lower in compression_extensions
+
+    # Determine format extension based on compression status
+    if len(suffixes) == 1:
+        # Only one extension: must be the format (no compression)
+        # Example: sample.fastq
+        format_ext = suffixes[0]
+    elif has_compression:
+        # Last extension is compression: format is second-to-last
+        # Example: sample.fastq.gz → suffixes[-2] = .fastq
+        # Example: sample.R1.fastq.gz → suffixes[-2] = .fastq (3+ extensions)
+        format_ext = suffixes[-2]
+    else:
+        # Multiple extensions but last is NOT compression: format is last
+        # Example: sample.R1.fastq → suffixes[-1] = .fastq
+        # Example: sample.processed.fasta → suffixes[-1] = .fasta
+        format_ext = suffixes[-1]
 
     # Let the format enum's _missing_ method handle the conversion
-    return format_enum(format_ext)
+    try:
+        return format_enum(format_ext)
+    except ValueError as e:
+        raise ValueError(
+            f"Cannot determine format for {filepath.name}: {e}\n"
+            f"Supported formats: {', '.join([fmt.name for fmt in format_enum])}"
+        )
 
 
 def parse_config_file_value(
@@ -720,3 +803,69 @@ def open_compressed_writer(filepath: Union[str, Path], coding_type: CodingType, 
     else:
         # No compression
         return open(filepath, 'w')
+
+
+def get_incremented_path(path: Path, separator: str = "_") -> Path:
+    """
+    Get next available filename by auto-incrementing if file exists.
+
+    Prevents overwriting existing files by adding an incremented number suffix.
+    If the file doesn't exist, returns the original path.
+    If it exists, adds _001, _002, etc. before the extension.
+
+    Args:
+        path: Original file path (can be Path object or string)
+        separator: Separator before number (default: "_")
+
+    Returns:
+        Path: Next available path (original if doesn't exist, incremented if exists)
+
+    Examples:
+        >>> # If report.txt doesn't exist:
+        >>> get_incremented_path(Path("report.txt"))
+        Path("report.txt")
+
+        >>> # If report.txt exists:
+        >>> get_incremented_path(Path("report.txt"))
+        Path("report_001.txt")
+
+        >>> # If report_001.txt also exists:
+        >>> get_incremented_path(Path("report.txt"))
+        Path("report_002.txt")
+
+        >>> # If given report_001.txt and it exists:
+        >>> get_incremented_path(Path("report_001.txt"))
+        Path("report_002.txt")
+    """
+    # Ensure path is a Path object
+    path = Path(path)
+
+    # If file doesn't exist, return original path
+    if not path.exists():
+        return path
+
+    stem = path.stem
+    suffix = path.suffix
+    parent = path.parent
+
+    # Check if stem already has increment pattern (e.g., report_001)
+    match = re.match(r'^(.+)_(\d+)$', stem)
+    if match:
+        base_stem = match.group(1)
+        start_counter = int(match.group(2)) + 1
+    else:
+        base_stem = stem
+        start_counter = 1
+
+    # Find next available number
+    counter = start_counter
+    while True:
+        new_name = f"{base_stem}{separator}{counter:03d}{suffix}"
+        new_path = parent / new_name
+        if not new_path.exists():
+            return new_path
+        counter += 1
+
+        # Safety check to avoid infinite loop
+        if counter > 9999:
+            raise RuntimeError(f"Too many incremented files for {path}. Maximum is 9999.")

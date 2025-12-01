@@ -8,6 +8,10 @@ against path traversal attacks.
 from pathlib import Path
 from validation_pkg.exceptions import ConfigurationError
 
+__all__ = [
+    'resolve_filepath',
+]
+
 
 def resolve_filepath(base_dir: Path, filename: str) -> Path:
     """

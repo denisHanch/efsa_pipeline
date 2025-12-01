@@ -20,6 +20,7 @@ Key Features:
 """
 
 import json
+import os
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
@@ -35,8 +36,11 @@ from validation_pkg.exceptions import (
 # ===== Global Configuration Constants =====
 # Only these fields can be specified in config.json "options" section
 # These are the only settings that make sense to apply globally to all files
-ALLOWED_GLOBAL_OPTIONS = {'threads', 'validation_level'}
+ALLOWED_GLOBAL_OPTIONS = {'threads', 'validation_level', 'logging_level'}
 MAX_RECOMMENDED_THREADS = 16
+
+# Default thread count when not specified in config
+DEFAULT_THREADS = 8
 
 @dataclass
 class GenomeConfig:
@@ -53,6 +57,7 @@ class GenomeConfig:
     """
     filename: str
     filepath: Path
+    basename: str = None
     coding_type: CodingType = None
     detected_format: GenomeFormat = None
     output_dir: Path = None
@@ -61,6 +66,18 @@ class GenomeConfig:
     def __post_init__(self):
         if self.global_options is None:
             self.global_options = {}
+
+        # Extract basename (filename without extension)
+        # Handle files with or without extensions safely
+        if self.coding_type:
+            # Compressed file: remove both compression and format extensions (e.g., .fasta.gz)
+            parts = self.filename.rsplit('.', 2)
+            self.basename = parts[0] if len(parts) >= 2 else self.filename
+        else:
+            # Uncompressed file: remove only format extension (e.g., .fasta)
+            parts = self.filename.rsplit('.', 1)
+            self.basename = parts[0] if len(parts) >= 2 else self.filename
+
 
 @dataclass
 class ReadConfig:
@@ -74,10 +91,11 @@ class ReadConfig:
         coding_type: Compression format (GZIP, BZIP2, or NONE)
         detected_format: File format (FASTQ or BAM)
         output_dir: Base output directory from config
-        options: Merged global + file-level options (threads, validation_level only)
+        global_options: Merged global + file-level options (threads, validation_level only)
     """
     filename: str
     filepath: Path
+    basename: str = None
     ngs_type: str = None
     coding_type: CodingType = None
     detected_format: ReadFormat = None
@@ -89,6 +107,18 @@ class ReadConfig:
             raise ValueError(f"Invalid ngs_type: {self.ngs_type}")
         if self.global_options is None:
             self.global_options = {}
+
+        # Extract basename (filename without extension)
+        # Handle files with or without extensions safely
+        if self.coding_type:
+            # Compressed file: remove both compression and format extensions (e.g., .fastq.gz)
+            parts = self.filename.rsplit('.', 2)
+            self.basename = parts[0] if len(parts) >= 2 else self.filename
+        else:
+            # Uncompressed file: remove only format extension (e.g., .fastq)
+            parts = self.filename.rsplit('.', 1)
+            self.basename = parts[0] if len(parts) >= 2 else self.filename
+
 
 @dataclass
 class FeatureConfig:
@@ -105,6 +135,7 @@ class FeatureConfig:
     """
     filename: str
     filepath: Path
+    basename: str = None
     coding_type: CodingType = None
     detected_format: FeatureFormat = None
     output_dir: Path = None
@@ -113,6 +144,17 @@ class FeatureConfig:
     def __post_init__(self):
         if self.global_options is None:
             self.global_options = {}
+
+        # Extract basename (filename without extension)
+        # Handle files with or without extensions safely
+        if self.coding_type:
+            # Compressed file: remove both compression and format extensions (e.g., .gff.gz)
+            parts = self.filename.rsplit('.', 2)
+            self.basename = parts[0] if len(parts) >= 2 else self.filename
+        else:
+            # Uncompressed file: remove only format extension (e.g., .gff)
+            parts = self.filename.rsplit('.', 1)
+            self.basename = parts[0] if len(parts) >= 2 else self.filename
 
 
 class Config:
@@ -169,7 +211,16 @@ class Config:
             None
         """
         return self.options.get('threads')
-    
+
+    def get_logging_level(self) -> str:
+        """
+        Get logging level from options, or default to 'INFO'.
+
+        Returns:
+            Logging level string ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
+        """
+        return self.options.get('logging_level', 'INFO')
+
     def __repr__(self):
         return (
             f"Config(\n"
@@ -249,6 +300,13 @@ class ConfigManager:
             ConfigManager._validate_required_fields(data)
             logger.debug("Parsing options...")
             ConfigManager._parse_options(data, config)
+
+            # Reconfigure logging level based on config options (if specified)
+            if config.options and 'logging_level' in config.options:
+                logging_level = config.options['logging_level']
+                logger.info(f"Applying logging level from config: {logging_level}")
+                logger.reconfigure_level(console_level=logging_level)
+
             logger.debug("Setup base for outputs")
             ConfigManager._setup_output_directory(config)
             logger.debug("Parsing genome configurations...")
@@ -265,7 +323,6 @@ class ConfigManager:
             error_msg = f"Configuration validation failed: {e}"
             logger.error(error_msg)
             raise ConfigurationError(error_msg) from e
-        
 
     @staticmethod
     def _validate_required_fields(data: dict):
@@ -518,7 +575,6 @@ class ConfigManager:
             global_options=filelvl_options
         )
 
-
     @staticmethod
     def _parse_options(data: dict, config: Config):
         """
@@ -527,6 +583,7 @@ class ConfigManager:
         Global options apply to ALL files in the config and can only contain:
         - threads: Number of threads for parallelization (positive integer or null)
         - validation_level: Validation strategy ('strict', 'trust', or 'minimal')
+        - logging_level: Console logging verbosity ('DEBUG', 'INFO', 'WARNING', 'ERROR')
 
         Other settings must be specified per-file in the config, not globally.
 
@@ -553,9 +610,10 @@ class ConfigManager:
             invalid_keys = set(options.keys()) - ALLOWED_GLOBAL_OPTIONS
 
             if invalid_keys:
+                allowed_list = ', '.join(f"'{k}'" for k in sorted(ALLOWED_GLOBAL_OPTIONS))
                 raise ConfigurationError(
                     f"Invalid global options: {invalid_keys}. "
-                    f"Only 'threads' and 'validation_level' are allowed in global options. "
+                    f"Only {allowed_list} are allowed in global options. "
                     f"Other settings should be specified per-file in the config."
                 )
 
@@ -572,6 +630,21 @@ class ConfigManager:
                 if threads <= 0:
                     raise ConfigurationError(f"'threads' must be a positive integer, got {threads}")
 
+                # Detect system CPU cores
+                system_cores = os.cpu_count()
+                if system_cores is None:
+                    system_cores_msg = "unknown"
+                else:
+                    system_cores_msg = f"{system_cores} cores"
+
+                # Warn if threads exceed system CPU cores
+                if system_cores and threads > system_cores:
+                    logger.warning(
+                        f"Requested {threads} threads but system only has {system_cores} CPU cores. "
+                        f"Performance may degrade due to context switching overhead. "
+                        f"Consider using threads ≤ {system_cores} for optimal performance."
+                    )
+
                 # Warn if excessive (diminishing returns beyond MAX_RECOMMENDED_THREADS)
                 if threads > MAX_RECOMMENDED_THREADS:
                     logger.warning(
@@ -579,7 +652,7 @@ class ConfigManager:
                         f"Consider using 4-8 threads for optimal performance."
                     )
 
-                logger.info(f"Global option: threads={threads}")
+                logger.info(f"Global option: threads={threads} (system has {system_cores_msg} available)")
                 config.options['threads'] = threads
             else:
                 raise ConfigurationError(
@@ -609,6 +682,31 @@ class ConfigManager:
             config.options['validation_level'] = validation_level
         else:
             logger.debug("validation_level not specified in global options")
+
+        # Parse logging_level option
+        if 'logging_level' in options:
+            logging_level = options['logging_level']
+
+            VALID_LOGGING_LEVELS = {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}
+
+            if not isinstance(logging_level, str):
+                raise ConfigurationError(
+                    f"'logging_level' must be a string, got {type(logging_level).__name__}: {logging_level}"
+                )
+
+            # Normalize to uppercase
+            logging_level = logging_level.upper()
+
+            if logging_level not in VALID_LOGGING_LEVELS:
+                raise ConfigurationError(
+                    f"Invalid logging_level '{logging_level}'. "
+                    f"Must be one of: {', '.join(sorted(VALID_LOGGING_LEVELS))}"
+                )
+
+            logger.info(f"Global option: logging_level={logging_level}")
+            config.options['logging_level'] = logging_level
+        else:
+            logger.debug("logging_level not specified in global options (default: INFO)")
 
     @staticmethod
     def _merge_options(field_name: str, global_options: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:        

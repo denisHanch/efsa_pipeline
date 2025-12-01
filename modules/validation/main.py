@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 
-import time
 import sys
 from validation_pkg import (
     ConfigManager,
     GenomeValidator,
     ReadValidator,
     FeatureValidator,
+    ReadXReadSettings,
+    GenomeXGenomeSettings,
+    ValidationReport,
     validate_genome,
     validate_reads,
     validate_feature,
     validate_reads,
-    setup_logging
+    setup_logging,
+    readxread_validation,
+    genomexgenome_validation
 )
+
 from pathlib import Path
 
 def main():
@@ -24,14 +29,13 @@ def main():
         return 1
 
     # Setup logging,
-    setup_logging(console_level='DEBUG',log_file=Path("logs/validation.log"),report_file=Path("logs/report.txt"))
+    setup_logging(console_level='DEBUG',log_file=Path("/EFSA_workspace/data/outputs/validation.log"))
 
     # ========================================================================
     # Step 1: Read and validate config
     # ========================================================================
     config_path = sys.argv[1]
     config = ConfigManager.load(config_path)
-    print(f"Configuration loaded from: {config_path}")
 
     # ========================================================================
     # Step 2: Edit settings for each validator
@@ -67,7 +71,6 @@ def main():
         coding_type=None,
         output_filename_suffix='plasmid'
     )
-
     
     # Settings for reads
     reads_settings = ReadValidator.Settings()
@@ -97,74 +100,62 @@ def main():
         output_filename_suffix='mod'
     )
     
+    # Inter genome validation settings
+    genomexgenome_settings = GenomeXGenomeSettings()
+    genomexgenome_settings.update(
+        same_number_of_sequences = True
+    )
+
+    # Inter read validation settings
+    readxread_settings = ReadXReadSettings()
+    readxread_settings.update(
+        pair_end_basename = True
+    )
+
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
-
-    print("="*70)
-    print("Starting Validation Workflow")
-    print("="*70)
+    report = ValidationReport(Path("logs/report.txt"))
 
     # Validate reference genome
-    start_time = time.time()
-    print(f"\n[1/4] Validating reference genome: {config.ref_genome.filename}")
-    validate_genome(config.ref_genome, ref_genome_settings)
-    end_time = time.time()
-    print(f"Execution time: {end_time - start_time:.6f} seconds")
+    ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
+    report.write(ref_genome_res,file_type = "genome")
 
     # Validate modified genome
-    start_time = time.time()
-    print(f"\n[2/4] Validating modified genome: {config.mod_genome.filename}")
-    validate_genome(config.mod_genome, mod_genome_settings)
-    end_time = time.time()
-    print(f"Execution time: {end_time - start_time:.6f} seconds")
+    mod_genome_res = validate_genome(config.mod_genome, mod_genome_settings)
+    report.write(mod_genome_res,file_type = "genome")
+
+    # Add intergenome validation
+    res = genomexgenome_validation(ref_genome_res,mod_genome_res,genomexgenome_settings)
+    report.write(res,file_type = "genomexgenome")
 
     # Validate plasmid genomes (if present in config)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
-        start_time = time.time()
-        print(f"\n[2.1/4] Validating reference plasmid: {config.ref_plasmid.filename}")
-        validate_genome(config.ref_plasmid, plasmid_settings)
-        end_time = time.time()
-        print(f"Execution time: {end_time - start_time:.6f} seconds")
+        res = validate_genome(config.ref_plasmid, plasmid_settings)
+        report.write(res,file_type = "genome")
 
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
-        start_time = time.time()
-        print(f"\n[2.2/4] Validating modified plasmid: {config.mod_plasmid.filename}")
-        validate_genome(config.mod_plasmid, plasmid_settings)
-        end_time = time.time()
-        print(f"Execution time: {end_time - start_time:.6f} seconds")
+        res = validate_genome(config.mod_plasmid, plasmid_settings)
+        report.write(res,file_type = "genome")
 
     # Validate reads
-    start_time = time.time()
-    print(f"\n[3/4] Validating {len(config.reads)} read file(s)...")
-    validate_reads(config.reads, reads_settings)
-    end_time = time.time()
-    print(f"Execution time: {end_time - start_time:.6f} seconds")
+    reads_res = validate_reads(config.reads, reads_settings)
+    report.write(reads_res,file_type = "read")
+
+    # Add interread validation
+    readxread_res = readxread_validation(reads_res,readxread_settings)
+    report.write(readxread_res,file_type = "readxread")
 
     # Validate features
     if config.ref_feature:
-        start_time = time.time()
-        print(f"\n[4/4] Validating feature file: {config.ref_feature.filename}")
-        validate_feature(config.ref_feature, ref_feature_settings)
-        end_time = time.time()
-        print(f"Execution time: {end_time - start_time:.6f} seconds")
+        res = validate_feature(config.ref_feature, ref_feature_settings)
+        report.write(res,file_type = "feature")
 
     if config.mod_feature:
-        start_time = time.time()
-        print(f"\n[4/4] Validating feature file: {config.mod_feature.filename}")
-        validate_feature(config.mod_feature, mod_feature_settings)
-        end_time = time.time()
-        print(f"Execution time: {end_time - start_time:.6f} seconds")
+        res = validate_feature(config.mod_feature, mod_feature_settings)
+        report.write(res,file_type = "feature")
 
-    # ========================================================================
-    # Done!
-    # ========================================================================
-
-    print("\n" + "="*70)
-    print("✓ All validations completed successfully!")
-    print("="*70)
-    print(f"\nOutput files saved to: {config.output_dir}")
-
+    report.flush()
     return 0
 
 

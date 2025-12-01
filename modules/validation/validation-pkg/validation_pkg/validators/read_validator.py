@@ -20,14 +20,16 @@ Classes:
 """
 
 from pathlib import Path
-from typing import Optional, List, IO, Union
-from dataclasses import dataclass
+from typing import Optional, List, IO, Union, Dict, Any
+from dataclasses import dataclass, asdict
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 import shutil
 from multiprocessing import Pool
 from functools import partial
+import re
+
 
 from validation_pkg.logger import get_logger
 from validation_pkg.utils.settings import BaseSettings
@@ -40,6 +42,37 @@ from validation_pkg.exceptions import (
 )
 from validation_pkg.utils.formats import ReadFormat
 from validation_pkg.utils.formats import CodingType as CT
+
+# Constants
+TRUST_MODE_SAMPLE_SIZE = 10  # Number of records to validate in trust mode
+PARALLEL_CHUNK_MULTIPLIER = 4  # Multiplier for calculating chunk size (sequences // (threads * 4))
+MIN_CHUNK_SIZE = 1000  # Minimum chunk size for parallel processing
+
+# Illumina paired-end filename patterns (compiled regex for performance)
+# Pattern format: (regex, read_number_group_index)
+ILLUMINA_PAIRED_END_PATTERNS = [
+    # With lane numbers: _R1_001, _R2_001
+    (re.compile(r'(.+)_(R[12])_\d+$'), 2),
+    # With lane numbers: _1_001, _2_001
+    (re.compile(r'(.+)_([12])_\d+$'), 2),
+    # With arbitrary suffix: _R1_combined, _R2_final
+    (re.compile(r'(.+)_(R[12])_[A-Za-z0-9_]+$'), 2),
+    # With arbitrary suffix (no R prefix): _1_combined, _2_final
+    (re.compile(r'(.+)_([12])_[A-Za-z0-9_]+$'), 2),
+    # No separator with suffix: sampleR1_combined
+    (re.compile(r'(.+)(R[12])_[A-Za-z0-9_]+$'), 2),
+    # Standard Illumina: _R1, _R2
+    (re.compile(r'(.+)_(R[12])$'), 2),
+    # SRA style: _1, _2
+    (re.compile(r'(.+)_([12])$'), 2),
+    # Dot separator: .R1, .R2
+    (re.compile(r'(.+)\.(R[12])$'), 2),
+    # Dot with numbers: .1, .2
+    (re.compile(r'(.+)\.([12])$'), 2),
+    # No separator (must be at end): sampleR1, sampleR2
+    (re.compile(r'(.+)(R[12])$'), 2),
+]
+
 from validation_pkg.utils.file_handler import (
     bz2_to_gz,
     none_to_gz,
@@ -93,6 +126,78 @@ def _validate_single_read(record, check_invalid_chars: bool, allow_empty_id: boo
 
     return {'success': True, 'record_id': record.id}
 
+
+@dataclass
+class OutputMetadata(BaseSettings):
+    """
+    Metadata returned from read validation.
+
+    Fields are populated based on validation_level:
+    - minimal: Only output_file, output_filename, validation_level
+    - trust: + num_reads, Illumina pattern info
+    - strict: All fields (includes n50, total_bases, mean_read_length)
+
+    Attributes:
+        input_file: Full path to input file
+        output_file: Full path to main output file
+        output_filename: Name of output file
+        base_name: Illumina paired-end base name (pattern detection)
+        read_number: Illumina read number (1 or 2) from pattern detection
+        ngs_type_detected: NGS platform type from read header
+        num_reads: Total number of reads in output
+        validation_level: Validation level used ('strict'/'trust'/'minimal')
+        elapsed_time: Time taken for validation in seconds
+
+        # Strict mode only statistics:
+        n50: N50 read length metric in bp (strict only)
+        total_bases: Sum of all read lengths in bp (strict only)
+        mean_read_length: Average read length in bp (strict only)
+        longest_read_length: Length of longest read in bp (strict only)
+        shortest_read_length: Length of shortest read in bp (strict only)
+    """
+    input_file: str = None
+    output_file: str = None
+    output_filename: str = None
+    base_name: str = None
+    read_number: int = None
+    ngs_type_detected: str = None
+    num_reads: int = None
+    validation_level: str = None
+    elapsed_time: float = None
+
+    # Strict mode statistics
+    n50: int = None
+    total_bases: int = None
+    mean_read_length: float = None
+    longest_read_length: int = None
+    shortest_read_length: int = None
+
+    def __str__(self):
+        parts = [f"Validation Level: {self.validation_level or 'N/A'}"]
+        parts.append(f"Output File: {self.output_file or 'N/A'}")
+        parts.append(f"Output Filename: {self.output_filename or 'N/A'}")
+
+        # Add Illumina pattern info if available
+        if self.base_name or self.read_number or self.ngs_type_detected or self.num_reads is not None:
+            parts.append("\n--- Pattern & Read Info ---")
+            parts.append(f"Base Name: {self.base_name or 'N/A'}")
+            parts.append(f"Read Number: {self.read_number if self.read_number is not None else 'N/A'}")
+            parts.append(f"NGS Type Detected: {self.ngs_type_detected or 'N/A'}")
+            parts.append(f"Number of Reads: {self.num_reads if self.num_reads is not None else 'N/A'}")
+
+        # Add strict statistics if present
+        if any(v is not None for v in [self.n50, self.total_bases, self.mean_read_length,
+                                       self.longest_read_length, self.shortest_read_length]):
+            parts.append("\n--- Strict Statistics ---")
+            parts.append(f"N50: {self.n50 if self.n50 is not None else 'N/A'} bp")
+            parts.append(f"Total Bases: {self.total_bases if self.total_bases is not None else 'N/A'} bp")
+            parts.append(f"Mean Read Length: {self.mean_read_length if self.mean_read_length is not None else 'N/A'} bp")
+            parts.append(f"Longest Read Length: {self.longest_read_length if self.longest_read_length is not None else 'N/A'} bp")
+            parts.append(f"Shortest Read Length: {self.shortest_read_length if self.shortest_read_length is not None else 'N/A'} bp")
+
+        return "\n".join(parts)
+
+
 class ReadValidator:
     """
     Validates and processes sequencing read files in FASTQ and BAM formats.
@@ -120,12 +225,6 @@ class ReadValidator:
         settings: Settings object controlling validation and processing behavior
         sequences: List of parsed SeqRecord objects (populated during validation)
 
-    Example:
-        >>> from validation_pkg import ConfigManager, ReadValidator
-        >>> config = ConfigManager.load("config.json")
-        >>> settings = ReadValidator.Settings(validation_level='trust', outdir_by_ngs_type=True)
-        >>> validator = ReadValidator(config.reads[0], config.output_dir, settings)
-        >>> validator.validate()
     """
 
     @dataclass
@@ -183,17 +282,18 @@ class ReadValidator:
         self.input_path = read_config.filepath
 
         # From settings
-        self.settings = settings if not None else self.Settings() 
+        self.settings = settings if settings is not None else self.Settings() 
+        self.output_metadata = OutputMetadata()
 
         # Parsed data
         self.sequences = []  # List of SeqRecord objects
 
-        print("post init")
         if not self.validation_level:
             self.validation_level = 'strict'    #   default global value
 
         if not self.threads:
-            self.threads = 1    #   default global value
+            from validation_pkg.config_manager import DEFAULT_THREADS
+            self.threads = DEFAULT_THREADS    #   default global value
 
         # Apply outdir_by_ngs_type if enabled
         if self.settings.outdir_by_ngs_type:
@@ -201,7 +301,70 @@ class ReadValidator:
             self.settings = self.settings.update(output_subdir_name=self.read_config.ngs_type)
             self.logger.debug(f"Applied outdir_by_ngs_type: output_subdir_name set to '{self.read_config.ngs_type}'")
 
-    def run(self) -> None:
+    def _calculate_read_statistics(self) -> dict:
+        """
+        Calculate read statistics for strict mode.
+
+        Returns:
+            dict with keys: n50, total_bases, mean_read_length, longest_read_length, shortest_read_length
+        """
+        if not self.sequences:
+            return {
+                'n50': 0,
+                'total_bases': 0,
+                'mean_read_length': 0.0,
+                'longest_read_length': 0,
+                'shortest_read_length': 0
+            }
+
+        # Get read lengths
+        lengths = [len(seq.seq) for seq in self.sequences]
+
+        # Calculate N50
+        sorted_lengths = sorted(lengths, reverse=True)
+        total_length = sum(sorted_lengths)
+        cumulative_length = 0
+        n50 = 0
+        for length in sorted_lengths:
+            cumulative_length += length
+            if cumulative_length >= total_length / 2:
+                n50 = length
+                break
+
+        return {
+            'n50': n50,
+            'total_bases': total_length,
+            'mean_read_length': total_length / len(lengths) if lengths else 0.0,
+            'longest_read_length': max(lengths) if lengths else 0,
+            'shortest_read_length': min(lengths) if lengths else 0
+        }
+
+    def _fill_output_metadata(self, output_path: Path) -> None:
+        """
+        Create OutputMetadata object based on validation level.
+
+        Args:
+            output_path: Path to the main output file
+
+        """
+        # Populate and return OutputMetadata
+        self.output_metadata.input_file = self.read_config.filename
+        self.output_metadata.output_file = str(output_path) if output_path else None
+        self.output_metadata.output_filename = output_path.name if output_path else None
+        self.output_metadata.num_reads = len(self.sequences)
+        self.output_metadata.validation_level = self.validation_level
+
+        # Calculate read statistics in strict mode only
+        if self.validation_level == 'strict' and self.sequences:
+            stats = self._calculate_read_statistics()
+            self.output_metadata.n50 = stats['n50']
+            self.output_metadata.total_bases = stats['total_bases']
+            self.output_metadata.mean_read_length = stats['mean_read_length']
+            self.output_metadata.longest_read_length = stats['longest_read_length']
+            self.output_metadata.shortest_read_length = stats['shortest_read_length']
+
+
+    def run(self) -> OutputMetadata:
         """
         Main validation and processing workflow.
 
@@ -211,9 +374,18 @@ class ReadValidator:
         - FASTQ: Parse → Validate → Edit → Save
         - BAM: Copy original → Convert to FASTQ → Parse → Validate → Edit → Save
 
+        Returns:
+            OutputMetadata: Metadata object containing:
+                - output_file: Full path to output file
+                - output_filename: Name of output file
+                - Illumina pattern detection (base_name, read_number)
+                - num_reads: Total number of reads
+                - validation_level: Validation mode used
+
         Raises:
             ReadValidationError: If validation fails
         """
+        self.logger.start_timer("read_validation")
         self.logger.info(f"Processing read file: {self.read_config.filename}")
         self.logger.debug(f"Format: {self.read_config.detected_format}, Compression: {self.read_config.coding_type}")
 
@@ -221,8 +393,16 @@ class ReadValidator:
             # Special workflow for BAM files
             if self.read_config.detected_format == ReadFormat.BAM:
                 if self.settings.ignore_bam:
-                    self.logger.warning(f"Cannot proccess BAM files, the file will be ignored")
-                    return
+                    self.logger.warning(f"Cannot process BAM files, the file will be ignored")
+                    # Return minimal metadata indicating the file was skipped
+                    return OutputMetadata(
+                        input_file=str(self.input_path),
+                        output_file=None,
+                        output_filename=None,
+                        num_reads=0,
+                        validation_level=self.settings.validation_level,
+                        elapsed_time=0.0
+                    )
 
                 # Step 1: Copy original BAM to output (if keep_bam is enabled)
                 if self.settings.keep_bam:
@@ -247,14 +427,31 @@ class ReadValidator:
 
                 # Validate sequences
                 self._validate_sequences()
-                
+
                 # Step 2: Apply editing specifications
                 self._apply_edits()
 
-                # Step 4: Save to output directory (already FASTQ)
-                self._save_output()
+                # Step 3: If ilumina, detect file read number and basename
+                if self.read_config.ngs_type == 'illumina':
+                    self._detect_illumina_pattern(self.read_config.filename)
 
-            self.logger.info(f"✓ Read validation completed")
+                # Step 4: Save to output directory (already FASTQ)
+                output_path = self._save_output()
+
+            elapsed = self.logger.stop_timer("read_validation")
+            self.logger.info(f"✓ Read validation completed in {elapsed:.2f}s")
+
+            # Record file timing for report
+            self.logger.add_file_timing(
+                self.read_config.filename,
+                "read",
+                elapsed
+            )
+
+            # Create and return OutputMetadata
+            self._fill_output_metadata(output_path)
+            self.output_metadata.elapsed_time = elapsed
+            return self.output_metadata
 
         except Exception as e:
             self.logger.error(f"Read validation failed: {e}")
@@ -428,11 +625,11 @@ class ReadValidator:
             self.sequences = []
             return
 
-        # Trust mode: Parse only first 10 sequences for validation
+        # Trust mode: Parse only first TRUST_MODE_SAMPLE_SIZE sequences for validation
         # Strict mode: Parse all sequences
         if self.validation_level == 'trust':
-            self.logger.info("Trust mode - parsing first 10 sequences only for validation")
-            parse_limit = 10
+            self.logger.info(f"Trust mode - parsing first {TRUST_MODE_SAMPLE_SIZE} sequences only for validation")
+            parse_limit = TRUST_MODE_SAMPLE_SIZE
         else:
             # Strict mode - parse all
             parse_limit = None
@@ -554,65 +751,57 @@ class ReadValidator:
 
         # Parallel validation (strict mode with threads > 1)
         if use_parallel:
-            # Enable parallel logging mode (adds process_id and thread_id to logs)
-            self.logger.enable_parallel_logging()
+            # Determine chunk size: MIN_CHUNK_SIZE records per chunk, or split into PARALLEL_CHUNK_MULTIPLIER chunks per worker
+            chunk_size = max(MIN_CHUNK_SIZE, validate_count // (self.threads * PARALLEL_CHUNK_MULTIPLIER))
 
-            try:
-                # Determine chunk size: min 1000 records per chunk, or split into 4 chunks per worker
-                chunk_size = max(1000, validate_count // (self.threads * 4))
+            self.logger.debug(
+                f"Parallel processing configuration: {self.threads} workers, chunk_size={chunk_size:,}",
+                workers=self.threads,
+                chunk_size=chunk_size,
+                estimated_chunks=validate_count // chunk_size
+            )
 
-                self.logger.debug(
-                    f"Parallel processing configuration: {self.threads} workers, chunk_size={chunk_size:,}",
-                    workers=self.threads,
-                    chunk_size=chunk_size,
-                    estimated_chunks=validate_count // chunk_size
-                )
+            # Create partial function with settings
+            validator_func = partial(
+                _validate_single_read,
+                check_invalid_chars=self.settings.check_invalid_chars,
+                allow_empty_id=self.settings.allow_empty_id
+            )
 
-                # Create partial function with settings
-                validator_func = partial(
-                    _validate_single_read,
-                    check_invalid_chars=self.settings.check_invalid_chars,
-                    allow_empty_id=self.settings.allow_empty_id
-                )
+            # Validate in parallel
+            self.logger.debug(f"Starting parallel validation across {self.threads} worker processes...")
+            with Pool(processes=self.threads) as pool:
+                results = pool.map(validator_func, self.sequences[:validate_count], chunksize=chunk_size)
 
-                # Validate in parallel
-                self.logger.debug(f"Starting parallel validation across {self.threads} worker processes...")
-                with Pool(processes=self.threads) as pool:
-                    results = pool.map(validator_func, self.sequences[:validate_count], chunksize=chunk_size)
+            self.logger.debug(
+                f"Parallel validation completed: {validate_count:,} sequences processed",
+                sequences_validated=validate_count
+            )
 
-                self.logger.debug(
-                    f"Parallel validation completed: {validate_count:,} sequences processed",
-                    sequences_validated=validate_count
-                )
+            # Collect errors
+            errors = []
+            for idx, result in enumerate(results):
+                if 'error' in result:
+                    # Add index to details if missing
+                    if result['details'].get('sequence_index') is None:
+                        result['details']['sequence_index'] = idx
 
-                # Collect errors
-                errors = []
-                for idx, result in enumerate(results):
-                    if 'error' in result:
-                        # Add index to details if missing
-                        if result['details'].get('sequence_index') is None:
-                            result['details']['sequence_index'] = idx
+                    # Log validation issue
+                    self.logger.add_validation_issue(
+                        level='ERROR',
+                        category='read',
+                        message=f"Sequence '{result['record_id']}': {result['error']}",
+                        details=result['details']
+                    )
+                    errors.append(result)
 
-                        # Log validation issue
-                        self.logger.add_validation_issue(
-                            level='ERROR',
-                            category='read',
-                            message=f"Sequence '{result['record_id']}': {result['error']}",
-                            details=result['details']
-                        )
-                        errors.append(result)
-
-                # Raise if any errors found
-                if errors:
-                    error_msg = f"{len(errors)} validation error(s) found in sequences (parallel validation)"
-                    self.logger.error(error_msg, error_count=len(errors), total_sequences=validate_count)
-                    raise ReadValidationError(error_msg)
-                else:
-                    self.logger.info(f"✓ All {validate_count:,} sequences validated successfully (parallel mode)")
-
-            finally:
-                # Always disable parallel logging mode when done
-                self.logger.disable_parallel_logging()
+            # Raise if any errors found
+            if errors:
+                error_msg = f"{len(errors)} validation error(s) found in sequences (parallel validation)"
+                self.logger.error(error_msg, error_count=len(errors), total_sequences=validate_count)
+                raise ReadValidationError(error_msg)
+            else:
+                self.logger.info(f"✓ All {validate_count:,} sequences validated successfully (parallel mode)")
 
         # Sequential validation (trust mode or single-threaded)
         else:
@@ -653,9 +842,12 @@ class ReadValidator:
 
         # Check for duplicate IDs (always sequential - requires full list)
         if not self.settings.allow_duplicate_ids:
+            from collections import Counter
             seq_ids = [record.id for record in self.sequences]
             if len(seq_ids) != len(set(seq_ids)):
-                duplicates = [sid for sid in set(seq_ids) if seq_ids.count(sid) > 1]
+                # Use Counter for O(n) instead of O(n²) duplicate detection
+                id_counts = Counter(seq_ids)
+                duplicates = [sid for sid, count in id_counts.items() if count > 1]
                 error_msg = f"Duplicate sequence IDs not allowed: {duplicates}"
                 self.logger.add_validation_issue(
                     level='ERROR',
@@ -799,8 +991,9 @@ class ReadValidator:
                     bam_file.reset()  # Reset file pointer after counting
                     self.logger.info(f"Processing {total_reads:,} reads from BAM file...")
                     progress_interval = max(1, total_reads // 20)  # Report every 5%
-                except:
-                    # If counting fails, just proceed without progress reporting
+                except Exception:
+                    # If counting fails (e.g., truncated file, permission issues),
+                    # just proceed without progress reporting
                     total_reads = None
                     progress_interval = 100000  # Report every 100k reads
 
@@ -955,17 +1148,19 @@ class ReadValidator:
 
         # Generate output filename from original filename (without compression extension)
         # Get base name without any extensions
-        base_name = self.read_config.filename
+        if self.output_metadata.base_name and self.output_metadata.read_number:
+            # Paired-end detected: use detected base name with R1/R2 suffix
+            base_name = f"{self.output_metadata.base_name}_R{self.output_metadata.read_number}"
+        else:
+            # Single-end (no pattern detected): use basename with _R1 suffix
+            # This ensures all Illumina reads have consistent _R1 or _R2 naming
+            base_name = f"{self.read_config.basename}_R1"
 
-        # Remove all suffixes (.fastq.gz -> remove .gz then .fastq)
-        for suffix in self.input_path.suffixes:
-            base_name = base_name.replace(suffix, '')
         # Add suffix if specified
         if self.settings.output_filename_suffix:
             output_filename = f"{base_name}_{self.settings.output_filename_suffix}.fastq"
         else:
             output_filename = f"{base_name}.fastq"
-
 
         # Add compression extension if requested (from settings)
         # Normalize settings.coding_type to CodingType enum
@@ -1082,15 +1277,91 @@ class ReadValidator:
             self.logger.info(f"Output saved: {output_path}")
             return output_path
 
-        # Strict mode - write sequences using BioPython (original behavior)
-        # Write output with appropriate compression
-        self.logger.debug(f"Writing output to: {output_path}")
+        # Strict mode - optimize based on whether edits were applied
+        # If input is FASTQ, coding matches, and no edits were made, use simple copy
+        # Otherwise, write sequences using BioPython
 
-        # Use optimized compression writer
-        with open_compressed_writer(output_path, coding, threads=self.threads) as handle:
-            SeqIO.write(self.sequences, handle, 'fastq')
+        input_coding = self.read_config.coding_type
+        output_coding = coding
+        input_format = self.read_config.detected_format
+
+        # Check if we can use optimized copy (no edits, same format and coding)
+        # Note: Currently _apply_edits() does nothing, so no edits are ever made
+        # In the future, check if edits were actually applied (e.g., sequences removed/modified)
+        can_optimize = (
+            input_format == ReadFormat.FASTQ and  # Input is FASTQ
+            input_coding == output_coding  # Compression matches
+            # Future: add check for "no edits were actually applied"
+        )
+
+        if can_optimize:
+            # Optimized path: simple copy (no need to parse/write)
+            self.logger.debug(f"Optimized copy: {self.input_path} to {output_path} (no edits, same format/coding)")
+            shutil.copy2(self.input_path, output_path)
+        else:
+            # Standard path: write sequences using BioPython
+            # Used when: BAM conversion, compression change, or future edits
+            self.logger.debug(f"Writing output to: {output_path}")
+
+            # Use optimized compression writer
+            with open_compressed_writer(output_path, coding, threads=self.threads) as handle:
+                SeqIO.write(self.sequences, handle, 'fastq')
 
         self.logger.info(f"Output saved: {output_path}")
 
         return output_path
     
+    def _detect_illumina_pattern(self, filename: str) -> None:
+        """
+        Detect Illumina paired-end naming patterns in filename.
+
+        Supports common Illumina naming conventions:
+        - _R1, _R2 (standard Illumina)
+        - _1, _2 (SRA/NCBI style)
+        - .R1, .R2 (dot separator)
+        - .1, .2 (dot separator)
+        - _R1_001, _R2_001 (with lane numbers)
+        - R1, R2 (no separator, at end of basename)
+
+        Args:
+            filename: Input filename (with or without extension)
+        """
+
+        # Strip only the last 2 extensions (format + compression)
+        base = self.read_config.basename
+
+        # Use pre-compiled patterns from module-level constant
+        for pattern, read_group_idx in ILLUMINA_PAIRED_END_PATTERNS:
+            match = pattern.match(base)
+            if match:
+                base_name = match.group(1)
+                read_indicator = match.group(read_group_idx)
+
+                # Extract read number (1 or 2)
+                if read_indicator in ('R1', '1'):
+                    read_number = 1
+                elif read_indicator in ('R2', '2'):
+                    read_number = 2
+                else:
+                    continue  # Should not happen with our patterns
+
+                self.output_metadata.base_name = base_name
+                self.output_metadata.read_number = read_number
+                self.output_metadata.ngs_type_detected = 'illumina'
+
+                if hasattr(self, 'logger') and self.logger:
+                    self.logger.debug(
+                        f"Detected Illumina paired-end pattern: {base_name}_R{read_number}"
+                    )
+                return  # Early return after successful match
+
+        # No paired-end pattern matched - fallback for single-end or non-standard naming
+        # Always set ngs_type_detected for Illumina files, even without pairing info
+        self.output_metadata.base_name = base
+        self.output_metadata.read_number = 1  # Default to R1 for single-end
+        self.output_metadata.ngs_type_detected = 'illumina'
+
+        if hasattr(self, 'logger') and self.logger:
+            self.logger.debug(
+                f"No paired-end pattern detected in '{base}' - treating as single-end R1"
+            )

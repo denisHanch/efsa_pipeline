@@ -242,14 +242,29 @@ class TestConfigManager:
         
         loaded_config = ConfigManager.load(str(config_file))
         assert len(loaded_config.reads) == 2
-        assert loaded_config.reads[0].filepath == (reads_dir / "R2.fastq")
-        assert loaded_config.reads[0].filename == "R2.fastq"
-        assert loaded_config.reads[0].detected_format == ReadFormat.FASTQ
-        assert loaded_config.reads[0].ngs_type == "illumina"
-        assert loaded_config.reads[1].filepath == (reads_dir / "R1.fastq")
-        assert loaded_config.reads[1].filename == "R1.fastq"
-        assert loaded_config.reads[1].detected_format == ReadFormat.FASTQ
-        assert loaded_config.reads[1].ngs_type == "illumina"
+
+        # Check filepaths in an order-independent way
+        read_paths = {r.filepath for r in loaded_config.reads}
+        expected_paths = {reads_dir / "R1.fastq", reads_dir / "R2.fastq"}
+        assert read_paths == expected_paths
+
+        # Verify all reads have correct properties (order-independent)
+        assert all(r.detected_format == ReadFormat.FASTQ for r in loaded_config.reads)
+        assert all(r.ngs_type == "illumina" for r in loaded_config.reads)
+
+        # Verify each file individually by looking it up by name
+        r1_config = next((r for r in loaded_config.reads if r.filename == "R1.fastq"), None)
+        r2_config = next((r for r in loaded_config.reads if r.filename == "R2.fastq"), None)
+
+        assert r1_config is not None
+        assert r1_config.filepath == (reads_dir / "R1.fastq")
+        assert r1_config.detected_format == ReadFormat.FASTQ
+        assert r1_config.ngs_type == "illumina"
+
+        assert r2_config is not None
+        assert r2_config.filepath == (reads_dir / "R2.fastq")
+        assert r2_config.detected_format == ReadFormat.FASTQ
+        assert r2_config.ngs_type == "illumina"
     
     def test_missing_directory_reads(self, temp_dir):
         """Test error when reads directory doesn't exist."""
