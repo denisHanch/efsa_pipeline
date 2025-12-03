@@ -1,0 +1,51 @@
+{
+  "ref_genome_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+  },
+  "mod_genome_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+  },
+  "ref_plasmid_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+    },
+  "mod_plasmid_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+    },
+  "reads": [
+    {
+      "filename": "TBA",
+      "ngs_type": "illumina/pacbio/ont",
+      "validation_level": "strict/trust/minimal",
+      "threads": 8
+    },
+    {
+      "directory": "TBA",
+      "ngs_type": "illumina/pacbio/ont",
+      "validation_level": "strict/trust/minimal",
+      "threads": 8
+    }
+  ],
+  "ref_feature_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+  },
+  "mod_feature_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+    },
+  "options": {
+    "threads": 8,
+    "validation_level": "strict/trust/minimal",
+    "logging_level":"DEBUG/INFO/WARNING/ERROR"
+  }
+}
