@@ -24,7 +24,7 @@
 
 # Quick Start
 
-1. **Generate a GitHub token** (see instructions in the repository link) and **download the repository**:
+1. **Download the repository**:
 
    ```bash
    git clone https://github.com/denisHanch/efsa_pipeline.git
@@ -43,7 +43,7 @@
 
 3. **Running QC** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder
 
-4. **Use the GitHub token provided in the Slack channel**, then start the pipeline:
+4.  Start the pipeline with a command:
 
    ```bash
    nextflow run main.nf \
@@ -150,7 +150,7 @@ nextflow run main.nf \
 | -------------- | -------------------------------------------- | ---------------------- |
 | `--in_dir`     | Input directory                              | `data/valid`           |
 | `--out_dir`    | Output directory                             | `data/outputs`         |
-| `--registry`   | Docker/Singularity container registry        | `ghcr.io/kate-simonova`|
+| `--registry`   | Docker/Singularity container registry        | `ghcr.io/ecomolegmo`   |
 | `--max_cpu`    | Maximum CPUs per process                     | `1`                    |
 | `--log`        | Enable logging                               | `true`                 |
 | `--clean_work` | Remove work directory after successful run   | `true`                 |
