@@ -428,7 +428,7 @@ class TestGenomeValidatorEditing:
         assert validator.sequences[0].id == "long_seq"
 
     def test_replace_id_with_added(self, fasta_with_mixed_lengths, output_dir):
-        """Test replacing sequence IDs with new value."""
+        """Test replacing sequence IDs with auto-increment for multiple sequences."""
         settings = GenomeValidator.Settings(
             replace_id_with="chr",
             min_sequence_length=0,
@@ -449,9 +449,14 @@ class TestGenomeValidatorEditing:
         validator = GenomeValidator(genome_config, settings)
         validator.run()
 
-        # All sequences should have ID replaced with "chr" (line 308: record.id = f"{prefix}")
-        assert all(seq.id == "chr" for seq in validator.sequences)
-        # Original IDs should be in description (line 307: record.description = f"{record.id}")
+        # First sequence should have base name, subsequent should have increments
+        assert validator.sequences[0].id == "chr"
+        assert validator.sequences[1].id == "chr1"
+        assert validator.sequences[2].id == "chr2"
+        # Verify IDs are unique
+        sequence_ids = [seq.id for seq in validator.sequences]
+        assert len(sequence_ids) == len(set(sequence_ids)), "Sequence IDs should be unique"
+        # Original IDs should be in description
         assert any("short_seq" in seq.description for seq in validator.sequences)
         assert any("medium_seq" in seq.description for seq in validator.sequences)
         assert any("long_seq" in seq.description for seq in validator.sequences)
@@ -1006,12 +1011,14 @@ class TestGenomeValidatorValidationLevels:
         validator = GenomeValidator(genome_config, settings)
         validator.run()
 
-        # Check that ID replacement was applied
+        # Check that ID replacement was applied with auto-increment
         output_file = list(output_dir.glob("*.fasta"))[0]
         with open(output_file, 'r') as f:
             sequences = list(SeqIO.parse(f, 'fasta'))
-            # All sequences should have replaced ID
-            assert all(seq.id == 'genome' for seq in sequences)
+            # First sequence should have base ID, rest should have increments
+            assert sequences[0].id == 'genome'
+            assert sequences[1].id == 'genome1'
+            assert sequences[2].id == 'genome2'
 
     # ===== Tests for TRUST validation level =====
 
@@ -1078,19 +1085,22 @@ class TestGenomeValidatorValidationLevels:
         validator = GenomeValidator(genome_config, settings)
         validator.run()
 
-        # Check that ID replacement was applied to ALL sequences
+        # Check that ID replacement was applied to ALL sequences with auto-increment
         # Main sequence + plasmid files
-        output_files = list(output_dir.glob("*.fasta"))
+        output_files = sorted(output_dir.glob("*.fasta"))
         assert len(output_files) == 3  # main + 2 plasmids
 
-        # Check all output files - ID should be replaced in all
+        # Collect all sequence IDs from all files
+        all_ids = []
         for output_file in output_files:
             with open(output_file, 'r') as f:
                 sequences = list(SeqIO.parse(f, 'fasta'))
                 # Each file has 1 sequence
                 assert len(sequences) == 1
-                # All sequences should have replaced ID
-                assert sequences[0].id == 'genome'
+                all_ids.append(sequences[0].id)
+
+        # Check that IDs are replaced with auto-increment: genome, genome1, genome2
+        assert sorted(all_ids) == sorted(['genome', 'genome1', 'genome2'])
 
     def test_trust_filters_short_sequences(self, multi_seq_fasta, output_dir):
         """Test trust mode applies min_sequence_length filter."""
