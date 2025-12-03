@@ -41,7 +41,16 @@
    ./run_container.sh
    ```
 
-3. **Running QC** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder
+> **Important!**
+> 
+> Create configuration file `config.json` on `data/inputs`.
+> 
+
+3. **Running QC** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder:
+
+   ```bash
+   python3 ./modules/validation/main.py ./data/inputs/config.json
+   ```
 
 4. **Use the GitHub token provided in the Slack channel**, then start the pipeline:
 
@@ -111,6 +120,149 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
 >
 
 The input validation module preprocesses and verifies all input data to ensure it meets the required format and structure before the Nextflow pipeline is executed.
+
+## Supported File Formats
+
+
+### Genome Files
+| Supported Input Formats | Final Output Format |
+|------------------------|---------------------|
+| FASTA: `.fasta`, `.fa`, `.fna` | `.fasta` |
+| GenBank: `.gb`, `.gbk`, `.genbank` | `.fasta` |
+| Compression: `.gz`, `.bz2`, `.gzip`, `.bzip2` | Uncompressed |
+
+### Read Files
+| Supported Input Formats | Final Output Format |
+|------------------------|---------------------|
+| FASTQ: `.fastq`, `.fq` | `.fastq` |
+| BAM: `.bam` (limited support) | `.bam` |
+| Compression: `.gz`, `.bz2`, `.gzip`, `.bzip2` | `.gz` |
+
+### Feature Files
+| Supported Input Formats | Final Output Format |
+|------------------------|---------------------|
+| GFF: `.gff`, `.gff3`, `.gtf` | `.gff3` |
+| BED: `.bed` | `.gff3` |
+| Compression: `.gz`, `.bz2`, `.gzip`, `.bzip2` | Uncompressed |
+
+
+## Configuration
+
+To run validation, configuration file is expected in `json` format. This config specify which file corresponds to reference genome, assembled modified genome and reads. The detailed documentation of the configuration is described [here](/docs/validation/CONFIG_GUIDE.md).
+
+Full configuration template is prepared in `data/inputs/config.json`.
+
+```json
+{
+  "ref_genome_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+  },
+  "mod_genome_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+  },
+  "ref_plasmid_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+    },
+  "mod_plasmid_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+    },
+  "reads": [
+    {
+      "filename": "TBA",
+      "ngs_type": "illumina/pacbio/ont",
+      "validation_level": "strict/trust/minimal",
+      "threads": 8
+    },
+    {
+      "directory": "TBA",
+      "ngs_type": "illumina/pacbio/ont",
+      "validation_level": "strict/trust/minimal",
+      "threads": 8
+    }
+  ],
+  "ref_feature_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+  },
+  "mod_feature_filename": {
+    "filename": "TBA",
+    "validation_level": "strict/trust/minimal",
+    "threads": 8
+    },
+  "options": {
+    "threads": 8,
+    "validation_level": "strict/trust/minimal",
+    "logging_level":"DEBUG/INFO/WARNING/ERROR"
+  }
+}
+```
+
+
+## Validation Levels
+
+The package supports three validation levels to balance thoroughness and performance:
+
+### Comparison Table
+
+| Level | Parsing | Validation | Edits | Output | Speed | Use Case |
+|-------|---------|------------|-------|--------|-------|----------|
+| **strict** (default) | All data | All data | All applied | BioPython write | Slowest | Structure validation sequence by sequence, statistics gathering |
+| **trust** | All data (genome)<br>First record only (reads) | First sequence only | All applied (genome)<br>None (reads) | BioPython write (genome)<br>File copy (reads) | Fast | Trust data, adapt file coding,name and location |
+| **minimal** | None | None | None | File copy | Fastest | Rename and move files to meet the requirements |
+
+## Logging
+
+Every validation run create a new **log** file on `./logs/validation_ID.log`. With option `logging_level` in configuration file you may specify the amount of information logged.
+
+**Supported levels:**
+- `"DEBUG"`: Most verbose (all messages including debug info)
+- `"INFO"`: Standard output (validation progress, file operations)
+- `"WARNING"`: Warnings and errors only
+- `"ERROR"`: Errors only
+
+Every validation run create a new **report** file on `./logs/report_ID.txt`.
+A validation report contains three main sections:
+
+
+**1. Summary Section:**
+- Overall validation status (PASSED/FAILED)
+- File counts by type (genomes, reads, features)
+- Inter-file validation counts (passed/failed)
+- Total execution time
+
+**2. File Validation Results**
+For each validated file:
+- **Input information**: Original filename, validator type, settings used
+- **Output information**: Output file path, validation level
+- **Metadata**: Type-specific information and statistics
+  - **Genomes**: Sequence count, IDs, lengths, GC content
+  - **Reads**: Read count, NGS type, pairing info, N50, lengths, total bases
+  - **Features**: Feature count, types, sequence coverage
+- **Timing**: Elapsed time for validation
+
+**3. Inter-file Validation Results**
+- Validation type (genome×genome, read×read, feature×genome)
+- Status (PASSED/FAILED)
+- Errors and warnings
+- Metadata about cross-file checks
+
+## Performance Tips
+
+**To adapt validation performance:**
+
+1. Install parallel compression tools: `sudo apt-get install pigz pbzip2`
+2. Use `validation_level='trust'` for pre-validated data (10-15x faster)
+3. Use `threads` option in config (default 8) for record-level parallelization (3-7x faster in strict mode)
+
 
 # Nextflow
 
