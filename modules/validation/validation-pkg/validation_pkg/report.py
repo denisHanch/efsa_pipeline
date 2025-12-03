@@ -66,6 +66,20 @@ class ValidationReport:
         # Track start time
         self.start_time = datetime.now()
 
+    @staticmethod
+    def _has_value(data: Dict[str, Any], key: str) -> bool:
+        """
+        Check if a key exists in dictionary and its value is not None.
+
+        Args:
+            data: Dictionary to check
+            key: Key name to look for
+
+        Returns:
+            True if key exists and value is not None, False otherwise
+        """
+        return key in data and data[key] is not None
+
     def write(
         self,
         result: Union[Any, List[Any]],
@@ -346,10 +360,10 @@ class ValidationReport:
 
         if validator_type == "genome":
             # Genome-specific statistics
-            if 'num_sequences' in output_data:
+            if self._has_value(output_data, 'num_sequences'):
                 lines.append(f"    Sequences: {output_data['num_sequences']:,}")
 
-            if 'sequence_lengths' in output_data:
+            if self._has_value(output_data, 'sequence_lengths'):
                 seq_lengths = output_data['sequence_lengths']
                 if isinstance(seq_lengths, dict):
                     total_len = sum(seq_lengths.values())
@@ -357,7 +371,7 @@ class ValidationReport:
                     total_len = sum(seq_lengths)
                 lines.append(f"    Total Length: {total_len:,} bp")
 
-            if 'sequence_ids' in output_data:
+            if self._has_value(output_data, 'sequence_ids'):
                 seq_ids = output_data['sequence_ids']
                 if len(seq_ids) <= 3:
                     lines.append(f"    Sequence IDs: {', '.join(seq_ids)}")
@@ -366,45 +380,43 @@ class ValidationReport:
 
         elif validator_type == "read":
             # Read-specific statistics
-            if 'num_reads' in output_data:
+            if self._has_value(output_data, 'num_reads'):
                 lines.append(f"    Reads: {output_data['num_reads']:,}")
 
-            if 'total_bases' in output_data:
+            if self._has_value(output_data, 'total_bases'):
                 lines.append(f"    Total Bases: {output_data['total_bases']:,} bp")
 
-            if 'mean_read_length' in output_data:
+            if self._has_value(output_data, 'mean_read_length'):
                 lines.append(f"    Mean Length: {output_data['mean_read_length']:.1f} bp")
 
-            if 'n50' in output_data:
+            if self._has_value(output_data, 'n50'):
                 lines.append(f"    N50: {output_data['n50']:,} bp")
 
-            if 'longest_read_length' in output_data and 'shortest_read_length' in output_data:
+            if self._has_value(output_data, 'longest_read_length') and self._has_value(output_data, 'shortest_read_length'):
                 lines.append(f"    Length Range: {output_data['shortest_read_length']:,} - {output_data['longest_read_length']:,} bp")
 
-            if 'ngs_type_detected' in output_data:
+            if self._has_value(output_data, 'ngs_type_detected'):
                 ngs_type = output_data['ngs_type_detected']
-                if ngs_type:
-                    lines.append(f"    NGS Type: {ngs_type}")
+                lines.append(f"    NGS Type: {ngs_type}")
 
-            if 'base_name' in output_data and 'read_number' in output_data:
+            if self._has_value(output_data, 'base_name') and self._has_value(output_data, 'read_number'):
                 base_name = output_data['base_name']
                 read_num = output_data['read_number']
-                if base_name and read_num:
-                    lines.append(f"    Paired-End: R{read_num} (base: {base_name})")
+                lines.append(f"    Paired-End: R{read_num} (base: {base_name})")
 
         elif validator_type == "feature":
             # Feature-specific statistics
-            if 'num_features' in output_data:
+            if self._has_value(output_data, 'num_features'):
                 lines.append(f"    Features: {output_data['num_features']:,}")
 
-            if 'feature_types' in output_data:
+            if self._has_value(output_data, 'feature_types'):
                 types = output_data['feature_types']
                 if len(types) <= 5:
                     lines.append(f"    Types: {', '.join(types)}")
                 else:
                     lines.append(f"    Types: {', '.join(list(types)[:5])}, ... (+{len(types)-5} more)")
 
-            if 'sequence_ids' in output_data:
+            if self._has_value(output_data, 'sequence_ids'):
                 seq_ids = output_data['sequence_ids']
                 if len(seq_ids) <= 3:
                     lines.append(f"    Sequences: {', '.join(seq_ids)}")
@@ -419,17 +431,17 @@ class ValidationReport:
 
         if validator_type == "genome":
             # Genome-specific metadata
-            if 'num_sequences' in metadata:
+            if self._has_value(metadata, 'num_sequences'):
                 lines.append(f"  Sequences: {metadata['num_sequences']}")
 
-            if 'sequence_ids' in metadata:
+            if self._has_value(metadata, 'sequence_ids'):
                 seq_ids = metadata['sequence_ids']
                 if len(seq_ids) <= 5:
                     lines.append(f"    IDs: {', '.join(seq_ids)}")
                 else:
                     lines.append(f"    IDs: {', '.join(seq_ids[:5])}, ... ({len(seq_ids)} total)")
 
-            if 'sequence_lengths' in metadata:
+            if self._has_value(metadata, 'sequence_lengths'):
                 # Handle both list and dict formats
                 seq_lengths = metadata['sequence_lengths']
                 if isinstance(seq_lengths, dict):
@@ -440,42 +452,41 @@ class ValidationReport:
 
         elif validator_type == "read":
             # Read-specific metadata
-            if 'num_reads' in metadata:
+            if self._has_value(metadata, 'num_reads'):
                 lines.append(f"  Reads: {metadata['num_reads']:,}")
 
-            if 'ngs_type_detected' in metadata:
+            if self._has_value(metadata, 'ngs_type_detected'):
                 lines.append(f"  NGS Type: {metadata['ngs_type_detected']}")
 
-            if 'base_name' in metadata and 'read_number' in metadata:
-                if metadata['base_name'] and metadata['read_number']:
-                    lines.append(f"  Paired-End: R{metadata['read_number']} (base: {metadata['base_name']})")
+            if self._has_value(metadata, 'base_name') and self._has_value(metadata, 'read_number'):
+                lines.append(f"  Paired-End: R{metadata['read_number']} (base: {metadata['base_name']})")
 
             # Read statistics
-            if 'total_bases' in metadata:
+            if self._has_value(metadata, 'total_bases'):
                 lines.append(f"  Total Bases: {metadata['total_bases']:,} bp")
 
-            if 'mean_read_length' in metadata:
+            if self._has_value(metadata, 'mean_read_length'):
                 lines.append(f"  Mean Read Length: {metadata['mean_read_length']:.1f} bp")
 
-            if 'n50' in metadata:
+            if self._has_value(metadata, 'n50'):
                 lines.append(f"  N50: {metadata['n50']:,} bp")
 
-            if 'longest_read_length' in metadata:
+            if self._has_value(metadata, 'longest_read_length'):
                 lines.append(f"  Longest Read: {metadata['longest_read_length']:,} bp")
 
-            if 'shortest_read_length' in metadata:
+            if self._has_value(metadata, 'shortest_read_length'):
                 lines.append(f"  Shortest Read: {metadata['shortest_read_length']:,} bp")
 
         elif validator_type == "feature":
             # Feature-specific metadata
-            if 'num_features' in metadata:
+            if self._has_value(metadata, 'num_features'):
                 lines.append(f"  Features: {metadata['num_features']}")
 
-            if 'feature_types' in metadata:
+            if self._has_value(metadata, 'feature_types'):
                 types = metadata['feature_types']
                 lines.append(f"    Types: {', '.join(types)}")
 
-            if 'sequence_ids' in metadata:
+            if self._has_value(metadata, 'sequence_ids'):
                 seq_ids = metadata['sequence_ids']
                 if len(seq_ids) <= 5:
                     lines.append(f"    Sequences: {', '.join(seq_ids)}")

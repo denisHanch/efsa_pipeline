@@ -524,6 +524,231 @@ class TestTextReportGeneration:
         assert "VALIDATION PIPELINE REPORT" in content
         assert "Files Processed: 0" in content
 
+    def test_text_report_with_none_read_statistics(self, temp_report_path):
+        """Test that report handles None values in read statistics (non-strict mode).
+
+        In non-strict validation mode, read statistics like total_bases, n50,
+        mean_read_length, etc. are None. The report should handle these gracefully
+        without throwing TypeError when formatting.
+        """
+        report = ValidationReport(temp_report_path)
+
+        # Simulate read validation metadata from non-strict mode
+        # where statistics are None
+        output_data = {
+            'input_file': 'reads_R1.fastq',
+            'output_file': '/output/reads_R1.fastq.gz',
+            'output_filename': 'reads_R1.fastq.gz',
+            'num_reads': 1000000,
+            'base_name': 'reads',
+            'read_number': 1,
+            'ngs_type_detected': 'illumina',
+            'validation_level': 'trust',
+            # These are None in non-strict mode
+            'total_bases': None,
+            'mean_read_length': None,
+            'n50': None,
+            'longest_read_length': None,
+            'shortest_read_length': None
+        }
+
+        report.write(output_data, file_type='read')
+
+        # This should not raise TypeError
+        report.flush(format='text')
+
+        assert temp_report_path.exists()
+        content = temp_report_path.read_text()
+
+        # Verify the report was generated
+        assert "VALIDATION PIPELINE REPORT" in content
+        assert "Files Processed: 1" in content
+        assert "Reads:    1" in content
+
+        # Verify that None values are not displayed in the report
+        # (they should be skipped, not formatted as "None bp")
+        assert "None bp" not in content
+        assert "None" not in content or "None" in "NoneType"  # Allow "NoneType" in error messages if any
+
+    def test_text_report_with_none_genome_statistics(self, temp_report_path):
+        """Test that report handles None values in genome statistics (minimal mode).
+
+        In minimal validation mode, genome statistics like num_sequences
+        may be None. The report should handle these gracefully.
+        """
+        report = ValidationReport(temp_report_path)
+
+        output_data = {
+            'input_file': 'genome.fasta',
+            'output_file': '/output/genome.fasta.gz',
+            'output_filename': 'genome.fasta.gz',
+            'validation_level': 'minimal',
+            # These are None in minimal mode
+            'num_sequences': None
+        }
+
+        report.write(output_data, file_type='genome')
+
+        # This should not raise TypeError
+        report.flush(format='text')
+
+        assert temp_report_path.exists()
+        content = temp_report_path.read_text()
+
+        # Verify the report was generated
+        assert "VALIDATION PIPELINE REPORT" in content
+        assert "Files Processed: 1" in content
+
+        # Verify that None values are not displayed
+        assert "Sequences: None" not in content
+
+    def test_text_report_with_none_feature_statistics(self, temp_report_path):
+        """Test that report handles None values in feature statistics.
+
+        Feature statistics like num_features may be None in error cases.
+        The report should handle these gracefully.
+        """
+        report = ValidationReport(temp_report_path)
+
+        output_data = {
+            'input_file': 'features.gff',
+            'output_file': '/output/features.gff.gz',
+            'output_filename': 'features.gff.gz',
+            'validation_level': 'trust',
+            # This could be None in error cases
+            'num_features': None
+        }
+
+        report.write(output_data, file_type='feature')
+
+        # This should not raise TypeError
+        report.flush(format='text')
+
+        assert temp_report_path.exists()
+        content = temp_report_path.read_text()
+
+        # Verify the report was generated
+        assert "VALIDATION PIPELINE REPORT" in content
+        assert "Files Processed: 1" in content
+
+        # Verify that None values are not displayed
+        assert "Features: None" not in content
+
+    def test_text_report_with_none_ngs_type(self, temp_report_path):
+        """Test that report handles None value for ngs_type_detected.
+
+        The ngs_type_detected field can be None in some cases.
+        The report should skip displaying it instead of showing 'None'.
+        """
+        report = ValidationReport(temp_report_path)
+
+        output_data = {
+            'input_file': 'reads_R1.fastq',
+            'output_file': '/output/reads_R1.fastq.gz',
+            'output_filename': 'reads_R1.fastq.gz',
+            'num_reads': 500000,
+            'validation_level': 'trust',
+            # ngs_type_detected is None
+            'ngs_type_detected': None,
+        }
+
+        report.write(output_data, file_type='read')
+
+        # This should not raise TypeError
+        report.flush(format='text')
+
+        assert temp_report_path.exists()
+        content = temp_report_path.read_text()
+
+        # Verify the report was generated
+        assert "VALIDATION PIPELINE REPORT" in content
+        assert "Files Processed: 1" in content
+
+        # Verify that None value is not displayed
+        assert "NGS Type: None" not in content
+
+    def test_text_report_with_none_paired_end_info(self, temp_report_path):
+        """Test that report handles None values for base_name and read_number.
+
+        The base_name and read_number fields can be None.
+        The report should skip displaying paired-end info instead of showing 'None'.
+        """
+        report = ValidationReport(temp_report_path)
+
+        output_data = {
+            'input_file': 'reads.fastq',
+            'output_file': '/output/reads.fastq.gz',
+            'output_filename': 'reads.fastq.gz',
+            'num_reads': 750000,
+            'validation_level': 'trust',
+            # Paired-end info is None
+            'base_name': None,
+            'read_number': None,
+        }
+
+        report.write(output_data, file_type='read')
+
+        # This should not raise TypeError
+        report.flush(format='text')
+
+        assert temp_report_path.exists()
+        content = temp_report_path.read_text()
+
+        # Verify the report was generated
+        assert "VALIDATION PIPELINE REPORT" in content
+        assert "Files Processed: 1" in content
+
+        # Verify that None values are not displayed
+        assert "Paired-End: RNone" not in content
+        assert "base: None" not in content
+
+    def test_text_report_with_partial_paired_end_info(self, temp_report_path):
+        """Test that report handles case where only one of base_name/read_number is None.
+
+        If only one value is present, the paired-end info should not be displayed.
+        """
+        report = ValidationReport(temp_report_path)
+
+        # Test case 1: base_name is None, read_number is present
+        output_data1 = {
+            'input_file': 'reads1.fastq',
+            'output_file': '/output/reads1.fastq.gz',
+            'output_filename': 'reads1.fastq.gz',
+            'num_reads': 100000,
+            'validation_level': 'trust',
+            'base_name': None,
+            'read_number': 1,
+        }
+
+        report.write(output_data1, file_type='read')
+
+        # Test case 2: base_name is present, read_number is None
+        output_data2 = {
+            'input_file': 'reads2.fastq',
+            'output_file': '/output/reads2.fastq.gz',
+            'output_filename': 'reads2.fastq.gz',
+            'num_reads': 200000,
+            'validation_level': 'trust',
+            'base_name': 'sample',
+            'read_number': None,
+        }
+
+        report.write(output_data2, file_type='read')
+
+        # This should not raise TypeError
+        report.flush(format='text')
+
+        assert temp_report_path.exists()
+        content = temp_report_path.read_text()
+
+        # Verify the report was generated
+        assert "VALIDATION PIPELINE REPORT" in content
+        assert "Files Processed: 2" in content
+
+        # Verify that incomplete paired-end info is not displayed
+        assert "Paired-End: R1 (base: None)" not in content
+        assert "Paired-End: RNone (base: sample)" not in content
+
 
 # ============================================================================
 # Test JSON Report Generation

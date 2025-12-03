@@ -125,7 +125,9 @@ class GenomeValidator:
             plasmids_to_one: Merge all plasmid sequences into one file (default: False)
             main_longest: Select longest sequence as main chromosome (default: True)
             main_first: Select first sequence as main chromosome (default: False)
-            replace_id_with: Prefix to add to sequence IDs, None = no prefix (default: None)
+            replace_id_with: Replace all sequence IDs with this value. For multiple sequences,
+                             automatically appends increments (e.g., 'chr', 'chr1', 'chr2').
+                             Original IDs stored in description field. (default: None)
             min_sequence_length: Minimum sequence length to keep in bp, remove shorter (default: 100)
             coding_type: Output compression type: 'gz', 'bz2', or None (default: None)
             output_filename_suffix: Suffix to add to output filename (default: None)
@@ -597,14 +599,18 @@ class GenomeValidator:
                 self.logger.debug("All sequences filtered out")
                 return
 
-        # 2. Add sequence prefix
+        # 2. Replace sequence IDs with auto-increment
         if self.settings.replace_id_with:
             prefix = self.settings.replace_id_with
-            for record in self.sequences:
+            for idx, record in enumerate(self.sequences):
                 # Store original ID in description
                 record.description = f"{record.id}"
-                record.id = f"{prefix}"
-            self.logger.debug(f"Added prefix '{prefix}' to all sequence IDs")
+                # First sequence: just prefix, subsequent: prefix + number (no separator)
+                if idx == 0:
+                    record.id = f"{prefix}"
+                else:
+                    record.id = f"{prefix}{idx}"
+            self.logger.debug(f"Replaced sequence IDs with '{prefix}' (auto-incremented for multiple sequences)")
 
         # 3. Handle plasmid sequences
         if self.settings.is_plasmid:
