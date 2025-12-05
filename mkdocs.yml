@@ -1,0 +1,117 @@
+site_name: EFSA Pipeline Documentation
+site_description: Comprehensive genomic analysis pipeline with validation, QC, and variant detection
+site_author: EFSA Pipeline Team
+site_url: https://denisHanch.github.io/efsagmopipeline
+
+# Repository
+repo_name: efsa_pipeline
+repo_url: https://github.com/denisHanch/efsa_pipeline
+edit_uri: edit/main/docs/md/
+
+# Copyright
+copyright: Copyright &copy; 2025 EFSA Pipeline Team
+
+# Documentation directory
+docs_dir: docs
+site_dir: site
+
+# Theme configuration
+theme:
+  name: material
+  language: en
+  palette:
+    # Light mode
+    - scheme: default
+      primary: teal
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: teal
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+# Plugins
+plugins:
+  - search:
+      lang: en
+  - mermaid2:
+      version: 10.6.1
+
+# Extensions
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - admonition
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+# Navigation structure
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Quick Start: getting-started/quick-start.md
+    - Docker Setup: getting-started/docker-setup.md
+  - Input Validation:
+    - Overview: validation/OVERVIEW.md
+    - File Formats: validation/FILE_FORMATS.md
+    - Configuration: validation/CONFIG_GUIDE.md
+    - Settings: validation/SETTINGS.md
+    - Performance: validation/PERFORMANCE.md
+  - Nextflow Pipeline:
+    - Running the Pipeline: nextflow/running-pipeline.md
+    - Runtime Messages: nextflow/runtime-messages.md
+    - Directory Structures: nextflow/directory-structures.md
+    - Pipeline Visualization: nextflow/pipeline-visualization.md
+  - Output Documentation:
+    - Reference vs Modified: outputs/fasta-ref-mod.md
+    - Illumina Results: outputs/illumina.md
+    - Long-Read Results: outputs/long-reads.md
+    - Truvari Comparison: outputs/truvari.md
+    - Unmapped Statistics: outputs/unmapped-stats.md
+    - Logs: outputs/logs.md
+
+# Extra configuration
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/denisHanch/efsa_pipeline
+  generator: false
+
+# CSS customization (optional)
+extra_css:
+  - stylesheets/extra.css

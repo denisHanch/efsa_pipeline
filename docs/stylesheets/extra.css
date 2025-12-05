@@ -1,0 +1,28 @@
+/* Custom CSS for EFSA Pipeline Documentation */
+
+/* Make code blocks slightly more visible */
+.highlight {
+    border-radius: 4px;
+}
+
+/* Improve mermaid diagram visibility */
+.mermaid {
+    text-align: center;
+    margin: 2em 0;
+}
+
+/* Better table styling */
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+/* Improve admonition styling */
+.admonition {
+    border-radius: 4px;
+}
+
+/* Make navigation more compact */
+.md-nav__item {
+    padding: 0.2em 0;
+}
