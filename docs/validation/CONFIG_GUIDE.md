@@ -13,7 +13,6 @@ This document defines the **JSON** configuration file that `ConfigManager` uses 
   - [Global Options](#global-options-options-field)
   - [File-Level Settings](#file-level-settings)
 - [Examples](#examples)
-- [Validation Rules](#validation-rules)
 
 ---
 

@@ -60,11 +60,13 @@ This is useful for assessing mapping efficiency and data quality.
 **Unmapped reads** represent sequences that did not align to the provided reference or modified FASTA files.
 
 A low percentage of unmapped reads indicates:
+
 - High mapping quality
 - Good reference/assembly quality
 - Low contamination or sequencing errors
 
 If the percentage of unmapped reads is unusually high, this may indicate:
+
 - Poor read quality
 - Inadequate or incomplete reference
 - Contamination

@@ -32,6 +32,7 @@ Captures standard output of the process.
 
 ### `.command.run`
 Metadata about process execution including:
+
 - Exit code
 - Runtime duration
 - Resource usage
@@ -42,6 +43,7 @@ The shell script that Nextflow runs; contains the exact commands for the process
 ## Usage
 
 These log files are useful for:
+
 - **Debugging** - Identify what went wrong when a process fails
 - **Reproducibility** - See exact commands that were executed
 - **Performance monitoring** - Check resource usage and execution times

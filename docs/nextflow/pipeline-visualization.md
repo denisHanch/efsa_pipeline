@@ -66,7 +66,7 @@ flowchart TD
 
 ## Detailed Workflow Diagrams
 
-For detailed workflow diagrams of specific pipeline components, see the **[Outputs Documentation](../outputs/)** section:
+For detailed workflow diagrams of specific pipeline components, see the **[Output Documentation](../outputs/index.md)**:
 
 - [Reference vs Modified FASTA Comparison](../outputs/fasta-ref-mod.md)
 - [Illumina Short-Read Pipeline](../outputs/illumina.md)

@@ -165,6 +165,7 @@ This directory contains all quality control and preprocessing outputs generated 
 This folder contains Illumina reads mapped to the **reference genome**.
 
 Includes:
+
 - **`bam/`** - Sorted and indexed BAM alignment files
 - **`bwa_index/`** - Precomputed BWA reference genome indices
 - **`samtools_index_dict/`** - FASTA index and sequence dictionary files
@@ -180,6 +181,7 @@ Includes:
 This folder holds the mapping results of Illumina reads aligned to the reference plasmid fasta. It is created only if a reference plasmid is present in the `data/valid` folder. A folder with a similar structure, `short-mod-plasmid/`, is created if a modified plasmid is present within the `data/valid` folder.
 
 Includes:
+
 - **`bam/`** - Aligned reads (that were not mapped to the reference) mapped to the plasmid
 - **`bwa_index/`** - Plasmid reference index files
 - **`samtools_stats/`** - Mapping and coverage statistics
@@ -192,6 +194,7 @@ Includes:
 This folder contains Illumina read alignments against the **modified/assembled genome**.
 
 Includes:
+
 - **`bam/`** - Sorted BAM files for modified genome mapping
 - **`bwa_index/`** - Modified genome BWA index
 - **`samtools_stats/`** - Mapping and coverage statistics

@@ -51,14 +51,14 @@ data/inputs/
 After validation, files are organized in:
 ```
 data/valid/
- assembled_genome.fasta
- reference_genome.fasta
- ref_plasmid.fa
- mod_plasmid.fa
- ref_feature.gff
- illumina/
- ont/
- pacbio/
+├── assembled_genome.fasta
+├── reference_genome.fasta
+├── ref_plasmid.fa
+├── mod_plasmid.fa
+├── ref_feature.gff
+├── illumina/
+├── ont/
+└── pacbio/
 ```
 
 ## See Also

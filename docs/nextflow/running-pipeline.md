@@ -5,6 +5,7 @@ Please run the `docker login` command that is given in the efsa Slack channel - 
 ## Overview
 
 The main pipeline (`main.nf`) executes **all three workflows** in sequence:
+
 - Short-read processing
 - Long-read processing
 - Reference vs modified genome comparison

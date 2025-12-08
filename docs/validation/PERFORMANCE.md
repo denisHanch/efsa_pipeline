@@ -107,6 +107,7 @@ Reduce logging verbosity for slight performance improvements:
 ```
 
 Logging levels (from most to least verbose):
+
 - `DEBUG` - Most detailed
 - `INFO` - Standard
 - `WARNING` - Warnings only

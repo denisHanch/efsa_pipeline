@@ -9,6 +9,7 @@ The input validation module preprocesses and verifies all input data to ensure i
 ## Purpose
 
 The validation module ensures that:
+
 - All input files are in the correct format
 - Files are properly structured and can be parsed
 - Data meets quality standards
@@ -17,6 +18,7 @@ The validation module ensures that:
 ## How It Works
 
 The validation process:
+
 1. Reads the configuration file from `data/inputs/config.json`
 2. Validates each input file according to its type (genome, reads, features)
 3. Converts files to standardized formats
@@ -39,6 +41,7 @@ python3 ./modules/validation/main.py ./data/inputs/config.json
 ## Output
 
 After successful validation:
+
 - Validated files are placed in `data/valid/`
 - Log file created in `./logs/validation_ID.log`
 - Report file created in `./logs/report_ID.txt`

@@ -35,7 +35,7 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   features:
-    - navigation.instant
+    # - navigation.instant  # Disabled: causes issues with Mermaid rendering
     - navigation.tracking
     - navigation.tabs
     - navigation.sections
@@ -54,7 +54,10 @@ plugins:
   - search:
       lang: en
   - mermaid2:
-      version: 10.6.1
+      version: 10.9.0
+      arguments:
+        theme: 'base'
+        startOnLoad: true
 
 # Extensions
 markdown_extensions:
@@ -98,6 +101,7 @@ nav:
     - Directory Structures: nextflow/directory-structures.md
     - Pipeline Visualization: nextflow/pipeline-visualization.md
   - Output Documentation:
+    - Overview: outputs/index.md
     - Reference vs Modified: outputs/fasta-ref-mod.md
     - Illumina Results: outputs/illumina.md
     - Long-Read Results: outputs/long-reads.md

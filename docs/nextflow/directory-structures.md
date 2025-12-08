@@ -59,9 +59,9 @@ data/outputs
 └── unmapped_stats      → Summary statistics of unmapped reads for each workflow
 ```
 
-A detailed description of each output subfolder is available in the **[Outputs Documentation](../outputs/)** section.
+## Output Documentation
 
-## Quick Links to Output Documentation
+A detailed description of each output subfolder is available in the **[Output Documentation](../outputs/index.md)**:
 
 - [Reference vs Modified FASTA Output](../outputs/fasta-ref-mod.md)
 - [Illumina Output](../outputs/illumina.md)
