@@ -44,7 +44,7 @@ docker run --privileged -d --rm \
     -v "$WORKSPACE_PATH:$WORKSPACE_PATH" \
     $INPUT_MOUNT \
     efsa-pipeline \
-    dockerd-entrypoint.sh
+    sh -c "dockerd-entrypoint.sh & tail -f /dev/null"
 
 # Execute interactive bash shell (not sh)
 docker exec -it "$CONTAINER_NAME" /bin/bash
