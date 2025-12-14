@@ -185,13 +185,33 @@ The table below summarises all tools used within the pipeline:
 
 | **Tool**     | **Link for Further Information**                       |
 | ------------ | ------------------------------------------------------ |
-| **samtools** | [samtools](http://www.htslib.org/)                     |
-| **BCFtools** | [BCFtools](http://www.htslib.org/)                     |
-| **cuteCV**   | [cuteCV](https://github.com/crybiod/ctesv)             |
-| **DeBreak**  | [DeBreak](https://github.com/4ureliek/DeBreak)         |
+| **samtools** | [samtools](https://www.htslib.org/doc/samtools.html)   |
+| **BCFtools** | [BCFtools](https://samtools.github.io/bcftools/)       |
+| **cuteCV**   | [cuteCV](https://github.com/tjiangHIT/cuteSV?tab=readme-ov-file)             |
+| **DeBreak**  | [DeBreak](https://github.com/Maggi-Chen/DeBreak)       |
 | **Sniffles** | [Sniffles](https://github.com/fritzsedlazeck/Sniffles) |
 | **SURVIVOR** | [SURVIVOR](https://github.com/fritzsedlazeck/SURVIVOR) |
 | **NanoPlot** | [NanoPlot](https://github.com/wdecoster/NanoPlot)      |
+
+## Citation
+
+* Wouter De Coster, Rosa Rademakers, NanoPack2: population-scale evaluation of long-read sequencing data, Bioinformatics, Volume 39, Issue 5, May 2023, btad311, https://doi.org/10.1093/bioinformatics/btad311
+
+* Twelve years of SAMtools and BCFtools
+Petr Danecek, James K Bonfield, Jennifer Liddle, John Marshall, Valeriu Ohan, Martin O Pollard, Andrew Whitwham, Thomas Keane, Shane A McCarthy, Robert M Davies, Heng Li GigaScience, Volume 10, Issue 2, February 2021, giab008, https://doi.org/10.1093/gigascience/giab008
+
+* Jiang T et al. Long-read-based human genomic structural variation detection with cuteSV. Genome Biol 21, 189 (2020). https://doi.org/10.1186/s13059-020-02107-y
+
+* Transient structural variations have strong effects on quantitative traits and reproductive isolation in fission yeast.
+Jeffares, Daniel C; Jolly, Clemency; Hoti, Mimoza; Speed, Doug; Shaw, Liam; Rallis, Charalampos; Balloux, Francois; Dessimoz, Christophe; Bähler, Jürg; Sedlazeck, Fritz J.
+Nature communications, Vol. 8, 14061, 24.01.2017, p. 1-11. DOI:10.1038/NCOMMS14061
+
+* Chen, Y., Wang, A.Y., Barkley, C.A. et al. Deciphering the exact breakpoints of structural variations using long sequencing reads with DeBreak. Nat Commun 14, 283 (2023). https://doi.org/10.1038/s41467-023-35996-1
+
+* Smolka, M., Paulin, L.F., Grochowski, C.M. et al. Detection of mosaic and population-level structural variants with Sniffles2. Nat Biotechnol 42, 1571–1580 (2024). https://doi.org/10.1038/s41587-023-02024-y
+
+* Sedlazeck, F.J., Rescheneder, P., Smolka, M. et al. Accurate detection of complex structural variations using single-molecule sequencing. Nat Methods 15, 461–468 (2018). https://doi.org/10.1038/s41592-018-0001-7
+
 
 ## See Also
 

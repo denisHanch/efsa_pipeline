@@ -210,12 +210,38 @@ Includes:
 | **FastQC**      | [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) |
 | **MultiQC**     | [MultiQC](https://multiqc.info/)                                     |
 | **BWA**         | [BWA](http://bio-bwa.sourceforge.net/)                               |
-| **Picard**      | [Picard](https://broadinstitute.github.io/picard/)                   |
-| **Samtools**    | [Samtools](http://www.htslib.org/)                                   |
-| **BCFtools**    | [BCFtools](http://www.htslib.org/)                                   |
+| **Picard**      | [Picard](https://gatk.broadinstitute.org/hc/en-us/articles/360040507751-CollectAlignmentSummaryMetrics-Picard)                   |
+| **Samtools**    | [Samtools](https://www.htslib.org/doc/samtools.html)                 |
+| **BCFtools**    | [BCFtools](https://samtools.github.io/bcftools/)                     |
 | **FreeBayes**   | [FreeBayes](https://github.com/freebayes/freebayes)                  |
 | **SnpEff**      | [SnpEff](http://snpeff.sourceforge.net/)                             |
 | **Delly**       | [Delly](https://github.com/dellytools/delly)                         |
+
+# Citation
+
+* Twelve years of SAMtools and BCFtools
+Petr Danecek, James K Bonfield, Jennifer Liddle, John Marshall, Valeriu Ohan, Martin O Pollard, Andrew Whitwham, Thomas Keane, Shane A McCarthy, Robert M Davies, Heng Li GigaScience, Volume 10, Issue 2, February 2021, giab008, https://doi.org/10.1093/gigascience/giab008
+
+* Tobias Rausch, Thomas Zichner, Andreas Schlattl, Adrian M. Stuetz, Vladimir Benes, Jan O. Korbel.
+DELLY: structural variant discovery by integrated paired-end and split-read analysis.
+Bioinformatics. 2012 Sep 15;28(18):i333-i339.
+https://doi.org/10.1093/bioinformatics/bts378
+
+* A program for annotating and predicting the effects of single nucleotide polymorphisms, SnpEff: SNPs in the genome of Drosophila melanogaster strain w1118; iso-2; iso-3.", Cingolani P, Platts A, Wang le L, Coon M, Nguyen T, Wang L, Land SJ, Lu X, Ruden DM. Fly (Austin). 2012 Apr-Jun;6(2):80-92. PMID: 22728672
+
+* Garrison E, Marth G. Haplotype-based variant detection from short-read sequencing. arXiv preprint arXiv:1207.3907 [q-bio.GN] 2012
+
+* Philip Ewels, Måns Magnusson, Sverker Lundin, Max Käller, MultiQC: summarize analysis results for multiple tools and samples in a single report, Bioinformatics, Volume 32, Issue 19, October 2016, Pages 3047–3048, https://doi.org/10.1093/bioinformatics/btw354
+
+* Andrews, S. (2010). FastQC: a quality control tool for high throughput sequence data. Available online at: http://www.bioinformatics.babraham.ac.uk/projects/fastqc/
+
+* Heng Li, Richard Durbin, Fast and accurate short read alignment with Burrows–Wheeler transform, Bioinformatics, Volume 25, Issue 14, July 2009, Pages 1754–1760, https://doi.org/10.1093/bioinformatics/btp324
+
+* 
+Cutadapt removes adapter sequences from high-throughput sequencing reads
+Citation Format  
+ABNT
+MARTIN, Marcel. Cutadapt removes adapter sequences from high-throughput sequencing reads. EMBnet.journal, [S.l.], v. 17, n. 1, p. pp. 10-12, may 2011. ISSN 2226-6089. Available at: <https://journal.embnet.org/index.php/embnetjournal/article/view/200>. Date accessed: 14 dec. 2025. doi:https://doi.org/10.14806/ej.17.1.200.
 
 
 ## See Also

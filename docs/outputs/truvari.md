@@ -114,8 +114,15 @@ The table below summarises all tools used within the pipeline:
 
 | **Tool**     | **Link for Further Information**                      |
 | ------------ | ----------------------------------------------------- |
-| **Truvari**  | [Truvari GitHub](https://github.com/Spikemut/Truvari) |
-| **BCFtools** | [BCFtools](http://www.htslib.org/)                    |
+| **Truvari**  | [Truvari GitHub](https://github.com/ACEnglish/truvari)|
+| **BCFtools** | [BCFtools](https://samtools.github.io/bcftools/)      |
+
+## Citation
+
+* English, A.C., Menon, V.K., Gibbs, R.A. et al. Truvari: refined structural variant comparison preserves allelic diversity. Genome Biol 23, 271 (2022). https://doi.org/10.1186/s13059-022-02840-6
+
+* Twelve years of SAMtools and BCFtools
+Petr Danecek, James K Bonfield, Jennifer Liddle, John Marshall, Valeriu Ohan, Martin O Pollard, Andrew Whitwham, Thomas Keane, Shane A McCarthy, Robert M Davies, Heng Li GigaScience, Volume 10, Issue 2, February 2021, giab008, https://doi.org/10.1093/gigascience/giab008
 
 ## See Also
 

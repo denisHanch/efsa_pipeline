@@ -652,10 +652,10 @@ The table below summarises all tools used within the pipeline:
 
 | **Tool**        | **Link for Further Information**                       |
 | --------------- | ------------------------------------------------------ |
-| **Nucmer**      | [nucmer - MUMmer](http://mummer.sourceforge.net/)      |
-| **deltaFilter** | [deltaFilter - MUMmer](http://mummer.sourceforge.net/) |
-| **showCoords**  | [showCoords - MUMmer](http://mummer.sourceforge.net/)  |
-| **Syri**        | [SyRI GitHub](https://github.com/pmelab/syri)          |
+| **Nucmer**      | [MUMmer](https://mummer4.github.io/manual/manual.html) |
+| **deltaFilter** | [MUMmer](https://mummer4.github.io/manual/manual.html) |
+| **showCoords**  | [MUMmer](https://mummer4.github.io/manual/manual.html) |
+| **Syri**        | [SyRI GitHub](https://schneebergerlab.github.io/syri/) |
 
 
 ---
@@ -873,9 +873,9 @@ The table below summarises all tools used within the pipeline:
 | **FastQC**      | [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) |
 | **MultiQC**     | [MultiQC](https://multiqc.info/)                                     |
 | **BWA**         | [BWA](http://bio-bwa.sourceforge.net/)                               |
-| **Picard**      | [Picard](https://broadinstitute.github.io/picard/)                   |
-| **Samtools**    | [Samtools](http://www.htslib.org/)                                   |
-| **BCFtools**    | [BCFtools](http://www.htslib.org/)                                   |
+| **Picard**      | [Picard](https://gatk.broadinstitute.org/hc/en-us/articles/360040507751-CollectAlignmentSummaryMetrics-Picard)                   |
+| **Samtools**    | [Samtools](https://www.htslib.org/doc/samtools.html)                 |
+| **BCFtools**    | [BCFtools](https://samtools.github.io/bcftools/)                     |
 | **FreeBayes**   | [FreeBayes](https://github.com/freebayes/freebayes)                  |
 | **SnpEff**      | [SnpEff](http://snpeff.sourceforge.net/)                             |
 | **Delly**       | [Delly](https://github.com/dellytools/delly)                         |
@@ -1076,13 +1076,14 @@ The table below summarises all tools used within the pipeline:
 
 | **Tool**     | **Link for Further Information**                       |
 | ------------ | ------------------------------------------------------ |
-| **samtools** | [samtools](http://www.htslib.org/)                     |
-| **BCFtools** | [BCFtools](http://www.htslib.org/)                     |
-| **cuteCV**   | [cuteCV](https://github.com/crybiod/ctesv)             |
-| **DeBreak**  | [DeBreak](https://github.com/4ureliek/DeBreak)         |
+| **samtools** | [samtools](https://www.htslib.org/doc/samtools.html)   |
+| **BCFtools** | [BCFtools](https://samtools.github.io/bcftools/)       |
+| **cuteCV**   | [cuteCV](https://github.com/tjiangHIT/cuteSV?tab=readme-ov-file)             |
+| **DeBreak**  | [DeBreak](https://github.com/Maggi-Chen/DeBreak)       |
 | **Sniffles** | [Sniffles](https://github.com/fritzsedlazeck/Sniffles) |
 | **SURVIVOR** | [SURVIVOR](https://github.com/fritzsedlazeck/SURVIVOR) |
 | **NanoPlot** | [NanoPlot](https://github.com/wdecoster/NanoPlot)      |
+
 
 ---
 
@@ -1200,8 +1201,8 @@ The table below summarises all tools used within the pipeline:
 
 | **Tool**     | **Link for Further Information**                      |
 | ------------ | ----------------------------------------------------- |
-| **Truvari**  | [Truvari GitHub](https://github.com/Spikemut/Truvari) |
-| **BCFtools** | [BCFtools](http://www.htslib.org/)                    |
+| **Truvari**  | [Truvari GitHub](https://github.com/ACEnglish/truvari)|
+| **BCFtools** | [BCFtools](https://samtools.github.io/bcftools/)      |
 
 ---
 

@@ -79,9 +79,11 @@ nextflow run workflows/fasta_ref_x_mod.nf \
   -resume
 ```
 
+
 ## Next Steps
 
 After running the pipeline:
+
 - Review [Runtime Messages](runtime-messages.md) to understand pipeline progress
 - Explore the [Output Directory Structure](directory-structures.md)
 - Check [Pipeline Visualization](pipeline-visualization.md) for workflow diagrams
