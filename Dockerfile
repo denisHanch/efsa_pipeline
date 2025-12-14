@@ -52,7 +52,17 @@ RUN apk add --no-cache --virtual .build-deps \
 COPY nextflow /usr/local/bin/nextflow
 RUN chmod +x /usr/local/bin/nextflow
 
+# Copy the validation wrapper script
+COPY modules/validation/validation.sh /usr/local/bin/validation.sh
+RUN chmod +x /usr/local/bin/validation.sh
+
 WORKDIR /EFSA_workspace
 
 # Copy shell configuration for better user experience
 COPY .devcontainer/.inputrc /root/
+
+# Setup bash aliases
+RUN echo 'alias validate="validation.sh"' >> /root/.bashrc
+
+# Set bash as default shell
+ENV SHELL=/bin/bash
