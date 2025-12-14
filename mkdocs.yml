@@ -103,9 +103,9 @@ nav:
   - Output Documentation:
     - Overview: outputs/index.md
     - Reference vs Modified: outputs/fasta-ref-mod.md
-    - Illumina Results: outputs/illumina.md
+    - Short-Read Results: outputs/illumina.md
     - Long-Read Results: outputs/long-reads.md
-    - Truvari Comparison: outputs/truvari.md
+    - VCF Comparison: outputs/truvari.md
     - Unmapped Statistics: outputs/unmapped-stats.md
     - Logs: outputs/logs.md
 

@@ -266,14 +266,74 @@ For each validated file:
 
 # Nextflow
 
-Please run the `docker login` command that is given in the efsa Slack channel - Nextflow notes.
+## Graphical Representation of the Pipeline
+
+```mermaid
+flowchart TD
+    %% Inputs
+    subgraph Inputs
+        illumina["Illumina Short Reads"]
+        pacbio["PacBio Long Reads"]
+        ont["ONT Long Reads"]
+        ref_fasta["Reference FASTA"]
+        mod_fasta["Modified FASTA"]
+    end
+    style Inputs fill:#E6F4EA,stroke:#2E7D32,stroke-width:2px
+
+    %% Short-read pipeline
+    subgraph ShortReadPipeline["Short-Read Pipeline"]
+        illumina --> trimgalore["TrimGalore / QC"]
+        trimgalore --> bwa_index["BWA Index"]
+        bwa_index --> bwa_map["BWA Mapping"]
+        bwa_map --> samtools_sort["Samtools Sort & Stats"]
+        samtools_sort --> picard["Picard / MultiQC"]
+        samtools_sort --> sr_vcf["VCF Output (Short-Read)"]
+    end
+    style ShortReadPipeline fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
+
+    %% Long-read PacBio pipeline
+    subgraph LongReadPacBio["Long-Read PacBio Pipeline"]
+        pacbio --> minimap2_pb["Minimap2 Mapping"]
+        minimap2_pb --> samtools_sort_pb["Samtools Sort & Stats"]
+        samtools_sort_pb --> pb_sv["SV Calling (CuteSV / Sniffles / Debreak)"]
+        pb_sv --> pb_vcf["VCF Output (PacBio)"]
+    end
+    style LongReadPacBio fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
+
+    %% Long-read ONT pipeline
+    subgraph LongReadONT["Long-Read ONT Pipeline"]
+        ont --> minimap2_ont["Minimap2 Mapping"]
+        minimap2_ont --> samtools_sort_ont["Samtools Sort & Stats"]
+        samtools_sort_ont --> ont_sv["SV Calling (CuteSV / Sniffles / Debreak)"]
+        ont_sv --> ont_vcf["VCF Output (ONT)"]
+    end
+    style LongReadONT fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
+
+    %% Reference vs Modified pipeline
+    subgraph RefVsMod["Reference vs Modified Pipeline"]
+        ref_fasta --> nucmer["NUCmer Alignment"]
+        mod_fasta --> nucmer
+        nucmer --> delta_filter["Delta Filter"]
+        delta_filter --> show_coords["Show Coords"]
+        show_coords --> syri_vcf["VCF Output (ref_x_modsyri)"]
+    end
+    style RefVsMod fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
+
+    %% Truvari comparison
+    subgraph Truvari["Truvari Comparison"]
+        sr_vcf --> truvari["Compare SVs (Truvari)"]
+        pb_vcf --> truvari
+        ont_vcf --> truvari
+        syri_vcf --> truvari
+        truvari --> final_report["Truvari Reports / Summary"]
+    end
+    style Truvari fill:#D0F0C0,stroke:#2E7D32,stroke-width:2px
+```
 
 ## Running the Pipeline
 
 The main pipeline (`main.nf`) executes **all three workflows** in sequence.
 Each workflow can also be executed individually if required.
-
----
 
 ### Running Main Workflow
 
@@ -409,8 +469,9 @@ This is useful for assessing mapping efficiency and data quality.
 
 #### Interpretation
 
-* **Unmapped reads** represent sequences that did not align to the provided reference or modified FASTA files.
-* A low percentage of unmapped reads indicates:
+**Unmapped reads** represent sequences that did not align to the provided reference or modified FASTA files.
+
+A low percentage of unmapped reads indicates:
 
   * High mapping quality
   * Good reference/assembly quality
@@ -449,7 +510,7 @@ When the pipeline is executed with the parameter:
 params.clean_work = true
 ```
 
-Nextflow automatically removes the temporary `work/` directory after successful completion.
+Nextflow automatically deletes the temporary `work/` directory upon successful completion and logs a message to confirm this.
 
 ```text
 ℹ️ Nextflow `work/` directory was removed.
@@ -496,13 +557,6 @@ data/valid/
 | `ont/`                   | Oxford Nanopore long reads.                           |
 | `pacbio/`                | PacBio long reads.                                    |
 
-
-| Data Type       | Supported Extensions                   |
-| --------------- | -------------------------------------- |
-| FASTA sequences | `.fa`, `.fna`, `.fasta`                |
-| GFF annotations | `.gff`, `.gtf`                         |
-| FASTQ reads     | `.fastq`, `.fq`, `.fastq.gz`, `.fq.gz` |
-
 ## 📁 `data/outputs` Directory Structure
 
 After successful pipeline execution, the outputs are organized as follows:
@@ -522,6 +576,8 @@ data/outputs
 A detailed description of the contents of each subfolder is provided below.
 
 ### `fasta_ref_mod/`
+
+The pipeline overview is outlined below. 
 
 ```mermaid
 %%{init: {
@@ -591,6 +647,15 @@ fasta_ref_mod/
 
 * `ref_x_modsyri.vcf`
   Structural variants and genome rearrangements detected by **SyRI**, stored in VCF format.
+
+The table below summarises all tools used within the pipeline:
+
+| **Tool**        | **Link for Further Information**                       |
+| --------------- | ------------------------------------------------------ |
+| **Nucmer**      | [nucmer - MUMmer](http://mummer.sourceforge.net/)      |
+| **deltaFilter** | [deltaFilter - MUMmer](http://mummer.sourceforge.net/) |
+| **showCoords**  | [showCoords - MUMmer](http://mummer.sourceforge.net/)  |
+| **Syri**        | [SyRI GitHub](https://github.com/pmelab/syri)          |
 
 
 ---
@@ -800,6 +865,22 @@ Includes:
 * `multiqc/` — Summary report of mapping and alignment metrics
 * `unmapped_fastq/` — Fastq file containing reads that failed to align to the modified genome
 
+The table below summarises all tools used within the pipeline:
+
+| **Tool**        | **Link for Further Information**                                     |
+| --------------- | -------------------------------------------------------------------- |
+| **Trim Galore** | [Trim Galore](https://github.com/FelixKrueger/TrimGalore)            |
+| **FastQC**      | [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) |
+| **MultiQC**     | [MultiQC](https://multiqc.info/)                                     |
+| **BWA**         | [BWA](http://bio-bwa.sourceforge.net/)                               |
+| **Picard**      | [Picard](https://broadinstitute.github.io/picard/)                   |
+| **Samtools**    | [Samtools](http://www.htslib.org/)                                   |
+| **BCFtools**    | [BCFtools](http://www.htslib.org/)                                   |
+| **FreeBayes**   | [FreeBayes](https://github.com/freebayes/freebayes)                  |
+| **SnpEff**      | [SnpEff](http://snpeff.sourceforge.net/)                             |
+| **Delly**       | [Delly](https://github.com/dellytools/delly)                         |
+
+
 ---
 
 ### `pacbio/` and `ont/`
@@ -991,6 +1072,17 @@ Inside this folder you typically find:
 * Read length vs quality plots
 * Summary statistics of long-read sequencing quality
 
+The table below summarises all tools used within the pipeline:
+
+| **Tool**     | **Link for Further Information**                       |
+| ------------ | ------------------------------------------------------ |
+| **samtools** | [samtools](http://www.htslib.org/)                     |
+| **BCFtools** | [BCFtools](http://www.htslib.org/)                     |
+| **cuteCV**   | [cuteCV](https://github.com/crybiod/ctesv)             |
+| **DeBreak**  | [DeBreak](https://github.com/4ureliek/DeBreak)         |
+| **Sniffles** | [Sniffles](https://github.com/fritzsedlazeck/Sniffles) |
+| **SURVIVOR** | [SURVIVOR](https://github.com/fritzsedlazeck/SURVIVOR) |
+| **NanoPlot** | [NanoPlot](https://github.com/wdecoster/NanoPlot)      |
 
 ---
 
@@ -1043,7 +1135,6 @@ classDef input fill:#E3F2FD,stroke:#1565C0
 classDef truthset fill:#FFF3B0,stroke:#FFB300,stroke-width:2px
 classDef process fill:#B6ECE2,stroke:#065647
 classDef output fill:#E8F5E9,stroke:#2E7D32
-
 ```
 
 #### Folder Structure
@@ -1062,8 +1153,6 @@ truvari
 ├── ref_x_modsyri_SampleName.pacbio_sv_long_read_truvari  → folder comparing Pacbio long-read SV pipeline to reference-to-modified fasta pipeline
 └── ref_x_modsyri_SampleName.ont_sv_long_read_truvari   → folder comparing Nanopore long-read SV pipeline to reference-to-modified fasta pipeline
 ```
-
----
 
 #### Description
 
@@ -1089,7 +1178,6 @@ All `.csi` files represent index files for fast querying of VCF contents.
 
 ### Truvari Comparison Result Folders
 
-
 Each Truvari output directory contains benchmarking results comparing the **SyRI structural variants** against sequencing-based SV calls:
 
 * `ref_x_modsyri_SampleName_sv_short_read_truvari/`
@@ -1108,6 +1196,13 @@ Each Truvari output folder usually contains:
 * Precision, recall, and F1 scores
 * Comparison summary statistics
 
+The table below summarises all tools used within the pipeline:
+
+| **Tool**     | **Link for Further Information**                      |
+| ------------ | ----------------------------------------------------- |
+| **Truvari**  | [Truvari GitHub](https://github.com/Spikemut/Truvari) |
+| **BCFtools** | [BCFtools](http://www.htslib.org/)                    |
+
 ---
 
 ### `unmapped_stats/`
@@ -1120,8 +1215,6 @@ unmapped_stats
 ├── SampleName_pacbio_read_stats.txt
 └── SampleName_ont_read_stats.txt
 ```
-
----
 
 #### Description
 
@@ -1435,67 +1528,3 @@ The `logs/` folder contains **detailed logs and command scripts** for each Nextf
 * **`.command.out`** — Captures standard output of the process.
 * **`.command.run`** — Metadata about process execution (e.g., exit code, runtime, resource usage).
 * **`.command.sh`** — The shell script that Nextflow runs; contains the exact commands for the process.
-
-## Graphical Representation of the Pipeline
-
-```mermaid
-flowchart TD
-    %% Inputs
-    subgraph Inputs
-        illumina["Illumina Short Reads"]
-        pacbio["PacBio Long Reads"]
-        ont["ONT Long Reads"]
-        ref_fasta["Reference FASTA"]
-        mod_fasta["Modified FASTA"]
-    end
-    style Inputs fill:#E6F4EA,stroke:#2E7D32,stroke-width:2px
-
-    %% Short-read pipeline
-    subgraph ShortReadPipeline["Short-Read Pipeline"]
-        illumina --> trimgalore["TrimGalore / QC"]
-        trimgalore --> bwa_index["BWA Index"]
-        bwa_index --> bwa_map["BWA Mapping"]
-        bwa_map --> samtools_sort["Samtools Sort & Stats"]
-        samtools_sort --> picard["Picard / MultiQC"]
-        samtools_sort --> sr_vcf["VCF Output (Short-Read)"]
-    end
-    style ShortReadPipeline fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
-
-    %% Long-read PacBio pipeline
-    subgraph LongReadPacBio["Long-Read PacBio Pipeline"]
-        pacbio --> minimap2_pb["Minimap2 Mapping"]
-        minimap2_pb --> samtools_sort_pb["Samtools Sort & Stats"]
-        samtools_sort_pb --> pb_sv["SV Calling (CuteSV / Sniffles / Debreak)"]
-        pb_sv --> pb_vcf["VCF Output (PacBio)"]
-    end
-    style LongReadPacBio fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
-
-    %% Long-read ONT pipeline
-    subgraph LongReadONT["Long-Read ONT Pipeline"]
-        ont --> minimap2_ont["Minimap2 Mapping"]
-        minimap2_ont --> samtools_sort_ont["Samtools Sort & Stats"]
-        samtools_sort_ont --> ont_sv["SV Calling (CuteSV / Sniffles / Debreak)"]
-        ont_sv --> ont_vcf["VCF Output (ONT)"]
-    end
-    style LongReadONT fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
-
-    %% Reference vs Modified pipeline
-    subgraph RefVsMod["Reference vs Modified Pipeline"]
-        ref_fasta --> nucmer["NUCmer Alignment"]
-        mod_fasta --> nucmer
-        nucmer --> delta_filter["Delta Filter"]
-        delta_filter --> show_coords["Show Coords"]
-        show_coords --> syri_vcf["VCF Output (ref_x_modsyri)"]
-    end
-    style RefVsMod fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
-
-    %% Truvari comparison
-    subgraph Truvari["Truvari Comparison"]
-        sr_vcf --> truvari["Compare SVs (Truvari)"]
-        pb_vcf --> truvari
-        ont_vcf --> truvari
-        syri_vcf --> truvari
-        truvari --> final_report["Truvari Reports / Summary"]
-    end
-    style Truvari fill:#D0F0C0,stroke:#2E7D32,stroke-width:2px
-```

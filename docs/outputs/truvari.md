@@ -1,4 +1,4 @@
-# Truvari Comparison Output
+# VCF Comparison with Truvari Output
 
 ## Pipeline Workflow
 
@@ -102,6 +102,7 @@ Comparison between SyRI SVs and SVs called from **PacBio long reads**.
 Comparison between SyRI SVs and SVs called from **Oxford Nanopore long reads**.
 
 Each Truvari output folder usually contains:
+
 - Matched SV calls
 - Unmatched (false negative / false positive) calls
 - Precision, recall, and F1 scores
@@ -109,10 +110,15 @@ Each Truvari output folder usually contains:
 
 ## Tools Used
 
-- **Truvari** - Structural variant comparison and benchmarking
+The table below summarises all tools used within the pipeline:
+
+| **Tool**     | **Link for Further Information**                      |
+| ------------ | ----------------------------------------------------- |
+| **Truvari**  | [Truvari GitHub](https://github.com/Spikemut/Truvari) |
+| **BCFtools** | [BCFtools](http://www.htslib.org/)                    |
 
 ## See Also
 
-- [Reference vs Modified Output](fasta-ref-mod.md) - SyRI baseline variants
-- [Illumina Output](illumina.md) - Short-read SV calls
-- [Long-Read Output](long-reads.md) - Long-read SV calls
+- [Reference vs Modified Processing Pipeline Output](fasta-ref-mod.md) - SyRI baseline variants
+- [Short-Read Processing Pipeline Output](illumina.md) - Short-read SV calls
+- [Long-Read Processing Pipeline Output](long-reads.md) - Long-read SV calls

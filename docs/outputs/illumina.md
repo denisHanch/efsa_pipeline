@@ -1,4 +1,4 @@
-# Illumina Short-Read Output
+# Short-Read Processing Pipeline Output
 
 ## Pipeline Workflow
 
@@ -204,19 +204,22 @@ Includes:
 
 ## Tools Used
 
-- **TrimGalore** - Adapter trimming and quality filtering
-- **FastQC** - Quality control reporting
-- **MultiQC** - Aggregated quality metrics
-- **BWA** - Short-read alignment
-- **Samtools** - BAM processing and statistics
-- **Picard** - Alignment QC metrics
-- **FreeBayes** - Variant calling (SNPs and indels)
-- **Delly** - Structural variant calling
-- **BCFtools** - VCF statistics
-- **snpEff** - Variant annotation
+| **Tool**        | **Link for Further Information**                                     |
+| --------------- | -------------------------------------------------------------------- |
+| **Trim Galore** | [Trim Galore](https://github.com/FelixKrueger/TrimGalore)            |
+| **FastQC**      | [FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) |
+| **MultiQC**     | [MultiQC](https://multiqc.info/)                                     |
+| **BWA**         | [BWA](http://bio-bwa.sourceforge.net/)                               |
+| **Picard**      | [Picard](https://broadinstitute.github.io/picard/)                   |
+| **Samtools**    | [Samtools](http://www.htslib.org/)                                   |
+| **BCFtools**    | [BCFtools](http://www.htslib.org/)                                   |
+| **FreeBayes**   | [FreeBayes](https://github.com/freebayes/freebayes)                  |
+| **SnpEff**      | [SnpEff](http://snpeff.sourceforge.net/)                             |
+| **Delly**       | [Delly](https://github.com/dellytools/delly)                         |
+
 
 ## See Also
 
-- [Long-Read Output](long-reads.md) - PacBio and ONT results
+- [Long-Read Processing Pipeline Output](long-reads.md) - PacBio and ONT results
 - [Unmapped Statistics](unmapped-stats.md) - Detailed unmapped read analysis
 - [Truvari Comparison](truvari.md) - Variant comparison results

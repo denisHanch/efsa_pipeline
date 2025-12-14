@@ -1,20 +1,18 @@
 # Running the Nextflow Pipeline
 
-Please run the `docker login` command that is given in the efsa Slack channel - Nextflow notes.
-
 ## Overview
 
 The main pipeline (`main.nf`) executes **all three workflows** in sequence:
 
-- Short-read processing
-- Long-read processing
-- Reference vs modified genome comparison
+- Short-read processing for Illumina data
+- Long-read processing for Pacbio/Oxford Nanopore data
+- Reference vs modified genome comparison using SyRI
 
 Each workflow can also be executed individually if required.
 
 ## Running Main Workflow
 
-This executes all workflows in sequence:
+This executes all workflows based on the files located within a subfolder of `data/valid` folder:
 
 ```bash
 nextflow run main.nf \
@@ -61,7 +59,7 @@ nextflow run workflows/short-read-ref.nf \
 
 ### Long-read Processing
 
-For Oxford Nanopore / PacBio long reads:
+For Oxford Nanopore / PacBio long-read data:
 
 ```bash
 nextflow run workflows/long-read-ref.nf \

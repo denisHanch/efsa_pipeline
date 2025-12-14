@@ -8,21 +8,21 @@ After running the Nextflow pipeline, outputs are organized in the `data/outputs/
 
 ## Output Categories
 
-### Sequence Comparison
+### whole-genome assemblies Comparison with SyRI
 
 - **[Reference vs Modified FASTA](fasta-ref-mod.md)** - Results from comparing reference and modified genome assemblies using SyRI and other tools
 
 ### Short-Read Analysis
 
-- **[Illumina Results](illumina.md)** - Short-read mapping results including BAM files, VCF variants, and coverage statistics
+- **[Short-Read Processing Pipeline Results (Illumina)](illumina.md)** - Short-read mapping results including BAM files, VCF variants, and coverage statistics
 
 ### Long-Read Analysis
 
-- **[Long-Read Results (PacBio & ONT)](long-reads.md)** - Long-read mapping results from PacBio and Oxford Nanopore sequencing
+- **[Long-Read Processing Pipeline Results (PacBio & Oxford Nanopore)](long-reads.md)** - Long-read mapping results from PacBio and Oxford Nanopore sequencing
 
-### Variant Analysis
+### Variant Analysis with Truvari
 
-- **[Truvari Comparison](truvari.md)** - Structural variant benchmarking and comparison results
+- **[VCF Comparison with Truvari](truvari.md)** - Structural variant benchmarking and comparison results
 
 ### Quality Metrics
 

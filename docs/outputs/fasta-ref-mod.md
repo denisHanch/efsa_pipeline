@@ -1,4 +1,4 @@
-# Reference vs Modified FASTA Output
+# Reference vs Modified FASTA Comparison Pipeline Output
 
 ## Pipeline Workflow
 
@@ -74,10 +74,14 @@ Structural variants and genome rearrangements detected by **SyRI**, stored in VC
 
 ## Tools Used
 
-- **nucmer** - Alignment of nucleotide sequences
-- **delta-filter** - Filtering alignments
-- **show-coords** - Extracting alignment coordinates
-- **SyRI** - Structural variant identification
+The table below summarises all tools used within the pipeline:
+
+| **Tool**        | **Link for Further Information**                       |
+| --------------- | ------------------------------------------------------ |
+| **Nucmer**      | [nucmer - MUMmer](http://mummer.sourceforge.net/)      |
+| **deltaFilter** | [deltaFilter - MUMmer](http://mummer.sourceforge.net/) |
+| **showCoords**  | [showCoords - MUMmer](http://mummer.sourceforge.net/)  |
+| **Syri**        | [SyRI GitHub](https://github.com/pmelab/syri)          |
 
 ## See Also
 
