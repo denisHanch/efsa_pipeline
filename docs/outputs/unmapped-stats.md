@@ -14,6 +14,7 @@ unmapped_stats/
 This folder contains read mapping comparisons between the reference genome and the modified/assembled genome for short-read and long-read processing pipelines.
 
 Each file summarizes:
+
 - Reads mapping to both reference and modified assemblies
 - Reads mapping only to reference
 - Reads mapping only to modified
@@ -28,6 +29,7 @@ Each file summarizes:
 | `SampleName_ont_read_stats.txt`    | Mapping comparison of Oxford Nanopore long reads between reference and modified assemblies |
 
 Each report includes:
+
 - Total input reads
 - Number of unmapped reads
 - Percentage of unmapped reads
@@ -44,7 +46,7 @@ Unique Reads <sample> reference: <number>
 Unique Reads <sample> modified: <number>
 ```
 
-## Graphical Visualization of Long-Read Preprocessing
+## Graphical Visualization of Long-Read Preprocessing Pipeline
 
 The flowchart below illustrates the preprocessing workflows applied to long reads to obtain mapping statistics.
 
@@ -297,6 +299,6 @@ end
 
 ## See Also
 
-- [Illumina Output](illumina.md) - Short-read mapping details
-- [Long-Read Output](long-reads.md) - Long-read mapping details
+- [Short-Read Processing Pipeline Output](illumina.md) - Short-read mapping details
+- [Long-Read Processing Pipeline Output](long-reads.md) - Long-read mapping details
 - [Runtime Messages](../nextflow/runtime-messages.md) - Pipeline execution messages

@@ -68,10 +68,10 @@ flowchart TD
 
 For detailed workflow diagrams of specific pipeline components, see the **[Output Documentation](../outputs/index.md)**:
 
-- [Reference vs Modified FASTA Comparison](../outputs/fasta-ref-mod.md)
-- [Illumina Short-Read Pipeline](../outputs/illumina.md)
-- [Long-Read Pipeline (PacBio & ONT)](../outputs/long-reads.md)
-- [Truvari Comparison Pipeline](../outputs/truvari.md)
+- [Reference vs Modified FASTA Comparison with SyRI](../outputs/fasta-ref-mod.md)
+- [Short-Read Processing Pipeline (Illumina)](../outputs/illumina.md)
+- [Long-Read Processing Pipeline (PacBio & Oxford Nanopore)](../outputs/long-reads.md)
+- [VCF Comparison Pipeline with SyRI](../outputs/truvari.md)
 
 ## See Also
 

@@ -1,4 +1,4 @@
-# Reference vs Modified FASTA Output
+# Reference vs Modified FASTA Comparison Pipeline Output
 
 ## Pipeline Workflow
 
@@ -74,10 +74,21 @@ Structural variants and genome rearrangements detected by **SyRI**, stored in VC
 
 ## Tools Used
 
-- **nucmer** - Alignment of nucleotide sequences
-- **delta-filter** - Filtering alignments
-- **show-coords** - Extracting alignment coordinates
-- **SyRI** - Structural variant identification
+The table below summarises all tools used within the pipeline:
+
+| **Tool**        | **Link for Further Information**                       |
+| --------------- | ------------------------------------------------------ |
+| **Nucmer**      | [MUMmer](https://mummer4.github.io/manual/manual.html) |
+| **deltaFilter** | [MUMmer](https://mummer4.github.io/manual/manual.html) |
+| **showCoords**  | [MUMmer](https://mummer4.github.io/manual/manual.html) |
+| **Syri**        | [SyRI GitHub](https://schneebergerlab.github.io/syri/) |
+
+
+## Citation
+
+* Goel, M., Sun, H., Jiao, W. et al. SyRI: finding genomic rearrangements and local sequence differences from whole-genome assemblies. Genome Biol 20, 277 (2019) doi:10.1186/s13059-019-1911-0
+
+* Marçais G, Delcher AL, Phillippy AM, Coston R, Salzberg SL, Zimin A. MUMmer4: A fast and versatile genome alignment system. PLoS computational biology. 2018 Jan 26;14(1):e1005944.
 
 ## See Also
 
