@@ -1,4 +1,4 @@
-# Truvari Comparison Output
+# VCF Comparison with Truvari Output
 
 ## Pipeline Workflow
 
@@ -102,6 +102,7 @@ Comparison between SyRI SVs and SVs called from **PacBio long reads**.
 Comparison between SyRI SVs and SVs called from **Oxford Nanopore long reads**.
 
 Each Truvari output folder usually contains:
+
 - Matched SV calls
 - Unmatched (false negative / false positive) calls
 - Precision, recall, and F1 scores
@@ -109,10 +110,22 @@ Each Truvari output folder usually contains:
 
 ## Tools Used
 
-- **Truvari** - Structural variant comparison and benchmarking
+The table below summarises all tools used within the pipeline:
+
+| **Tool**     | **Link for Further Information**                      |
+| ------------ | ----------------------------------------------------- |
+| **Truvari**  | [Truvari GitHub](https://github.com/ACEnglish/truvari)|
+| **BCFtools** | [BCFtools](https://samtools.github.io/bcftools/)      |
+
+## Citation
+
+* English, A.C., Menon, V.K., Gibbs, R.A. et al. Truvari: refined structural variant comparison preserves allelic diversity. Genome Biol 23, 271 (2022). https://doi.org/10.1186/s13059-022-02840-6
+
+* Twelve years of SAMtools and BCFtools
+Petr Danecek, James K Bonfield, Jennifer Liddle, John Marshall, Valeriu Ohan, Martin O Pollard, Andrew Whitwham, Thomas Keane, Shane A McCarthy, Robert M Davies, Heng Li GigaScience, Volume 10, Issue 2, February 2021, giab008, https://doi.org/10.1093/gigascience/giab008
 
 ## See Also
 
-- [Reference vs Modified Output](fasta-ref-mod.md) - SyRI baseline variants
-- [Illumina Output](illumina.md) - Short-read SV calls
-- [Long-Read Output](long-reads.md) - Long-read SV calls
+- [Reference vs Modified Processing Pipeline Output](fasta-ref-mod.md) - SyRI baseline variants
+- [Short-Read Processing Pipeline Output](illumina.md) - Short-read SV calls
+- [Long-Read Processing Pipeline Output](long-reads.md) - Long-read SV calls

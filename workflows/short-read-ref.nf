@@ -44,16 +44,9 @@ workflow short_ref {
             bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
             
             // Optional annotation of vcf files
-            def gtf_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref*\.gtf$/ } ?: []
-            def gff_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref*\.gff$/ } ?: []
+            def gff_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref*\.gff3$/ } ?: []
 
-            if (gtf_files) {
-                Channel.fromPath(gtf_files) | set { gtf }
-                annotate_vcf(fasta, gtf, vcf, "gtf", "gtf22", out_folder_name) | set {qc_vcf}
-            
-                qc_vcf.mix(bcftools_out).collect() | set { qc_out }
-                multiqc(qc_out, out_folder_name, 'varint_calling')
-            } else if (gff_files) {
+            if (gff_files) {
                 Channel.fromPath(gff_files) | set { gff }
                 annotate_vcf(fasta, gff, vcf, "gff", "gff3", out_folder_name) | set {qc_vcf}
             

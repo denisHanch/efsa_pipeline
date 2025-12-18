@@ -96,13 +96,14 @@ When the pipeline is executed with the parameter:
 params.clean_work = true
 ```
 
-Nextflow automatically removes the temporary `work/` directory after successful completion.
+Nextflow automatically removes the temporary `work/` directory after successful completion and logs a message to confirm this.
 
 ```text
 ℹ️ Nextflow `work/` directory was removed.
 ```
 
 **Notes:**
+
 - The `work/` directory contains intermediate files and temporary outputs generated during pipeline execution.
 - Removing it saves disk space while retaining all final results in the `out_dir`.
 - If you want to keep intermediate files for debugging or inspection, set: `params.clean_work = false` in nextflow.config or use `--clean_work false` when running the pipeline.

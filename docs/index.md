@@ -5,10 +5,12 @@ Welcome to the EFSA Pipeline documentation. This pipeline provides comprehensive
 ## Quick Navigation
 
 ### Getting Started
+
 - [Quick Start Guide](getting-started/quick-start.md)
 - [Docker Setup](getting-started/docker-setup.md)
 
 ### Input Validation
+
 - [Validation Overview](validation/OVERVIEW.md)
 - [Supported File Formats](validation/FILE_FORMATS.md)
 - [Configuration Guide](validation/CONFIG_GUIDE.md)
@@ -16,16 +18,18 @@ Welcome to the EFSA Pipeline documentation. This pipeline provides comprehensive
 - [Performance Tips](validation/PERFORMANCE.md)
 
 ### Nextflow Pipeline
+
 - [Running the Pipeline](nextflow/running-pipeline.md)
 - [Runtime Messages](nextflow/runtime-messages.md)
 - [Directory Structures](nextflow/directory-structures.md)
 - [Pipeline Visualization](nextflow/pipeline-visualization.md)
 
 ### Output Documentation
-- [Reference vs Modified FASTA Output](outputs/fasta-ref-mod.md)
-- [Illumina Output](outputs/illumina.md)
-- [Long-Read Output (PacBio & ONT)](outputs/long-reads.md)
-- [Truvari Comparison Output](outputs/truvari.md)
+
+- [Reference vs Modified FASTA Pipeline Output](outputs/fasta-ref-mod.md)
+- [Short-Read Pipeline Output (Illumina)](outputs/illumina.md)
+- [Long-Read Pipeline Output (PacBio & Oxford Nanopore)](outputs/long-reads.md)
+- [VCF Comparison Pipeline Output](outputs/truvari.md)
 - [Unmapped Reads Statistics](outputs/unmapped-stats.md)
 - [Logs](outputs/logs.md)
 

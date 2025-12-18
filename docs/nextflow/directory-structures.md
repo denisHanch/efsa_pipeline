@@ -36,13 +36,6 @@ data/valid/
 | `ont/`                   | Oxford Nanopore long reads.                           |
 | `pacbio/`                | PacBio long reads.                                    |
 
-### Supported Extensions
-
-| Data Type       | Supported Extensions                   |
-| --------------- | -------------------------------------- |
-| FASTA sequences | `.fa`, `.fna`, `.fasta`                |
-| GFF annotations | `.gff`, `.gtf`                         |
-| FASTQ reads     | `.fastq`, `.fq`, `.fastq.gz`, `.fq.gz` |
 
 ## `data/outputs` Directory Structure
 
@@ -63,10 +56,10 @@ data/outputs
 
 A detailed description of each output subfolder is available in the **[Output Documentation](../outputs/index.md)**:
 
-- [Reference vs Modified FASTA Output](../outputs/fasta-ref-mod.md)
-- [Illumina Output](../outputs/illumina.md)
-- [Long-Read Output (PacBio & ONT)](../outputs/long-reads.md)
-- [Truvari Comparison Output](../outputs/truvari.md)
+- [Reference vs Modified FASTA Pipeline Output](../outputs/fasta-ref-mod.md)
+- [Short-Read Processing Pipeline Output (Illumina)](../outputs/illumina.md)
+- [Long-Read Processing Pipeline Output (PacBio & Oxford Nanopore)](../outputs/long-reads.md)
+- [VCF Comparison Pipeline with Truvari Output](../outputs/truvari.md)
 - [Unmapped Reads Statistics](../outputs/unmapped-stats.md)
 - [Logs](../outputs/logs.md)
 
