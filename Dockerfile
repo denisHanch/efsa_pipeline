@@ -35,6 +35,20 @@ RUN apk add --no-cache build-base bzip2-dev ca-certificates && \
     rm -rf /tmp/pbzip2* && \
     apk del build-base bzip2-dev
 
+# Build and install gffread from source (not available in Alpine repos)
+RUN apk add --no-cache --virtual .gffread-build-deps \
+        build-base \
+        git \
+    && cd /tmp \
+    && git clone https://github.com/gpertea/gffread.git \
+    && cd gffread \
+    && make release \
+    && cp gffread /usr/local/bin/ \
+    && chmod +x /usr/local/bin/gffread \
+    && cd / \
+    && rm -rf /tmp/gffread \
+    && apk del .gffread-build-deps
+
 # Copy and install validation package
 COPY modules/validation/ /tmp/validation/
 # Install build dependencies for Python packages

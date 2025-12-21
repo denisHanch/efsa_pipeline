@@ -16,6 +16,7 @@ import pytest
 import tempfile
 import gzip
 import bz2
+import shutil
 from pathlib import Path
 
 from validation_pkg.config_manager import FeatureConfig
@@ -160,13 +161,16 @@ class TestFeatureValidatorParsing:
         validator = FeatureValidator(feature_config, FeatureValidator.Settings())
         validator.run()
 
-        assert len(validator.features) == 2
+        # gffread creates transcript + exon for each BED line (2 lines = 4 features)
+        assert len(validator.features) == 4
         assert validator.features[0].seqname == "chr1"
         assert validator.features[0].start == 100  # Converted to 1-based
         assert validator.features[0].end == 200
         assert validator.features[0].strand == "+"
-        assert validator.features[1].seqname == "chr2"
-        assert validator.features[1].strand == "-"
+        assert validator.features[0].feature_type == "transcript"
+        # features[1] is chr1 exon, features[2] is chr2 transcript
+        assert validator.features[2].seqname == "chr2"
+        assert validator.features[2].strand == "-"
 
     def test_parse_empty_file(self, temp_dir, output_dir):
         """Test parsing an empty GFF file."""
@@ -278,7 +282,8 @@ class TestFeatureValidatorCompression:
         validator = FeatureValidator(feature_config, FeatureValidator.Settings())
         validator.run()
 
-        assert len(validator.features) == 1
+        # gffread creates transcript + exon from BED
+        assert len(validator.features) == 2
         assert validator.features[0].seqname == "chr1"
 
 
@@ -478,11 +483,16 @@ class TestFeatureValidatorFormatConversion:
         validator = FeatureValidator(feature_config, settings)
         validator.run()
 
-        # Check conversion to GFF (1-based)
+        # gffread creates 4 features: 2 transcripts + 2 exons
+        assert len(validator.features) == 4
+
+        # Check conversion to GFF (1-based) - check transcripts (features[0] and [2])
         assert validator.features[0].start == 1  # 0 -> 1
         assert validator.features[0].end == 100
-        assert validator.features[1].start == 151  # 150 -> 151
-        assert validator.features[1].end == 200
+        assert validator.features[0].feature_type == "transcript"
+        assert validator.features[2].start == 151  # 150 -> 151
+        assert validator.features[2].end == 200
+        assert validator.features[2].feature_type == "transcript"
 
         # Verify output is GFF format
         output_file = output_dir / "test.gff"
@@ -966,10 +976,11 @@ class TestFeatureValidatorEdgeCases:
         return out_dir
 
     def test_bed_with_minimal_columns(self, temp_dir, output_dir):
-        """Test BED file with only required 3 columns."""
+        """Test BED file with minimal practical columns (chr, start, end, name)."""
         bed_file = temp_dir / "minimal.bed"
         with open(bed_file, "w") as f:
-            f.write("chr1\t0\t100\n")  # Only 3 columns
+            # 4 columns (chr, start, end, name) - minimal for gffread to work properly
+            f.write("chr1\t0\t100\tfeature1\n")
 
         feature_config = FeatureConfig(
             filename="minimal.bed",
@@ -984,9 +995,11 @@ class TestFeatureValidatorEdgeCases:
         validator = FeatureValidator(feature_config, FeatureValidator.Settings())
         validator.run()
 
-        assert len(validator.features) == 1
+        # gffread creates transcript + exon
+        assert len(validator.features) == 2
         assert validator.features[0].seqname == "chr1"
-        assert validator.features[0].attributes == ""
+        # gffread creates ID attribute from BED name field
+        assert 'ID=' in validator.features[0].attributes
         assert validator.features[0].score == "."
         assert validator.features[0].strand == "."
 
@@ -1046,3 +1059,231 @@ class TestFeatureValidatorEdgeCases:
         assert validator.features[1].strand == "-"
         assert validator.features[2].strand == "."
         assert validator.features[3].strand == "."  # Invalid converted to "."
+
+
+class TestGTFConversionWithGffread:
+    """Test GTF to GFF3 conversion using gffread tool."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        """Create a temporary directory for test files."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def output_dir(self, temp_dir):
+        """Create output directory."""
+        out_dir = temp_dir / "output"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir
+
+    @pytest.fixture
+    def skip_if_gffread_missing(self):
+        """Skip tests if gffread not installed."""
+        if not shutil.which('gffread'):
+            pytest.skip("gffread not available - install via: conda install -c bioconda gffread")
+
+    def test_detect_gtf_format(self, temp_dir, output_dir):
+        """Test GTF format detection."""
+        # Create GTF file with GTF-style attributes
+        gtf_file = temp_dir / "test.gtf"
+        with open(gtf_file, "w") as f:
+            f.write('chr1\ttest\tgene\t100\t200\t.\t+\t.\tgene_id "G1"; product "test protein";\n')
+
+        feature_config = FeatureConfig(
+            filename="test.gtf",
+            basename="test",
+            filepath=gtf_file,
+            coding_type=CodingType.NONE,
+            detected_format=FeatureFormat.GFF,  # GTF is subtype of GFF
+            output_dir=output_dir,
+            global_options={}
+        )
+
+        validator = FeatureValidator(feature_config, FeatureValidator.Settings())
+        # Parse file
+        with open(gtf_file, 'r') as f:
+            validator.features = validator._parse_gff(f)
+
+        # Should detect GTF format
+        assert validator._is_gtf_format() is True
+
+    def test_detect_gff3_format(self, temp_dir, output_dir):
+        """Test GFF3 format detection (not GTF)."""
+        # Create GFF3 file
+        gff_file = temp_dir / "test.gff"
+        with open(gff_file, "w") as f:
+            f.write('chr1\ttest\tgene\t100\t200\t.\t+\t.\tID=gene1;Name=test\n')
+
+        feature_config = FeatureConfig(
+            filename="test.gff",
+            basename="test",
+            filepath=gff_file,
+            coding_type=CodingType.NONE,
+            detected_format=FeatureFormat.GFF,
+            output_dir=output_dir,
+            global_options={}
+        )
+
+        validator = FeatureValidator(feature_config, FeatureValidator.Settings())
+        # Parse file
+        with open(gff_file, 'r') as f:
+            validator.features = validator._parse_gff(f)
+
+        # Should NOT detect GTF format
+        assert validator._is_gtf_format() is False
+
+    def test_convert_gtf_with_gffread(self, skip_if_gffread_missing, temp_dir, output_dir):
+        """Test full GTF to GFF3 conversion using gffread."""
+        # Create GTF file with realistic structure
+        gtf_file = temp_dir / "test.gtf"
+        with open(gtf_file, "w") as f:
+            f.write('chr1\ttest\tmRNA\t100\t200\t.\t+\t.\tgene_id "G1"; transcript_id "T1";\n')
+            f.write('chr1\ttest\tCDS\t100\t200\t.\t+\t0\tgene_id "G1"; transcript_id "T1"; product "test protein";\n')
+
+        feature_config = FeatureConfig(
+            filename="test.gtf",
+            basename="test",
+            filepath=gtf_file,
+            coding_type=CodingType.NONE,
+            detected_format=FeatureFormat.GFF,
+            output_dir=output_dir,
+            global_options={}
+        )
+
+        validator = FeatureValidator(feature_config, FeatureValidator.Settings())
+        validator.run()
+
+        # Verify conversion happened (mRNA + CDS = 2 features)
+        assert len(validator.features) == 2
+
+        # Verify GFF3 output - should have ID or Parent attribute
+        assert validator.features[0].attributes
+        # GTF format gene_id should be converted to geneID attribute
+        assert 'gene_id "' not in validator.features[0].attributes
+        # Should have GFF3 attributes (ID or Parent)
+        assert any(attr in validator.features[0].attributes for attr in ['ID=', 'Parent='])
+
+    def test_gtf_with_multiple_attributes(self, skip_if_gffread_missing, temp_dir, output_dir):
+        """Test GTF with multiple complex attributes."""
+        gtf_file = temp_dir / "complex.gtf"
+        with open(gtf_file, "w") as f:
+            f.write('#gtf-version 2.2\n')
+            f.write('chr1\ttest\tmRNA\t100\t200\t.\t+\t.\t'
+                   'gene_id "GENE1"; transcript_id "TR1"; gene_name "test"; gene_biotype "protein_coding";\n')
+            f.write('chr1\ttest\tCDS\t120\t180\t.\t+\t0\t'
+                   'gene_id "GENE1"; transcript_id "TR1"; product "test protein";\n')
+
+        feature_config = FeatureConfig(
+            filename="complex.gtf",
+            basename="complex",
+            filepath=gtf_file,
+            coding_type=CodingType.NONE,
+            detected_format=FeatureFormat.GFF,
+            output_dir=output_dir,
+            global_options={}
+        )
+
+        validator = FeatureValidator(feature_config, FeatureValidator.Settings())
+        validator.run()
+
+        # Should convert both features (mRNA + CDS)
+        assert len(validator.features) == 2
+
+    def test_gtf_with_special_characters(self, skip_if_gffread_missing, temp_dir, output_dir):
+        """Test GTF with special characters in attributes."""
+        gtf_file = temp_dir / "special.gtf"
+        with open(gtf_file, "w") as f:
+            f.write('#gtf-version 2.2\n')
+            f.write('chr1\ttest\tmRNA\t100\t200\t.\t+\t.\t'
+                   'gene_id "G1"; transcript_id "T1"; note "5\' UTR region, (verified)";\n')
+
+        feature_config = FeatureConfig(
+            filename="special.gtf",
+            basename="special",
+            filepath=gtf_file,
+            coding_type=CodingType.NONE,
+            detected_format=FeatureFormat.GFF,
+            output_dir=output_dir,
+            global_options={}
+        )
+
+        validator = FeatureValidator(feature_config, FeatureValidator.Settings())
+        validator.run()
+
+        # Should handle special characters (gffread adds exon from mRNA)
+        assert len(validator.features) == 2  # mRNA + exon
+
+    def test_gtf_with_replace_id(self, skip_if_gffread_missing, temp_dir, output_dir):
+        """Test GTF conversion works with replace_id_with setting."""
+        gtf_file = temp_dir / "test.gtf"
+        with open(gtf_file, "w") as f:
+            f.write('chr1\ttest\tmRNA\t100\t200\t.\t+\t.\tgene_id "G1"; transcript_id "T1";\n')
+
+        feature_config = FeatureConfig(
+            filename="test.gtf",
+            basename="test",
+            filepath=gtf_file,
+            coding_type=CodingType.NONE,
+            detected_format=FeatureFormat.GFF,
+            output_dir=output_dir,
+            global_options={}
+        )
+
+        settings = FeatureValidator.Settings(replace_id_with='chromosome')
+        validator = FeatureValidator(feature_config, settings)
+        validator.run()
+
+        # All features should have replaced seqname
+        for feature in validator.features:
+            assert feature.seqname == 'chromosome'
+            assert 'Original_seqname:chr1' in feature.attributes
+
+    def test_gffread_not_available_error(self, temp_dir, output_dir, monkeypatch):
+        """Test error handling when gffread is not available."""
+        # Create GTF file
+        gtf_file = temp_dir / "test.gtf"
+        with open(gtf_file, "w") as f:
+            f.write('chr1\ttest\tgene\t100\t200\t.\t+\t.\tgene_id "G1";\n')
+
+        feature_config = FeatureConfig(
+            filename="test.gtf",
+            basename="test",
+            filepath=gtf_file,
+            coding_type=CodingType.NONE,
+            detected_format=FeatureFormat.GFF,
+            output_dir=output_dir,
+            global_options={}
+        )
+
+        # Mock shutil.which to return None (gffread not found)
+        monkeypatch.setattr('shutil.which', lambda x: None)
+
+        validator = FeatureValidator(feature_config, FeatureValidator.Settings())
+
+        # Should raise error about missing gffread
+        with pytest.raises(FeatureValidationError) as exc_info:
+            validator.run()
+
+        assert 'gffread' in str(exc_info.value).lower()
+
+    def test_check_tool_available(self, temp_dir, output_dir):
+        """Test _check_tool_available helper method."""
+        feature_config = FeatureConfig(
+            filename="test.gff",
+            basename="test",
+            filepath=temp_dir / "test.gff",
+            coding_type=CodingType.NONE,
+            detected_format=FeatureFormat.GFF,
+            output_dir=output_dir,
+            global_options={}
+        )
+
+        validator = FeatureValidator(feature_config, FeatureValidator.Settings())
+
+        # Should find python (always available)
+        assert validator._check_tool_available('python') is True
+        assert validator._check_tool_available('python3') is True
+
+        # Should not find non-existent tool
+        assert validator._check_tool_available('nonexistenttool12345') is False

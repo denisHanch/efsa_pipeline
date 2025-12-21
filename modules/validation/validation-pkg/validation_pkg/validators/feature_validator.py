@@ -7,13 +7,24 @@ various editing operations for genomic annotations.
 
 Key Features:
     - Multi-format support: GFF, GTF, and BED
+    - GTF to GFF3 conversion using gffread (standards-compliant attribute conversion)
+    - BED to GFF3 conversion using gffread (coordinate system and format conversion)
     - Compression handling: gzip, bzip2, and uncompressed files
     - Three validation levels: strict (full validation), trust (fast validation), minimal (copy only)
     - Coordinate validation: start < end, no negative coordinates
-    - BED to GFF conversion (0-based to 1-based coordinate system)
     - Feature sorting by genomic position
     - Sequence ID replacement with original tracking
     - Parallel compression support: automatic detection of pigz/pbzip2
+
+Format Conversion:
+    GTF and BED files are automatically converted to GFF3 format using the gffread tool.
+    This ensures standards-compliant conversion of GTF attributes (gene_id, transcript_id)
+    to GFF3 attributes (ID, Parent, Name) and proper coordinate system conversion for BED files.
+
+    Installation of gffread:
+    - Conda: conda install -c bioconda gffread
+    - Ubuntu/Debian: apt-get install gffread
+    - macOS: brew install gffread
 
 Classes:
     Feature: Data container for genomic feature information
@@ -25,6 +36,8 @@ from pathlib import Path
 from typing import Optional, Dict, List, IO, Union
 from dataclasses import dataclass
 import shutil
+from multiprocessing import Pool
+from functools import partial
 
 from validation_pkg.logger import get_logger
 from validation_pkg.utils.settings import BaseSettings
@@ -38,6 +51,68 @@ from validation_pkg.exceptions import (
 from validation_pkg.utils.formats import CodingType as CT
 from validation_pkg.utils.formats import FeatureFormat
 from validation_pkg.utils.file_handler import open_compressed_writer
+
+
+# Constants for parallel processing
+PARALLEL_CHUNK_MULTIPLIER = 4  # Multiplier for calculating chunk size (features // (threads * 4))
+MIN_CHUNK_SIZE = 1000  # Minimum chunk size for parallel processing
+
+
+# Standalone function for parallel processing (must be picklable - defined at module level)
+def _replace_feature_id(feature, new_seqname: str):
+    """
+    Replace sequence ID for a single feature (parallelizable).
+
+    This function is standalone (not a method) to be picklable for multiprocessing.
+
+    Args:
+        feature: Feature object to process
+        new_seqname: New sequence name to use
+
+    Returns:
+        Feature: Modified feature with replaced seqname
+    """
+    # Store original seqname in attributes
+    old_seqname = feature.seqname
+
+    # Parse GFF attributes (inline to avoid method calls in parallel context)
+    attr_string = feature.attributes
+    attrs = {}
+    if attr_string and attr_string != '.':
+        # Split by semicolon
+        for pair in attr_string.split(';'):
+            pair = pair.strip()
+            if pair and '=' in pair:
+                key, value = pair.split('=', 1)
+                attrs[key.strip()] = value.strip()
+
+    # Store original seqname in Note field (GFF3 standard)
+    note_text = f"Original_seqname:{old_seqname}"
+    if 'Note' in attrs and attrs['Note']:
+        # Append to existing Note
+        attrs['Note'] = f"{attrs['Note']};{note_text}"
+    else:
+        # Create new Note
+        attrs['Note'] = note_text
+
+    # Rebuild attributes string
+    if attrs:
+        parts = []
+        # ID should come first (GFF3 convention)
+        if 'ID' in attrs:
+            parts.append(f"ID={attrs['ID']}")
+        # Add all other attributes in sorted order (for consistency)
+        for key in sorted(attrs.keys()):
+            if key != 'ID':  # Skip ID, already added
+                parts.append(f"{key}={attrs[key]}")
+        feature.attributes = ';'.join(parts)
+    else:
+        feature.attributes = '.'
+
+    # Replace seqname
+    feature.seqname = new_seqname
+
+    return feature
 
 
 @dataclass
@@ -700,66 +775,227 @@ class FeatureValidator:
         # Sort by position (seqname, then start, then end)
         if self.settings.sort_by_position:
             original_count = len(self.features)
+            if original_count > 10000:
+                self.logger.info(f"Sorting {original_count} features by genomic position...")
             self.features.sort(key=lambda f: (f.seqname, f.start, f.end))
             self.logger.debug(f"Sorted {original_count} features by position")
 
         # Replace feature seqnames (chromosome/sequence identifiers)
         if self.settings.replace_id_with:
             new_seqname = self.settings.replace_id_with
-            self.logger.debug(f"Replacing feature seqnames with '{new_seqname}'...")
+            feature_count = len(self.features)
 
-            for feature in self.features:
-                # Store original seqname in attributes
-                old_seqname = feature.seqname
+            # Determine if parallel processing should be used
+            use_parallel = (self.threads and self.threads > 1 and feature_count > MIN_CHUNK_SIZE)
 
-                # Parse GFF attributes
-                attrs = self._parse_gff_attributes(feature.attributes)
+            if use_parallel:
+                self.logger.info(
+                    f"Parallel ID replacement: {feature_count:,} features with '{new_seqname}' across {self.threads} workers"
+                )
 
-                # Store original seqname in Note field (GFF3 standard)
-                note_text = f"Original_seqname:{old_seqname}"
-                if 'Note' in attrs and attrs['Note']:
-                    # Append to existing Note
-                    attrs['Note'] = f"{attrs['Note']};{note_text}"
-                else:
-                    # Create new Note
-                    attrs['Note'] = note_text
+                # Determine chunk size
+                chunk_size = max(MIN_CHUNK_SIZE, feature_count // (self.threads * PARALLEL_CHUNK_MULTIPLIER))
 
-                # Rebuild attributes string
-                feature.attributes = self._build_gff_attributes(attrs)
+                self.logger.debug(
+                    f"Parallel processing config: {self.threads} workers, chunk_size={chunk_size:,}",
+                    workers=self.threads,
+                    chunk_size=chunk_size,
+                    estimated_chunks=feature_count // chunk_size
+                )
 
-                # Replace seqname for both GFF and BED
-                feature.seqname = new_seqname
+                # Create partial function with new_seqname
+                replace_func = partial(_replace_feature_id, new_seqname=new_seqname)
 
-            self.logger.debug(f"Replaced {len(self.features)} feature seqnames with '{new_seqname}'")
+                # Process in parallel
+                self.logger.debug(f"Starting parallel ID replacement across {self.threads} worker processes...")
+                with Pool(processes=self.threads) as pool:
+                    self.features = pool.map(replace_func, self.features, chunksize=chunk_size)
+
+                self.logger.info(f"✓ Sequence ID replacement complete for {feature_count:,} features (parallel mode)")
+
+            else:
+                # Sequential processing
+                if feature_count > 10000:
+                    self.logger.info(f"Replacing sequence IDs for {feature_count} features with '{new_seqname}'...")
+                self.logger.debug(f"Replacing feature seqnames with '{new_seqname}'...")
+
+                for feature in self.features:
+                    # Store original seqname in attributes
+                    old_seqname = feature.seqname
+
+                    # Parse GFF attributes
+                    attrs = self._parse_gff_attributes(feature.attributes)
+
+                    # Store original seqname in Note field (GFF3 standard)
+                    note_text = f"Original_seqname:{old_seqname}"
+                    if 'Note' in attrs and attrs['Note']:
+                        # Append to existing Note
+                        attrs['Note'] = f"{attrs['Note']};{note_text}"
+                    else:
+                        # Create new Note
+                        attrs['Note'] = note_text
+
+                    # Rebuild attributes string
+                    feature.attributes = self._build_gff_attributes(attrs)
+
+                    # Replace seqname for both GFF and BED
+                    feature.seqname = new_seqname
+
+                self.logger.debug(f"Replaced {len(self.features)} feature seqnames with '{new_seqname}'")
+                if feature_count > 10000:
+                    self.logger.info(f"✓ Sequence ID replacement complete for {feature_count} features")
 
         self.logger.debug(f"✓ Edits applied, {len(self.features)} feature(s) remaining")
 
     def _convert_to_gff(self) -> None:
         """
-        Convert features to GFF format if needed.
+        Convert features to GFF3 format using gffread.
 
-        BED and GFF use different coordinate systems:
+        Handles:
+        - BED→GFF3 coordinate conversion (via gffread)
+        - GTF→GFF3 attribute conversion (via gffread)
+        - GFF3→GFF3 validation (via gffread)
+
+        Coordinate systems:
             - BED: 0-based, half-open [start, end)
             - GFF: 1-based, closed [start, end]
 
-        Conversion: BED [start, end) → GFF [start+1, end]
+        Attribute formats:
+            - GTF: gene_id "value"; transcript_id "value";
+            - GFF3: ID=value;Parent=value
 
-        Example:
-            BED: chr1 100 200 (covers positions 100-199 in 0-based)
-            GFF: chr1 . . 101 200 (covers positions 101-200 in 1-based)
+        Uses gffread for standards-compliant conversion.
         """
-        if self.feature_config.detected_format == FeatureFormat.GFF:
-            self.logger.debug("Keeping GFF format")
+        # Already GFF3 format and not GTF - skip conversion
+        if self.feature_config.detected_format == FeatureFormat.GFF and not self._is_gtf_format():
+            self.logger.debug("Already in GFF3 format")
             return
 
-        self.logger.debug(f"Converting {len(self.features)} BED features to GFF format...")
+        # Use gffread for all conversions (BED, GTF, or GTF-style GFF)
+        if self._is_gtf_format() or self.feature_config.detected_format == FeatureFormat.BED:
+            self._convert_using_gffread()
+            return
 
-        # BED is 0-based half-open, GFF is 1-based closed
-        # Convert: BED [start, end) -> GFF [start+1, end]
-        for feature in self.features:
-            feature.start += 1  # Convert from 0-based to 1-based
+        # Already valid GFF3
+        self.logger.debug("Keeping GFF3 format")
 
-        self.logger.debug("✓ BED to GFF conversion complete")
+    def _check_tool_available(self, tool_name: str) -> bool:
+        """
+        Check if external tool is available in PATH.
+
+        Args:
+            tool_name: Name of the tool to check
+
+        Returns:
+            True if tool is available, False otherwise
+        """
+        import shutil
+        return shutil.which(tool_name) is not None
+
+    def _is_gtf_format(self) -> bool:
+        """
+        Check if features contain GTF-style attributes.
+
+        GTF uses space-separated quoted values: gene_id "value"
+        GFF3 uses key=value pairs: ID=value
+
+        Returns:
+            True if GTF format detected, False otherwise
+        """
+        if not self.features:
+            return False
+
+        # Check first feature for GTF pattern: key "value"
+        import re
+        first_attrs = self.features[0].attributes
+        if not first_attrs or first_attrs == '.':
+            return False
+
+        gtf_pattern = r'\w+\s+"[^"]*"'
+        return bool(re.search(gtf_pattern, first_attrs))
+
+    def _convert_using_gffread(self) -> None:
+        """
+        Convert GTF/BED to GFF3 using gffread tool.
+
+        Uses gffread for format conversion to ensure standards compliance.
+        Handles both GTF and BED input formats.
+
+        Raises:
+            FeatureValidationError: If gffread is not available or conversion fails
+        """
+        import subprocess
+        import tempfile
+        from pathlib import Path
+
+        # Check if gffread is available
+        if not self._check_tool_available('gffread'):
+            self.logger.error("gffread not found. Install: conda install -c bioconda gffread")
+            raise FeatureValidationError(
+                "gffread tool required for GTF/BED conversion. "
+                "Install via: conda install -c bioconda gffread"
+            )
+
+        # Detect input format
+        input_format = 'GTF' if self._is_gtf_format() else 'BED'
+        self.logger.info(f"Converting {input_format} to GFF3 using gffread...")
+
+        # Handle compressed files - gffread can't read compressed files directly
+        input_file = self.feature_config.filepath
+        temp_input_file = None
+
+        if self.feature_config.coding_type in [CT.GZIP, CT.BZIP2]:
+            # Decompress to temp file
+            suffix = '.gtf' if input_format == 'GTF' else '.bed'
+            with tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False) as tmp_input:
+                temp_input_file = tmp_input.name
+                # Write decompressed content (features are already parsed/decompressed)
+                for feature in self.features:
+                    if input_format == 'BED':
+                        # BED format: chr start end [name] [score] [strand]
+                        # Features from BED are already in 0-based coordinates (not converted during parse)
+                        line = '\t'.join([
+                            feature.seqname,
+                            str(feature.start),  # Already 0-based from BED parse
+                            str(feature.end),
+                            feature.attributes if feature.attributes and feature.attributes != '.' else 'feature',
+                            feature.score if feature.score != '.' else '100',
+                            feature.strand if feature.strand != '.' else '+'
+                        ])
+                    else:
+                        # GTF/GFF format
+                        line = '\t'.join([
+                            feature.seqname, feature.source, feature.feature_type,
+                            str(feature.start), str(feature.end), feature.score,
+                            feature.strand, feature.frame, feature.attributes
+                        ])
+                    tmp_input.write(line + '\n')
+            input_file = temp_input_file
+
+        # Convert using gffread (outputs GFF3 by default)
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.gff3', delete=False) as tmp_output:
+            tmp_gff3_path = tmp_output.name
+
+        try:
+            result = subprocess.run(
+                ['gffread', str(input_file), '-o', tmp_gff3_path],
+                capture_output=True, text=True, check=True
+            )
+
+            # Parse the converted GFF3
+            with open(tmp_gff3_path, 'r') as f:
+                self.features = self._parse_gff(f)
+
+            self.logger.info(f"✓ {input_format} to GFF3 conversion complete ({len(self.features)} features)")
+
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"gffread conversion failed: {e.stderr}")
+            raise FeatureValidationError(f"{input_format} conversion failed: {e.stderr}")
+        finally:
+            # Cleanup temp files
+            Path(tmp_gff3_path).unlink(missing_ok=True)
+            if temp_input_file:
+                Path(temp_input_file).unlink(missing_ok=True)
 
     def _save_output(self) -> Path:
         """
@@ -876,6 +1112,10 @@ class FeatureValidator:
             handle.write("##gff-version 3\n")
 
             # Write features
+            feature_count = len(self.features)
+            if feature_count > 10000:
+                self.logger.info(f"Writing {feature_count} features to output file...")
+
             for feature in self.features:
                 line = '\t'.join([
                     feature.seqname,
