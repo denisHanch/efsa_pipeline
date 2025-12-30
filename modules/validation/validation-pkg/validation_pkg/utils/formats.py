@@ -196,6 +196,7 @@ class ReadFormat(Enum):
 
 class FeatureFormat(Enum):
     GFF = "gff"
+    GTF = "gtf"
     BED = "bed"
 
     def to_biopython(self) -> str:
@@ -217,7 +218,7 @@ class FeatureFormat(Enum):
     @classmethod
     def _missing_(cls, value):
         """
-        Handle ReadFormat('bed'), ReadFormat('.gtf'), ReadFormat('file.gff')
+        Handle FeatureFormat('bed'), FeatureFormat('.gtf'), FeatureFormat('file.gff')
         """
         value_lower = str(value).lower().strip()
         
@@ -229,8 +230,8 @@ class FeatureFormat(Enum):
         extension_map = {
             'gff': cls.GFF,
             'gff3': cls.GFF,
-            'gtf': cls.GFF,
-            'gff2': cls.GFF,
+            'gtf': cls.GTF,
+            'gff2': cls.GTF,
             'bed': cls.BED,
         }
         

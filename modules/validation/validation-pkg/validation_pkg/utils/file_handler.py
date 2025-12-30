@@ -24,7 +24,7 @@ import shutil
 
 __all__ = [
     # Tool availability and compression commands
-    'check_compression_tool_available',
+    'check_tool_available',
     'get_compression_command',
 
     # File operations
@@ -88,21 +88,21 @@ _COMMAND_ARGS = {
 }
 
 
-def check_compression_tool_available(tool_name: str) -> bool:
+def check_tool_available(tool_name: str) -> bool:
     """
-    Check if a compression tool is available on the system.
+    Check if a tool is available on the system.
 
     Results are cached to avoid repeated subprocess calls.
     Thread-safe: uses lock to protect cache access.
 
     Args:
-        tool_name: Name of the tool to check ('pigz', 'pbzip2', 'gzip', 'bzip2')
+        tool_name: Name of the tool to check (e.g., 'pigz', 'pbzip2', 'gzip', 'bzip2', 'gffread')
 
     Returns:
         True if tool is available, False otherwise
 
     Example:
-        >>> if check_compression_tool_available('pigz'):
+        >>> if check_tool_available('pigz'):
         ...     print("pigz is available for faster compression")
     """
     # Fast path: check cache without lock (safe for reads)
@@ -174,7 +174,7 @@ def _select_compression_tool(coding_type: CodingType) -> tuple:
 
     # Try parallel tool first
     parallel_tool = tool_config['parallel']
-    if check_compression_tool_available(parallel_tool):
+    if check_tool_available(parallel_tool):
         return (parallel_tool, True, None)
 
     # Fallback to standard tool
@@ -753,9 +753,9 @@ def open_compressed_writer(filepath: Union[str, Path], coding_type: CodingType, 
         use_subprocess = False
 
         if coding_type == CodingType.GZIP:
-            use_subprocess = check_compression_tool_available('pigz')
+            use_subprocess = check_tool_available('pigz')
         elif coding_type == CodingType.BZIP2:
-            use_subprocess = check_compression_tool_available('pbzip2')
+            use_subprocess = check_tool_available('pbzip2')
 
         if use_subprocess:
             # Use subprocess pipe for parallel compression
