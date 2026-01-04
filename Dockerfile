@@ -24,7 +24,7 @@ RUN apk update && \
     && rm -rf /var/cache/apk/*
 
 # Install build dependencies and build pbzip2 from Debian source as pbzip2 is not available in Alpine
-RUN apk add --no-cache build-base bzip2-dev ca-certificates && \
+RUN apk add --no-cache build-base bzip2-dev && \
     cd /tmp && \
     wget http://ftp.debian.org/debian/pool/main/p/pbzip2/pbzip2_1.1.13.orig.tar.gz -O pbzip2.tar.gz && \
     tar xzf pbzip2.tar.gz && \
@@ -38,7 +38,6 @@ RUN apk add --no-cache build-base bzip2-dev ca-certificates && \
 # Build and install gffread from source (not available in Alpine repos)
 RUN apk add --no-cache --virtual .gffread-build-deps \
         build-base \
-        git \
     && cd /tmp \
     && git clone https://github.com/gpertea/gffread.git \
     && cd gffread \
