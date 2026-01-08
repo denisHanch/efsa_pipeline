@@ -455,7 +455,7 @@ class TestFeatureValidatorOutput:
             global_options={}
         )
 
-        settings = FeatureValidator.Settings(coding_type=None)
+        settings = FeatureValidator.Settings(coding_type=CodingType.NONE)
         validator = FeatureValidator(feature_config, settings)
         validator.run()
 
@@ -480,7 +480,7 @@ class TestFeatureValidatorOutput:
             global_options={}
         )
 
-        settings = FeatureValidator.Settings(coding_type='gz')
+        settings = FeatureValidator.Settings(coding_type=CodingType.GZIP)
         validator = FeatureValidator(feature_config, settings)
         validator.run()
 
@@ -509,7 +509,7 @@ class TestFeatureValidatorOutput:
             global_options={}
         )
 
-        settings = FeatureValidator.Settings(coding_type='bz2')
+        settings = FeatureValidator.Settings(coding_type=CodingType.BZIP2)
         validator = FeatureValidator(feature_config, settings)
         validator.run()
 
