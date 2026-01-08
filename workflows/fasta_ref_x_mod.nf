@@ -1,6 +1,7 @@
 #!/usr/bin/env nextflow
 
 include { nucmer; deltaFilter; showCoords; syri } from '../modules/ref_x_mod.nf'
+include { vcf_to_table }  from '../modules/sv_calling.nf'
 include { logWorkflowCompletion } from '../modules/logs.nf'
 
 
@@ -30,6 +31,7 @@ workflow {
     Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
 
     ref_mod(ref_fasta, mod_fasta)
+    vcf_to_table(ref_mod.out.sv_vcf)
 }
 
 

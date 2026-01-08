@@ -198,3 +198,28 @@ process survivor {
     SURVIVOR merge vcf_list.txt 1000 1 1 1 0 30 ${pair_id}_${mapping_tag}_sv_long_read.vcf
     """
 }
+
+process vcf_to_table {
+
+    container 'staphb/bcftools:latest'
+    publishDir "${params.out_dir}/tables", mode: 'copy'
+
+    input:
+    path vcf
+
+    output:
+    path "${vcf.simpleName}_sv_summary.tsv"
+
+    script:
+    """
+    set -euxo pipefail
+
+    (
+    echo -e "chrom\tstart\tend\tsvtype"
+    bcftools query \
+        -f '%CHROM\t%POS\t%INFO/END\t%ID\n' \
+        ${vcf} |
+    awk 'BEGIN{OFS="\\t"}{ print \$0 }'
+    ) > ${vcf.simpleName}_sv_summary.tsv
+    """
+}
