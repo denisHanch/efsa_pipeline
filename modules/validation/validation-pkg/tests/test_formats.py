@@ -265,11 +265,11 @@ class TestFeatureFormat:
         """Test _missing_ with GFF extensions."""
         assert FeatureFormat('gff') == FeatureFormat.GFF
         assert FeatureFormat('gff3') == FeatureFormat.GFF
-        assert FeatureFormat('gff2') == FeatureFormat.GFF
-        assert FeatureFormat('gtf') == FeatureFormat.GFF
+        assert FeatureFormat('gff2') == FeatureFormat.GTF
+        assert FeatureFormat('gtf') == FeatureFormat.GTF
         assert FeatureFormat('.gff') == FeatureFormat.GFF
         assert FeatureFormat('.gff3') == FeatureFormat.GFF
-        assert FeatureFormat('.gtf') == FeatureFormat.GFF
+        assert FeatureFormat('.gtf') == FeatureFormat.GTF
 
     def test_missing_with_bed_extensions(self):
         """Test _missing_ with BED extensions."""
@@ -280,7 +280,7 @@ class TestFeatureFormat:
         """Test _missing_ with full filenames."""
         assert FeatureFormat('features.gff') == FeatureFormat.GFF
         assert FeatureFormat('features.gff3') == FeatureFormat.GFF
-        assert FeatureFormat('genes.gtf') == FeatureFormat.GFF
+        assert FeatureFormat('genes.gtf') == FeatureFormat.GTF
         assert FeatureFormat('regions.bed') == FeatureFormat.BED
 
     def test_missing_with_compressed_filenames(self):
@@ -302,7 +302,7 @@ class TestFeatureFormat:
     def test_missing_case_insensitive(self):
         """Test that _missing_ is case-insensitive."""
         assert FeatureFormat('GFF') == FeatureFormat.GFF
-        assert FeatureFormat('GTF') == FeatureFormat.GFF
+        assert FeatureFormat('GTF') == FeatureFormat.GTF
         assert FeatureFormat('BED') == FeatureFormat.BED
 
     def test_missing_with_invalid_value_raises_error(self):
@@ -376,8 +376,9 @@ class TestEnumIteration:
     def test_feature_format_iteration(self):
         """Test iterating over FeatureFormat members."""
         members = list(FeatureFormat)
-        assert len(members) == 2
+        assert len(members) == 3
         assert FeatureFormat.GFF in members
+        assert FeatureFormat.GTF in members
         assert FeatureFormat.BED in members
 
 

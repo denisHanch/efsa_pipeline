@@ -1,6 +1,6 @@
 FROM python:3.10-slim-bookworm
 
-# Install system packages including compression tools
+# Install system packages including compression tools and gffread
 RUN apt-get update && \
     apt-get install -y --no-install-recommends\
         sudo \
@@ -10,6 +10,7 @@ RUN apt-get update && \
         bzip2 \
         pigz \
         pbzip2 \
+        gffread \
     && useradd -ms /bin/bash -u 1000 vscode \
     && mkdir -p /etc/sudoers.d \
     && echo "vscode ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/vscode \

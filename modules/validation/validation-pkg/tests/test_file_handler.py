@@ -24,7 +24,7 @@ from validation_pkg.utils.file_handler import (
     gz_to_none,
     bz2_to_none,
     none_to_bz2,
-    check_compression_tool_available,
+    check_tool_available,
     get_compression_command,
     open_compressed_writer,
     detect_compression_type,
@@ -245,24 +245,24 @@ class TestCompressionConversion:
 class TestParallelCompressionTools:
     """Tests for parallel compression tool utilities."""
 
-    def test_check_compression_tool_available_gzip(self):
+    def test_check_tool_available_gzip(self):
         """Test that gzip is available (should always be available on Unix)."""
-        assert check_compression_tool_available('gzip') is True
+        assert check_tool_available('gzip') is True
 
-    def test_check_compression_tool_available_bzip2(self):
+    def test_check_tool_available_bzip2(self):
         """Test that bzip2 is available (should always be available on Unix)."""
-        assert check_compression_tool_available('bzip2') is True
+        assert check_tool_available('bzip2') is True
 
-    def test_check_compression_tool_available_nonexistent(self):
+    def test_check_tool_available_nonexistent(self):
         """Test that nonexistent tools return False."""
-        assert check_compression_tool_available('nonexistent_compression_tool_xyz') is False
+        assert check_tool_available('nonexistent_compression_tool_xyz') is False
 
-    def test_check_compression_tool_available_caching(self):
+    def test_check_tool_available_caching(self):
         """Test that tool availability checks are cached."""
         # First call
-        result1 = check_compression_tool_available('gzip')
+        result1 = check_tool_available('gzip')
         # Second call should use cache
-        result2 = check_compression_tool_available('gzip')
+        result2 = check_tool_available('gzip')
         assert result1 == result2
 
     def test_get_compression_command_gzip(self):

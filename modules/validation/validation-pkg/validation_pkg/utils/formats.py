@@ -37,7 +37,16 @@ class CodingType(Enum):
     GZIP = "gzip"
     BZIP2 = "bzip2"
     NONE = "none"
-
+    
+    def to_extension(self) -> str:
+        """Return file extension for this compression type."""
+        extension_map = {
+            CodingType.GZIP: '.gz',
+            CodingType.BZIP2: '.bz2',
+            CodingType.NONE: ''
+        }
+        return extension_map[self]
+    
     @classmethod
     def _missing_(cls, value):
         """
@@ -106,7 +115,10 @@ class GenomeFormat(Enum):
             >>> Bio.SeqIO.parse(file, fmt.to_biopython())
         """
         return self.value
-
+    
+    def to_extension(self) -> str:
+        return f'.{self.value}'
+    
     @classmethod
     def _missing_(cls, value):
         """
@@ -162,7 +174,10 @@ class ReadFormat(Enum):
             >>> Bio.SeqIO.parse(file, fmt.to_biopython())
         """
         return self.value
-
+    
+    def to_extension(self) -> str:
+        return f'.{self.value}'
+    
     @classmethod
     def _missing_(cls, value):
         """
@@ -196,6 +211,7 @@ class ReadFormat(Enum):
 
 class FeatureFormat(Enum):
     GFF = "gff"
+    GTF = "gtf"
     BED = "bed"
 
     def to_biopython(self) -> str:
@@ -213,11 +229,14 @@ class FeatureFormat(Enum):
             >>> format_name = fmt.to_biopython()  # "gff"
         """
         return self.value
+    
+    def to_extension(self) -> str:
+        return f'.{self.value}'
 
     @classmethod
     def _missing_(cls, value):
         """
-        Handle ReadFormat('bed'), ReadFormat('.gtf'), ReadFormat('file.gff')
+        Handle FeatureFormat('bed'), FeatureFormat('.gtf'), FeatureFormat('file.gff')
         """
         value_lower = str(value).lower().strip()
         
@@ -229,8 +248,8 @@ class FeatureFormat(Enum):
         extension_map = {
             'gff': cls.GFF,
             'gff3': cls.GFF,
-            'gtf': cls.GFF,
-            'gff2': cls.GFF,
+            'gtf': cls.GTF,
+            'gff2': cls.GTF,
             'bed': cls.BED,
         }
         
@@ -244,4 +263,4 @@ class FeatureFormat(Enum):
             if ext in extension_map:
                 return extension_map[ext]
         
-        raise ValueError(f"'{value}' is not a valid {cls.__name__}")
+        raise ValueError(f"'{value}' is not a valid {cls.__name__}")   
