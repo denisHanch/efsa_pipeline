@@ -78,7 +78,7 @@ class FeatureValidator:
         sort_by_position: bool = True
         check_coordinates: bool = True
         replace_id_with: Optional[str] = None
-        coding_type: Optional[str] = None
+        coding_type: Optional[CT] = CT.NONE
         output_filename_suffix: Optional[str] = None
         output_subdir_name: Optional[str] = None
 
@@ -301,13 +301,7 @@ class FeatureValidator:
         if self.feature_config.coding_type == CT.NONE:
             return self.input_path
 
-        format_suffixes = {
-            FeatureFormat.GFF: '.gff',
-            FeatureFormat.GTF: '.gtf',
-            FeatureFormat.BED: '.bed',
-        }
-        suffix = format_suffixes.get(self.feature_config.detected_format, '.gff')
-
+        suffix = self.feature_config.detected_format.to_extension()
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False)
 
         self.logger.debug(f"Decompressing {self.input_path} to {temp_file.name}")
@@ -318,12 +312,6 @@ class FeatureValidator:
                     output_handle.write(line)
 
         return Path(temp_file.name)
-
-    def _cleanup_temp_files(self, temp_files: list) -> None:
-        """Remove temporary files."""
-        for temp_file in temp_files:
-            if temp_file and temp_file != self.input_path and isinstance(temp_file, Path):
-                temp_file.unlink(missing_ok=True)
 
     def _save_output(self) -> Path:
         """Save processed features to output directory."""
@@ -344,12 +332,7 @@ class FeatureValidator:
         else:
             output_filename = f"{base_name}.gff"
 
-        coding = self.settings.coding_type
-
-        if coding in ('gz', 'gzip', CT.GZIP):
-            output_filename += '.gz'
-        elif coding in ('bz2', 'bzip2', CT.BZIP2):
-            output_filename += '.bz2'
+        output_filename += self.settings.coding_type.to_extension()
 
         if self.validation_level == 'minimal':
             self.logger.debug("Minimal mode - validating format and coding requirements")
@@ -365,18 +348,7 @@ class FeatureValidator:
                 raise FeatureValidationError(error_msg)
 
             input_coding = self.feature_config.coding_type
-            required_coding = coding
-
-            if input_coding is None:
-                input_coding = CT.NONE
-            if required_coding is None:
-                required_coding = CT.NONE
-
-            if isinstance(required_coding, str):
-                if required_coding in ('gz', 'gzip'):
-                    required_coding = CT.GZIP
-                elif required_coding in ('bz2', 'bzip2'):
-                    required_coding = CT.BZIP2
+            required_coding = self.settings.coding_type
 
             if input_coding != required_coding:
                 error_msg = f'Minimal mode requires input coding to match output coding. Input: {input_coding}, Required: {required_coding}. Use validation_level "trust" or "strict" to change compression.'
@@ -397,13 +369,7 @@ class FeatureValidator:
         output_path = output_dir / output_filename
         self.logger.debug(f"Writing output to: {output_path}")
 
-        coding_enum = CT.NONE
-        if self.settings.coding_type in ('gz', 'gzip'):
-            coding_enum = CT.GZIP
-        elif self.settings.coding_type in ('bz2', 'bzip2'):
-            coding_enum = CT.BZIP2
-
-        with open_compressed_writer(output_path, coding_enum, threads=self.threads) as handle:
+        with open_compressed_writer(output_path, self.settings.coding_type, threads=self.threads) as handle:
             handle.write("##gff-version 3\n")
 
             feature_count = len(self.features)
