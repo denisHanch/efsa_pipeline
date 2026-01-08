@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Optional, List, IO
 from dataclasses import dataclass
 import shutil
+import tempfile
+import subprocess
 
 from validation_pkg.logger import get_logger
 from validation_pkg.utils.settings import BaseSettings
@@ -200,7 +202,6 @@ class FeatureValidator:
             if temp_input != self.input_path:
                 temp_files.append(temp_input)
 
-            import tempfile
             temp_gff3_file = tempfile.NamedTemporaryFile(mode='w', suffix='.gff3', delete=False)
             temp_gff3_file.close()
             temp_gff3 = Path(temp_gff3_file.name)
@@ -256,11 +257,10 @@ class FeatureValidator:
         Raises:
             FeatureValidationError: If gffread fails
         """
-        import subprocess
 
         if not check_tool_available('gffread'):
             raise FeatureValidationError(
-                "gffread tool required. Install via: conda install -c bioconda gffread"
+                "gffread tool required."
             )
 
         cmd = [
@@ -297,7 +297,6 @@ class FeatureValidator:
 
     def _prepare_input_file(self) -> Path:
         """Decompress input file if needed for gffread processing."""
-        import tempfile
 
         if self.feature_config.coding_type == CT.NONE:
             return self.input_path
