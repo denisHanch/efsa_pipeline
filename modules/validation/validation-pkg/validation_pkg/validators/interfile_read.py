@@ -1,19 +1,4 @@
-"""
-Inter-file validation for read files.
-
-Provides validation functions for checking consistency across multiple
-read files, particularly for paired-end read completeness (R1 ↔ R2 matching).
-
-Usage:
-    from validation_pkg import validate_reads, readxread_validation, ReadXReadSettings
-
-    # Validate individual files
-    reads_results = validate_reads(config.reads, settings)
-
-    # Check inter-file consistency
-    readxread_settings = ReadXReadSettings(pair_end_basename=True)
-    result = readxread_validation(reads_results, readxread_settings)
-"""
+"""Inter-file validation for read files."""
 
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Any
@@ -24,44 +9,16 @@ from ..logger import get_logger
 
 @dataclass
 class ReadXReadSettings(BaseSettings):
-    """
-    Settings for read-to-read inter-file validation.
-
-    Attributes:
-        pair_end_basename: Check that R2 files have matching R1 files
-        allow_missing_r1: Allow R2 files without matching R1 (for incomplete data)
-    """
+    """Settings for read-to-read inter-file validation."""
     pair_end_basename: bool = True
     allow_missing_r1: bool = False
-
-    def __post_init__(self):
-        """Validate settings."""
-        # Nothing to validate currently, but follows pattern
-        pass
 
 
 def readxread_validation(
     reads_results: List[Dict[str, Any]],
     settings: Optional[ReadXReadSettings] = None
 ) -> Dict[str, Any]:
-    """
-    Validate consistency across multiple read files.
-
-    Currently supports:
-    - Paired-end completeness: R2 files must have matching R1 files
-
-    Args:
-        reads_results: List of result dicts from validate_reads()
-                      Each dict should contain 'output_metadata' key with
-                      base_name, read_number, ngs_type_detected fields
-        settings: Validation settings (uses defaults if not provided)
-
-    Returns:
-        Dict with validation results and metadata
-
-    Raises:
-        ReadValidationError: If critical validation fails (missing R1 for R2)
-    """
+    """Validate consistency across multiple read files."""
     settings = settings or ReadXReadSettings()
     logger = get_logger()
 

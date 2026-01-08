@@ -1,22 +1,4 @@
-"""
-Genome file validator and processor.
-
-This module provides comprehensive validation and processing for genome files in FASTA and GenBank
-formats. It handles decompression (gzip/bzip2), parsing using BioPython, validation of sequence
-structure, and various editing operations like plasmid splitting and sequence ID modification.
-
-Key Features:
-    - Multi-format support: FASTA and GenBank
-    - Compression handling: gzip, bzip2, and uncompressed files
-    - Three validation levels: strict (full validation), trust (fast validation), minimal (copy only)
-    - Plasmid handling: split plasmids to separate files or merge them
-    - Sequence filtering: by length, ID modification
-    - Parallel compression support: automatic detection of pigz/pbzip2
-
-Classes:
-    GenomeValidator: Main validator class for genome files
-    GenomeValidator.Settings: Configuration dataclass for validation behavior
-"""
+"""Genome file validator and processor for FASTA and GenBank formats."""
 
 from pathlib import Path
 from typing import Optional, List, IO, Union
@@ -41,34 +23,7 @@ from validation_pkg.utils.file_handler import open_compressed_writer
 
 @dataclass
 class OutputMetadata(BaseSettings):
-    """
-    Metadata returned from genome validation.
-
-    Fields are populated based on validation_level:
-    - minimal: Only output_filename, validation_level, output_file
-    - trust: + num_sequences, longest_sequence_*, plasmid_info, inter-file validation fields
-    - strict: All fields (includes total_genome_size, gc_content, n50)
-
-    Attributes:
-        input_file: Full path to input file
-        output_file: Full path to main output file
-        output_filename: Name of main output file
-        num_sequences: Total number of sequences in output
-        total_genome_size: Sum of all sequence lengths in bp (strict only)
-        longest_sequence_length: Length of longest sequence in bp
-        longest_sequence_id: ID of longest sequence
-        gc_content: GC content percentage (0-100) (strict only)
-        n50: N50 assembly quality metric in bp (strict only)
-        plasmid_count: Number of plasmid sequences detected
-        plasmid_filenames: List of plasmid output filenames (if plasmid_split=True)
-        num_sequences_filtered: Number of sequences removed by min_sequence_length filter
-        validation_level: Validation level used ('strict'/'trust'/'minimal')
-        elapsed_time: Time taken for validation in seconds
-
-        # Inter-file validation fields (trust/strict only)
-        sequence_ids: List of sequence IDs for inter-file validation
-        sequence_lengths: Dict mapping sequence IDs to lengths
-    """
+    """Metadata returned from genome validation."""
     input_file: str = None
     output_file: str = None
     output_filename: str = None
@@ -89,63 +44,15 @@ class OutputMetadata(BaseSettings):
     sequence_lengths: dict = None
 
 class GenomeValidator:
-    """
-    Validates and processes genome files in FASTA and GenBank formats.
-
-    This validator provides three validation levels:
-        - 'strict': Parse and validate all sequences, apply all edits (slowest, most thorough)
-        - 'trust': Parse all sequences, validate only first one, apply all edits (~10-15x faster)
-        - 'minimal': No parsing/validation, direct file copy (fastest, requires FASTA format)
-
-    Processing Workflow:
-        1. Parse file using BioPython (format auto-detected by ConfigManager)
-        2. Validate sequence structure (IDs, lengths)
-        3. Apply edits: filter by length, add ID prefixes
-        4. Handle plasmids: split to separate files or merge
-        5. Convert to FASTA format (if input is GenBank)
-        6. Save with optional compression (supports pigz/pbzip2 for performance)
-
-    Attributes:
-        genome_config: GenomeConfig object with file path and format info
-        output_dir: Directory for output files
-        settings: Settings object controlling validation and processing behavior
-        sequences: List of parsed SeqRecord objects (populated during validation)
-    """
+    """Validates and processes genome files in FASTA and GenBank formats."""
 
     @dataclass
     class Settings(BaseSettings):
-        """
-        Settings for genome validation and processing.
-        Attributes:
-            allow_empty_sequences: Allow SeqRecord empty seequence (default: False)
-            allow_empty_id: Allow SeqRecord empty ID (default: False)
-            warn_n_sequences: Warn if number of sequences exceeds this (default: 2)
-            is_plasmid: Treat all sequences as plasmids (no main chromosome) (default: False)
-            plasmid_split: Separate plasmid sequences into different files (default: False)
-            plasmids_to_one: Merge all plasmid sequences into one file (default: False)
-            main_longest: Select longest sequence as main chromosome (default: True)
-            main_first: Select first sequence as main chromosome (default: False)
-            replace_id_with: Replace all sequence IDs with this value. For multiple sequences,
-                             automatically appends increments (e.g., 'chr', 'chr1', 'chr2').
-                             Original IDs stored in description field. (default: None)
-            min_sequence_length: Minimum sequence length to keep in bp, remove shorter (default: 100)
-            coding_type: Output compression type: 'gz', 'bz2', or None (default: None)
-            output_filename_suffix: Suffix to add to output filename (default: None)
-            output_subdir_name: Subdirectory name for output files (default: None)
-
-        Note:
-            - plasmid_split and plasmids_to_one are mutually exclusive - only one can be True.
-            - main_longest and main_first are mutually exclusive - only one can be True.
-            - When is_plasmid=True, all sequences are treated as plasmids:
-              - If plasmid_split=True: each sequence saved to separate file
-              - If plasmids_to_one=True: all sequences saved to one merged file
-              - If both False: all sequences saved to main output file
-            - Main selection (main_longest/main_first) only applies when is_plasmid=False
-        """
+        """Settings for genome validation and processing."""
         # Validation thresholds
-        allow_empty_sequences: bool = False #   Raise ERROR
-        allow_empty_id: bool = False    #   Raise ERROR
-        warn_n_sequences: int = 2   #   Raise Warning - set plasmid_split to True
+        allow_empty_sequences: bool = False
+        allow_empty_id: bool = False
+        warn_n_sequences: int = 2
 
         # Editing specifications
         is_plasmid: bool = False
@@ -179,14 +86,6 @@ class GenomeValidator:
                 )
 
     def __init__(self, genome_config, settings: Optional[Settings] = None) -> None:
-        """
-        Initialize genome validator.
-
-        Args:
-            genome_config: GenomeConfig object from ConfigManager with file info
-            output_dir: Directory for output files (Path object)
-            settings: Settings object with validation parameters.
-        """
         self.logger = get_logger()
 
         # From genome global configuration
@@ -204,26 +103,18 @@ class GenomeValidator:
         self.sequences = []  # List of SeqRecord objects
 
         if not self.validation_level:
-            self.validation_level = 'strict'    #   default global value
+            self.validation_level = 'strict'
 
         if not self.threads:
             from validation_pkg.config_manager import DEFAULT_THREADS
-            self.threads = DEFAULT_THREADS    #   default global value
+            self.threads = DEFAULT_THREADS
 
         # Tracking for metadata
         self.num_sequences_filtered = 0
         self.plasmid_filenames = []
 
     def _calculate_gc_content(self, sequences: List[SeqRecord]) -> float:
-        """
-        Calculate GC content percentage for all sequences using BioPython.
-
-        Args:
-            sequences: List of SeqRecord objects
-
-        Returns:
-            GC content as percentage (0-100)
-        """
+        """Calculate GC content percentage for all sequences using BioPython."""
         if not sequences:
             return 0.0
 
@@ -244,18 +135,7 @@ class GenomeValidator:
         return (total_gc / total_bases) * 100
 
     def _calculate_n50(self, sequences: List[SeqRecord]) -> int:
-        """
-        Calculate N50 assembly quality metric.
-
-        N50 is the sequence length at which 50% of the total genome size
-        is contained in sequences of that length or longer.
-
-        Args:
-            sequences: List of SeqRecord objects
-
-        Returns:
-            N50 value in base pairs
-        """
+        """Calculate N50 assembly quality metric."""
         if not sequences:
             return 0
 
@@ -273,13 +153,7 @@ class GenomeValidator:
         return 0
 
     def _fill_output_metadata(self, output_path: Path) -> None:
-        """
-        Create OutputMetadata object based on validation level.
-
-        Args:
-            output_path: Path to the main output file
-
-        """
+        """Populate output metadata with validation results."""
         self.output_metadata.input_file = self.genome_config.filename
         self.output_metadata.validation_level = self.validation_level
         self.output_metadata.output_file = str(output_path) if output_path else None
@@ -325,23 +199,7 @@ class GenomeValidator:
             self.output_metadata.n50 = self._calculate_n50(self.sequences)
 
     def run(self) -> OutputMetadata:
-        """
-        Main validation and processing workflow.
-
-        Uses genome_config data (format, compression) provided by ConfigManager.
-
-        Returns:
-            OutputMetadata: Metadata object containing:
-                - output_file: Full path to output file
-                - output_filename: Name of output file
-                - Validation statistics (based on validation_level)
-                - Inter-file validation fields (sequence_ids, sequence_lengths)
-
-                All dict-style keys are available as attributes for backward compatibility.
-
-        Raises:
-            GenomeValidationError: If validation fails
-        """
+        """Execute validation and processing workflow."""
         self.logger.start_timer("genome_validation")
         self.logger.info(f"Processing genome file: {self.genome_config.filename}")
         self.logger.debug(f"Format: {self.genome_config.detected_format}, Compression: {self.genome_config.coding_type}")
@@ -377,20 +235,7 @@ class GenomeValidator:
             raise
 
     def _open_file(self, mode: str = 'rt') -> IO:
-        """
-        Open file with automatic decompression based on genome_config.
-
-        Uses centralized file opening from file_handler.py to eliminate code duplication.
-
-        Args:
-            mode: File opening mode (default: 'rt' for text read)
-
-        Returns:
-            File handle
-
-        Raises:
-            CompressionError: If file cannot be opened or decompressed
-        """
+        """Open file with automatic decompression based on genome_config."""
         try:
             from validation_pkg.utils.file_handler import open_file_with_coding_type
             return open_file_with_coding_type(
@@ -408,14 +253,7 @@ class GenomeValidator:
             raise
     
     def _parse_file(self) -> None:
-        """
-        Parse file using BioPython and validate format from genome_config.
-
-        Behavior depends on validation_level:
-        - 'strict': Parse all sequences, validate all
-        - 'trust': Parse all sequences, validate only first one
-        - 'minimal': Skip parsing entirely
-        """
+        """Parse file using BioPython and validate format from genome_config."""
         self.logger.debug(f"Parsing {self.genome_config.detected_format} file (validation_level={self.validation_level})...")
 
         # Minimal mode - skip parsing
@@ -474,14 +312,7 @@ class GenomeValidator:
             raise exception_class(error_msg) from e
     
     def _validate_sequences(self) -> None:
-        """
-        Validate parsed sequences.
-
-        Behavior depends on validation_level:
-        - 'strict': Validate all sequences
-        - 'trust': Validate only first sequence
-        - 'minimal': Skip validation (no parsing done)
-        """
+        """Validate parsed sequences."""
         self.logger.debug("Validating sequences...")
 
         # Minimal mode - no sequences to validate
@@ -558,19 +389,7 @@ class GenomeValidator:
         self.logger.debug("✓ Sequence validation passed")
     
     def _apply_edits(self) -> None:
-        """
-        Apply editing specifications to sequences based on settings.
-
-        Applies the following edits (if enabled in settings):
-        - Remove short sequences (min_sequence_length)
-        - Add sequence prefix (replace_id_with)
-        - Handle plasmid sequences (split or merge)
-
-        Behavior depends on validation_level:
-        - 'strict': Apply all edits
-        - 'trust': Apply all edits (all sequences loaded)
-        - 'minimal': Skip edits (file will be copied as-is)
-        """
+        """Apply editing specifications to sequences based on settings."""
         self.logger.debug("Applying editing specifications from settings...")
 
         # Minimal mode - skip edits, file will be copied as-is
@@ -627,18 +446,7 @@ class GenomeValidator:
         self.logger.debug(f"✓ Edits applied, {len(self.sequences)} sequence(s) remaining")
 
     def _select_main_sequence(self, sequences: List[SeqRecord]) -> tuple[SeqRecord, List[SeqRecord]]:
-        """
-        Select main chromosome from sequences based on settings.
-
-        Args:
-            sequences: List of SeqRecord objects to choose from
-
-        Returns:
-            Tuple of (main_sequence, plasmid_sequences)
-
-        Raises:
-            ValueError: If neither main_longest nor main_first is True
-        """
+        """Select main chromosome from sequences based on settings."""
         if self.settings.main_longest:
             # Sort by length (longest first)
             sorted_sequences = sorted(sequences, key=lambda x: len(x.seq), reverse=True)
@@ -657,17 +465,7 @@ class GenomeValidator:
         return main_sequence, plasmid_sequences
 
     def _handle_plasmids(self, plasmid_sequences: List[SeqRecord]) -> None:
-        """
-        Handle plasmid sequences according to settings.
-
-        Args:
-            plasmid_sequences: List of SeqRecord objects representing plasmids
-
-        Behavior based on settings:
-            - plasmid_split=True: Save each plasmid to separate file
-            - plasmids_to_one=True: Merge all plasmids into one file
-            - Both False: Keep plasmids in main output file (no action needed)
-        """
+        """Handle plasmid sequences according to settings."""
         if len(plasmid_sequences) == 0:
             return
 
@@ -699,13 +497,7 @@ class GenomeValidator:
             )
 
     def _save_plasmid_file(self, plasmid_sequences: List[SeqRecord], index: str) -> None:
-        """
-        Save plasmid sequences to a separate file.
-
-        Args:
-            plasmid_sequences: List of SeqRecord objects for plasmids (usually one plasmid)
-            index: Index number to append to filename
-        """
+        """Save plasmid sequences to a separate file."""
         # Determine output directory (with optional subdirectory)
         output_dir = self.genome_config.output_dir
         if self.settings.output_subdir_name and self.settings.output_subdir_name != "plasmid":
@@ -776,19 +568,7 @@ class GenomeValidator:
         self.logger.debug("✓ Ready for FASTA output")
     
     def _save_output(self) -> Path:
-        """
-        Save processed genome to output directory using settings.
-
-        Behavior depends on validation_level:
-        - 'strict': Write sequences using BioPython (may convert to FASTA)
-        - 'trust': Write sequences using BioPython (all sequences with edits applied)
-        - 'minimal': Copy file as-is (preserve original format)
-
-        Note: Compression handling will be moved to utils/file_handler.py in future.
-
-        Returns:
-            Path to output file
-        """
+        """Save processed genome to output directory using settings."""
         self.logger.debug("Saving output file...")
 
         # Determine output directory (with optional subdirectory)
