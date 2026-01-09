@@ -10,6 +10,7 @@ import subprocess
 from validation_pkg.logger import get_logger
 from validation_pkg.utils.settings import BaseSettings
 from validation_pkg.exceptions import (
+    ValidationError,
     FeatureValidationError,
     CompressionError,
 )
@@ -320,58 +321,43 @@ class FeatureValidator:
 
     def _save_output(self) -> Path:
         """Save processed features to output directory."""
+        from validation_pkg.utils.file_handler import build_output_path
+        from validation_pkg.utils.validation_helpers import (
+            validate_minimal_mode_requirements,
+            copy_file_minimal_mode
+        )
+
         self.logger.debug("Saving output file...")
 
-        output_dir = self.output_dir
-        if self.settings.output_subdir_name:
-            output_dir = output_dir / self.settings.output_subdir_name
-
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        base_name = self.feature_config.filename
-        for suffix in self.input_path.suffixes:
-            base_name = base_name.replace(suffix, '')
-
-        if self.settings.output_filename_suffix:
-            output_filename = f"{base_name}_{self.settings.output_filename_suffix}.gff"
-        else:
-            output_filename = f"{base_name}.gff"
-
-        output_filename += self.settings.coding_type.to_extension()
+        # Build output path using utility (with path traversal protection)
+        output_path = build_output_path(
+            base_dir=self.output_dir,
+            input_filename=self.feature_config.filename,
+            output_format="gff",
+            coding_type=self.settings.coding_type,
+            subdir_name=self.settings.output_subdir_name,
+            filename_suffix=self.settings.output_filename_suffix,
+            input_path=self.input_path
+        )
 
         if self.validation_level == 'minimal':
             self.logger.debug("Minimal mode - validating format and coding requirements")
 
-            if self.feature_config.detected_format != FeatureFormat.GFF:
-                error_msg = f'Minimal mode requires GFF format, got {self.feature_config.detected_format}. Use validation_level "trust" or "strict" to convert.'
-                self.logger.add_validation_issue(
-                    level='ERROR',
-                    category='feature',
-                    message=error_msg,
-                    details={'file': self.feature_config.filename, 'detected_format': str(self.feature_config.detected_format)}
+            try:
+                validate_minimal_mode_requirements(
+                    self.feature_config.detected_format,
+                    FeatureFormat.GFF,
+                    self.feature_config.coding_type,
+                    self.settings.coding_type,
+                    self.feature_config.filename,
+                    self.logger,
+                    'feature'
                 )
-                raise FeatureValidationError(error_msg)
+            except ValidationError as e:
+                # Re-raise as FeatureValidationError for consistency
+                raise FeatureValidationError(str(e)) from e
 
-            input_coding = self.feature_config.coding_type
-            required_coding = self.settings.coding_type
-
-            if input_coding != required_coding:
-                error_msg = f'Minimal mode requires input coding to match output coding. Input: {input_coding}, Required: {required_coding}. Use validation_level "trust" or "strict" to change compression.'
-                self.logger.add_validation_issue(
-                    level='ERROR',
-                    category='feature',
-                    message=error_msg,
-                    details={'file': self.feature_config.filename, 'input_coding': str(input_coding), 'required_coding': str(required_coding)}
-                )
-                raise FeatureValidationError(error_msg)
-
-            output_path_minimal = output_dir / output_filename
-            self.logger.debug(f"Copying {self.input_path} to {output_path_minimal}")
-            shutil.copy2(self.input_path, output_path_minimal)
-            self.logger.info(f"Output saved: {output_path_minimal}")
-            return output_path_minimal
-
-        output_path = output_dir / output_filename
+            return copy_file_minimal_mode(self.input_path, output_path, self.logger)
         self.logger.debug(f"Writing output to: {output_path}")
 
         with open_compressed_writer(output_path, self.settings.coding_type, threads=self.threads) as handle:

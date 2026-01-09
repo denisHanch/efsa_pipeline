@@ -15,6 +15,7 @@ import re
 from validation_pkg.logger import get_logger
 from validation_pkg.utils.settings import BaseSettings
 from validation_pkg.exceptions import (
+    ValidationError,
     ReadValidationError,
     FileFormatError,
     FastqFormatError,
@@ -769,23 +770,23 @@ class ReadValidator:
     
     def _copy_bam_to_output(self) -> Path:
         """Copy BAM file to output directory without processing."""
+        from validation_pkg.utils.path_utils import build_safe_output_dir
+        from validation_pkg.utils.file_handler import strip_all_extensions
+
         self.logger.debug("Copying BAM file to output directory...")
 
-        # Determine output directory (with optional subdirectory)
-        output_dir = self.output_dir
-        if self.settings.output_subdir_name:
-            output_dir = output_dir / self.settings.output_subdir_name
-
-        # Create output directory
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Build safe output directory (with path traversal protection)
+        output_dir = build_safe_output_dir(
+            self.output_dir,
+            self.settings.output_subdir_name,
+            create=True
+        )
 
         # Generate output filename - keep original name and compression
         output_filename = self.read_config.filename
         if self.settings.output_filename_suffix:
             # Insert suffix before extensions
-            base_name = self.read_config.filename
-            for suffix in self.input_path.suffixes:
-                base_name = base_name.replace(suffix, '')
+            base_name = strip_all_extensions(self.read_config.filename, self.input_path)
             # Reconstruct with suffix and original extensions
             extensions = ''.join(self.input_path.suffixes)
             output_filename = f"{base_name}_{self.settings.output_filename_suffix}{extensions}"
@@ -801,15 +802,20 @@ class ReadValidator:
 
     def _save_output(self) -> Path:
         """Save processed read to output directory using settings."""
+        from validation_pkg.utils.path_utils import build_safe_output_dir
+        from validation_pkg.utils.validation_helpers import (
+            validate_minimal_mode_requirements,
+            copy_file_minimal_mode
+        )
+
         self.logger.debug("Saving output file...")
 
-        # Determine output directory (with optional subdirectory)
-        output_dir = self.output_dir
-        if self.settings.output_subdir_name:
-            output_dir = output_dir / self.settings.output_subdir_name
-
-        # Create output directory
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Build safe output directory (with path traversal protection)
+        output_dir = build_safe_output_dir(
+            self.output_dir,
+            self.settings.output_subdir_name,
+            create=True
+        )
 
         # Generate output filename from original filename (without compression extension)
         # Get base name without any extensions
@@ -830,9 +836,7 @@ class ReadValidator:
         output_filename += self.settings.coding_type.to_extension()
         output_path = output_dir / output_filename
 
-
-        # Check coding - must match settings.coding_type
-        # read_config.coding_type is CodingType enum, coding is normalized above
+        # Store input and required coding for later use
         input_coding = self.read_config.coding_type
         required_coding = self.settings.coding_type
 
@@ -841,28 +845,22 @@ class ReadValidator:
         if self.validation_level == 'minimal':
             self.logger.debug("Minimal mode - validating format and coding requirements")
 
-            # Check format - must be FASTQ
-            if self.read_config.detected_format != ReadFormat.FASTQ:
-                error_msg = f'Minimal mode requires FASTQ format, got {self.read_config.detected_format}. Use validation_level "trust" or "strict" to convert.'
-                self.logger.add_validation_issue(
-                    level='ERROR',
-                    category='read',
-                    message=error_msg,
-                    details={'file': self.read_config.filename, 'detected_format': str(self.read_config.detected_format)}
+            # Validate format and coding requirements
+            try:
+                validate_minimal_mode_requirements(
+                    self.read_config.detected_format,
+                    ReadFormat.FASTQ,
+                    input_coding,
+                    required_coding,
+                    self.read_config.filename,
+                    self.logger,
+                    'read'
                 )
-                raise ReadValidationError(error_msg)
+            except ValidationError as e:
+                # Re-raise as ReadValidationError for consistency
+                raise ReadValidationError(str(e)) from e
 
-            if input_coding != required_coding:
-                error_msg = f'Minimal mode requires input coding to match output coding. Input: {input_coding}, Required: {required_coding}. Use validation_level "trust" or "strict" to change compression.'
-                self.logger.add_validation_issue(
-                    level='ERROR',
-                    category='read',
-                    message=error_msg,
-                    details={'file': self.read_config.filename, 'input_coding': str(input_coding), 'required_coding': str(required_coding)}
-                )
-                raise ReadValidationError(error_msg)
-
-            # Check line count divisible by 4 (fast validation)
+            # Additional FASTQ-specific validation: check line count divisible by 4
             try:
                 line_count = self._count_lines_fast()
                 if line_count % 4 != 0:
@@ -888,15 +886,7 @@ class ReadValidator:
                 )
                 raise ReadValidationError(error_msg) from e
 
-            # Use the output_filename already constructed (includes correct extension)
-            output_path_minimal = output_dir / output_filename
-
-            # Copy file
-            self.logger.debug(f"Copying {self.input_path} to {output_path_minimal}")
-            shutil.copy2(self.input_path, output_path_minimal)
-
-            self.logger.info(f"Output saved: {output_path_minimal}")
-            return output_path_minimal
+            return copy_file_minimal_mode(self.input_path, output_path, self.logger)
 
         # Trust mode - copy original file with coding conversion
         # Trust mode parsed only first 10 sequences for validation, so we copy the original file

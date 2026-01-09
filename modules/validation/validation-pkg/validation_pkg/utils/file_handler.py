@@ -5,7 +5,7 @@ import bz2
 import re
 import threading
 from pathlib import Path
-from typing import Union, TextIO, Type, Tuple, Any, Dict
+from typing import Union, TextIO, Type, Tuple, Any, Dict, Optional
 
 from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, FeatureFormat
 from validation_pkg.exceptions import CompressionError
@@ -39,6 +39,9 @@ __all__ = [
 
     # Path utilities
     'get_incremented_path',
+    'strip_all_extensions',
+    'build_output_filename',
+    'build_output_path',
 ]
 
 
@@ -554,3 +557,147 @@ def get_incremented_path(path: Path, separator: str = "_") -> Path:
         # Safety check to avoid infinite loop
         if counter > 9999:
             raise RuntimeError(f"Too many incremented files for {path}. Maximum is 9999.")
+
+
+def strip_all_extensions(filename: str, path: Optional[Path] = None) -> str:
+    """
+    Strip all extensions from a filename.
+
+    Args:
+        filename: The filename to process
+        path: Optional Path object to get suffixes from
+
+    Returns:
+        Filename with all extensions removed
+
+    Examples:
+        >>> strip_all_extensions("genome.fasta.gz")
+        'genome'
+        >>> strip_all_extensions("reads_R1.fastq")
+        'reads_R1'
+    """
+    if not filename:
+        return filename
+
+    # If path provided, use its suffixes list (more reliable)
+    if path:
+        base_name = filename
+        for suffix in path.suffixes:
+            base_name = base_name.replace(suffix, '', 1)
+        return base_name
+
+    # Otherwise, iteratively remove extensions
+    result = filename
+    while True:
+        name_without_ext = Path(result).stem
+        if name_without_ext == result:
+            break
+        result = name_without_ext
+
+    return result
+
+
+def build_output_filename(
+    input_filename: str,
+    output_format: str,
+    coding_type: Optional[CodingType] = None,
+    suffix: Optional[str] = None,
+    input_path: Optional[Path] = None
+) -> str:
+    """
+    Build output filename with consistent naming convention.
+
+    Args:
+        input_filename: Original input filename
+        output_format: Output format extension (e.g., 'fasta', 'fastq', 'gff')
+        coding_type: Optional compression type (adds .gz, .bz2, etc.)
+        suffix: Optional custom suffix to add before extension
+        input_path: Optional input Path object for accurate extension stripping
+
+    Returns:
+        Output filename with proper extensions
+
+    Examples:
+        >>> build_output_filename("genome.fa.gz", "fasta", CodingType.GZIP, "validated")
+        'genome_validated.fasta.gz'
+        >>> build_output_filename("reads.fq", "fastq", CodingType.NONE)
+        'reads.fastq'
+    """
+    # Strip all extensions from input filename
+    base_name = strip_all_extensions(input_filename, input_path)
+
+    # Add custom suffix if provided
+    if suffix:
+        filename = f"{base_name}_{suffix}.{output_format}"
+    else:
+        filename = f"{base_name}.{output_format}"
+
+    # Add compression extension if specified
+    if coding_type:
+        filename += coding_type.to_extension()
+
+    return filename
+
+
+def build_output_path(
+    base_dir: Path,
+    input_filename: str,
+    output_format: str,
+    coding_type: Optional[CodingType] = None,
+    subdir_name: Optional[str] = None,
+    filename_suffix: Optional[str] = None,
+    input_path: Optional[Path] = None,
+    create_dirs: bool = True
+) -> Path:
+    """
+    Build complete output path with consistent naming and directory structure.
+
+    This is the main entry point for building output paths. It handles:
+    - Safe subdirectory creation (with path traversal protection)
+    - Extension stripping
+    - Custom suffix addition
+    - Compression extension handling
+
+    Args:
+        base_dir: Base output directory
+        input_filename: Original input filename
+        output_format: Output format extension (e.g., 'fasta', 'fastq', 'gff')
+        coding_type: Optional compression type
+        subdir_name: Optional subdirectory name (will be sanitized)
+        filename_suffix: Optional suffix to add to filename
+        input_path: Optional input Path for accurate extension handling
+        create_dirs: Whether to create directories (default: True)
+
+    Returns:
+        Complete output path
+
+    Raises:
+        ValueError: If subdir_name contains illegal characters
+        ConfigurationError: If path would escape base_dir
+
+    Examples:
+        >>> build_output_path(
+        ...     Path("/output"),
+        ...     "genome.fasta.gz",
+        ...     "fasta",
+        ...     CodingType.GZIP,
+        ...     subdir_name="validated",
+        ...     filename_suffix="filtered"
+        ... )
+        Path("/output/validated/genome_filtered.fasta.gz")
+    """
+    from validation_pkg.utils.path_utils import build_safe_output_dir
+
+    # Build safe output directory (with path traversal protection)
+    output_dir = build_safe_output_dir(base_dir, subdir_name, create=create_dirs)
+
+    # Build output filename
+    output_filename = build_output_filename(
+        input_filename,
+        output_format,
+        coding_type,
+        filename_suffix,
+        input_path
+    )
+
+    return output_dir / output_filename
