@@ -158,7 +158,7 @@ class ReadValidator:
         ignore_bam: bool = True
 
         # Output format
-        coding_type: Optional[str] = None
+        coding_type: Optional[CT] = CT.NONE
         output_filename_suffix: Optional[str] = None
         output_subdir_name: Optional[str] = None
         outdir_by_ngs_type: bool = False
@@ -243,7 +243,6 @@ class ReadValidator:
             self.output_metadata.mean_read_length = stats['mean_read_length']
             self.output_metadata.longest_read_length = stats['longest_read_length']
             self.output_metadata.shortest_read_length = stats['shortest_read_length']
-
 
     def run(self) -> OutputMetadata:
         """Execute validation and processing workflow."""
@@ -342,79 +341,11 @@ class ReadValidator:
         from validation_pkg.utils.file_handler import open_file_with_coding_type
 
         try:
-            # Count lines using Python file iteration (no shell commands)
-            # This is secure against command injection and works for all compression types
             with open_file_with_coding_type(self.input_path, self.read_config.coding_type, mode='rt') as f:
-                line_count = sum(1 for _ in f)
-
-            return line_count
-
-        except TimeoutError:
-            raise ReadValidationError("Line counting timed out - file too large")
-        except (ValueError, IndexError) as e:
-            raise ReadValidationError(f"Failed to parse line count: {e}")
+                return sum(1 for _ in f)
         except Exception as e:
             raise ReadValidationError(f"Line counting failed: {e}")
 
-    def _validate_first_fastq_record(self) -> Optional[SeqRecord]:
-        """Validate only the first FASTQ record for format correctness."""
-        self.logger.debug("Validating first FASTQ record...")
-
-        try:
-            handle = self._open_file()
-            try:
-                # Read first 4 lines
-                lines = []
-                for i in range(4):
-                    line = handle.readline()
-                    if not line:
-                        raise FastqFormatError(
-                            f"File has fewer than 4 lines - not a valid FASTQ file"
-                        )
-                    lines.append(line.rstrip('\n\r'))
-
-                # Validate FASTQ format
-                if not lines[0].startswith('@'):
-                    raise FastqFormatError(
-                        f"First line must start with '@', found: {lines[0][:50]}"
-                    )
-
-                if not lines[2].startswith('+'):
-                    raise FastqFormatError(
-                        f"Third line must start with '+', found: {lines[2][:50]}"
-                    )
-
-                # Check that sequence and quality have same length
-                seq_len = len(lines[1])
-                qual_len = len(lines[3])
-                if seq_len != qual_len:
-                    raise FastqFormatError(
-                        f"Sequence length ({seq_len}) doesn't match quality length ({qual_len})"
-                    )
-
-                # Parse first record using BioPython to ensure it's valid
-                from io import StringIO
-                first_record_text = '\n'.join(lines)
-                record = next(SeqIO.parse(StringIO(first_record_text), 'fastq'))
-
-                self.logger.debug(f"✓ First record validated: {record.id}, length={len(record.seq)}")
-                return record
-
-            finally:
-                handle.close()
-
-        except FastqFormatError:
-            raise
-        except Exception as e:
-            error_msg = f"Failed to validate first FASTQ record: {e}"
-            self.logger.add_validation_issue(
-                level='ERROR',
-                category='read',
-                message=error_msg,
-                details={'file': self.read_config.filename, 'error': str(e)}
-            )
-            raise FastqFormatError(error_msg) from e
-    
     def _parse_file(self) -> None:
         """Parse FASTQ file using BioPython and validate format from read_config."""
         self.logger.debug(f"Parsing {self.read_config.detected_format} file (validation_level={self.validation_level})...")
@@ -596,37 +527,22 @@ class ReadValidator:
             for idx in range(validate_count):
                 record = self.sequences[idx]
 
-                # Check sequence ID
-                if not record.id and not self.settings.allow_empty_id:
-                    error_msg = f"Sequence at index {idx} has no ID"
+                # Use the same validation function as parallel mode
+                result = _validate_single_read(
+                    record,
+                    check_invalid_chars=self.settings.check_invalid_chars,
+                    allow_empty_id=self.settings.allow_empty_id
+                )
+
+                if 'error' in result:
+                    error_msg = f"Sequence '{result['record_id']}': {result['error']}"
                     self.logger.add_validation_issue(
                         level='ERROR',
                         category='read',
                         message=error_msg,
-                        details={'sequence_index': idx, 'sequence_id': str(record.id)}
+                        details={**result['details'], 'sequence_index': idx}
                     )
                     raise ReadValidationError(error_msg)
-
-                # Check for valid nucleotides
-                if self.settings.check_invalid_chars:
-                    valid_chars = set('ATCGNatcgn')
-                    seq_str = str(record.seq)
-                    invalid_chars = set(seq_str) - valid_chars
-
-                    if invalid_chars:
-                        char_count = sum(1 for c in seq_str if c in invalid_chars)
-                        error_msg = f"Sequence '{record.id}' contains {char_count} invalid character(s): {', '.join(sorted(invalid_chars))}"
-                        self.logger.add_validation_issue(
-                            level='ERROR',
-                            category='read',
-                            message=error_msg,
-                            details={
-                                'sequence_id': record.id,
-                                'invalid_chars': list(invalid_chars),
-                                'count': char_count
-                            }
-                        )
-                        raise ReadValidationError(error_msg)
 
         # Check for duplicate IDs (always sequential - requires full list)
         if not self.settings.allow_duplicate_ids:
@@ -906,16 +822,14 @@ class ReadValidator:
         else:
             output_filename = f"{base_name}.fastq"
 
-        # Add compression extension if requested (from settings)
-        # Normalize settings.coding_type to CodingType enum
-        coding = CT(self.settings.coding_type) if self.settings.coding_type else CT.NONE
-
-        if coding == CT.GZIP:
-            output_filename += '.gz'
-        elif coding == CT.BZIP2:
-            output_filename += '.bz2'
-
+        output_filename += self.settings.coding_type.to_extension()
         output_path = output_dir / output_filename
+
+
+        # Check coding - must match settings.coding_type
+        # read_config.coding_type is CodingType enum, coding is normalized above
+        input_coding = self.read_config.coding_type
+        required_coding = self.settings.coding_type
 
         # Minimal mode - copy file as-is without parsing
         # Required: FASTQ format + coding must match settings.coding_type
@@ -932,11 +846,6 @@ class ReadValidator:
                     details={'file': self.read_config.filename, 'detected_format': str(self.read_config.detected_format)}
                 )
                 raise ReadValidationError(error_msg)
-
-            # Check coding - must match settings.coding_type
-            # read_config.coding_type is CodingType enum, coding is normalized above
-            input_coding = self.read_config.coding_type
-            required_coding = coding
 
             if input_coding != required_coding:
                 error_msg = f'Minimal mode requires input coding to match output coding. Input: {input_coding}, Required: {required_coding}. Use validation_level "trust" or "strict" to change compression.'
@@ -989,17 +898,13 @@ class ReadValidator:
         if self.validation_level == 'trust':
             self.logger.debug("Trust mode - copying original file with coding conversion")
 
-            # Both are CodingType enum: read_config.coding_type and coding (normalized above)
-            input_coding = self.read_config.coding_type
-            output_coding = coding
-
             # If input and output coding match, simple copy
-            if input_coding == output_coding:
+            if input_coding == required_coding:
                 self.logger.debug(f"Copying {self.input_path} to {output_path} (same coding)")
                 shutil.copy2(self.input_path, output_path)
             else:
                 # Convert coding using file_handler utilities
-                self.logger.debug(f"Converting {input_coding} -> {output_coding}")
+                self.logger.debug(f"Converting {input_coding} -> {required_coding}")
 
                 # Map (input, output) pairs to conversion functions
                 conversion_map = {
@@ -1011,11 +916,11 @@ class ReadValidator:
                     (CT.GZIP, CT.BZIP2): gz_to_bz2,
                 }
 
-                conversion_func = conversion_map.get((input_coding, output_coding))
+                conversion_func = conversion_map.get((input_coding, required_coding))
                 if conversion_func:
                     conversion_func(self.input_path, output_path, threads=self.threads)
                 else:
-                    error_msg = f"Unsupported coding conversion: {input_coding} -> {output_coding}"
+                    error_msg = f"Unsupported coding conversion: {input_coding} -> {required_coding}"
                     raise ReadValidationError(error_msg)
 
             self.logger.info(f"Output saved: {output_path}")
@@ -1025,8 +930,6 @@ class ReadValidator:
         # If input is FASTQ, coding matches, and no edits were made, use simple copy
         # Otherwise, write sequences using BioPython
 
-        input_coding = self.read_config.coding_type
-        output_coding = coding
         input_format = self.read_config.detected_format
 
         # Check if we can use optimized copy (no edits, same format and coding)
@@ -1034,7 +937,7 @@ class ReadValidator:
         # In the future, check if edits were actually applied (e.g., sequences removed/modified)
         can_optimize = (
             input_format == ReadFormat.FASTQ and  # Input is FASTQ
-            input_coding == output_coding  # Compression matches
+            input_coding == required_coding  # Compression matches
             # Future: add check for "no edits were actually applied"
         )
 
@@ -1048,7 +951,7 @@ class ReadValidator:
             self.logger.debug(f"Writing output to: {output_path}")
 
             # Use optimized compression writer
-            with open_compressed_writer(output_path, coding, threads=self.threads) as handle:
+            with open_compressed_writer(output_path, self.settings.coding_type, threads=self.threads) as handle:
                 SeqIO.write(self.sequences, handle, 'fastq')
 
         self.logger.info(f"Output saved: {output_path}")

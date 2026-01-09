@@ -65,7 +65,7 @@ class GenomeValidator:
         min_sequence_length: int = 100
 
         # Output format
-        coding_type: Optional[str] = None
+        coding_type: Optional[CT] = CT.NONE
         output_filename_suffix: Optional[str] = None
         output_subdir_name: Optional[str] = None
 
@@ -208,8 +208,6 @@ class GenomeValidator:
             self._parse_file()
 
             self._validate_sequences()
-
-            self._convert_to_fasta()
 
             self._apply_edits() # include plasmid handle
 
@@ -518,28 +516,15 @@ class GenomeValidator:
         else:
             plasmid_filename = f"{base_name}_plasmid{index}.fasta"
 
-        # Add compression extension if requested
-        coding = self.settings.coding_type
-
-        if coding in ('gz', 'gzip', CT.GZIP):
-            plasmid_filename += '.gz'
-        elif coding in ('bz2', 'bzip2', CT.BZIP2):
-            plasmid_filename += '.bz2'
+        plasmid_filename += self.settings.coding_type.to_extension()
             
         plasmid_path = output_dir / plasmid_filename
 
         # Write plasmid sequences with appropriate compression
         self.logger.debug(f"Writing plasmid sequences to: {plasmid_path}")
 
-        # Normalize coding type to CodingType enum
-        coding_enum = CT.NONE
-        if coding in ('gz', 'gzip', CT.GZIP):
-            coding_enum = CT.GZIP
-        elif coding in ('bz2', 'bzip2', CT.BZIP2):
-            coding_enum = CT.BZIP2
-
         # Use optimized compression writer
-        with open_compressed_writer(plasmid_path, coding_enum, threads=self.threads) as handle:
+        with open_compressed_writer(plasmid_path, self.settings.coding_type, threads=self.threads) as handle:
             SeqIO.write(plasmid_sequences, handle, 'fasta')
 
         self.logger.info(f"Plasmid sequences saved: {plasmid_path}")
@@ -550,22 +535,6 @@ class GenomeValidator:
         # Log details about each plasmid
         for seq in plasmid_sequences:
             self.logger.debug(f"  Plasmid: {seq.id} ({len(seq.seq)} bp)")
-
-    def _convert_to_fasta(self) -> None:
-        """Convert sequences to FASTA format (if not already)."""
-        # Check if already FASTA using enum comparison
-        from validation_pkg.utils.formats import GenomeFormat
-
-        if self.genome_config.detected_format == GenomeFormat.FASTA:
-            self.logger.debug("Already in FASTA format")
-            return
-
-        self.logger.debug(f"Converting from {self.genome_config.detected_format} to FASTA...")
-
-        # BioPython SeqRecord objects can be written as FASTA directly
-        # No conversion needed, just change the output format
-
-        self.logger.debug("✓ Ready for FASTA output")
     
     def _save_output(self) -> Path:
         """Save processed genome to output directory using settings."""
@@ -594,12 +563,7 @@ class GenomeValidator:
 
         # Add compression extension if requested (from settings, not input)
         # Support both string ('gz', 'bz2') and enum (CodingType.GZIP, CodingType.BZIP2)
-        coding = self.settings.coding_type
-
-        if coding in ('gz', 'gzip', CT.GZIP):
-            output_filename += '.gz'
-        elif coding in ('bz2', 'bzip2', CT.BZIP2):
-            output_filename += '.bz2'
+        output_filename += self.settings.coding_type.to_extension()
 
         # Minimal mode - copy file as-is without parsing
         # Required: FASTA format + coding must match settings.coding_type
@@ -620,20 +584,7 @@ class GenomeValidator:
             # Check coding - must match settings.coding_type
             # Normalize both for comparison
             input_coding = self.genome_config.coding_type
-            required_coding = coding  # This is already normalized from settings.coding_type
-
-            # Map None to CT.NONE for comparison
-            if input_coding is None:
-                input_coding = CT.NONE
-            if required_coding is None:
-                required_coding = CT.NONE
-
-            # Convert string to CT if needed
-            if isinstance(required_coding, str):
-                if required_coding in ('gz', 'gzip'):
-                    required_coding = CT.GZIP
-                elif required_coding in ('bz2', 'bzip2'):
-                    required_coding = CT.BZIP2
+            required_coding = self.settings.coding_type
 
             if input_coding != required_coding:
                 error_msg = f'Minimal mode requires input coding to match output coding. Input: {input_coding}, Required: {required_coding}. Use validation_level "trust" or "strict" to change compression.'
@@ -666,15 +617,8 @@ class GenomeValidator:
         # Write output with appropriate compression
         self.logger.debug(f"Writing output to: {output_path}")
 
-        # Normalize coding type to CodingType enum
-        coding_enum = CT.NONE
-        if coding in ('gz', 'gzip', CT.GZIP):
-            coding_enum = CT.GZIP
-        elif coding in ('bz2', 'bzip2', CT.BZIP2):
-            coding_enum = CT.BZIP2
-
         # Use optimized compression writer
-        with open_compressed_writer(output_path, coding_enum, threads=self.threads) as handle:
+        with open_compressed_writer(output_path, self.settings.coding_type, threads=self.threads) as handle:
             SeqIO.write(self.sequences, handle, 'fasta')
 
         self.logger.info(f"Output saved: {output_path}")
