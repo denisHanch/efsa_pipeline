@@ -82,6 +82,11 @@ class FeatureValidator:
         output_filename_suffix: Optional[str] = None
         output_subdir_name: Optional[str] = None
 
+        def __post_init__(self):
+            """Normalize settings after initialization."""
+            # Normalize coding_type to handle strings and None
+            self.coding_type = CT.normalize(self.coding_type)
+
     def __init__(self, feature_config, settings: Optional[Settings] = None) -> None:
         self.logger = get_logger()
         self.feature_config = feature_config

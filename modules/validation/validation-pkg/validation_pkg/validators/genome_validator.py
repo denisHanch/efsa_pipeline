@@ -70,7 +70,10 @@ class GenomeValidator:
         output_subdir_name: Optional[str] = None
 
         def __post_init__(self):
-            """Validate settings after initialization."""
+            """Validate and normalize settings after initialization."""
+            # Normalize coding_type if needed (handles direct instantiation)
+            self.coding_type = CT.normalize(self.coding_type)
+
             if self.plasmid_split and self.plasmids_to_one:
                 raise ValueError(
                     "plasmid_split and plasmids_to_one cannot both be True. "

@@ -34,8 +34,19 @@ class BaseSettings(ABC):
                 f"Allowed settings: {allowed}"
             )
 
-        # Update fields
+        # Update fields with automatic type normalization
         for key, value in kwargs.items():
+            # Get the field type annotation
+            field_info = next((f for f in fields(new_settings) if f.name == key), None)
+            if field_info:
+                # Check if this field is a CodingType enum and normalize it
+                field_type = field_info.type
+                # Handle Optional[CodingType] or CodingType annotations
+                if 'CodingType' in str(field_type):
+                    # Import here to avoid circular imports
+                    from validation_pkg.utils.formats import CodingType
+                    value = CodingType.normalize(value)
+
             setattr(new_settings, key, value)
 
         return new_settings
@@ -60,7 +71,17 @@ class BaseSettings(ABC):
                 f"Allowed settings: {allowed}"
             )
 
-        return cls(**data)
+        # Normalize CodingType fields before creating instance
+        normalized_data = {}
+        for key, value in data.items():
+            field_info = next((f for f in fields(cls) if f.name == key), None)
+            if field_info and 'CodingType' in str(field_info.type):
+                # Import here to avoid circular imports
+                from validation_pkg.utils.formats import CodingType
+                value = CodingType.normalize(value)
+            normalized_data[key] = value
+
+        return cls(**normalized_data)
 
     def __str__(self) -> str:
         """Pretty print settings for inspection."""

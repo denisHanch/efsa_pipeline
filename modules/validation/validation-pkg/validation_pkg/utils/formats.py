@@ -16,7 +16,7 @@ class CodingType(Enum):
     GZIP = "gzip"
     BZIP2 = "bzip2"
     NONE = "none"
-    
+
     def to_extension(self) -> str:
         """Return file extension for this compression type."""
         extension_map = {
@@ -25,10 +25,31 @@ class CodingType(Enum):
             CodingType.NONE: ''
         }
         return extension_map[self]
-    
+
     @classmethod
-    def _missing_(cls, value):
-        """Called when enum lookup fails - allows flexible input formats."""
+    def normalize(cls, value):
+        """
+        Convert various input formats to CodingType enum.
+
+        This method allows flexible input:
+        - Strings: 'gz', 'gzip', '.gz', 'bz2', 'bzip2', '.bz2', 'none', None
+        - Enums: CodingType.GZIP, etc.
+        - Filenames: 'file.gz' extracts '.gz'
+
+        Args:
+            value: Input value to normalize
+
+        Returns:
+            CodingType enum member
+        """
+        # If already a CodingType, return as-is
+        if isinstance(value, cls):
+            return value
+
+        # Handle None
+        if value is None:
+            return cls.NONE
+
         # Normalize the input
         value_lower = str(value).lower().strip()
 
@@ -42,6 +63,8 @@ class CodingType(Enum):
             'gzip': cls.GZIP,
             'bz2': cls.BZIP2,
             'bzip2': cls.BZIP2,
+            'none': cls.NONE,
+            '': cls.NONE
         }
 
         # Try to find matching enum
@@ -54,10 +77,15 @@ class CodingType(Enum):
             ext = path.suffix.lower()
             if ext:
                 # Remove dot and try again
-                return cls._missing_(ext)
+                return cls.normalize(ext)
 
         # Default to NONE if nothing matches
         return cls.NONE
+
+    @classmethod
+    def _missing_(cls, value):
+        """Called when enum lookup fails - allows flexible input formats."""
+        return cls.normalize(value)
 
 
 class GenomeFormat(Enum):
