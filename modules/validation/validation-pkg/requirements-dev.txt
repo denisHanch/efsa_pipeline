@@ -1,0 +1,8 @@
+# Development and testing dependencies
+# Install with: pip install -r requirements-dev.txt
+
+# Base requirements
+-r requirements.txt
+
+# Testing framework
+pytest==8.4.2

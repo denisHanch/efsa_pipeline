@@ -22,7 +22,6 @@ setup(
     description="Simple package to manage input validation for GMO pipeline",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/draessld/validation-pkg",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -31,4 +30,9 @@ setup(
     ],
     python_requires=">=3.10",
     install_requires=read_requirements(),
+    extras_require={
+        "dev": [
+            "pytest==8.4.2",
+        ],
+    },
 )
