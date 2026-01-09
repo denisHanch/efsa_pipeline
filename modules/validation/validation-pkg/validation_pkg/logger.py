@@ -1,10 +1,4 @@
-"""
-Logging configuration for the bioinformatics validation package.
-
-Provides structured logging with multiple outputs:
-- Console output (colored, user-friendly)
-- File output (detailed, for debugging)
-"""
+"""Logging configuration for the bioinformatics validation package."""
 
 import sys
 import os
@@ -61,12 +55,7 @@ def add_log_level_colors(_, level: str, event_dict: dict) -> dict:
 
 
 def format_process_info(logger, method_name, event_dict: dict) -> dict:
-    """
-    Format process/worker information for display in console logs.
-
-    Creates a formatted prefix like: [Worker-1] or [file.fastq]
-    This appears before the log message for easy identification.
-    """
+    """Format process/worker information for display in console logs."""
     worker_id = event_dict.get("worker_id")
     file_context = event_dict.get("file_context")
     category = event_dict.get("category")
@@ -100,13 +89,7 @@ def format_process_info(logger, method_name, event_dict: dict) -> dict:
 
 
 class ValidationLogger:
-    """
-    Logger for validation package.
-
-    Features:
-    - Console output (colored, user-friendly)
-    - File output (detailed debug log)
-    """
+    """Logger for validation package with structured logging support."""
 
     _instance = None
     _initialized = False
@@ -147,18 +130,7 @@ class ValidationLogger:
         log_file: Optional[Path] = None,
         clear_previous_issues: bool = True
     ):
-        """
-        Set up logging handlers.
-
-        Args:
-            console_level: Level for console output (DEBUG, INFO, WARNING, ERROR)
-            log_file: Path to detailed log file (optional)
-            clear_previous_issues: Clear validation issues from previous runs (default: True)
-
-        Note:
-            Setting clear_previous_issues=True helps prevent test contamination and
-            ensures each validation run starts with a clean slate.
-        """
+        """Set up logging handlers."""
         # Clear validation issues from previous runs (prevents contamination)
         if clear_previous_issues:
             self.clear_issues()
@@ -263,21 +235,7 @@ class ValidationLogger:
         enable_file_logging: bool = True,
         log_file: Optional[Path] = None
     ):
-        """
-        Reconfigure logging level after initial setup.
-
-        This method allows changing the logging level after the logger has been
-        initially configured, useful for applying user-specified logging levels
-        from config files.
-
-        Args:
-            console_level: New console logging level (DEBUG, INFO, WARNING, ERROR)
-            enable_file_logging: Whether to enable file logging
-            log_file: Path to log file (if enabling file logging and not already set)
-
-        Note:
-            This updates existing handlers rather than recreating the entire logger.
-        """
+        """Reconfigure logging level after initial setup."""
         console_level_upper = console_level.upper()
 
         # Check if we're using stdlib logging (has handlers)
@@ -358,15 +316,7 @@ class ValidationLogger:
             self.validation_issues.append(('CRITICAL', message))
 
     def add_validation_issue(self, level: str, category: str, message: str, details: dict = None):
-        """
-        Add a structured validation issue (thread-safe).
-
-        Args:
-            level: ERROR, WARNING, INFO
-            category: genome, feature, read, inter-file, etc.
-            message: Human-readable description
-            details: Additional context (file, line, position, etc.)
-        """
+        """Add a structured validation issue (thread-safe)."""
         issue = {
             'timestamp': datetime.now().isoformat(),
             'level': level,
@@ -395,41 +345,12 @@ class ValidationLogger:
                 self.logger.info(log_message, **log_kwargs)
 
     def start_timer(self, name: str):
-        """
-        Start a named timer for performance measurement (thread-safe).
-
-        Args:
-            name: Unique identifier for this timer
-
-        Example:
-            >>> logger = get_logger()
-            >>> logger.start_timer("validation")
-            >>> # do some work
-            >>> elapsed = logger.stop_timer("validation")
-        """
+        """Start a named timer for performance measurement (thread-safe)."""
         with self._timers_lock:
             self._timers[name] = time.time()
 
     def stop_timer(self, name: str) -> float:
-        """
-        Stop a named timer and return elapsed time in seconds (thread-safe).
-
-        Args:
-            name: Identifier for the timer to stop
-
-        Returns:
-            float: Elapsed time in seconds
-
-        Raises:
-            KeyError: If timer with given name was never started
-
-        Example:
-            >>> logger = get_logger()
-            >>> logger.start_timer("validation")
-            >>> # do some work
-            >>> elapsed = logger.stop_timer("validation")
-            >>> print(f"Took {elapsed:.2f}s")
-        """
+        """Stop a named timer and return elapsed time in seconds (thread-safe)."""
         end_time = time.time()
         with self._timers_lock:
             if name not in self._timers:
@@ -441,24 +362,12 @@ class ValidationLogger:
             return elapsed
 
     def get_timers(self) -> Dict[str, float]:
-        """
-        Get all recorded timers (thread-safe).
-
-        Returns:
-            dict: Copy of timers dictionary with elapsed times
-        """
+        """Get all recorded timers (thread-safe)."""
         with self._timers_lock:
             return self._timers.copy()
 
     def add_file_timing(self, input_file: str, validator_type: str, elapsed_time: float):
-        """
-        Add file timing information (thread-safe).
-
-        Args:
-            input_file: Name of the input file
-            validator_type: Type of validator ("genome", "read", "feature")
-            elapsed_time: Time taken to process the file in seconds
-        """
+        """Add file timing information (thread-safe)."""
         timing = FileTimingSummary(
             input_file=input_file,
             validator_type=validator_type,
@@ -473,15 +382,7 @@ class ValidationLogger:
             self.file_timings.clear()
 
     def display_file_timings_summary(self):
-        """
-        Display a nice summary of file processing times.
-
-        Creates a formatted table showing:
-        - File name
-        - Validator type
-        - Processing time
-        - Total time
-        """
+        """Display a formatted summary of file processing times."""
         if not self.file_timings:
             return
 
@@ -526,42 +427,17 @@ class ValidationLogger:
         self.info("")
 
     def clear_issues(self):
-        """
-        Clear all validation issues (thread-safe).
-
-        This is useful for:
-        - Starting a new validation run with clean state
-        - Test isolation (preventing contamination between tests)
-
-        Example:
-            >>> logger = get_logger()
-            >>> logger.clear_issues()
-            >>> # Now validation_issues list is empty
-        """
+        """Clear all validation issues (thread-safe)."""
         with self._issues_lock:
             self.validation_issues.clear()
 
     def __enter__(self):
-        """
-        Context manager entry - clear issues at start.
-
-        This enables using the logger with 'with' statement for automatic isolation:
-        """
+        """Context manager entry - clear issues at start."""
         self.clear_issues()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Context manager exit - optionally clear issues at end.
-
-        Args:
-            exc_type: Exception type if an exception occurred
-            exc_val: Exception value
-            exc_tb: Exception traceback
-
-        Returns:
-            False to propagate exceptions
-        """
+        """Context manager exit - propagate exceptions."""
         # Don't clear issues on exit - caller may want to inspect them
         # If you want to clear, call clear_issues() explicitly
         return False
@@ -577,13 +453,7 @@ def setup_logging(
     console_level: str = "INFO",
     log_file: Optional[Path] = None,
 ):
-    """
-    Set up logging for the package.
-
-    Args:
-        console_level: Console output level (DEBUG, INFO, WARNING, ERROR)
-        log_file: Path to detailed log file
-    """
+    """Set up logging for the package."""
     logger = get_logger()
     logger.setup(console_level, log_file)
     return logger

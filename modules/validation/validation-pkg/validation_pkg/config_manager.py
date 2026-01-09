@@ -1,23 +1,4 @@
-"""
-Configuration management for bioinformatics file validation.
-
-This module provides classes and utilities for loading and validating JSON configuration
-files that specify input files, output directories, and validation settings.
-
-Main Components:
-    - GenomeConfig: Configuration for genome/plasmid files
-    - ReadConfig: Configuration for sequencing read files
-    - FeatureConfig: Configuration for feature annotation files
-    - Config: Main configuration container
-    - ConfigManager: JSON parser and validator
-
-Key Features:
-    - Automatic path resolution relative to config file location
-    - Compression and format detection
-    - Directory-based read loading
-    - Validator-specific settings extraction from config
-    - Thread count configuration for parallel compression
-"""
+"""Configuration management for bioinformatics file validation."""
 
 import json
 import os
@@ -44,17 +25,7 @@ DEFAULT_THREADS = 8
 
 @dataclass
 class GenomeConfig:
-    """
-    Configuration for genome or plasmid files.
-
-    Attributes:
-        filename: Original filename (relative to config)
-        filepath: Absolute resolved path
-        coding_type: Compression format (GZIP, BZIP2, or NONE)
-        detected_format: File format (FASTA or GENBANK)
-        output_dir: Base output directory from config
-        options: Merged global + file-level options (threads, validation_level only)
-    """
+    """Configuration for genome or plasmid files."""
     filename: str
     filepath: Path
     basename: str = None
@@ -81,18 +52,7 @@ class GenomeConfig:
 
 @dataclass
 class ReadConfig:
-    """
-    Configuration for sequencing read files.
-
-    Attributes:
-        filename: Original filename (relative to config)
-        filepath: Absolute resolved path
-        ngs_type: Sequencing platform ("illumina", "ont", or "pacbio")
-        coding_type: Compression format (GZIP, BZIP2, or NONE)
-        detected_format: File format (FASTQ or BAM)
-        output_dir: Base output directory from config
-        global_options: Merged global + file-level options (threads, validation_level only)
-    """
+    """Configuration for sequencing read files."""
     filename: str
     filepath: Path
     basename: str = None
@@ -122,17 +82,7 @@ class ReadConfig:
 
 @dataclass
 class FeatureConfig:
-    """
-    Configuration for feature annotation files.
-
-    Attributes:
-        filename: Original filename (relative to config)
-        filepath: Absolute resolved path
-        coding_type: Compression format (GZIP, BZIP2, or NONE)
-        detected_format: File format (GFF, GTF, or BED)
-        output_dir: Base output directory from config
-        options: Merged global + file-level options (threads, validation_level only)
-    """
+    """Configuration for feature annotation files."""
     filename: str
     filepath: Path
     basename: str = None
@@ -158,24 +108,7 @@ class FeatureConfig:
 
 
 class Config:
-    """
-    Main configuration container for validation workflow.
-
-    Stores validated configuration data loaded from JSON file, including file paths,
-    compression/format details, and options. Provides helper methods for path resolution.
-
-    Attributes:
-        ref_genome: Reference genome configuration (required)
-        mod_genome: Modified genome configuration (required)
-        reads: List of read file configurations (required, non-empty)
-        ref_plasmid: Reference plasmid configuration (optional)
-        mod_plasmid: Modified plasmid configuration (optional)
-        ref_feature: Reference feature configuration (optional)
-        mod_feature: Modified feature configuration (optional)
-        options: Additional options (e.g., thread count)
-        config_dir: Directory containing config file
-        output_dir: Base output directory for validated files
-    """
+    """Main configuration container for validation workflow."""
 
     def __init__(self):
         # Required fields
@@ -195,30 +128,11 @@ class Config:
         self.output_dir: Optional[Path] = None
 
     def get_threads(self) -> Optional[int]:
-        """
-        Get thread count from options, or None for auto-detection.
-
-        Returns:
-            Thread count if specified in options, None for auto-detection
-
-        Example:
-            >>> config = Config()
-            >>> config.options = {'threads': 4}
-            >>> config.get_threads()
-            4
-            >>> config.options = {}
-            >>> config.get_threads()
-            None
-        """
+        """Get thread count from options, or None for auto-detection."""
         return self.options.get('threads')
 
     def get_logging_level(self) -> str:
-        """
-        Get logging level from options, or default to 'INFO'.
-
-        Returns:
-            Logging level string ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
-        """
+        """Get logging level from options, or default to 'INFO'."""
         return self.options.get('logging_level', 'INFO')
 
     def __repr__(self):
@@ -236,33 +150,11 @@ class Config:
 
 
 class ConfigManager:
-    """
-    Configuration file parser and validator.
-
-    Responsible for loading JSON configuration files, validating their structure,
-    resolving file paths, detecting formats/compression, and extracting validator
-    settings.
-
-    Primary usage:
-        config = ConfigManager.load("config.json")
-    """
+    """Configuration file parser and validator."""
     
     @staticmethod
     def load(config_path: str) -> Config:
-        """
-        Load and validate configuration from JSON file.
-        
-        Args:
-            config_path: Path to config.json
-            
-        Returns:
-            Validated Config object
-            
-        Raises:
-            FileNotFoundError: If config file doesn't exist
-            ValueError: If configuration is invalid
-            json.JSONDecodeError: If JSON is malformed
-        """
+        """Load and validate configuration from JSON file."""
         logger = get_logger()
         logger.info(f"Loading configuration from: {config_path}")
         
@@ -361,19 +253,7 @@ class ConfigManager:
 
     @staticmethod
     def _parse_genome_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> GenomeConfig:
-        """
-        Parse a genome configuration entry.
-
-        Args:
-            value: Config value (dict with 'filename' or string)
-            field_name: Name of field for error messages
-            config_dir: Base directory for resolving relative paths
-            output_dir: Output directory for validated files
-            global_options: Global options from config (threads, validation_level)
-
-        Returns:
-            GenomeConfig with resolved paths and detected format/compression
-        """
+        """Parse a genome configuration entry."""
         logger = get_logger()
 
         # Parse filename and extra fields using unified utility
@@ -467,19 +347,7 @@ class ConfigManager:
 
     @staticmethod
     def _parse_read_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> ReadConfig:
-        """
-        Parse a read configuration entry.
-
-        Args:
-            value: Config value (dict with 'filename' and 'ngs_type' or string)
-            field_name: Name of field for error messages
-            config_dir: Base directory for resolving relative paths
-            output_dir: Output directory for validated files
-            global_options: Global options from config (threads, validation_level)
-
-        Returns:
-            ReadConfig with resolved paths and detected format/compression
-        """
+        """Parse a read configuration entry."""
         logger = get_logger()
 
         # Parse filename and extra fields using unified utility
@@ -530,24 +398,7 @@ class ConfigManager:
 
     @staticmethod
     def _parse_feature_config(value: Any, field_name: str, config_dir: Path, output_dir : Path, global_options: Dict[str, Any] = None) -> FeatureConfig:
-        """
-        Parse a single feature config entry and resolve paths.
-
-        Uses unified utilities from file_handler for consistent parsing.
-
-        Args:
-            value: Config value (dict with 'filename' or string)
-            field_name: Name of field for error messages
-            config_dir: Base directory for resolving relative paths
-            output_dir: Output directory for validated files
-            global_options: Global options from config (threads, validation_level)
-
-        Returns:
-            FeatureConfig with resolved paths and detected format/compression
-
-        Raises:
-            ValueError: If value format is invalid
-        """
+        """Parse a single feature config entry and resolve paths."""
         logger = get_logger()
 
         # Parse filename and extra fields using unified utility
@@ -577,23 +428,7 @@ class ConfigManager:
 
     @staticmethod
     def _parse_options(data: dict, config: Config):
-        """
-        Parse and validate global configuration options.
-
-        Global options apply to ALL files in the config and can only contain:
-        - threads: Number of threads for parallelization (positive integer or null)
-        - validation_level: Validation strategy ('strict', 'trust', or 'minimal')
-        - logging_level: Console logging verbosity ('DEBUG', 'INFO', 'WARNING', 'ERROR')
-
-        Other settings must be specified per-file in the config, not globally.
-
-        Args:
-            data: Configuration dictionary
-            config: Config object to update
-
-        Raises:
-            ConfigurationError: If invalid options provided or invalid values
-        """
+        """Parse and validate global configuration options."""
         logger = get_logger()
 
         # Get options dict from config, or empty dict if not present
@@ -747,21 +582,7 @@ class ConfigManager:
 
     @staticmethod
     def _setup_output_directory(config: Config):
-        """
-        Set up output directory for validation results.
-
-        Creates the output directory at config_dir/output/ if it doesn't exist.
-        Sets config.output_dir to the created directory path.
-
-        Note: Individual validators can use output_subdir_name in their settings
-        to create subdirectories within this base output directory.
-
-        Args:
-            config: Config object to update with output directory
-
-        Raises:
-            OSError: If directory creation fails
-        """
+        """Set up output directory for validation results."""
         logger = get_logger()
 
         # Create output directory path

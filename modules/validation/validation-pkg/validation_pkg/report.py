@@ -1,9 +1,4 @@
-"""
-Validation report generation module.
-
-Provides comprehensive reporting for validation results including
-input settings, output metadata, and inter-file validation results.
-"""
+"""Validation report generation module."""
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,21 +29,10 @@ class InterFileValidationRecord:
 
 
 class ValidationReport:
-    """
-    Comprehensive validation report builder.
-
-    Collects results from validators and inter-file validation,
-    tracks input settings and output metadata, then generates a
-    detailed report when flush() is called.
-    """
+    """Comprehensive validation report builder."""
 
     def __init__(self, report_path: Path):
-        """
-        Initialize validation report.
-
-        Args:
-            report_path: Path where the report will be written
-        """
+        """Initialize validation report."""
         from validation_pkg.utils.file_handler import get_incremented_path
 
         self.report_path = Path(report_path)
@@ -68,16 +52,7 @@ class ValidationReport:
 
     @staticmethod
     def _has_value(data: Dict[str, Any], key: str) -> bool:
-        """
-        Check if a key exists in dictionary and its value is not None.
-
-        Args:
-            data: Dictionary to check
-            key: Key name to look for
-
-        Returns:
-            True if key exists and value is not None, False otherwise
-        """
+        """Check if a key exists in dictionary and its value is not None."""
         return key in data and data[key] is not None
 
     def write(
@@ -86,20 +61,7 @@ class ValidationReport:
         file_type: str,
         settings: Optional[Any] = None
     ) -> None:
-        """
-        Add a validation result to the report.
-
-        Args:
-            result: Result dict from validator or inter-file validation
-            settings: Settings object used for validation (for file validators)
-            file_type: Type of result:
-                - "genome": GenomeValidator result
-                - "read": ReadValidator result (can be single or list)
-                - "feature": FeatureValidator result
-                - "genomexgenome": Genome inter-file validation
-                - "readxread": Read inter-file validation
-                - "featurexgenome": Feature-genome inter-file validation
-        """
+        """Add a validation result to the report."""
         # Handle file validation results
         if file_type in ("genome", "read", "feature"):
             # Handle both single result and list of results
@@ -140,18 +102,7 @@ class ValidationReport:
             raise ValueError(f"Unknown file_type: {file_type}")
 
     def flush(self, format: str = "text") -> None:
-        """
-        Generate and write the final report to file.
-
-        Args:
-            format: Report format - "text" (default) or "json"
-
-        Creates a comprehensive report with:
-        - Summary statistics
-        - Per-file validation results with settings
-        - Inter-file validation results
-        - Issue listings
-        """
+        """Generate and write the final report to file."""
         if format == "text":
             self._flush_text()
         elif format == "json":
@@ -160,7 +111,7 @@ class ValidationReport:
             raise ValueError(f"Unknown format: {format}. Use 'text' or 'json'")
 
     def _flush_text(self) -> None:
-        """Generate and write text format report."""
+        """Generate text format report."""
         end_time = datetime.now()
         duration = (end_time - self.start_time).total_seconds()
 
@@ -195,7 +146,7 @@ class ValidationReport:
         print(f"\n✓ Report written to: {self.report_path}")
 
     def _flush_json(self) -> None:
-        """Generate and write JSON format report."""
+        """Generate JSON format report."""
         end_time = datetime.now()
         duration = (end_time - self.start_time).total_seconds()
 
@@ -235,7 +186,7 @@ class ValidationReport:
         print(f"\n✓ JSON report written to: {json_path}")
 
     def _generate_summary_section(self) -> List[str]:
-        """Generate summary section of report."""
+        """Generate summary section."""
         lines = []
 
         # Count files by type
@@ -276,7 +227,7 @@ class ValidationReport:
         return lines
 
     def _get_summary_data(self) -> Dict[str, Any]:
-        """Get summary data for JSON export."""
+        """Get summary data."""
         genome_count = sum(1 for r in self.file_records if r.validator_type == "genome")
         read_count = sum(1 for r in self.file_records if r.validator_type == "read")
         feature_count = sum(1 for r in self.file_records if r.validator_type == "feature")
@@ -296,7 +247,7 @@ class ValidationReport:
         }
 
     def _generate_file_results_section(self) -> List[str]:
-        """Generate file-specific results section."""
+        """Generate file results section."""
         lines = []
         lines.append("=" * 100)
         lines.append("FILE VALIDATION RESULTS".center(100))
@@ -309,7 +260,7 @@ class ValidationReport:
         return lines
 
     def _format_file_record(self, idx: int, record: FileValidationRecord) -> List[str]:
-        """Format a single file validation record."""
+        """Format file validation record."""
         lines = []
 
         # Header with validator type
@@ -355,7 +306,7 @@ class ValidationReport:
         return lines
 
     def _format_statistics(self, output_data: Dict[str, Any], validator_type: str) -> List[str]:
-        """Format statistics from output_data based on validator type."""
+        """Format statistics based on validator type."""
         lines = []
 
         if validator_type == "genome":
@@ -426,7 +377,7 @@ class ValidationReport:
         return lines
 
     def _format_metadata(self, metadata: Dict[str, Any], validator_type: str) -> List[str]:
-        """Format metadata based on validator type."""
+        """Format metadata."""
         lines = []
 
         if validator_type == "genome":
@@ -509,7 +460,7 @@ class ValidationReport:
         return lines
 
     def _format_interfile_record(self, idx: int, record: InterFileValidationRecord) -> List[str]:
-        """Format a single inter-file validation record."""
+        """Format inter-file validation record."""
         lines = []
 
         # Title with nice formatting

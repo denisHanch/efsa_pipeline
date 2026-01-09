@@ -1,16 +1,4 @@
-"""
-Base settings infrastructure for validators.
-
-Provides BaseSettings abstract base class with immutable update pattern,
-deep copy support, and dictionary serialization for all validator Settings classes.
-
-Features:
-    - Immutable update pattern (prevents shared mutable state bugs)
-    - Deep copy support
-    - Dictionary serialization (to_dict/from_dict)
-    - Field name validation (prevents typos)
-    - Pretty printing for inspection
-"""
+"""Base settings infrastructure for validators."""
 
 from dataclasses import asdict, fields
 from copy import deepcopy
@@ -23,67 +11,14 @@ __all__ = [
 
 # ===== Base Settings Class =====
 class BaseSettings(ABC):
-    """
-    Base class for all validator settings with common functionality.
-
-    Features:
-    - Deep copy support
-    - Immutable update pattern (returns new instance)
-    - Dictionary conversion for serialization
-    - Pretty printing
-    - from_dict() class method for loading from dictionaries
-    - Validation of setting names (prevents typos)
-
-    Usage:
-        # Create settings
-        settings = MyValidator.Settings()
-
-        # Update (returns new instance)
-        new_settings = settings.update(param1=value1, param2=value2)
-
-        # Print to inspect
-        print(settings)
-
-        # Convert to dict
-        settings_dict = settings.to_dict()
-
-        # Load from dict
-        settings = MyValidator.Settings.from_dict({'param1': value1})
-    """
+    """Base class for all validator settings with common functionality."""
 
     def copy(self):
-        """
-        Return a deep copy of settings.
-
-        Returns:
-            New settings instance with copied values
-        """
+        """Return a deep copy of settings."""
         return deepcopy(self)
 
     def update(self, **kwargs):
-        """
-        Update settings and return new instance (immutable pattern).
-
-        This method prevents mutation of the original settings object,
-        which avoids bugs from shared mutable state.
-
-        Args:
-            **kwargs: Settings to update
-
-        Returns:
-            New settings instance with updated values
-
-        Raises:
-            ValueError: If an unknown setting name is provided
-
-        Example:
-            >>> settings = GenomeValidator.Settings()
-            >>> new_settings = settings.update(sequence_prefix="chr1")
-            >>> settings.sequence_prefix  # Original unchanged
-            None
-            >>> new_settings.sequence_prefix
-            'chr1'
-        """
+        """Update settings and return new instance (immutable pattern)."""
         new_settings = self.copy()
 
         # Get list of valid field names
@@ -106,36 +41,12 @@ class BaseSettings(ABC):
         return new_settings
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert settings to dictionary for serialization.
-
-        Returns:
-            Dictionary with all settings
-
-        Example:
-            >>> settings.to_dict()
-            {'plasmid_split': True, 'sequence_prefix': None, ...}
-        """
+        """Convert settings to dictionary for serialization."""
         return asdict(self)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]):
-        """
-        Create settings instance from dictionary.
-
-        Args:
-            data: Dictionary with settings
-
-        Returns:
-            New settings instance
-
-        Raises:
-            ValueError: If dictionary contains unknown settings
-
-        Example:
-            >>> data = {'sequence_prefix': 'chr1', 'plasmid_split': False}
-            >>> settings = GenomeValidator.Settings.from_dict(data)
-        """
+        """Create settings instance from dictionary."""
         # Get valid field names
         valid_fields = {f.name for f in fields(cls)}
 
@@ -152,32 +63,14 @@ class BaseSettings(ABC):
         return cls(**data)
 
     def __str__(self) -> str:
-        """
-        Pretty print settings for inspection.
-
-        Returns:
-            Formatted string representation
-
-        Example:
-            >>> print(settings)
-            GenomeValidator.Settings:
-              plasmid_split: True
-              sequence_prefix: None
-              min_sequence_length: 100
-              ...
-        """
+        """Pretty print settings for inspection."""
         lines = [f"{self.__class__.__name__}:"]
         for key, value in self.to_dict().items():
             lines.append(f"  {key}: {value}")
         return '\n'.join(lines)
 
     def __repr__(self) -> str:
-        """
-        Return repr string for debugging.
-
-        Returns:
-            String representation suitable for debugging
-        """
+        """Return repr string for debugging."""
         params = ', '.join(f"{k}={v!r}" for k, v in self.to_dict().items())
         return f"{self.__class__.__name__}({params})"
     
