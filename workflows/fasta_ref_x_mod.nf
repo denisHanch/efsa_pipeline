@@ -22,6 +22,8 @@ workflow ref_mod {
         deltaFilter(prefix_name, delta) | set { filtered_delta }
         showCoords(prefix_name, filtered_delta) | set { coords }
         syri(ref_mod_fasta, coords, filtered_delta) | set { sv_vcf }
+        vcf_to_table(sv_vcf)
+
     emit: 
         sv_vcf
 }
@@ -31,7 +33,6 @@ workflow {
     Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
 
     ref_mod(ref_fasta, mod_fasta)
-    vcf_to_table(ref_mod.out.sv_vcf)
 }
 
 
