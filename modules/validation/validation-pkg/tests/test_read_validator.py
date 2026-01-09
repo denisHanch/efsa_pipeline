@@ -28,7 +28,8 @@ from validation_pkg.exceptions import (
     BamFormatError,
     CompressionError,
 )
-from validation_pkg.utils.formats import ReadFormat, CodingType
+from validation_pkg.utils.formats import ReadFormat
+from validation_pkg.utils.formats import CodingType as CT
 
 
 class TestReadValidatorInitialization:
@@ -65,7 +66,7 @@ class TestReadValidatorInitialization:
             basename="reads",
             filepath=simple_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -92,7 +93,7 @@ class TestReadValidatorInitialization:
             basename="reads",
             filepath=simple_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -159,7 +160,7 @@ class TestReadValidatorParsing:
             basename="reads",
             filepath=simple_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -180,7 +181,7 @@ class TestReadValidatorParsing:
             basename="empty",
             filepath=empty_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -198,7 +199,7 @@ class TestReadValidatorParsing:
             basename="invalid",
             filepath=invalid_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -253,7 +254,7 @@ class TestReadValidatorCompression:
             basename="reads",
             filepath=compressed_fastq_gz,
             ngs_type="illumina",
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -272,7 +273,7 @@ class TestReadValidatorCompression:
             basename="reads",
             filepath=compressed_fastq_bz2,
             ngs_type="illumina",
-            coding_type=CodingType.BZIP2,
+            coding_type=CT.BZIP2,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -332,7 +333,7 @@ class TestReadValidatorValidation:
             basename="duplicates",
             filepath=fastq_with_duplicates,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -353,7 +354,7 @@ class TestReadValidatorValidation:
             basename="duplicates",
             filepath=fastq_with_duplicates,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -373,7 +374,7 @@ class TestReadValidatorValidation:
             basename="invalid_chars",
             filepath=fastq_with_invalid_chars,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -391,7 +392,7 @@ class TestReadValidatorValidation:
             basename="invalid_chars",
             filepath=fastq_with_invalid_chars,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -437,7 +438,7 @@ class TestReadValidatorBAMHandling:
     #         filename="reads.bam",
     #         filepath=fake_bam,
     #         ngs_type="illumina",
-    #         coding_type=CodingType.NONE,
+    #         coding_type=CT.NONE,
     #         detected_format=ReadFormat.BAM
     #     )
 
@@ -481,14 +482,14 @@ class TestReadValidatorOutput:
 
     def test_output_uncompressed(self, simple_fastq, output_dir):
         """Test generating uncompressed output."""
-        settings = ReadValidator.Settings(coding_type=None)
+        settings = ReadValidator.Settings(coding_type=CT.NONE)
 
         read_config = ReadConfig(
             filename="reads.fastq",
             basename="reads",
             filepath=simple_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -504,14 +505,14 @@ class TestReadValidatorOutput:
 
     def test_output_gzip_compressed(self, simple_fastq, output_dir):
         """Test generating gzip compressed output."""
-        settings = ReadValidator.Settings(coding_type='gz')
+        settings = ReadValidator.Settings(coding_type=CT.GZIP)
 
         read_config = ReadConfig(
             filename="reads.fastq",
             basename="reads",
             filepath=simple_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -531,14 +532,14 @@ class TestReadValidatorOutput:
 
     def test_output_bzip2_compressed(self, simple_fastq, output_dir):
         """Test generating bzip2 compressed output."""
-        settings = ReadValidator.Settings(coding_type='bz2')
+        settings = ReadValidator.Settings(coding_type=CT.BZIP2)
 
         read_config = ReadConfig(
             filename="reads.fastq",
             basename="reads",
             filepath=simple_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -565,7 +566,7 @@ class TestReadValidatorOutput:
             basename="reads",
             filepath=simple_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -586,7 +587,7 @@ class TestReadValidatorOutput:
             basename="reads",
             filepath=simple_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -633,7 +634,7 @@ class TestReadValidatorNGSTypes:
             basename="reads",
             filepath=simple_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -651,7 +652,7 @@ class TestReadValidatorNGSTypes:
             basename="reads",
             filepath=simple_fastq,
             ngs_type="ont",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -669,7 +670,7 @@ class TestReadValidatorNGSTypes:
             basename="reads",
             filepath=simple_fastq,
             ngs_type="pacbio",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -722,13 +723,13 @@ class TestReadValidatorValidationLevels:
 
     def test_strict_correct_file_passes(self, multi_read_fastq, output_dir):
         """Test strict mode with correct FASTQ file - should pass."""
-        settings = ReadValidator.Settings(coding_type='gz')
+        settings = ReadValidator.Settings(coding_type=CT.GZIP)
         read_config = ReadConfig(
             filename="reads.fastq.gz",
             basename="reads",
             filepath=multi_read_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}
@@ -752,7 +753,7 @@ class TestReadValidatorValidationLevels:
             basename="damaged",
             filepath=damaged_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}
@@ -768,13 +769,13 @@ class TestReadValidatorValidationLevels:
 
     def test_trust_correct_file_passes(self, multi_read_fastq, output_dir):
         """Test trust mode with correct FASTQ file - parses first 10, validates them, copies original file."""
-        settings = ReadValidator.Settings(coding_type='gz')
+        settings = ReadValidator.Settings(coding_type=CT.GZIP)
         read_config = ReadConfig(
             filename="reads.fastq.gz",
             basename="reads",
             filepath=multi_read_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={'validation_level': 'trust'}
@@ -798,7 +799,7 @@ class TestReadValidatorValidationLevels:
             basename="damaged",
             filepath=damaged_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={'validation_level': 'trust'}
@@ -814,13 +815,13 @@ class TestReadValidatorValidationLevels:
 
     def test_minimal_correct_file_passes(self, multi_read_fastq, output_dir):
         """Test minimal mode with correct file - should pass without validation."""
-        settings = ReadValidator.Settings(coding_type='gz')
+        settings = ReadValidator.Settings(coding_type=CT.GZIP)
         read_config = ReadConfig(
             filename="reads.fastq.gz",
             basename="reads",
             filepath=multi_read_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={'validation_level': 'minimal'}
@@ -837,7 +838,7 @@ class TestReadValidatorValidationLevels:
 
     def test_minimal_damaged_file_raises_error(self, damaged_fastq, output_dir):
         """Test minimal mode with uncompressed file - should raise error due to coding mismatch."""
-        settings = ReadValidator.Settings(coding_type='gz',  # Require GZIP output
+        settings = ReadValidator.Settings(coding_type=CT.GZIP,  # Require GZIP output
             allow_empty_id=False  # Ignored in minimal mode
         )
         read_config = ReadConfig(
@@ -845,7 +846,7 @@ class TestReadValidatorValidationLevels:
             basename="damaged",
             filepath=damaged_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,  # Uncompressed - doesn't match output coding
+            coding_type=CT.NONE,  # Uncompressed - doesn't match output coding
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={'validation_level': 'minimal'}
@@ -858,13 +859,13 @@ class TestReadValidatorValidationLevels:
 
     def test_minimal_output_is_copy(self, multi_read_fastq, output_dir):
         """Test that minimal mode copies file as-is."""
-        settings = ReadValidator.Settings(coding_type='gz')
+        settings = ReadValidator.Settings(coding_type=CT.GZIP)
         read_config = ReadConfig(
             filename="reads.fastq.gz",
             basename="reads",
             filepath=multi_read_fastq,
             ngs_type="illumina",
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={'validation_level': 'minimal'}
@@ -893,13 +894,13 @@ class TestReadValidatorValidationLevels:
                 f.write("+\n")
                 f.write("IIIIIIIIIIIIIIIIIIII\n")
 
-        settings = ReadValidator.Settings(coding_type='gz')
+        settings = ReadValidator.Settings(coding_type=CT.GZIP)
         read_config = ReadConfig(
             filename="reads.fastq.gz",
             basename="reads",
             filepath=fastq_file,
             ngs_type="illumina",
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={'validation_level': 'trust'}
@@ -924,13 +925,13 @@ class TestReadValidatorValidationLevels:
             f.write("+\n")
             f.write("IIIIIIIIIIIIIIIIIIII\n")
 
-        settings = ReadValidator.Settings(coding_type='gz')
+        settings = ReadValidator.Settings(coding_type=CT.GZIP)
         read_config = ReadConfig(
             filename="reads.fastq.bz2",
             basename="reads",
             filepath=fastq_file,
             ngs_type="illumina",
-            coding_type=CodingType.BZIP2,
+            coding_type=CT.BZIP2,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={'validation_level': 'minimal'}
@@ -992,7 +993,7 @@ class TestReadValidatorEdgeCases:
             basename="varying",
             filepath=fastq_with_varying_lengths,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -1015,7 +1016,7 @@ class TestReadValidatorEdgeCases:
             basename="low_quality",
             filepath=fastq_with_low_quality,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={}
@@ -1051,7 +1052,7 @@ class TestSecurityCommandInjection:
             basename="reads",
             filepath=fastq_file,
             ngs_type='illumina',
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=ReadFormat.FASTQ,
             output_dir=tmp_path,
             global_options={'validation_level': 'strict'}
@@ -1084,7 +1085,7 @@ class TestSecurityCommandInjection:
             basename="reads",
             filepath=fastq_file,
             ngs_type='ont',
-            coding_type=CodingType.BZIP2,
+            coding_type=CT.BZIP2,
             detected_format=ReadFormat.FASTQ,
             output_dir=tmp_path,
             global_options={'validation_level': 'strict'}
@@ -1116,7 +1117,7 @@ class TestSecurityCommandInjection:
             basename="reads",
             filepath=fastq_file,
             ngs_type='illumina',
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=tmp_path,
             global_options={'validation_level': 'strict'}
@@ -1155,7 +1156,7 @@ class TestSecurityCommandInjection:
             basename="reads",
             filepath=fastq_file,
             ngs_type='illumina',
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=ReadFormat.FASTQ,
             output_dir=tmp_path,
             global_options={}
@@ -1233,7 +1234,7 @@ class TestParallelValidationLogging:
             basename="test",
             filepath=fastq_file,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={"threads": 1, "validation_level": "strict"}
@@ -1266,7 +1267,7 @@ class TestParallelValidationLogging:
             basename="test",
             filepath=fastq_file,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={"threads": 4, "validation_level": "strict"}
@@ -1299,7 +1300,7 @@ class TestParallelValidationLogging:
             basename="test",
             filepath=fastq_file,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={"threads": 8, "validation_level": "trust"}  # threads=8 but trust mode
@@ -1342,7 +1343,7 @@ class TestParallelValidationLogging:
             basename="invalid",
             filepath=fastq_file,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={"threads": 4, "validation_level": "strict"}
@@ -1376,7 +1377,7 @@ class TestParallelValidationLogging:
             basename="test",
             filepath=fastq_file,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={"threads": 8, "validation_level": "strict"}
@@ -1415,7 +1416,7 @@ class TestParallelValidationLogging:
             basename="test1",
             filepath=fastq_file1,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={"threads": 4, "validation_level": "strict"}
@@ -1433,7 +1434,7 @@ class TestParallelValidationLogging:
             basename="test2",
             filepath=fastq_file2,
             ngs_type="illumina",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,
             global_options={"threads": 1, "validation_level": "strict"}
@@ -1929,7 +1930,7 @@ class TestReadStatistics:
         read_config = ReadConfig(
             filepath=test_fastq_with_known_stats,
             filename=test_fastq_with_known_stats.name,
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=ReadFormat.FASTQ,
             ngs_type='illumina',
             output_dir=output_dir,
@@ -1956,7 +1957,7 @@ class TestReadStatistics:
         read_config = ReadConfig(
             filepath=test_fastq_with_known_stats,
             filename=test_fastq_with_known_stats.name,
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=ReadFormat.FASTQ,
             ngs_type='illumina',
             output_dir=output_dir,
@@ -2002,7 +2003,7 @@ class TestReadStatistics:
         read_config = ReadConfig(
             filepath=fastq_path,
             filename=fastq_path.name,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             ngs_type='ont',
             output_dir=output_dir,
@@ -2025,7 +2026,7 @@ class TestReadStatistics:
         read_config = ReadConfig(
             filepath=Path("dummy.fastq"),
             filename="dummy.fastq",
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             ngs_type='illumina',
             output_dir=output_dir,
