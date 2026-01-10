@@ -132,12 +132,12 @@ process debreak {
     val out_folder_name
 
     output:
-    tuple val(pair_id), path("debreak_out/${pair_id}_debreak.vcf")
+    tuple val(pair_id), path("${pair_id}_debreak.vcf")
 
     script:
     """
     debreak --bam $bam_file -r $fasta_file -o debreak_out -t ${params.max_cpu}
-    mv debreak_out/debreak.vcf debreak_out/${pair_id}_debreak.vcf
+    mv debreak_out/debreak.vcf ${pair_id}_debreak.vcf
     """
 }
 
@@ -199,6 +199,10 @@ process survivor {
     """
 }
 
+
+/*
+ * Convert vcf file to tsv table 
+*/
 process vcf_to_table {
 
     container 'staphb/bcftools:latest'
@@ -215,9 +219,9 @@ process vcf_to_table {
     set -euxo pipefail
 
     (
-    echo -e "chrom\tstart\tend\tsvtype"
+    echo -e "chrom\tstart\tend\tsvtype\tdebreak_type"
     bcftools query \
-        -f '%CHROM\t%POS\t%INFO/END\t%ID\n' \
+        -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\n' \
         ${vcf} |
     awk 'BEGIN{OFS="\\t"}{ print \$0 }'
     ) > ${vcf.simpleName}_sv_summary.tsv
