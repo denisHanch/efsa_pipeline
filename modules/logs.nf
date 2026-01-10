@@ -68,8 +68,7 @@ def logWorkflowCompletion(out_folder_name) {
 def loadLongFastqFiles(long_read_files) { 
     return Channel.fromPath(long_read_files)
                   .map { file ->
-                      def name = file.baseName.replaceFirst(/\.fastq/, '')
-                      [name, file]
+                      [file.simpleName, file]
                   }
 }
 

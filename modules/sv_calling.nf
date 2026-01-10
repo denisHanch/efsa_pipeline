@@ -218,12 +218,18 @@ process vcf_to_table {
     """
     set -euxo pipefail
 
-    (
-    echo -e "chrom\tstart\tend\tsvtype\tdebreak_type"
-    bcftools query \
-        -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\n' \
-        ${vcf} |
-    awk 'BEGIN{OFS="\\t"}{ print \$0 }'
-    ) > ${vcf.simpleName}_sv_summary.tsv
+    output="${vcf.simpleName}_sv_summary.tsv"
+
+    if [[ "${vcf.simpleName}" == "ref_x_modsyri" ]]; then
+        {
+            echo -e "chrom\tstart\tend\tsvtype\"
+            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
+        } > "\${output}"
+    else
+        {
+            echo -e "chrom\tstart\tend\tsvtype\tdebreak_type\tsupporting_reads"
+            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\t[%DR]\n' "${vcf}" 
+        } > "\${output}"
+    fi
     """
 }
