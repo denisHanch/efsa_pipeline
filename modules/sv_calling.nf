@@ -222,13 +222,13 @@ process vcf_to_table {
 
     if [[ "${vcf.simpleName}" == "ref_x_modsyri" ]]; then
         {
-            echo -e "chrom\tstart\tend\tsvtype\"
+            echo -e "chrom\tstart\tend\tsvtype"
             bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
         } > "\${output}"
     else
         {
-            echo -e "chrom\tstart\tend\tsvtype\tdebreak_type\tsupporting_reads"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\t[%DR]\n' "${vcf}" 
+            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tdebreak_type\tsupporting_reads"
+            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%ALT\t[%DR]\n' "${vcf}"
         } > "\${output}"
     fi
     """
