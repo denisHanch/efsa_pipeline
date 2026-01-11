@@ -24,7 +24,6 @@ process bwa_index {
 }
 
 
-
 /*
  * Mapping reads to the genome
 */
@@ -166,6 +165,9 @@ process samtools_sort {
     """
 }
 
+/*
+ * Calculate total reads
+*/
 process calc_total_reads {
     container 'staphb/samtools:latest'
     tag "$pair_id"
@@ -178,15 +180,18 @@ process calc_total_reads {
 
     script:
     """
-    #!/usr/bin/env bash
+    set -euo pipefail
 
-    total=\$(samtools view -c "$bam")
+    total=\$(samtools view -c "$bam" || echo 0)
 
     export total
     """
 }
 
 
+/*
+ * Calculate unmapped reads
+*/
 process calc_unmapped {
     tag "$pair_id"
 
@@ -198,7 +203,8 @@ process calc_unmapped {
 
     script:
     """
-    #!/usr/bin/env bash
+    set -euo pipefail
+
     if [[ "$fastq" == *.gz ]]; then
         total_lines=\$(zcat "$fastq" | wc -l)
     else
@@ -217,7 +223,9 @@ process calc_unmapped {
     """
 }
 
-
+/*
+ * Export unmapped reads to fastq file
+*/
 process get_unmapped_reads {
     container 'staphb/samtools:latest'
     tag "$pair_id"
@@ -236,6 +244,9 @@ process get_unmapped_reads {
     """
 }
 
+/*
+ * Calculate unmapped statistics
+*/
 process compare_unmapped {
     tag "$pair_id1"
     publishDir "${params.out_dir}/unmapped_stats", mode: 'copy'

@@ -132,12 +132,12 @@ process debreak {
     val out_folder_name
 
     output:
-    tuple val(pair_id), path("debreak_out/${pair_id}_debreak.vcf")
+    tuple val(pair_id), path("${pair_id}_debreak.vcf")
 
     script:
     """
     debreak --bam $bam_file -r $fasta_file -o debreak_out -t ${params.max_cpu}
-    mv debreak_out/debreak.vcf debreak_out/${pair_id}_debreak.vcf
+    mv debreak_out/debreak.vcf ${pair_id}_debreak.vcf
     """
 }
 
@@ -196,5 +196,40 @@ process survivor {
 
     # Run the SURVIVOR merge command
     SURVIVOR merge vcf_list.txt 1000 1 1 1 0 30 ${pair_id}_${mapping_tag}_sv_long_read.vcf
+    """
+}
+
+
+/*
+ * Convert vcf file to tsv table 
+*/
+process vcf_to_table {
+
+    container 'staphb/bcftools:latest'
+    publishDir "${params.out_dir}/tables", mode: 'copy'
+
+    input:
+    path vcf
+
+    output:
+    path "${vcf.simpleName}_sv_summary.tsv"
+
+    script:
+    """
+    set -euxo pipefail
+
+    output="${vcf.simpleName}_sv_summary.tsv"
+
+    if [[ "${vcf.simpleName}" == "ref_x_modsyri" ]]; then
+        {
+            echo -e "chrom\tstart\tend\tsvtype\"
+            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
+        } > "\${output}"
+    else
+        {
+            echo -e "chrom\tstart\tend\tsvtype\tdebreak_type\tsupporting_reads"
+            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\t[%DR]\n' "${vcf}" 
+        } > "\${output}"
+    fi
     """
 }

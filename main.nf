@@ -12,7 +12,7 @@ include { nanoplot as nanoplot_pacbio; nanoplot as nanoplot_ont } from './module
 include { truvari_comparison } from './modules/compare_vcfs.nf'
 
 include { qc } from './modules/subworkflow.nf'
-include { describePipeline; logWorkflowCompletion; loadFastqFiles; loadShortFastqFiles } from './modules/logs.nf'
+include { describePipeline; logWorkflowCompletion; loadLongFastqFiles; loadShortFastqFiles } from './modules/logs.nf'
 
 
 // Help message
@@ -65,7 +65,7 @@ workflow {
     if (pacbio_files) {
         mapping_tag = "map-pb"
 
-        pacbio_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
+        pacbio_fastqs = loadLongFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
         
         // qc
         nanoplot_pacbio(pacbio_fastqs, "pacbio")
@@ -86,7 +86,7 @@ workflow {
     if (ont_files) {
         mapping_tag = "map-ont"
         
-        ont_fastqs = loadFastqFiles("${params.in_dir}/ont/*.fastq.gz")
+        ont_fastqs = loadLongFastqFiles("${params.in_dir}/ont/*.fastq.gz")
 
         // qc
         nanoplot_ont(ont_fastqs, "ont")

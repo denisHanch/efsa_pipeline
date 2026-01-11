@@ -24,7 +24,7 @@ process freebayes {
 }
 
 /*
-* SNPEff build
+*  Building SNPEff config for vcf annotations
 */
 
 process build_config {
@@ -157,7 +157,7 @@ process indexVcf {
 }
 
 /*
- * Running comparision btw files
+ * Compare vcf files from subworkflows
 */
 process truvari {
     container "${params.registry}/truvari:latest"
