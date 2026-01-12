@@ -138,7 +138,7 @@ class ValidationLogger:
 
         # Setup stdlib logging first (if file logging is requested)
         if log_file:
-            from validation_pkg.utils.file_handler import get_incremented_path
+            from validation_pkg.utils.path_utils import get_incremented_path
 
             log_file = Path(log_file)
             log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -227,7 +227,6 @@ class ValidationLogger:
 
         if log_file:
             self.info(f"Detailed log file: {log_file}")
-
 
     def reconfigure_level(
         self,

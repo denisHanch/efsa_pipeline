@@ -1,33 +1,29 @@
 """Genome file validator and processor for FASTA and GenBank formats."""
 
 from pathlib import Path
-from typing import Optional, List, IO, Union
+from typing import Optional, List, Type, Any
 from dataclasses import dataclass
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqUtils import gc_fraction
-import shutil
 
-from validation_pkg.logger import get_logger
-from validation_pkg.utils.settings import BaseSettings
-from validation_pkg.utils.formats import CodingType as CT, GenomeFormat
+from validation_pkg.utils.base_settings import BaseOutputMetadata, BaseValidatorSettings
+from validation_pkg.utils.formats import GenomeFormat
 from validation_pkg.exceptions import (
-    ValidationError,
     GenomeValidationError,
     FileFormatError,
     FastaFormatError,
-    GenBankFormatError,
-    CompressionError
+    GenBankFormatError
 )
 from validation_pkg.utils.file_handler import open_compressed_writer
-
+from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
+from validation_pkg.utils.base_validator import BaseValidator
+from validation_pkg.utils.sequence_stats import calculate_n50
 
 @dataclass
-class OutputMetadata(BaseSettings):
+class OutputMetadata(BaseOutputMetadata):
     """Metadata returned from genome validation."""
-    input_file: str = None
-    output_file: str = None
-    output_filename: str = None
+    # Genome-specific fields
     num_sequences: int = None
     total_genome_size: int = None  # strict only
     longest_sequence_length: int = None
@@ -37,18 +33,16 @@ class OutputMetadata(BaseSettings):
     plasmid_count: int = None
     plasmid_filenames: List[str] = None
     num_sequences_filtered: int = None
-    validation_level: str = None
-    elapsed_time: float = None
 
     # Inter-file validation fields
     sequence_ids: List[str] = None
     sequence_lengths: dict = None
 
-class GenomeValidator:
+class GenomeValidator(BaseValidator):
     """Validates and processes genome files in FASTA and GenBank formats."""
 
     @dataclass
-    class Settings(BaseSettings):
+    class Settings(BaseValidatorSettings):
         """Settings for genome validation and processing."""
         # Validation thresholds
         allow_empty_sequences: bool = False
@@ -65,16 +59,12 @@ class GenomeValidator:
         replace_id_with: Optional[str] = None
         min_sequence_length: int = 100
 
-        # Output format
-        coding_type: Optional[CT] = CT.NONE
-        output_filename_suffix: Optional[str] = None
-        output_subdir_name: Optional[str] = None
-
         def __post_init__(self):
             """Validate and normalize settings after initialization."""
-            # Normalize coding_type if needed (handles direct instantiation)
-            self.coding_type = CT.normalize(self.coding_type)
+            # Normalize coding_type from base class
+            self._normalize_coding_type()
 
+            # Genome-specific validation
             if self.plasmid_split and self.plasmids_to_one:
                 raise ValueError(
                     "plasmid_split and plasmids_to_one cannot both be True. "
@@ -90,82 +80,78 @@ class GenomeValidator:
                 )
 
     def __init__(self, genome_config, settings: Optional[Settings] = None) -> None:
-        self.logger = get_logger()
+        # Call base class initialization
+        super().__init__(genome_config, settings)
 
-        # From genome global configuration
+        # Keep genome_config for type safety and specific access
         self.genome_config = genome_config
-        self.output_dir = genome_config.output_dir
-        self.validation_level = genome_config.global_options.get("validation_level")   
-        self.threads = genome_config.global_options.get("threads") 
-        self.input_path = genome_config.filepath
 
-        # From settings
-        self.settings = settings if settings is not None else self.Settings() 
-        self.output_metadata = OutputMetadata()
-
-        # Parsed data
+        # Validator-specific data
         self.sequences = []  # List of SeqRecord objects
-
-        if not self.validation_level:
-            self.validation_level = 'strict'
-
-        if not self.threads:
-            from validation_pkg.config_manager import DEFAULT_THREADS
-            self.threads = DEFAULT_THREADS
-
-        # Tracking for metadata
         self.num_sequences_filtered = 0
         self.plasmid_filenames = []
 
-    def _calculate_gc_content(self, sequences: List[SeqRecord]) -> float:
-        """Calculate GC content percentage for all sequences using BioPython."""
-        if not sequences:
-            return 0.0
+    # Required abstract properties and methods from BaseValidator
 
-        total_gc = 0.0
-        total_bases = 0
+    @property
+    def _validator_type(self) -> str:
+        """Return validator type string."""
+        return 'genome'
 
-        for seq in sequences:
-            seq_length = len(seq.seq)
-            if seq_length > 0:
-                # gc_fraction returns value between 0 and 1
-                total_gc += gc_fraction(seq.seq) * seq_length
-                total_bases += seq_length
+    @property
+    def OutputMetadata(self) -> Type:
+        """Return OutputMetadata class for this validator."""
+        return OutputMetadata
 
-        if total_bases == 0:
-            return 0.0
+    @property
+    def _output_format(self) -> str:
+        """Return output format string for build_output_path."""
+        return 'fasta'
 
-        # Return as percentage (0-100)
-        return (total_gc / total_bases) * 100
+    @property
+    def _expected_format(self) -> Any:
+        """Return expected format for minimal mode validation."""
+        return GenomeFormat.FASTA
 
-    def _calculate_n50(self, sequences: List[SeqRecord]) -> int:
-        """Calculate N50 assembly quality metric."""
-        if not sequences:
-            return 0
+    def _get_validator_exception(self) -> Type[Exception]:
+        """Return the validator-specific exception class."""
+        return GenomeValidationError
 
-        # Get lengths and sort in descending order
-        lengths = sorted([len(seq.seq) for seq in sequences], reverse=True)
-        total_length = sum(lengths)
+    def _run_validation(self) -> Path:
+        """Execute validation and processing workflow for trust/strict modes."""
+        # Trust/Strict modes - full validation and processing
+        self._parse_file()
+        self._validate_sequences()
+        self._apply_edits()  # include plasmid handle
+        output_path = self._write_output()
+        return output_path
+    
+    def _write_output(self) -> Path:
+        """Write processed genome to output file."""
+        # Check if we have sequences to write
+        if self.sequences == []:
+            self.logger.warning("No sequences to write")
+            return None
 
-        # Find N50
-        cumulative_length = 0
-        for length in lengths:
-            cumulative_length += length
-            if cumulative_length >= total_length / 2:
-                return length
+        # Write output with appropriate compression
+        self.logger.debug(f"Writing output to: {self.output_path}")
 
-        return 0
+        # Use optimized compression writer
+        with open_compressed_writer(self.output_path, self.settings.coding_type, threads=self.threads) as handle:
+            SeqIO.write(self.sequences, handle, 'fasta')
+
+        self.logger.info(f"Output saved: {self.output_path}")
+
+        return self.output_path
 
     def _fill_output_metadata(self, output_path: Path) -> None:
         """Populate output metadata with validation results."""
-        self.output_metadata.input_file = self.genome_config.filename
-        self.output_metadata.validation_level = self.validation_level
-        self.output_metadata.output_file = str(output_path) if output_path else None
-        self.output_metadata.output_filename = output_path.name if output_path else None
+        # Fill common fields from base class
+        self._fill_base_metadata(output_path)
 
         # Minimal mode - only basic info available
         if self.validation_level == 'minimal':
-            return self.output_metadata
+            return
 
         # Trust and Strict modes - sequences were parsed
         if self.sequences:
@@ -202,71 +188,41 @@ class GenomeValidator:
             # N50
             self.output_metadata.n50 = self._calculate_n50(self.sequences)
 
-    def run(self) -> OutputMetadata:
-        """Execute validation and processing workflow."""
-        self.logger.start_timer("genome_validation")
-        self.logger.info(f"Processing genome file: {self.genome_config.filename}")
-        self.logger.debug(f"Format: {self.genome_config.detected_format}, Compression: {self.genome_config.coding_type}")
+    #   Validator help functions
 
-        try:
-            self._parse_file()
+    def _calculate_gc_content(self, sequences: List[SeqRecord]) -> float:
+        """Calculate GC content percentage for all sequences using BioPython."""
+        if not sequences:
+            return 0.0
 
-            self._validate_sequences()
+        total_gc = 0.0
+        total_bases = 0
 
-            self._apply_edits() # include plasmid handle
+        for seq in sequences:
+            seq_length = len(seq.seq)
+            if seq_length > 0:
+                # gc_fraction returns value between 0 and 1
+                total_gc += gc_fraction(seq.seq) * seq_length
+                total_bases += seq_length
 
-            output_path = self._save_output()
+        if total_bases == 0:
+            return 0.0
 
-            elapsed = self.logger.stop_timer("genome_validation")
-            self.logger.info(f"✓ Genome validation completed in {elapsed:.2f}s")
+        # Return as percentage (0-100)
+        return (total_gc / total_bases) * 100
 
-            # Record file timing for report
-            self.logger.add_file_timing(
-                self.genome_config.filename,
-                "genome",
-                elapsed
-            )
+    def _calculate_n50(self, sequences: List[SeqRecord]) -> int:
+        """Calculate N50 assembly quality metric."""
+        lengths = [len(seq.seq) for seq in sequences]
+        return calculate_n50(lengths)
 
-            # Create and return OutputMetadata
-            self._fill_output_metadata(output_path)
-            self.output_metadata.elapsed_time = elapsed
-            return self.output_metadata
-
-        except Exception as e:
-            self.logger.error(f"Genome validation failed: {e}")
-            raise
-
-    def _open_file(self, mode: str = 'rt') -> IO:
-        """Open file with automatic decompression based on genome_config."""
-        try:
-            from validation_pkg.utils.file_handler import open_file_with_coding_type
-            return open_file_with_coding_type(
-                self.input_path,
-                self.genome_config.coding_type,
-                mode
-            )
-        except CompressionError as e:
-            self.logger.add_validation_issue(
-                level='ERROR',
-                category='genome',
-                message=str(e),
-                details={'file': str(self.input_path)}
-            )
-            raise
-    
     def _parse_file(self) -> None:
         """Parse file using BioPython and validate format from genome_config."""
         self.logger.debug(f"Parsing {self.genome_config.detected_format} file (validation_level={self.validation_level})...")
 
-        # Minimal mode - skip parsing
-        if self.validation_level == 'minimal':
-            self.logger.info("Minimal validation mode - skipping file parsing")
-            self.sequences = []
-            return
-
         # Trust and Strict modes - parse all sequences
         try:
-            with self._open_file() as handle:
+            with self._open_file('rt') as handle:
                 # Parse using BioPython with clean enum conversion
                 biopython_format = self.genome_config.detected_format.to_biopython()
                 self.sequences = list(SeqIO.parse(handle, biopython_format))
@@ -293,7 +249,6 @@ class GenomeValidator:
             error_msg = f"Failed to parse {self.genome_config.detected_format} file: {e}"
 
             # Determine exception type based on format using enum
-            from validation_pkg.utils.formats import GenomeFormat
             if self.genome_config.detected_format == GenomeFormat.FASTA:
                 exception_class = FastaFormatError
             elif self.genome_config.detected_format == GenomeFormat.GENBANK:
@@ -314,13 +269,8 @@ class GenomeValidator:
             raise exception_class(error_msg) from e
     
     def _validate_sequences(self) -> None:
-        """Validate parsed sequences."""
+        """Validate parsed sequences (trust/strict modes only)."""
         self.logger.debug("Validating sequences...")
-
-        # Minimal mode - no sequences to validate
-        if self.validation_level == 'minimal':
-            self.logger.debug("Minimal mode - skipping sequence validation")
-            return
 
         # Trust mode - validate only first sequence
         if self.validation_level == 'trust':
@@ -500,8 +450,6 @@ class GenomeValidator:
 
     def _save_plasmid_file(self, plasmid_sequences: List[SeqRecord], index: str) -> None:
         """Save plasmid sequences to a separate file."""
-        from validation_pkg.utils.path_utils import build_safe_output_dir
-        from validation_pkg.utils.file_handler import strip_all_extensions
 
         # Build safe output directory (with path traversal protection)
         # Only use subdir if it's not "plasmid" itself
@@ -538,62 +486,3 @@ class GenomeValidator:
         # Log details about each plasmid
         for seq in plasmid_sequences:
             self.logger.debug(f"  Plasmid: {seq.id} ({len(seq.seq)} bp)")
-    
-    def _save_output(self) -> Path:
-        """Save processed genome to output directory using settings."""
-        from validation_pkg.utils.file_handler import build_output_path
-        from validation_pkg.utils.validation_helpers import (
-            validate_minimal_mode_requirements,
-            copy_file_minimal_mode
-        )
-
-        self.logger.debug("Saving output file...")
-
-        # Build output path using utility (with path traversal protection)
-        output_path = build_output_path(
-            base_dir=self.genome_config.output_dir,
-            input_filename=self.genome_config.filename,
-            output_format="fasta",
-            coding_type=self.settings.coding_type,
-            subdir_name=self.settings.output_subdir_name,
-            filename_suffix=self.settings.output_filename_suffix,
-            input_path=self.input_path
-        )
-
-        # Minimal mode - copy file as-is without parsing
-        # Required: FASTA format + coding must match settings.coding_type
-        if self.validation_level == 'minimal':
-            self.logger.debug("Minimal mode - validating format and coding requirements")
-
-            try:
-                validate_minimal_mode_requirements(
-                    self.genome_config.detected_format,
-                    GenomeFormat.FASTA,
-                    self.genome_config.coding_type,
-                    self.settings.coding_type,
-                    self.genome_config.filename,
-                    self.logger,
-                    'genome'
-                )
-            except ValidationError as e:
-                # Re-raise as GenomeValidationError for consistency
-                raise GenomeValidationError(str(e)) from e
-
-            return copy_file_minimal_mode(self.input_path, output_path, self.logger)
-
-        # Strict and Trust modes - write sequences using BioPython
-        # Check if we have sequences to write
-        if self.sequences == []:
-            self.logger.warning("No sequences to write")
-            return None
-
-        # Write output with appropriate compression
-        self.logger.debug(f"Writing output to: {output_path}")
-
-        # Use optimized compression writer
-        with open_compressed_writer(output_path, self.settings.coding_type, threads=self.threads) as handle:
-            SeqIO.write(self.sequences, handle, 'fasta')
-
-        self.logger.info(f"Output saved: {output_path}")
-
-        return output_path

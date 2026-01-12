@@ -942,6 +942,8 @@ class TestReadValidatorValidationLevels:
         # Should raise error - minimal mode requires input coding to match output coding
         with pytest.raises(ReadValidationError, match="input coding to match output coding"):
             validator.run()
+
+
 class TestReadValidatorEdgeCases:
     """Test edge cases and error handling."""
 
@@ -1188,9 +1190,9 @@ class TestSecurityCommandInjection:
         assert '| wc -l' not in source, \
             "_count_lines_fast should not use shell pipes"
 
-        # Verify it uses Python libraries instead
-        assert 'open_file_with_coding_type' in source, \
-            "_count_lines_fast should use open_file_with_coding_type"
+        # Verify it uses Python libraries instead (via BaseValidator's _open_file method)
+        assert 'self._open_file' in source, \
+            "_count_lines_fast should use self._open_file (which wraps open_file_with_coding_type)"
 
 
 class TestParallelValidationLogging:

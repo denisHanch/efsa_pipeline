@@ -21,6 +21,7 @@ __all__ = [
     # File operations
     'open_file_with_coding_type',
     'open_compressed_writer',
+    'copy_file',
 
     # Detection functions
     'detect_compression_type',
@@ -36,12 +37,7 @@ __all__ = [
     'gz_to_none',
     'bz2_to_none',
     'none_to_bz2',
-
-    # Path utilities
-    'get_incremented_path',
-    'strip_all_extensions',
-    'build_output_filename',
-    'build_output_path',
+    'convert_file_compression',
 ]
 
 
@@ -461,6 +457,99 @@ def none_to_bz2(none_file: Path, bz2_file: Path, threads: int = None):
         raise CompressionError(f"Compression tool not found: {e}") from e
 
 
+def convert_file_compression(
+    input_path: Union[str, Path],
+    output_path: Union[str, Path],
+    input_coding: CodingType,
+    output_coding: CodingType,
+    threads: int = None
+) -> None:
+    """
+    Convert file from one compression type to another.
+
+    This is a unified interface for all compression conversions.
+    If input and output coding are the same, the file is simply copied.
+
+    Args:
+        input_path: Source file path
+        output_path: Destination file path
+        input_coding: Input compression type
+        output_coding: Output compression type
+        threads: Number of threads for parallel compression (optional)
+
+    Raises:
+        CompressionError: If conversion fails or is not supported
+
+    Examples:
+        >>> convert_file_compression('data.gz', 'data.bz2', CodingType.GZIP, CodingType.BZIP2)
+        >>> convert_file_compression('data.txt', 'data.gz', CodingType.NONE, CodingType.GZIP)
+    """
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+
+    # If coding types match, just copy the file
+    if input_coding == output_coding:
+        import shutil
+        shutil.copy2(input_path, output_path)
+        return
+
+    # Map (input, output) pairs to conversion functions
+    conversion_map = {
+        (CodingType.BZIP2, CodingType.GZIP): bz2_to_gz,
+        (CodingType.NONE, CodingType.GZIP): none_to_gz,
+        (CodingType.GZIP, CodingType.NONE): gz_to_none,
+        (CodingType.BZIP2, CodingType.NONE): bz2_to_none,
+        (CodingType.NONE, CodingType.BZIP2): none_to_bz2,
+        (CodingType.GZIP, CodingType.BZIP2): gz_to_bz2,
+    }
+
+    conversion_func = conversion_map.get((input_coding, output_coding))
+    if conversion_func:
+        conversion_func(input_path, output_path, threads=threads)
+    else:
+        raise CompressionError(
+            f"Unsupported compression conversion: {input_coding} -> {output_coding}"
+        )
+
+
+def copy_file(
+    input_path: Union[str, Path],
+    output_path: Union[str, Path],
+    logger=None
+) -> Path:
+    """
+    Copy file with optional logging.
+
+    Uses shutil.copy2 to preserve metadata (timestamps, permissions).
+
+    Args:
+        input_path: Source file path
+        output_path: Destination file path
+        logger: Optional logger instance for logging copy operation
+
+    Returns:
+        Output path (as Path object)
+
+    Examples:
+        >>> copy_file('input.txt', 'output.txt')
+        PosixPath('output.txt')
+        >>> copy_file('data.gz', 'backup/data.gz', logger)
+        PosixPath('backup/data.gz')
+    """
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+
+    if logger:
+        logger.debug(f"Copying {input_path} to {output_path}")
+
+    shutil.copy2(input_path, output_path)
+
+    if logger:
+        logger.info(f"File copied: {output_path}")
+
+    return output_path
+
+
 def open_compressed_writer(filepath: Union[str, Path], coding_type: CodingType, use_parallel: bool = True, threads: int = None):
     """Open a file handle for writing compressed data efficiently."""
     filepath = Path(filepath)
@@ -522,182 +611,3 @@ def open_compressed_writer(filepath: Union[str, Path], coding_type: CodingType, 
         # No compression
         return open(filepath, 'w')
 
-
-def get_incremented_path(path: Path, separator: str = "_") -> Path:
-    """Get next available filename by auto-incrementing if file exists."""
-    # Ensure path is a Path object
-    path = Path(path)
-
-    # If file doesn't exist, return original path
-    if not path.exists():
-        return path
-
-    stem = path.stem
-    suffix = path.suffix
-    parent = path.parent
-
-    # Check if stem already has increment pattern (e.g., report_001)
-    match = re.match(r'^(.+)_(\d+)$', stem)
-    if match:
-        base_stem = match.group(1)
-        start_counter = int(match.group(2)) + 1
-    else:
-        base_stem = stem
-        start_counter = 1
-
-    # Find next available number
-    counter = start_counter
-    while True:
-        new_name = f"{base_stem}{separator}{counter:03d}{suffix}"
-        new_path = parent / new_name
-        if not new_path.exists():
-            return new_path
-        counter += 1
-
-        # Safety check to avoid infinite loop
-        if counter > 9999:
-            raise RuntimeError(f"Too many incremented files for {path}. Maximum is 9999.")
-
-
-def strip_all_extensions(filename: str, path: Optional[Path] = None) -> str:
-    """
-    Strip all extensions from a filename.
-
-    Args:
-        filename: The filename to process
-        path: Optional Path object to get suffixes from
-
-    Returns:
-        Filename with all extensions removed
-
-    Examples:
-        >>> strip_all_extensions("genome.fasta.gz")
-        'genome'
-        >>> strip_all_extensions("reads_R1.fastq")
-        'reads_R1'
-    """
-    if not filename:
-        return filename
-
-    # If path provided, use its suffixes list (more reliable)
-    if path:
-        base_name = filename
-        for suffix in path.suffixes:
-            base_name = base_name.replace(suffix, '', 1)
-        return base_name
-
-    # Otherwise, iteratively remove extensions
-    result = filename
-    while True:
-        name_without_ext = Path(result).stem
-        if name_without_ext == result:
-            break
-        result = name_without_ext
-
-    return result
-
-
-def build_output_filename(
-    input_filename: str,
-    output_format: str,
-    coding_type: Optional[CodingType] = None,
-    suffix: Optional[str] = None,
-    input_path: Optional[Path] = None
-) -> str:
-    """
-    Build output filename with consistent naming convention.
-
-    Args:
-        input_filename: Original input filename
-        output_format: Output format extension (e.g., 'fasta', 'fastq', 'gff')
-        coding_type: Optional compression type (adds .gz, .bz2, etc.)
-        suffix: Optional custom suffix to add before extension
-        input_path: Optional input Path object for accurate extension stripping
-
-    Returns:
-        Output filename with proper extensions
-
-    Examples:
-        >>> build_output_filename("genome.fa.gz", "fasta", CodingType.GZIP, "validated")
-        'genome_validated.fasta.gz'
-        >>> build_output_filename("reads.fq", "fastq", CodingType.NONE)
-        'reads.fastq'
-    """
-    # Strip all extensions from input filename
-    base_name = strip_all_extensions(input_filename, input_path)
-
-    # Add custom suffix if provided
-    if suffix:
-        filename = f"{base_name}_{suffix}.{output_format}"
-    else:
-        filename = f"{base_name}.{output_format}"
-
-    # Add compression extension if specified
-    if coding_type:
-        filename += coding_type.to_extension()
-
-    return filename
-
-
-def build_output_path(
-    base_dir: Path,
-    input_filename: str,
-    output_format: str,
-    coding_type: Optional[CodingType] = None,
-    subdir_name: Optional[str] = None,
-    filename_suffix: Optional[str] = None,
-    input_path: Optional[Path] = None,
-    create_dirs: bool = True
-) -> Path:
-    """
-    Build complete output path with consistent naming and directory structure.
-
-    This is the main entry point for building output paths. It handles:
-    - Safe subdirectory creation (with path traversal protection)
-    - Extension stripping
-    - Custom suffix addition
-    - Compression extension handling
-
-    Args:
-        base_dir: Base output directory
-        input_filename: Original input filename
-        output_format: Output format extension (e.g., 'fasta', 'fastq', 'gff')
-        coding_type: Optional compression type
-        subdir_name: Optional subdirectory name (will be sanitized)
-        filename_suffix: Optional suffix to add to filename
-        input_path: Optional input Path for accurate extension handling
-        create_dirs: Whether to create directories (default: True)
-
-    Returns:
-        Complete output path
-
-    Raises:
-        ValueError: If subdir_name contains illegal characters
-        ConfigurationError: If path would escape base_dir
-
-    Examples:
-        >>> build_output_path(
-        ...     Path("/output"),
-        ...     "genome.fasta.gz",
-        ...     "fasta",
-        ...     CodingType.GZIP,
-        ...     subdir_name="validated",
-        ...     filename_suffix="filtered"
-        ... )
-        Path("/output/validated/genome_filtered.fasta.gz")
-    """
-    from validation_pkg.utils.path_utils import build_safe_output_dir
-
-    # Build safe output directory (with path traversal protection)
-    output_dir = build_safe_output_dir(base_dir, subdir_name, create=create_dirs)
-
-    # Build output filename
-    output_filename = build_output_filename(
-        input_filename,
-        output_format,
-        coding_type,
-        filename_suffix,
-        input_path
-    )
-
-    return output_dir / output_filename

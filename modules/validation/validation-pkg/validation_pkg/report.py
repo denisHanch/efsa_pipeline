@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Optional, Any, Union
 import json
+from validation_pkg.utils.path_utils import get_incremented_path
 
 
 @dataclass
@@ -33,7 +34,6 @@ class ValidationReport:
 
     def __init__(self, report_path: Path):
         """Initialize validation report."""
-        from validation_pkg.utils.file_handler import get_incremented_path
 
         self.report_path = Path(report_path)
         self.report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -281,7 +281,7 @@ class ValidationReport:
 
         # Statistics section (validator-specific formatting)
         lines.append("  Statistics:")
-        lines.extend(self._format_statistics(record.output_data, record.validator_type))
+        lines.extend(self._format_validator_data(record.output_data, record.validator_type, indent="    ", verbose_labels=False))
         lines.append("")
 
         # Settings used (collapsed for readability)
@@ -305,144 +305,119 @@ class ValidationReport:
 
         return lines
 
-    def _format_statistics(self, output_data: Dict[str, Any], validator_type: str) -> List[str]:
-        """Format statistics based on validator type."""
+    def _format_validator_data(
+        self,
+        data: Dict[str, Any],
+        validator_type: str,
+        indent: str = "    ",
+        verbose_labels: bool = False
+    ) -> List[str]:
+        """
+        Format validator data (statistics or metadata) based on validator type.
+
+        Args:
+            data: Dictionary containing validation data
+            validator_type: Type of validator ("genome", "read", "feature")
+            indent: Indentation string for formatting (default: 4 spaces)
+            verbose_labels: Use verbose label style (default: False for concise)
+
+        Returns:
+            List of formatted strings
+        """
         lines = []
 
         if validator_type == "genome":
-            # Genome-specific statistics
-            if self._has_value(output_data, 'num_sequences'):
-                lines.append(f"    Sequences: {output_data['num_sequences']:,}")
+            # Genome-specific data
+            if self._has_value(data, 'num_sequences'):
+                lines.append(f"{indent}Sequences: {data['num_sequences']:,}")
 
-            if self._has_value(output_data, 'sequence_lengths'):
-                seq_lengths = output_data['sequence_lengths']
+            if self._has_value(data, 'sequence_ids'):
+                seq_ids = data['sequence_ids']
+                if verbose_labels:
+                    # Metadata style - show IDs sub-indented
+                    if len(seq_ids) <= 5:
+                        lines.append(f"{indent}  IDs: {', '.join(seq_ids)}")
+                    else:
+                        lines.append(f"{indent}  IDs: {', '.join(seq_ids[:5])}, ... ({len(seq_ids)} total)")
+                else:
+                    # Statistics style - inline
+                    if len(seq_ids) <= 3:
+                        lines.append(f"{indent}Sequence IDs: {', '.join(seq_ids)}")
+                    else:
+                        lines.append(f"{indent}Sequence IDs: {seq_ids[0]}, {seq_ids[1]}, ... (+{len(seq_ids)-2} more)")
+
+            if self._has_value(data, 'sequence_lengths'):
+                seq_lengths = data['sequence_lengths']
                 if isinstance(seq_lengths, dict):
                     total_len = sum(seq_lengths.values())
                 else:
                     total_len = sum(seq_lengths)
-                lines.append(f"    Total Length: {total_len:,} bp")
-
-            if self._has_value(output_data, 'sequence_ids'):
-                seq_ids = output_data['sequence_ids']
-                if len(seq_ids) <= 3:
-                    lines.append(f"    Sequence IDs: {', '.join(seq_ids)}")
-                else:
-                    lines.append(f"    Sequence IDs: {seq_ids[0]}, {seq_ids[1]}, ... (+{len(seq_ids)-2} more)")
+                lines.append(f"{indent}Total Length: {total_len:,} bp")
 
         elif validator_type == "read":
-            # Read-specific statistics
-            if self._has_value(output_data, 'num_reads'):
-                lines.append(f"    Reads: {output_data['num_reads']:,}")
+            # Read-specific data
+            if self._has_value(data, 'num_reads'):
+                lines.append(f"{indent}Reads: {data['num_reads']:,}")
 
-            if self._has_value(output_data, 'total_bases'):
-                lines.append(f"    Total Bases: {output_data['total_bases']:,} bp")
+            if self._has_value(data, 'ngs_type_detected'):
+                lines.append(f"{indent}NGS Type: {data['ngs_type_detected']}")
 
-            if self._has_value(output_data, 'mean_read_length'):
-                lines.append(f"    Mean Length: {output_data['mean_read_length']:.1f} bp")
+            if self._has_value(data, 'base_name') and self._has_value(data, 'read_number'):
+                lines.append(f"{indent}Paired-End: R{data['read_number']} (base: {data['base_name']})")
 
-            if self._has_value(output_data, 'n50'):
-                lines.append(f"    N50: {output_data['n50']:,} bp")
+            if self._has_value(data, 'total_bases'):
+                label = "Total Bases" if not verbose_labels else "Total Bases"
+                lines.append(f"{indent}{label}: {data['total_bases']:,} bp")
 
-            if self._has_value(output_data, 'longest_read_length') and self._has_value(output_data, 'shortest_read_length'):
-                lines.append(f"    Length Range: {output_data['shortest_read_length']:,} - {output_data['longest_read_length']:,} bp")
+            if self._has_value(data, 'mean_read_length'):
+                label = "Mean Length" if not verbose_labels else "Mean Read Length"
+                lines.append(f"{indent}{label}: {data['mean_read_length']:.1f} bp")
 
-            if self._has_value(output_data, 'ngs_type_detected'):
-                ngs_type = output_data['ngs_type_detected']
-                lines.append(f"    NGS Type: {ngs_type}")
+            if self._has_value(data, 'n50'):
+                lines.append(f"{indent}N50: {data['n50']:,} bp")
 
-            if self._has_value(output_data, 'base_name') and self._has_value(output_data, 'read_number'):
-                base_name = output_data['base_name']
-                read_num = output_data['read_number']
-                lines.append(f"    Paired-End: R{read_num} (base: {base_name})")
-
-        elif validator_type == "feature":
-            # Feature-specific statistics
-            if self._has_value(output_data, 'num_features'):
-                lines.append(f"    Features: {output_data['num_features']:,}")
-
-            if self._has_value(output_data, 'feature_types'):
-                types = output_data['feature_types']
-                if len(types) <= 5:
-                    lines.append(f"    Types: {', '.join(types)}")
-                else:
-                    lines.append(f"    Types: {', '.join(list(types)[:5])}, ... (+{len(types)-5} more)")
-
-            if self._has_value(output_data, 'sequence_ids'):
-                seq_ids = output_data['sequence_ids']
-                if len(seq_ids) <= 3:
-                    lines.append(f"    Sequences: {', '.join(seq_ids)}")
-                else:
-                    lines.append(f"    Sequences: {seq_ids[0]}, {seq_ids[1]}, ... (+{len(seq_ids)-2} more)")
-
-        return lines
-
-    def _format_metadata(self, metadata: Dict[str, Any], validator_type: str) -> List[str]:
-        """Format metadata."""
-        lines = []
-
-        if validator_type == "genome":
-            # Genome-specific metadata
-            if self._has_value(metadata, 'num_sequences'):
-                lines.append(f"  Sequences: {metadata['num_sequences']}")
-
-            if self._has_value(metadata, 'sequence_ids'):
-                seq_ids = metadata['sequence_ids']
-                if len(seq_ids) <= 5:
-                    lines.append(f"    IDs: {', '.join(seq_ids)}")
-                else:
-                    lines.append(f"    IDs: {', '.join(seq_ids[:5])}, ... ({len(seq_ids)} total)")
-
-            if self._has_value(metadata, 'sequence_lengths'):
-                # Handle both list and dict formats
-                seq_lengths = metadata['sequence_lengths']
-                if isinstance(seq_lengths, dict):
-                    total_len = sum(seq_lengths.values())
-                else:  # Assume list
-                    total_len = sum(seq_lengths)
-                lines.append(f"  Total Length: {total_len:,} bp")
-
-        elif validator_type == "read":
-            # Read-specific metadata
-            if self._has_value(metadata, 'num_reads'):
-                lines.append(f"  Reads: {metadata['num_reads']:,}")
-
-            if self._has_value(metadata, 'ngs_type_detected'):
-                lines.append(f"  NGS Type: {metadata['ngs_type_detected']}")
-
-            if self._has_value(metadata, 'base_name') and self._has_value(metadata, 'read_number'):
-                lines.append(f"  Paired-End: R{metadata['read_number']} (base: {metadata['base_name']})")
-
-            # Read statistics
-            if self._has_value(metadata, 'total_bases'):
-                lines.append(f"  Total Bases: {metadata['total_bases']:,} bp")
-
-            if self._has_value(metadata, 'mean_read_length'):
-                lines.append(f"  Mean Read Length: {metadata['mean_read_length']:.1f} bp")
-
-            if self._has_value(metadata, 'n50'):
-                lines.append(f"  N50: {metadata['n50']:,} bp")
-
-            if self._has_value(metadata, 'longest_read_length'):
-                lines.append(f"  Longest Read: {metadata['longest_read_length']:,} bp")
-
-            if self._has_value(metadata, 'shortest_read_length'):
-                lines.append(f"  Shortest Read: {metadata['shortest_read_length']:,} bp")
+            if verbose_labels:
+                # Metadata style - separate longest/shortest
+                if self._has_value(data, 'longest_read_length'):
+                    lines.append(f"{indent}Longest Read: {data['longest_read_length']:,} bp")
+                if self._has_value(data, 'shortest_read_length'):
+                    lines.append(f"{indent}Shortest Read: {data['shortest_read_length']:,} bp")
+            else:
+                # Statistics style - combined range
+                if self._has_value(data, 'longest_read_length') and self._has_value(data, 'shortest_read_length'):
+                    lines.append(f"{indent}Length Range: {data['shortest_read_length']:,} - {data['longest_read_length']:,} bp")
 
         elif validator_type == "feature":
-            # Feature-specific metadata
-            if self._has_value(metadata, 'num_features'):
-                lines.append(f"  Features: {metadata['num_features']}")
+            # Feature-specific data
+            if self._has_value(data, 'num_features'):
+                lines.append(f"{indent}Features: {data['num_features']:,}")
 
-            if self._has_value(metadata, 'feature_types'):
-                types = metadata['feature_types']
-                lines.append(f"    Types: {', '.join(types)}")
-
-            if self._has_value(metadata, 'sequence_ids'):
-                seq_ids = metadata['sequence_ids']
-                if len(seq_ids) <= 5:
-                    lines.append(f"    Sequences: {', '.join(seq_ids)}")
+            if self._has_value(data, 'feature_types'):
+                types = data['feature_types']
+                if verbose_labels:
+                    # Metadata style - inline
+                    lines.append(f"{indent}  Types: {', '.join(types)}")
                 else:
-                    lines.append(f"    Sequences: {', '.join(seq_ids[:5])}, ... ({len(seq_ids)} total)")
+                    # Statistics style - with truncation
+                    if len(types) <= 5:
+                        lines.append(f"{indent}Types: {', '.join(types)}")
+                    else:
+                        lines.append(f"{indent}Types: {', '.join(list(types)[:5])}, ... (+{len(types)-5} more)")
+
+            if self._has_value(data, 'sequence_ids'):
+                seq_ids = data['sequence_ids']
+                if verbose_labels:
+                    # Metadata style
+                    if len(seq_ids) <= 5:
+                        lines.append(f"{indent}  Sequences: {', '.join(seq_ids)}")
+                    else:
+                        lines.append(f"{indent}  Sequences: {', '.join(seq_ids[:5])}, ... ({len(seq_ids)} total)")
+                else:
+                    # Statistics style
+                    if len(seq_ids) <= 3:
+                        lines.append(f"{indent}Sequences: {', '.join(seq_ids)}")
+                    else:
+                        lines.append(f"{indent}Sequences: {seq_ids[0]}, {seq_ids[1]}, ... (+{len(seq_ids)-2} more)")
 
         return lines
 

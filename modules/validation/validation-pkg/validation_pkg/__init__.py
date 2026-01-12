@@ -28,23 +28,24 @@ Features
 Quick Start
 -----------
 
-**Using the Functional API:**
+**Functional API with Settings:**
 
->>> from validation_pkg import ConfigManager, validate_genome, validate_read, validate_feature
+>>> from validation_pkg import (
+...     ConfigManager, ValidationReport, GenomeValidator,
+...     validate_genome, validate_reads, genomexgenome_validation
+... )
 >>> config = ConfigManager.load("config.json")
+>>> report = ValidationReport("logs/report.txt")
 >>>
->>> # Validate genome files
->>> if config.ref_genome:
-...     validate_genome(config.ref_genome, config.output_dir)
+>>> # Configure and validate genomes
+>>> ref_settings = GenomeValidator.Settings(plasmids_to_one=True, replace_id_with='chr')
+>>> ref_result = validate_genome(config.ref_genome, ref_settings)
+>>> report.write(ref_result, file_type="genome")
 >>>
->>> # Validate read files
->>> if config.reads:
-...     for read in config.reads:
-...         validate_read(read, config.output_dir)
->>>
->>> # Validate feature files
->>> if config.ref_feature:
-...     validate_feature(config.ref_feature, config.output_dir)
+>>> # Validate reads (using defaults)
+>>> reads_results = validate_reads(config.reads)
+>>> report.write(reads_results, file_type="read")
+>>> report.flush()
 
 Configuration Example
 --------------------

@@ -462,6 +462,7 @@ class TestGenomeValidatorEditing:
         assert any("medium_seq" in seq.description for seq in validator.sequences)
         assert any("long_seq" in seq.description for seq in validator.sequences)
 
+
 class TestGenomeValidatorOutput:
     """Test output generation."""
 

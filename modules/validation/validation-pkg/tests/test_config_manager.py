@@ -701,14 +701,14 @@ class TestConfigOptionsThreads:
         config = ConfigManager.load(str(config_file))
 
         assert config.options['threads'] == 4
-        assert config.get_threads() == 4
+        assert config.threads == 4
 
     def test_threads_single_thread(self, temp_dir):
         """Test single thread configuration."""
         config_file = self.create_config_with_threads(temp_dir, 1)
         config = ConfigManager.load(str(config_file))
 
-        assert config.get_threads() == 1
+        assert config.threads == 1
 
     def test_threads_many_threads(self, temp_dir):
         """Test high thread count (should warn but allow)."""
@@ -716,14 +716,14 @@ class TestConfigOptionsThreads:
         config = ConfigManager.load(str(config_file))
 
         # Should succeed but log warning
-        assert config.get_threads() == 20
+        assert config.threads == 20
 
     def test_threads_null_means_autodetect(self, temp_dir):
         """Test that null threads value means auto-detect."""
         config_file = self.create_config_with_threads(temp_dir, None)
         config = ConfigManager.load(str(config_file))
 
-        assert config.get_threads() is None
+        assert config.threads is None
 
     def test_threads_omitted_means_none(self, temp_dir):
         """Test that omitting threads returns None (empty options)."""
@@ -743,8 +743,8 @@ class TestConfigOptionsThreads:
 
         loaded_config = ConfigManager.load(str(config_file))
 
-        # No options section means get_threads() returns None
-        assert loaded_config.get_threads() is None
+        # No options section means threads returns None
+        assert loaded_config.threads is None
 
     def test_threads_zero_raises_error(self, temp_dir):
         """Test that threads=0 raises ValueError."""
@@ -807,19 +807,19 @@ class TestConfigOptionsThreads:
             ConfigManager.load(str(config_file))
 
     def test_config_get_threads_method(self):
-        """Test Config.get_threads() method."""
+        """Test Config.threads method."""
         config = Config()
 
         # No threads specified
-        assert config.get_threads() is None
+        assert config.threads is None
 
         # Threads specified
         config.options['threads'] = 4
-        assert config.get_threads() == 4
+        assert config.threads == 4
 
         # Threads explicitly null
         config.options['threads'] = None
-        assert config.get_threads() is None
+        assert config.threads is None
 
 
 class TestConfigValidatorSettings:

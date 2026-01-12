@@ -13,7 +13,7 @@ import pytest
 from dataclasses import dataclass
 from typing import Optional
 
-from validation_pkg.utils.settings import BaseSettings
+from validation_pkg.utils.base_settings import BaseSettings
 
 
 # ===== Test Fixtures =====

@@ -9,7 +9,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from validation_pkg.utils.path_utils import resolve_filepath
+from validation_pkg.utils.path_utils import *
 from validation_pkg.exceptions import ConfigurationError
 
 
@@ -132,3 +132,121 @@ class TestResolveFilepathEdgeCases:
         deep_path = "a/b/c/d/e/f/genome.fasta"
         filepath = resolve_filepath(temp_dir, deep_path)
         assert filepath == temp_dir / "a" / "b" / "c" / "d" / "e" / "f" / "genome.fasta"
+
+
+class TestPathIncrement:
+    """Test suite for get_incremented_path() function."""
+
+    def test_increment_nonexistent_file(self):
+        """Test that original path is returned if file doesn't exist."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "report.txt"
+            result = get_incremented_path(path)
+            assert result == path
+            assert str(result) == str(path)
+
+    def test_increment_existing_file(self):
+        """Test that _001 suffix is added if file exists."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "report.txt"
+            path.write_text("test")
+
+            result = get_incremented_path(path)
+            assert result.name == "report_001.txt"
+            assert result.parent == path.parent
+            assert not result.exists()
+
+    def test_increment_multiple_times(self):
+        """Test correct incrementing: 001 → 002 → 003."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_path = Path(tmpdir) / "report.txt"
+            base_path.write_text("test")
+
+            # First increment
+            path1 = get_incremented_path(base_path)
+            assert path1.name == "report_001.txt"
+            path1.write_text("test1")
+
+            # Second increment from base
+            path2 = get_incremented_path(base_path)
+            assert path2.name == "report_002.txt"
+            path2.write_text("test2")
+
+            # Third increment from base
+            path3 = get_incremented_path(base_path)
+            assert path3.name == "report_003.txt"
+
+    def test_increment_preserves_extension(self):
+        """Test that file extension is preserved correctly."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Test .txt
+            txt_path = Path(tmpdir) / "report.txt"
+            txt_path.write_text("test")
+            result = get_incremented_path(txt_path)
+            assert result.suffix == ".txt"
+            assert result.name == "report_001.txt"
+
+            # Test .log
+            log_path = Path(tmpdir) / "validation.log"
+            log_path.write_text("test")
+            result = get_incremented_path(log_path)
+            assert result.suffix == ".log"
+            assert result.name == "validation_001.log"
+
+    def test_increment_with_existing_number(self):
+        """Test incrementing a file that already has a number."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create report_001.txt
+            path1 = Path(tmpdir) / "report_001.txt"
+            path1.write_text("test")
+
+            # Incrementing it should give report_002.txt
+            result = get_incremented_path(path1)
+            assert result.name == "report_002.txt"
+
+    def test_increment_with_custom_separator(self):
+        """Test using a custom separator."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "report.txt"
+            path.write_text("test")
+
+            result = get_incremented_path(path, separator="-")
+            assert result.name == "report-001.txt"
+
+    def test_increment_no_extension(self):
+        """Test incrementing a file without extension."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "report"
+            path.write_text("test")
+
+            result = get_incremented_path(path)
+            assert result.name == "report_001"
+
+    def test_increment_multiple_dots(self):
+        """Test with files that have multiple dots in name."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "my.report.txt"
+            path.write_text("test")
+
+            result = get_incremented_path(path)
+            # Should preserve stem and only last extension
+            assert result.name == "my.report_001.txt"
+
+    def test_increment_safety_limit(self):
+        """Test that function raises error after reaching counter limit."""
+        import unittest.mock as mock
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "report.txt"
+            path.write_text("test")
+
+            # Mock Path.exists to always return True, simulating all files exist
+            # This will cause the counter to keep incrementing until it hits 10000
+            original_exists = Path.exists
+            def mock_exists(self):
+                # Allow the original path to exist, but all numbered paths also exist
+                return True
+
+            with mock.patch.object(Path, 'exists', mock_exists):
+                with pytest.raises(RuntimeError, match="Too many incremented files"):
+                    get_incremented_path(path)

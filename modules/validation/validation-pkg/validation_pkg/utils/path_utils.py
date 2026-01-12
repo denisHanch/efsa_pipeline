@@ -3,11 +3,14 @@
 from pathlib import Path
 from typing import Optional
 from validation_pkg.exceptions import ConfigurationError
+import re
 
 __all__ = [
     'resolve_filepath',
     'sanitize_path_component',
     'build_safe_output_dir',
+    'strip_all_extensions',
+    'get_incremented_path'
 ]
 
 
@@ -152,3 +155,77 @@ def build_safe_output_dir(
         output_dir.mkdir(parents=True, exist_ok=True)
 
     return output_dir
+
+
+def strip_all_extensions(filename: str, path: Optional[Path] = None) -> str:
+    """
+    Strip all extensions from a filename.
+
+    Args:
+        filename: The filename to process
+        path: Optional Path object to get suffixes from
+
+    Returns:
+        Filename with all extensions removed
+
+    Examples:
+        >>> strip_all_extensions("genome.fasta.gz")
+        'genome'
+        >>> strip_all_extensions("reads_R1.fastq")
+        'reads_R1'
+    """
+    if not filename:
+        return filename
+
+    # If path provided, use its suffixes list (more reliable)
+    if path:
+        base_name = filename
+        for suffix in path.suffixes:
+            base_name = base_name.replace(suffix, '', 1)
+        return base_name
+
+    # Otherwise, iteratively remove extensions
+    result = filename
+    while True:
+        name_without_ext = Path(result).stem
+        if name_without_ext == result:
+            break
+        result = name_without_ext
+
+    return result
+
+
+def get_incremented_path(path: Path, separator: str = "_") -> Path:
+    """Get next available filename by auto-incrementing if file exists."""
+    # Ensure path is a Path object
+    path = Path(path)
+
+    # If file doesn't exist, return original path
+    if not path.exists():
+        return path
+
+    stem = path.stem
+    suffix = path.suffix
+    parent = path.parent
+
+    # Check if stem already has increment pattern (e.g., report_001)
+    match = re.match(r'^(.+)_(\d+)$', stem)
+    if match:
+        base_stem = match.group(1)
+        start_counter = int(match.group(2)) + 1
+    else:
+        base_stem = stem
+        start_counter = 1
+
+    # Find next available number
+    counter = start_counter
+    while True:
+        new_name = f"{base_stem}{separator}{counter:03d}{suffix}"
+        new_path = parent / new_name
+        if not new_path.exists():
+            return new_path
+        counter += 1
+
+        # Safety check to avoid infinite loop
+        if counter > 9999:
+            raise RuntimeError(f"Too many incremented files for {path}. Maximum is 9999.")

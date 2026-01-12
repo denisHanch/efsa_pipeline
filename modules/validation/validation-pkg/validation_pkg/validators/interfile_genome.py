@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from typing import Dict, Optional, Any
-from ..utils.settings import BaseSettings
+from ..utils.base_settings import BaseSettings
 from ..exceptions import GenomeValidationError
 from ..logger import get_logger
 

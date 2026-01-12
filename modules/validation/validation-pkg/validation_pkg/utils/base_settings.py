@@ -1,12 +1,15 @@
 """Base settings infrastructure for validators."""
 
-from dataclasses import asdict, fields
+from dataclasses import asdict, fields, dataclass
 from copy import deepcopy
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from abc import ABC
+from validation_pkg.utils.formats import CodingType
 
 __all__ = [
     'BaseSettings',
+    'BaseOutputMetadata',
+    'BaseValidatorSettings',
 ]
 
 # ===== Base Settings Class =====
@@ -94,4 +97,28 @@ class BaseSettings(ABC):
         """Return repr string for debugging."""
         params = ', '.join(f"{k}={v!r}" for k, v in self.to_dict().items())
         return f"{self.__class__.__name__}({params})"
-    
+
+
+# ===== Base Output Metadata =====
+@dataclass
+class BaseOutputMetadata(BaseSettings):
+    """Base metadata class with common fields for all validator output metadata."""
+    input_file: str = None
+    output_file: str = None
+    output_filename: str = None
+    validation_level: str = None
+    elapsed_time: float = None
+
+
+# ===== Base Validator Settings =====
+@dataclass
+class BaseValidatorSettings(BaseSettings):
+    """Base settings class with common fields for all validators."""
+    coding_type: Optional[CodingType] = None 
+    output_filename_suffix: Optional[str] = None
+    output_subdir_name: Optional[str] = None
+
+    def _normalize_coding_type(self):
+        """Normalize coding_type to handle strings and None."""
+        self.coding_type = CodingType.normalize(self.coding_type)
+
