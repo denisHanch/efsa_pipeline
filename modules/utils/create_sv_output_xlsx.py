@@ -1,419 +1,491 @@
 #!/usr/bin/env python3
-"""Creates SV output file
-
-Inputs:
-  - Assembly (SyRI) TSV: chrom, start, end, svtype
-  - Short-read TSV: chrom, start, end, svtype, [info_svtype], [debreak_type], supporting_reads
-  - Long-read TSV: chrom, start, end, svtype, [info_svtype], [debreak_type], supporting_reads
-
-Main functionality implemented:
-  - Separate sheets: Insertions, Deletions, Replacements, Inversions, Translocations
-  - Unique IDs per sheet (e.g., INS1, INS2 ...)
-  - SV length computed as end - start
-  - Validate INS/DEL: keep assembly events that intersect BOTH short-read and long-read events of same type
-  - SV type derived from (in order): info_svtype, svtype, debreak_type; DeBreak stores type in ALT (debreak_type)
-  - For long-read supporting_reads with 4 comma-separated numbers, the 3rd number is used
 """
+Create SV output workbook split across tabs by SV type, combining long-read and short-read calls.
 
+High-level logic (per business requirements):
+- Read long.tsv and short.tsv produced by modules/sv_calling.nf (vcf_to_table).
+- Split calls into tabs: Insertions, Deletions, Replacements, Inversions, Translocations.
+- Assign unique event_id per tab based on LONG-read events ordered by (chrom, start).
+- If a short-read event overlaps ("is within") a long-read event of the same SV type on the same chromosome,
+  it is treated as evidence for the same event (same row / same event_id).
+- Optionally, use syri.tsv (assembly) to fill asm_* coordinates by best-overlap with the long-read event.
+- Write results into an Excel workbook. If --template is provided, keep the first two header rows intact and
+  overwrite rows 3+ only.
+
+Notes on upstream TSV formats:
+- TSV columns: chrom, start, end, svtype, debreak_type, supporting_reads
+- SV type normalization:
+  - prefers a recognized SV token parsed from svtype; if not recognized, falls back to debreak_type (e.g. <INS>)
+  - DUP is mapped to INS (template has no DUP tab)
+  - BND is mapped to TRA
+  - SyRI codes: TRANS* -> TRA, CPL* -> REP
+- supporting_reads in long-read summary may be "a,b,c,d"; the 3rd number (index 2) is used.
+
+Dependencies: openpyxl only (no pandas required).
+"""
 from __future__ import annotations
 
 import argparse
+import csv
 import math
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+import re
+import statistics
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Tuple
 
-import pandas as pd
-import openpyxl
-
-
-TEMPLATE_HEADERS: Dict[str, List[str]] = {
-  "Insertions": [
-    "SV unique ID",
-    "which type of event is taking place (possibly dismissable)",
-    "which fasta sequence the given SV is occuring",
-    "assembly-based SV start",
-    "assembly-based SV end",
-    "assembly-based SV length",
-    "long-reads-based SV start (median)",
-    "long-reads-based SV start (standard deviation)",
-    "long-reads-based SV end (median)",
-    "long-reads-based SV end (standard deviation)",
-    "long-reads-based SV length (median)",
-    "short-reads-based SV start (median)",
-    "short-reads-based SV start (standard deviation)",
-    "short-reads-based SV end (median)",
-    "short-reads-based SV end (standard deviation)",
-    "short-reads-based SV length (median)",
-    "long-reads-based support (how many long-reads supporting the SV)",
-    "long-reads-based confidence score (%, p-value, e-value, etc)",
-    "short-reads-based support (how many short-reads supporting the SV)",
-    "short-reads-based confidence score (%, p-value, e-value, etc)",
-    "assembly-based estimate number of copies",
-    "long-reads-based estimate number of copies",
-    "short-reads-based estimate number of copies"
-  ],
-  "Deletions": [
-    "SV unique ID",
-    "which type of event is taking place (possibly dismissable)",
-    "which fasta sequence the given SV is occuring",
-    "assembly-based SV start",
-    "assembly-based SV end",
-    "assembly-based SV length",
-    "long reads-based SV start (median)",
-    "long reads-based SV start (standard deviation)",
-    "long reads-based SV end (median)",
-    "long reads-based SV end (standard deviation)",
-    "long reads-based SV length (median)",
-    "short reads-based SV start (median)",
-    "short reads-based SV start (standard deviation)",
-    "short reads-based SV end (median)",
-    "short reads-based SV end (standard deviation)",
-    "short reads-based SV length (median)",
-    "assembly-based confidence score (%, e-value, p-value)",
-    "long readss-based support (how many long readss supporting the SV)",
-    "long readss-based confidence score (%, p-value, e-value, etc)",
-    "short reads-based support (how many short reads supporting the SV)",
-    "short reads-based confidence score (%, p-value, e-value, etc)",
-    "assembly-based estimate number of copies",
-    "long readss-based estimate number of copies",
-    "short reads-based estimate number of copies"
-  ],
-  "Replacements": [
-    "SV unique ID",
-    "which type of event is taking place (possibly dismissable)",
-    "which fasta sequence the given SV is occuring",
-    "assembly-based start of deleted region",
-    "assembly-based end of deleted region",
-    "assembly-based length of deleted region",
-    "assembly-based start of inserted region",
-    "assembly-based end of inserted region",
-    "assembly-based length of inserted region",
-    "long reads-based start of deletion (median)",
-    "long reads-based start of deletion (standard deviation)",
-    "long reads-based deletion end (median)",
-    "long reads-based deletion end (standard deviation)",
-    "long reads-based length of deletion (standard deviation)",
-    "long reads-based start of insertion (median)",
-    "long reads-based start of insertion (standard deviation)",
-    "long reads-based end of insertion (median)",
-    "long reads-based end of insertion (standard deviation)",
-    "long reads-based length of insertion (median)",
-    "short reads-based start of deletion (median)",
-    "short reads-based start of deletion (standard deviation)",
-    "short reads-based deletion end (median)",
-    "short reads-based deletion end (standard deviation)",
-    "short reads-based length of deletion (standard deviation)",
-    "short reads-based start of insertion (median)",
-    "short reads-based start of insertion (standard deviation)",
-    "short reads-based end of insertion (median)",
-    "short reads-based end of insertion (standard deviation)",
-    "short reads-based length of insertion (median)",
-    "assembly-based SV support",
-    "assembly-based confidence score (%, e-value, p-value)",
-    "long reads-based support (how many long reads supporting the SV)",
-    "long reads-based confidence score (%, p-value, e-value, etc)",
-    "short reads-based support (how many short reads supporting the SV)",
-    "short reads-based confidence score (%, p-value, e-value, etc)",
-    "assembly-based estimate number of copies",
-    "long reads-based estimate number of copies",
-    "short reads-based estimate number of copies"
-  ],
-  "Inversions": [
-    "SV unique ID",
-    "which type of event is taking place (possibly dismissable)",
-    "which fasta sequence the given SV is occuring",
-    "assembly-based SV start",
-    "assembly-based SV end",
-    "assembly-based SV length",
-    "long reads-based SV start (median)",
-    "long reads-based SV start (standard deviation)",
-    "long reads-based SV end (median)",
-    "long reads-based SV end (standard deviation)",
-    "long reads-based SV length (median)",
-    "short reads-based SV start (median)",
-    "short reads-based SV start (standard deviation)",
-    "short reads-based SV end (median)",
-    "short reads-based SV end (standard deviation)",
-    "short reads-based SV length (median)",
-    "assembly-based SV support",
-    "assembly-based confidence score (%, e-value, p-value)",
-    "long reads-based support (how many long reads supporting the SV)",
-    "long reads-based confidence score (%, p-value, e-value, etc)",
-    "short reads-based support (how many short reads supporting the SV)",
-    "long reads-based confidence score (%, p-value, e-value, etc)",
-    "assembly-based estimate number of copies",
-    "long reads-based estimate number of copies",
-    "short long reads-based estimate number of copies"
-  ],
-  "Translocations": [
-    "SV unique ID",
-    "which type of event is taking place (possibly dismissable)",
-    "sequence from which the DNA fragment originates",
-    "sequence to which the DNA fragment is translocated",
-    "assembly-based start coordinate of origin breakpoint",
-    "assembly-based end coordinate of origin breakpoint",
-    "assembly-based start coordinate of destination breakpoint",
-    "assembly-based end coordinate of destination breakpoint",
-    "assembly-based length of translocated fragment",
-    "long reads-based start coordinate of origin breakpoint (median)",
-    "long reads-based start coordinate of origin breakpoint (standard deviation)",
-    "long reads-based end coordinate of origin breakpoint (median)",
-    "long reads-based end coordinate of origin breakpoint (standard deviation)",
-    "long reads-based start coordinate of destination breakpoint (median)",
-    "long reads-based start coordinate of destination breakpoint (standard deviation)",
-    "long reads-based end coordinate of destination breakpoint (median)",
-    "long reads-based end coordinate of destination breakpoint (standard deviation)",
-    "long reads-based length of translocated fragment",
-    "short reads-based start coordinate of origin breakpoint (median)",
-    "short reads-based start coordinate of origin breakpoint (standard deviation)",
-    "short reads-based end coordinate of origin breakpoint (median)",
-    "short reads-based end coordinate of origin breakpoint (standard deviation)",
-    "short reads-based start coordinate of destination breakpoint (median)",
-    "short reads-based start coordinate of destination breakpoint (standard deviation)",
-    "short reads-based end coordinate of destination breakpoint (median)",
-    "short reads-based end coordinate of destination breakpoint (standard deviation)",
-    "short reads-based length of translocated fragment",
-    "assembly-based SV support",
-    "assembly-based confidence score (%, e-value, p-value)",
-    "long reads-based support (how many long reads supporting the SV)",
-    "long reads-based confidence score (%, p-value, e-value, etc)",
-    "short reads-based support (how many short reads supporting the SV)",
-    "short reads-based confidence score (%, p-value, e-value, etc)",
-    "assembly-based estimate number of copies",
-    "long reads-based estimate number of copies",
-    "short reads-based estimate number of copies"
-  ]
-}
+from openpyxl import load_workbook, Workbook
 
 
-def _read_tsv(path: Path) -> pd.DataFrame:
-    df = pd.read_csv(path, sep="\t", dtype=str).fillna("")
-    for c in ["start", "end"]:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-    return df
+KNOWN = {"INS", "DEL", "INV", "TRA", "REP"}
 
 
-def _clean_svtype(raw: str) -> str:
-    s = (raw or "").strip()
-    if not s:
-        return ""
-    s = s.strip("<>")
-    s = s.split(",")[0].strip()
-    s = s.upper()
-    if s == "BND":
-        return "TRA"
-    return s
-
-
-def _svtype_from_row(row: pd.Series) -> str:
-    for key in ["info_svtype", "svtype", "debreak_type"]:
-        if key in row and str(row[key]).strip():
-            return _clean_svtype(str(row[key]))
-    return ""
-
-
-def _parse_supporting_reads(value: str, *, long_read_special: bool) -> Optional[int]:
-    s = (value or "").strip()
-    if not s:
-        return None
-
-    if long_read_special and "," in s:
-        parts = [p.strip() for p in s.split(",")]
-        if len(parts) >= 3:
-            try:
-                return int(float(parts[2]))
-            except Exception:
-                pass
-
+def to_int(x: Any) -> Optional[int]:
     try:
+        if x is None:
+            return None
+        s = str(x).strip()
+        if s == "" or s.lower() == "nan":
+            return None
         return int(float(s))
     except Exception:
         return None
 
 
-def _intervals_intersect(a_start: float, a_end: float, b_start: float, b_end: float) -> bool:
-    if any(
-        x is None or (isinstance(x, float) and math.isnan(x))
-        for x in [a_start, a_end, b_start, b_end]
-    ):
-        return False
-    return max(a_start, b_start) <= min(a_end, b_end)
-
-
-def _overlapping_rows(df: pd.DataFrame, chrom: str, start: float, end: float, svtype: str) -> pd.DataFrame:
-    if df.empty:
-        return df
-    sub = df[df["chrom"] == chrom]
-    if "svtype_norm" in sub.columns:
-        sub = sub[sub["svtype_norm"] == svtype]
-    mask = sub.apply(lambda r: _intervals_intersect(start, end, r["start"], r["end"]), axis=1)
-    return sub[mask]
-
-
-def _median(values: List[float]) -> Optional[float]:
-    vals = [v for v in values if v is not None and not (isinstance(v, float) and math.isnan(v))]
-    if not vals:
+def parse_support(x: Any) -> Optional[int]:
+    if x is None:
         return None
-    vals_sorted = sorted(vals)
-    n = len(vals_sorted)
-    mid = n // 2
-    if n % 2 == 1:
-        return float(vals_sorted[mid])
-    return float((vals_sorted[mid - 1] + vals_sorted[mid]) / 2)
+    s = str(x).strip()
+    if s == "" or s.lower() == "nan":
+        return None
+    if "," in s:
+        parts = [p for p in s.split(",") if p != ""]
+        if len(parts) >= 3:
+            return to_int(parts[2])
+        return to_int(parts[-1]) if parts else None
+    return to_int(s)
 
 
-def build_workbook(assembly_tsv: Path, short_tsv: Path, long_tsv: Path, out_xlsx: Path) -> None:
-    asm = _read_tsv(assembly_tsv)
-    sr = _read_tsv(short_tsv)
-    lr = _read_tsv(long_tsv)
+def normalize_type(svtype: Any, debreak_type: Any) -> Optional[str]:
+    def norm_one(v: Any) -> Optional[str]:
+        if v is None:
+            return None
+        t = str(v).strip()
+        if t == "" or t.lower() == "nan":
+            return None
 
-    # Standardize column names for assembly: expect chrom/start/end/svtype
-    asm_cols = {str(c).lower(): c for c in asm.columns}
-    asm = asm.rename(
-        columns={
-            asm_cols.get("chrom", "chrom"): "chrom",
-            asm_cols.get("start", "start"): "start",
-            asm_cols.get("end", "end"): "end",
-            asm_cols.get("svtype", "svtype"): "svtype",
-        }
-    )
-    asm["svtype_norm"] = asm["svtype"].apply(_clean_svtype)
+        # <INS>
+        m = re.match(r"^<(\w+)>$", t)
+        if m:
+            tok = m.group(1).upper()
+            if tok == "BND":
+                tok = "TRA"
+            if tok == "DUP":
+                tok = "INS"
+            return tok
 
-    def prep_reads(df: pd.DataFrame, long_read_special: bool) -> pd.DataFrame:
-        out = df.copy()
-        if "info_svtype" not in out.columns:
-            out["info_svtype"] = ""
-        if "debreak_type" not in out.columns:
-            out["debreak_type"] = ""
-        if "svtype" not in out.columns:
-            out["svtype"] = ""
-        out["svtype_norm"] = out.apply(_svtype_from_row, axis=1)
+        # IDs like INV0000001, DEL123, TRA...
+        m = re.match(r"^(INS|DEL|INV|TRA|REP|DUP|BND)", t.upper())
+        if m:
+            tok = m.group(1)
+            if tok == "BND":
+                tok = "TRA"
+            if tok == "DUP":
+                tok = "INS"
+            return tok
 
-        if "supporting_reads" not in out.columns:
-            out["supporting_reads"] = ""
-        out["supporting_reads_norm"] = out["supporting_reads"].apply(
-            lambda x: _parse_supporting_reads(str(x), long_read_special=long_read_special)
-        )
-        return out
+        # caller like cuteSV.INS.0
+        m = re.search(r"\b(INS|DEL|INV|TRA|REP|DUP|BND)\b", t.upper())
+        if m:
+            tok = m.group(1)
+            if tok == "BND":
+                tok = "TRA"
+            if tok == "DUP":
+                tok = "INS"
+            return tok
 
-    sr = prep_reads(sr, long_read_special=False)
-    lr = prep_reads(lr, long_read_special=True)
+        # SyRI codes
+        up = t.upper()
+        if up.startswith("CPL"):
+            return "REP"
+        if up.startswith("TRANS"):
+            return "TRA"
+        if up.startswith("INV"):
+            return "INV"
+        if up.startswith("DEL"):
+            return "DEL"
+        if up.startswith("INS"):
+            return "INS"
 
-    wb = openpyxl.Workbook()
+        return None
+
+    a = norm_one(svtype)
+    b = norm_one(debreak_type)
+
+    if a in KNOWN:
+        return a
+    if b in KNOWN:
+        return b
+    return a or b
+
+
+def calc_length(start: Any, end: Any, svtype: Any, debreak_type: Any) -> Optional[int]:
+    s = to_int(start)
+    e = to_int(end)
+    if s is None or e is None:
+        return None
+
+    t = normalize_type(svtype, debreak_type)
+    if t == "INS":
+        # If debreak_type contains the inserted sequence (not <INS>), use its length
+        if debreak_type and not re.match(r"^<\w+>$", str(debreak_type).strip()):
+            seq = str(debreak_type).strip()
+            if re.fullmatch(r"[ACGTNacgtn]+", seq):
+                return len(seq)
+        # Otherwise coordinates don't encode insertion length
+        return 0
+
+    return e - s
+
+
+def interval_overlap(a_start: int, a_end: int, b_start: int, b_end: int) -> int:
+    return max(0, min(a_end, b_end) - max(a_start, b_start) + 1)
+
+
+def overlaps(short_row: Dict[str, Any], long_row: Dict[str, Any]) -> bool:
+    if short_row.get("chrom") != long_row.get("chrom"):
+        return False
+    ss, se = short_row.get("start"), short_row.get("end")
+    ls, le = long_row.get("start"), long_row.get("end")
+    if None in (ss, se, ls, le):
+        return False
+    return interval_overlap(ss, se, ls, le) > 0
+
+
+def stats(vals: List[Optional[int]]) -> Tuple[Optional[float], Optional[float]]:
+    vv = [v for v in vals if v is not None]
+    if not vv:
+        return None, None
+    if len(vv) == 1:
+        return float(vv[0]), 0.0
+    med = float(statistics.median(vv))
+    mean = sum(vv) / len(vv)
+    var = sum((v - mean) ** 2 for v in vv) / (len(vv) - 1)
+    return med, math.sqrt(var)
+
+
+def read_tsv(path: str) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    with open(path, newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for r in reader:
+            rows.append(dict(r))
+    return rows
+
+
+def enrich(rows: List[Dict[str, Any]], source: str) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        rr = dict(r)
+        rr["start"] = to_int(rr.get("start"))
+        rr["end"] = to_int(rr.get("end"))
+        rr["support"] = parse_support(rr.get("supporting_reads"))
+        rr["type"] = normalize_type(rr.get("svtype"), rr.get("debreak_type"))
+        rr["length"] = calc_length(rr.get("start"), rr.get("end"), rr.get("svtype"), rr.get("debreak_type"))
+        rr["source"] = source
+        out.append(rr)
+    return out
+
+
+def enrich_syri(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        rr = dict(r)
+        rr["start"] = to_int(rr.get("start"))
+        rr["end"] = to_int(rr.get("end"))
+        rr["type"] = normalize_type(rr.get("svtype"), None)
+        if rr["start"] is not None and rr["end"] is not None:
+            rr["length"] = rr["end"] - rr["start"]
+        else:
+            rr["length"] = None
+        out.append(rr)
+    return out
+
+
+def best_asm_match(
+    longr: Dict[str, Any],
+    svtype: str,
+    syri_by_type: Dict[str, List[Dict[str, Any]]],
+) -> Optional[Dict[str, Any]]:
+    candidates = syri_by_type.get(svtype, [])
+    ls, le = longr.get("start"), longr.get("end")
+    if ls is None or le is None:
+        return None
+    best = None
+    bestov = 0
+    for c in candidates:
+        if c.get("chrom") != longr.get("chrom"):
+            continue
+        cs, ce = c.get("start"), c.get("end")
+        if cs is None or ce is None:
+            continue
+        ov = interval_overlap(ls, le, cs, ce)
+        if ov > bestov:
+            bestov = ov
+            best = c
+    return best
+
+
+def load_template_or_create(template_path: Optional[str]) -> Workbook:
+    if template_path:
+        return load_workbook(template_path)
+
+    # No template: create workbook with expected sheets + 2 header rows (minimal)
+    wb = Workbook()
     wb.remove(wb.active)
 
-    def add_sheet(name: str):
+    # Minimal headers (row 2 keys; row 1 descriptions are left blank)
+    headers = {
+        "Insertions": [
+            "event_id","event_type","sequence_id","asm_start","asm_end","asm_length_bp",
+            "long_reads_start_median","long_reads_start_std","long_reads_end_median","long_reads_end_std","long_reads_length_median",
+            "short_reads_start_median","short_reads_start_std","short_reads_end_median","short_reads_end_std","short_reads_length_median",
+            "long_reads_support","long_reads_score","short_reads_support","short_reads_score",
+            "asm_copy_number_estimate","long_reads_copy_number_estimate","short_reads_copy_number_estimate"
+        ],
+        "Deletions": [
+            "event_id","event_type","sequence_id","asm_start","asm_end","asm_length_bp",
+            "long_reads_start_median","long_reads_start_std","long_reads_end_median","long_reads_end_std","long_reads_length_median",
+            "short_reads_start_median","short_reads_start_std","short_reads_end_median","short_reads_end_std","short_reads_length_median",
+            "assembly_support","assembly_score","long_reads_support","long_reads_score","short_reads_support","short_reads_score",
+            "asm_copy_number_estimate","long_reads_copy_number_estimate","short_reads_copy_number_estimate"
+        ],
+        "Inversions": [
+            "event_id","event_type","sequence_id","asm_start","asm_end","asm_length_bp",
+            "long_reads_start_median","long_reads_start_std","long_reads_end_median","long_reads_end_std","long_reads_length_median",
+            "short_reads_start_median","short_reads_start_std","short_reads_end_median","short_reads_end_std","short_reads_length_median",
+            "assembly_support","assembly_score","long_reads_support","long_reads_score","short_reads_support","short_reads_score",
+            "asm_copy_number_estimate","long_reads_copy_number_estimate","short_reads_copy_number_estimate"
+        ],
+        "Replacements": [
+            "event_id","event_type","sequence_id",
+            "asm_del_start","asm_del_end","asm_del_length","asm_ins_start","asm_ins_end","asm_ins_length",
+            "long_reads_del_start_median","long_reads_del_start_std","long_reads_del_end_median","long_reads_del_end_std","long_reads_del_length_median",
+            "long_reads_ins_start_median","long_reads_ins_start_std","long_reads_ins_end_median","long_reads_ins_end_std","long_reads_ins_length_median",
+            "short_reads_del_start_median","short_reads_del_start_std","short_reads_del_end_median","short_reads_del_end_std","short_reads_del_length_median",
+            "short_reads_ins_start_median","short_reads_ins_start_std","short_reads_ins_end_median","short_reads_ins_end_std","short_reads_ins_length_median",
+            "assembly_support","assembly_score","long_reads_support","long_reads_score","short_reads_support","short_reads_score",
+            "asm_copy_number_estimate","long_reads_copy_number_estimate","short_reads_copy_number_estimate"
+        ],
+        "Translocations": [
+            "event_id","event_type","origin_sequence_id","destination_sequence_id",
+            "asm_origin_start","asm_origin_end","asm_dest_start","asm_dest_end","asm_length",
+            "long_reads_origin_start_median","long_reads_origin_start_std","long_reads_origin_end_median","long_reads_origin_end_std",
+            "long_reads_dest_start_median","long_reads_dest_start_std","long_reads_dest_end_median","long_reads_dest_end_std","long_reads_length_median",
+            "short_reads_origin_start_median","short_reads_origin_start_std","short_reads_origin_end_median","short_reads_origin_end_std",
+            "short_reads_dest_start_median","short_reads_dest_start_std","short_reads_dest_end_median","short_reads_dest_end_std","short_reads_length_median",
+            "assembly_support","assembly_score","long_reads_support","long_reads_score","short_reads_support","short_reads_score",
+        ],
+    }
+
+    for name, keyrow in headers.items():
         ws = wb.create_sheet(title=name)
-        for col_idx, h in enumerate(TEMPLATE_HEADERS[name], start=1):
-            ws.cell(row=1, column=col_idx, value=h)
-        return ws
+        ws.append(["" for _ in keyrow])  # row 1: descriptions blank
+        ws.append(keyrow)                # row 2: keys
 
-    sheets = {name: add_sheet(name) for name in TEMPLATE_HEADERS.keys()}
-
-    bucket_map = {
-        "Insertions": {"INS"},
-        "Deletions": {"DEL"},
-        "Replacements": {"REP", "REPLACEMENT"},
-        "Inversions": {"INV"},
-        "Translocations": {"TRA", "TRANSLOCATION"},
-    }
-
-    prefix_map = {
-        "Insertions": "INS",
-        "Deletions": "DEL",
-        "Replacements": "REP",
-        "Inversions": "INV",
-        "Translocations": "TRA",
-    }
-
-    counters = {name: 0 for name in TEMPLATE_HEADERS.keys()}
-
-    def write_row(sheet_name: str, row_dict: Dict[str, object]) -> None:
-        ws = sheets[sheet_name]
-        counters[sheet_name] += 1
-        event_id = f"{prefix_map[sheet_name]}{counters[sheet_name]}"
-
-        row_dict = dict(row_dict)
-        row_dict["SV unique ID"] = event_id
-
-        r = ws.max_row + 1
-        for c, h in enumerate(TEMPLATE_HEADERS[sheet_name], start=1):
-            ws.cell(row=r, column=c, value=row_dict.get(h, ""))
-
-    def summarize(df: pd.DataFrame) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[int]]:
-        if df.empty:
-            return None, None, None, None
-        s_med = _median(df["start"].tolist())
-        e_med = _median(df["end"].tolist())
-        l_med = None
-        if s_med is not None and e_med is not None:
-            l_med = e_med - s_med
-
-        supp_vals = [v for v in df.get("supporting_reads_norm", pd.Series([], dtype=object)).tolist() if v is not None]
-        supp = int(max(supp_vals)) if supp_vals else None
-        return s_med, e_med, l_med, supp
-
-    for _, a in asm.iterrows():
-        chrom = str(a.get("chrom", "")).strip()
-        start = a.get("start", float("nan"))
-        end = a.get("end", float("nan"))
-        svt = str(a.get("svtype_norm", "")).strip().upper()
-
-        sheet_name = None
-        for sname, types in bucket_map.items():
-            if svt in types:
-                sheet_name = sname
-                break
-        if sheet_name is None:
-            continue
-
-        sr_ov = _overlapping_rows(sr, chrom, start, end, svt)
-        lr_ov = _overlapping_rows(lr, chrom, start, end, svt)
-
-        if svt in {"INS", "DEL"}:
-            if sr_ov.empty or lr_ov.empty:
-                continue
-
-        lr_s, lr_e, lr_len, lr_supp = summarize(lr_ov)
-        sr_s, sr_e, sr_len, sr_supp = summarize(sr_ov)
-
-        asm_len = None
-        if pd.notna(start) and pd.notna(end):
-            asm_len = float(end) - float(start)
-
-        base = {
-            "which type of event is taking place (possibly dismissable)": svt,
-            "which fasta sequence the given SV is occuring": chrom,
-            "assembly-based SV start": None if pd.isna(start) else float(start),
-            "assembly-based SV end": None if pd.isna(end) else float(end),
-            "assembly-based SV length": asm_len,
-            "long-reads-based SV start (median)": lr_s,
-            "long-reads-based SV end (median)": lr_e,
-            "long-reads-based SV length (median)": lr_len,
-            "short-reads-based SV start (median)": sr_s,
-            "short-reads-based SV end (median)": sr_e,
-            "short-reads-based SV length (median)": sr_len,
-            "long reads-based support (how many long reads supporting the SV)": lr_supp,
-            "short reads-based support (how many short reads supporting the SV)": sr_supp,
-        }
-
-        if sheet_name == "Deletions":
-            base["assembly-based deleted segment length"] = asm_len
-
-        write_row(sheet_name, base)
-
-    wb.save(out_xlsx)
+    return wb
 
 
 def main() -> None:
-    p = argparse.ArgumentParser()
-    p.add_argument("--assembly", required=True, type=Path, help="SyRI assembly SV summary TSV")
-    p.add_argument("--short", required=True, type=Path, help="Short-read SV summary TSV")
-    p.add_argument("--long", required=True, type=Path, help="Long-read SV summary TSV")
-    p.add_argument("--out", required=True, type=Path, help="Output XLSX path")
-    args = p.parse_args()
-    build_workbook(args.assembly, args.short, args.long, args.out)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--assembly", required=True, help="SyRI SV summary TSV (syri.tsv)")
+    ap.add_argument("--short", required=True, help="Short-read SV summary TSV (short.tsv)")
+    ap.add_argument("--long", required=True, help="Long-read SV summary TSV (long.tsv)")
+    ap.add_argument("--out", required=True, help="Output XLSX path")
+    ap.add_argument("--template", required=False, default=None, help="Optional template XLSX (output.xlsx)")
+    args = ap.parse_args()
+
+    short_rows = enrich(read_tsv(args.short), "short")
+    long_rows = enrich(read_tsv(args.long), "long")
+    syri_rows = enrich_syri(read_tsv(args.assembly))
+
+    short_by_type: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for r in short_rows:
+        if r.get("type") in KNOWN:
+            short_by_type[r["type"]].append(r)
+
+    long_by_type: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for r in long_rows:
+        if r.get("type") in KNOWN:
+            long_by_type[r["type"]].append(r)
+    for t in long_by_type:
+        long_by_type[t].sort(key=lambda x: (x.get("chrom") or "", x.get("start") or -1))
+
+    syri_by_type: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for r in syri_rows:
+        if r.get("type") in KNOWN:
+            syri_by_type[r["type"]].append(r)
+
+    sheet_for_type = {"INS": "Insertions", "DEL": "Deletions", "INV": "Inversions", "TRA": "Translocations", "REP": "Replacements"}
+    prefix_for_type = {"INS": "INS", "DEL": "DEL", "INV": "INV", "TRA": "TRL", "REP": "REP"}  # matches example style
+
+    events_by_sheet: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+
+    for svt, long_list in long_by_type.items():
+        sheet = sheet_for_type[svt]
+        prefix = prefix_for_type[svt]
+
+        for idx, longr in enumerate(long_list, 1):
+            eid = f"{prefix}_{idx}"
+            shorts = [sr for sr in short_by_type.get(svt, []) if overlaps(sr, longr)]
+
+            asm = best_asm_match(longr, svt, syri_by_type)
+            if asm:
+                asm_start, asm_end, asm_len = asm.get("start"), asm.get("end"), asm.get("length")
+            else:
+                asm_start, asm_end, asm_len = longr.get("start"), longr.get("end"), longr.get("length")
+
+            row: Dict[str, Any] = {}
+
+            if sheet in ("Insertions", "Deletions", "Inversions"):
+                row.update({
+                    "event_id": eid,
+                    "event_type": svt,
+                    "sequence_id": longr.get("chrom"),
+                    "asm_start": asm_start,
+                    "asm_end": asm_end,
+                    "asm_length_bp": asm_len,
+                    "long_reads_start_median": longr.get("start"),
+                    "long_reads_start_std": 0.0,
+                    "long_reads_end_median": longr.get("end"),
+                    "long_reads_end_std": 0.0,
+                    "long_reads_length_median": longr.get("length"),
+                    "long_reads_support": longr.get("support"),
+                    "long_reads_score": None,
+                })
+
+                smed, sstd = stats([s.get("start") for s in shorts])
+                emed, estd = stats([s.get("end") for s in shorts])
+                lmed, _ = stats([s.get("length") for s in shorts])
+                supmed, _ = stats([s.get("support") for s in shorts])
+
+                row.update({
+                    "short_reads_start_median": smed,
+                    "short_reads_start_std": sstd,
+                    "short_reads_end_median": emed,
+                    "short_reads_end_std": estd,
+                    "short_reads_length_median": lmed,
+                    "short_reads_support": supmed,
+                    "short_reads_score": None,
+                })
+
+            elif sheet == "Replacements":
+                row.update({
+                    "event_id": eid,
+                    "event_type": svt,
+                    "sequence_id": longr.get("chrom"),
+                    "asm_del_start": asm_start,
+                    "asm_del_end": asm_end,
+                    "asm_del_length": asm_len,
+                    "asm_ins_start": None,
+                    "asm_ins_end": None,
+                    "asm_ins_length": None,
+                    "long_reads_del_start_median": longr.get("start"),
+                    "long_reads_del_start_std": 0.0,
+                    "long_reads_del_end_median": longr.get("end"),
+                    "long_reads_del_end_std": 0.0,
+                    "long_reads_del_length_median": longr.get("length"),
+                    "long_reads_ins_start_median": None,
+                    "long_reads_ins_start_std": None,
+                    "long_reads_ins_end_median": None,
+                    "long_reads_ins_end_std": None,
+                    "long_reads_ins_length_median": None,
+                    "long_reads_support": longr.get("support"),
+                    "long_reads_score": None,
+                })
+
+                smed, sstd = stats([s.get("start") for s in shorts])
+                emed, estd = stats([s.get("end") for s in shorts])
+                lmed, _ = stats([s.get("length") for s in shorts])
+                supmed, _ = stats([s.get("support") for s in shorts])
+
+                row.update({
+                    "short_reads_del_start_median": smed,
+                    "short_reads_del_start_std": sstd,
+                    "short_reads_del_end_median": emed,
+                    "short_reads_del_end_std": estd,
+                    "short_reads_del_length_median": lmed,
+                    "short_reads_ins_start_median": None,
+                    "short_reads_ins_start_std": None,
+                    "short_reads_ins_end_median": None,
+                    "short_reads_ins_end_std": None,
+                    "short_reads_ins_length_median": None,
+                    "short_reads_support": supmed,
+                    "short_reads_score": None,
+                })
+
+            elif sheet == "Translocations":
+                row.update({
+                    "event_id": eid,
+                    "event_type": svt,
+                    "origin_sequence_id": longr.get("chrom"),
+                    "destination_sequence_id": None,
+                    "asm_origin_start": asm_start,
+                    "asm_origin_end": asm_end,
+                    "asm_dest_start": None,
+                    "asm_dest_end": None,
+                    "asm_length": asm_len,
+                    "long_reads_origin_start_median": longr.get("start"),
+                    "long_reads_origin_start_std": 0.0,
+                    "long_reads_origin_end_median": longr.get("end"),
+                    "long_reads_origin_end_std": 0.0,
+                    "long_reads_dest_start_median": None,
+                    "long_reads_dest_start_std": None,
+                    "long_reads_dest_end_median": None,
+                    "long_reads_dest_end_std": None,
+                    "long_reads_length_median": longr.get("length"),
+                    "long_reads_support": longr.get("support"),
+                    "long_reads_score": None,
+                })
+
+                smed, sstd = stats([s.get("start") for s in shorts])
+                emed, estd = stats([s.get("end") for s in shorts])
+                lmed, _ = stats([s.get("length") for s in shorts])
+                supmed, _ = stats([s.get("support") for s in shorts])
+
+                row.update({
+                    "short_reads_origin_start_median": smed,
+                    "short_reads_origin_start_std": sstd,
+                    "short_reads_origin_end_median": emed,
+                    "short_reads_origin_end_std": estd,
+                    "short_reads_dest_start_median": None,
+                    "short_reads_dest_start_std": None,
+                    "short_reads_dest_end_median": None,
+                    "short_reads_dest_end_std": None,
+                    "short_reads_length_median": lmed,
+                    "short_reads_support": supmed,
+                    "short_reads_score": None,
+                })
+
+            events_by_sheet[sheet].append(row)
+
+    wb = load_template_or_create(args.template)
+
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+
+        # Determine key row from template row 2 (preferred)
+        max_col = ws.max_column
+        key_row = [ws.cell(row=2, column=c).value for c in range(1, max_col + 1)]
+        key_row = [k for k in key_row if k is not None]
+
+        # Clear rows 3+ only (keep header rows 1-2)
+        if ws.max_row > 2:
+            ws.delete_rows(3, ws.max_row - 2)
+
+        for r in events_by_sheet.get(sheet_name, []):
+            ws.append([r.get(k) for k in key_row])
+
+    wb.save(args.out)
 
 
 if __name__ == "__main__":

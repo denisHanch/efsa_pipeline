@@ -20,6 +20,7 @@
       - [`truvari/`](#truvari)
       - [`unmapped_stats/`](#unmapped_stats)
   - [Graphical Representation of the Pipeline](#graphical-representation-of-the-pipeline)
+- [Parse VCF data](#parse-vcf)
       
 
 # Quick Start
@@ -1529,3 +1530,7 @@ The `logs/` folder contains **detailed logs and command scripts** for each Nextf
 * **`.command.out`** — Captures standard output of the process.
 * **`.command.run`** — Metadata about process execution (e.g., exit code, runtime, resource usage).
 * **`.command.sh`** — The shell script that Nextflow runs; contains the exact commands for the process.
+
+# Parse VCF
+
+To parse VCF table run `python3 modules/utils/create_sv_output_xlsx.py --assembly ASSEMBLY.tsv --short SHORT_READS.tsv --long LONG_READS.tsv   --out OUTPUT_FILENAME.xlsx` within container
