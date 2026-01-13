@@ -109,6 +109,30 @@ class BaseOutputMetadata(BaseSettings):
     validation_level: str = None
     elapsed_time: float = None
 
+    def format_common_fields(self, indent: str = "  ") -> list[str]:
+        """
+        Format common fields that are present in all validators.
+        Returns a list of formatted strings ready for report output.
+
+        Args:
+            indent: Indentation string (default: 2 spaces)
+
+        Returns:
+            List of formatted strings (input file, output file, elapsed time)
+        """
+        lines = []
+
+        if self.input_file is not None:
+            lines.append(f"{indent}Input:  {self.input_file}")
+
+        if self.output_file is not None:
+            lines.append(f"{indent}Output: {self.output_file}")
+
+        if self.elapsed_time is not None:
+            lines.append(f"{indent}Time:   {self.elapsed_time:.2f}s")
+
+        return lines
+
 
 # ===== Base Validator Settings =====
 @dataclass

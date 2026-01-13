@@ -38,6 +38,78 @@ class OutputMetadata(BaseOutputMetadata):
     sequence_ids: List[str] = None
     sequence_lengths: dict = None
 
+    def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
+        """
+        Format genome-specific statistics for report output.
+
+        Args:
+            indent: Indentation string (default: 4 spaces)
+            input_settings: Optional settings dict for additional context (e.g., plasmid handling)
+
+        Returns:
+            List of formatted strings with genome statistics
+        """
+        lines = []
+
+        # Helper to format values
+        def format_value(value):
+            if isinstance(value, float):
+                return f"{value:.2f}"
+            elif isinstance(value, int) and value > 999:
+                return f"{value:,}"
+            return str(value)
+
+        # Iterate through all fields, skipping common ones and internal fields
+        skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
+        special_fields = {'sequence_ids', 'sequence_lengths', 'plasmid_filenames'}
+
+        data = self.to_dict()
+
+        for key, value in data.items():
+            if key in skip_fields or value is None:
+                continue
+
+            # Special handling for specific fields
+            if key == 'sequence_ids' and isinstance(value, list):
+                if len(value) <= 3:
+                    lines.append(f"{indent}sequence_ids: {', '.join(value)}")
+                else:
+                    lines.append(f"{indent}sequence_ids: {value[0]}, {value[1]}, ... (+{len(value)-2} more)")
+
+            elif key == 'sequence_lengths' and isinstance(value, dict):
+                total_len = sum(value.values())
+                lines.append(f"{indent}total_length: {total_len:,} bp")
+
+            elif key == 'plasmid_count' and value > 0:
+                # Show plasmid extraction section
+                lines.append("")
+                lines.append(f"{indent}plasmid_count: {value}")
+
+            elif key == 'plasmid_filenames' and isinstance(value, list):
+                # Show plasmid filenames with tree structure
+                for i, filename in enumerate(value):
+                    if i < len(value) - 1:
+                        lines.append(f"{indent}  ├─ {filename}")
+                    else:
+                        lines.append(f"{indent}  └─ {filename}")
+
+                # Show plasmid handling strategy
+                if input_settings:
+                    if input_settings.get('plasmid_split'):
+                        lines.append(f"{indent}plasmid_handling: split to separate files")
+                    elif input_settings.get('plasmids_to_one'):
+                        lines.append(f"{indent}plasmid_handling: merged to one file")
+
+            elif key == 'num_sequences_filtered' and value > 0:
+                lines.append(f"{indent}{key}: {value:,}")
+
+            elif key not in special_fields:
+                # Generic field formatting
+                formatted_value = format_value(value)
+                lines.append(f"{indent}{key}: {formatted_value}")
+
+        return lines
+
 class GenomeValidator(BaseValidator):
     """Validates and processes genome files in FASTA and GenBank formats."""
 

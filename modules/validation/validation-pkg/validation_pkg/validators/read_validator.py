@@ -100,7 +100,8 @@ class OutputMetadata(BaseOutputMetadata):
     # Read-specific fields
     base_name: str = None
     read_number: int = None
-    ngs_type_detected: str = None
+    ngs_type: str = None  # Configured NGS type from config (pacbio, illumina, ont, etc.)
+    illumina_pairing_detected: str = None  # "illumina" if Illumina paired-end pattern detected
     num_reads: int = None
 
     # Strict mode statistics
@@ -110,17 +111,77 @@ class OutputMetadata(BaseOutputMetadata):
     longest_read_length: int = None
     shortest_read_length: int = None
 
+    def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
+        """
+        Format read-specific statistics for report output.
+
+        Args:
+            indent: Indentation string (default: 4 spaces)
+            input_settings: Optional settings dict (not currently used but kept for consistency)
+
+        Returns:
+            List of formatted strings with read statistics
+        """
+        lines = []
+
+        # Helper to check if key has value
+        def has_value(key):
+            data = self.to_dict()
+            return key in data and data[key] is not None
+
+        # Helper to format values
+        def format_value(value):
+            if isinstance(value, float):
+                return f"{value:.2f}"
+            elif isinstance(value, int) and value > 999:
+                return f"{value:,}"
+            return str(value)
+
+        # Iterate through all fields, skipping common ones
+        skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
+        special_fields = {'base_name', 'read_number', 'illumina_pairing_detected', 'longest_read_length', 'shortest_read_length'}
+
+        data = self.to_dict()
+
+        for key, value in data.items():
+            if key in skip_fields or value is None:
+                continue
+
+            # Special handling for specific fields
+            if key == 'base_name' and has_value('read_number'):
+                lines.append(f"{indent}paired_end: R{data['read_number']} (base: {value})")
+            elif key == 'read_number' and not has_value('base_name'):
+                # Only show if base_name wasn't already handled
+                lines.append(f"{indent}{key}: R{value}")
+            elif key == 'illumina_pairing_detected':
+                # Show Illumina pairing detection status
+                if value == 'illumina':
+                    lines.append(f"{indent}illumina_pairing_detected: yes")
+            elif key == 'longest_read_length' and has_value('shortest_read_length'):
+                # Show length range
+                lines.append(f"{indent}length_range: {data['shortest_read_length']:,} - {value:,} bp")
+            elif key == 'shortest_read_length':
+                # Skip, handled with longest_read_length
+                continue
+            elif key not in special_fields:
+                # Generic field formatting
+                formatted_value = format_value(value)
+                lines.append(f"{indent}{key}: {formatted_value}")
+
+        return lines
+
     def __str__(self):
         parts = [f"Validation Level: {self.validation_level or 'N/A'}"]
         parts.append(f"Output File: {self.output_file or 'N/A'}")
         parts.append(f"Output Filename: {self.output_filename or 'N/A'}")
 
         # Add Illumina pattern info if available
-        if self.base_name or self.read_number or self.ngs_type_detected or self.num_reads is not None:
+        if self.base_name or self.read_number or self.ngs_type or self.illumina_pairing_detected or self.num_reads is not None:
             parts.append("\n--- Pattern & Read Info ---")
+            parts.append(f"NGS Type: {self.ngs_type or 'N/A'}")
             parts.append(f"Base Name: {self.base_name or 'N/A'}")
             parts.append(f"Read Number: {self.read_number if self.read_number is not None else 'N/A'}")
-            parts.append(f"NGS Type Detected: {self.ngs_type_detected or 'N/A'}")
+            parts.append(f"Illumina Pairing Detected: {self.illumina_pairing_detected or 'N/A'}")
             parts.append(f"Number of Reads: {self.num_reads if self.num_reads is not None else 'N/A'}")
 
         # Add strict statistics if present
@@ -339,6 +400,9 @@ class ReadValidator(BaseValidator):
 
         # Add read-specific fields
         self.output_metadata.num_reads = len(self.sequences)
+
+        # Store configured NGS type
+        self.output_metadata.ngs_type = self.read_config.ngs_type
 
         # Calculate read statistics in strict mode only
         if self.validation_level == 'strict' and self.sequences:
@@ -909,7 +973,7 @@ class ReadValidator(BaseValidator):
 
                 self.output_metadata.base_name = base_name
                 self.output_metadata.read_number = read_number
-                self.output_metadata.ngs_type_detected = 'illumina'
+                self.output_metadata.illumina_pairing_detected = 'illumina'
 
                 if hasattr(self, 'logger') and self.logger:
                     self.logger.debug(
@@ -918,10 +982,10 @@ class ReadValidator(BaseValidator):
                 return  # Early return after successful match
 
         # No paired-end pattern matched - fallback for single-end or non-standard naming
-        # Always set ngs_type_detected for Illumina files, even without pairing info
+        # Always set illumina_pairing_detected for Illumina files, even without pairing info
         self.output_metadata.base_name = base
         self.output_metadata.read_number = 1  # Default to R1 for single-end
-        self.output_metadata.ngs_type_detected = 'illumina'
+        self.output_metadata.illumina_pairing_detected = 'illumina'
 
         if hasattr(self, 'logger') and self.logger:
             self.logger.debug(

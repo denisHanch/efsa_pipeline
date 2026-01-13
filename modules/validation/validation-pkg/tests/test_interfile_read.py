@@ -38,14 +38,14 @@ class TestPairedEndValidation:
                 output_file='sample_R1.fastq.gz',
                 base_name='sample',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
             OutputMetadata(
                 output_file='sample_R2.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -64,7 +64,7 @@ class TestPairedEndValidation:
                 output_file='sample_R2.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -82,7 +82,7 @@ class TestPairedEndValidation:
                 output_file='sample_R1.fastq.gz',
                 base_name='sample',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -99,14 +99,14 @@ class TestPairedEndValidation:
                 output_file='sample1_R2.fastq.gz',
                 base_name='sample1',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
             OutputMetadata(
                 output_file='sample2_R2.fastq.gz',
                 base_name='sample2',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -126,14 +126,14 @@ class TestPairedEndValidation:
                 output_file='sample1_R1.fastq.gz',
                 base_name='sample1',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
             OutputMetadata(
                 output_file='sample1_R2.fastq.gz',
                 base_name='sample1',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
             # Incomplete pair (R2 only)
@@ -141,7 +141,7 @@ class TestPairedEndValidation:
                 output_file='sample2_R2.fastq.gz',
                 base_name='sample2',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -156,7 +156,7 @@ class TestPairedEndValidation:
         reads_results = [
             OutputMetadata(
                 output_file='sample.fastq.gz',
-                ngs_type_detected='ont',
+                illumina_pairing_detected='ont',
                 num_reads=1000
             )
         ]
@@ -173,7 +173,7 @@ class TestPairedEndValidation:
                 output_file='sample_R2.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -192,14 +192,14 @@ class TestPairedEndValidation:
                 output_file='sample_R1_copy1.fastq.gz',
                 base_name='sample',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
             OutputMetadata(
                 output_file='sample_R1_copy2.fastq.gz',
                 base_name='sample',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -217,21 +217,21 @@ class TestPairedEndValidation:
                 output_file='sample_R1.fastq.gz',
                 base_name='sample',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
             OutputMetadata(
                 output_file='sample_R2_copy1.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
             OutputMetadata(
                 output_file='sample_R2_copy2.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -256,7 +256,7 @@ class TestPairedEndValidation:
                 output_file='sample_R2.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]

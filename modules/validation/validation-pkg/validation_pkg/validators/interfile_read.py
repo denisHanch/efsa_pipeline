@@ -50,7 +50,7 @@ def readxread_validation(
         output_file = result.output_file or 'unknown'
         base_name = result.base_name
         read_number = result.read_number
-        ngs_type_detected = result.ngs_type_detected
+        illumina_pairing_detected = result.illumina_pairing_detected
 
         # Skip if no pattern detected (not paired-end or not Illumina)
         if read_number is None:
@@ -61,7 +61,7 @@ def readxread_validation(
             'output_file': output_file,
             'base_name': base_name,
             'read_number': read_number,
-            'ngs_type_detected': ngs_type_detected
+            'illumina_pairing_detected': illumina_pairing_detected
         })
 
     if not read_metadata:

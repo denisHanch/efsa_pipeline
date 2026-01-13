@@ -1491,7 +1491,7 @@ class TestIlluminaPatternDetection:
         validator._detect_illumina_pattern("Bacillus_toyonensis_LE1_S1_L001_R1.fastq.gz")
         assert validator.output_metadata.base_name == "Bacillus_toyonensis_LE1_S1_L001"
         assert validator.output_metadata.read_number == 1
-        assert validator.output_metadata.ngs_type_detected == "illumina"
+        assert validator.output_metadata.illumina_pairing_detected == "illumina"
 
         # Bacillus_toyonensis_LE1_S1_L001_R2.fastq.gz
         validator2 = self._create_validator_with_basename("Bacillus_toyonensis_LE1_S1_L001_R2.fastq.gz")
@@ -1507,7 +1507,7 @@ class TestIlluminaPatternDetection:
         validator._detect_illumina_pattern("Bacillus-toyonensis-LE1-sequence_1.fastq.gz")
         assert validator.output_metadata.base_name == "Bacillus-toyonensis-LE1-sequence"
         assert validator.output_metadata.read_number == 1
-        assert validator.output_metadata.ngs_type_detected == "illumina"
+        assert validator.output_metadata.illumina_pairing_detected == "illumina"
 
         # Bacillus-toyonensis-LE1-sequence_2.fastq.gz
         validator2 = self._create_validator_with_basename("Bacillus-toyonensis-LE1-sequence_2.fastq.gz")
@@ -1523,7 +1523,7 @@ class TestIlluminaPatternDetection:
         validator._detect_illumina_pattern("Bacillus_toyonensis_LE1_sequence.R1.fastq.gz")
         assert validator.output_metadata.base_name == "Bacillus_toyonensis_LE1_sequence"
         assert validator.output_metadata.read_number == 1
-        assert validator.output_metadata.ngs_type_detected == "illumina"
+        assert validator.output_metadata.illumina_pairing_detected == "illumina"
 
     def test_single_end_no_pattern(self):
         """Test single-end files without paired-end indicators."""
@@ -1534,7 +1534,7 @@ class TestIlluminaPatternDetection:
         # No paired-end pattern - should set fallback metadata for single-end
         assert validator.output_metadata.base_name == "SRR834393"
         assert validator.output_metadata.read_number == 1  # Defaults to R1
-        assert validator.output_metadata.ngs_type_detected == 'illumina'
+        assert validator.output_metadata.illumina_pairing_detected == 'illumina'
 
     def test_sra_style_underscore_suffix(self):
         """Test SRA-style filenames with _1/_2 suffix."""
@@ -1544,7 +1544,7 @@ class TestIlluminaPatternDetection:
         validator._detect_illumina_pattern("SRR834394_1.fq.gz")
         assert validator.output_metadata.base_name == "SRR834394"
         assert validator.output_metadata.read_number == 1
-        assert validator.output_metadata.ngs_type_detected == "illumina"
+        assert validator.output_metadata.illumina_pairing_detected == "illumina"
 
         # SRR837394_1.fastq.gz
         validator2 = self._create_validator_with_basename("SRR837394_1.fastq.gz")
@@ -1560,7 +1560,7 @@ class TestIlluminaPatternDetection:
         validator._detect_illumina_pattern("SRR837394_1_001.fastq.gz")
         assert validator.output_metadata.base_name == "SRR837394"
         assert validator.output_metadata.read_number == 1
-        assert validator.output_metadata.ngs_type_detected == "illumina"
+        assert validator.output_metadata.illumina_pairing_detected == "illumina"
 
         # SRR837394_2_001.fastq.gz
         validator2 = self._create_validator_with_basename("SRR837394_2_001.fastq.gz")
@@ -1576,7 +1576,7 @@ class TestIlluminaPatternDetection:
         validator._detect_illumina_pattern("SRR834393R1_combined.fq.gz")
         assert validator.output_metadata.base_name == "SRR834393"
         assert validator.output_metadata.read_number == 1
-        assert validator.output_metadata.ngs_type_detected == "illumina"
+        assert validator.output_metadata.illumina_pairing_detected == "illumina"
 
         # SRR834393R2_combined.fq.gz
         validator2 = self._create_validator_with_basename("SRR834393R2_combined.fq.gz")
@@ -1592,7 +1592,7 @@ class TestIlluminaPatternDetection:
         validator._detect_illumina_pattern("Trichoderma_illumina_ABE_R1_combined.fastq.gz")
         assert validator.output_metadata.base_name == "Trichoderma_illumina_ABE"
         assert validator.output_metadata.read_number == 1
-        assert validator.output_metadata.ngs_type_detected == "illumina"
+        assert validator.output_metadata.illumina_pairing_detected == "illumina"
 
         # Trichoderma_illumina_ABE_R2_combined.fastq.gz
         validator2 = self._create_validator_with_basename("Trichoderma_illumina_ABE_R2_combined.fastq.gz")
@@ -1657,7 +1657,7 @@ class TestIlluminaPatternDetection:
         validator._detect_illumina_pattern("SRR837394_1_combined.fastq.gz")
         assert validator.output_metadata.base_name == "SRR837394"
         assert validator.output_metadata.read_number == 1
-        assert validator.output_metadata.ngs_type_detected == "illumina"
+        assert validator.output_metadata.illumina_pairing_detected == "illumina"
 
         # _2_combined pattern
         validator2 = self._create_validator_with_basename("SRR837394_2_combined.fastq.gz")
@@ -1814,7 +1814,7 @@ class TestIlluminaPatternDetection:
         validator1._detect_illumina_pattern("sample_R3.fastq")
         assert validator1.output_metadata.base_name == "sample_R3"
         assert validator1.output_metadata.read_number == 1  # Fallback
-        assert validator1.output_metadata.ngs_type_detected == 'illumina'
+        assert validator1.output_metadata.illumina_pairing_detected == 'illumina'
 
         # _3 is not valid - treated as single-end
         validator2 = self._create_validator_with_basename("sample_3.fastq")
@@ -1834,7 +1834,7 @@ class TestIlluminaPatternDetection:
         validator1._detect_illumina_pattern("R1.fastq")
         # Pattern should match with empty base_name OR fallback to full basename
         assert validator1.output_metadata.read_number is not None
-        assert validator1.output_metadata.ngs_type_detected == 'illumina'
+        assert validator1.output_metadata.illumina_pairing_detected == 'illumina'
 
         # R1 in middle of filename (not at end) - treated as single-end
         validator2 = self._create_validator_with_basename("R1_sample.fastq")
@@ -1842,7 +1842,7 @@ class TestIlluminaPatternDetection:
         # Should not match standard patterns, gets fallback
         assert validator2.output_metadata.base_name == "R1_sample"
         assert validator2.output_metadata.read_number == 1  # Fallback
-        assert validator2.output_metadata.ngs_type_detected == 'illumina'
+        assert validator2.output_metadata.illumina_pairing_detected == 'illumina'
 
     def test_invalid_lowercase_r_prefix(self):
         """Test that lowercase 'r' gets fallback metadata (not a valid pattern)."""
@@ -1851,7 +1851,7 @@ class TestIlluminaPatternDetection:
         # Should not match - Illumina uses uppercase R1/R2, gets fallback
         assert validator.output_metadata.base_name == "sample_r1"
         assert validator.output_metadata.read_number == 1  # Fallback
-        assert validator.output_metadata.ngs_type_detected == 'illumina'
+        assert validator.output_metadata.illumina_pairing_detected == 'illumina'
 
     # ==================== Metadata Isolation Tests ====================
 
@@ -1884,7 +1884,7 @@ class TestIlluminaPatternDetection:
         validator._detect_illumina_pattern("single_end_sample.fastq.gz")
         assert validator.output_metadata.base_name == "single_end_sample"
         assert validator.output_metadata.read_number == 1
-        assert validator.output_metadata.ngs_type_detected == 'illumina'
+        assert validator.output_metadata.illumina_pairing_detected == 'illumina'
 
 
 class TestReadStatistics:
