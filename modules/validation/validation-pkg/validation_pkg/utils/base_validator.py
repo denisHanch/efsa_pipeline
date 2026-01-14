@@ -1,5 +1,4 @@
-"""Common validation helper functions."""
-"""Abstract base class for all validators."""
+"""Abstract base class for all validators with common validation helper functions."""
 
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -13,29 +12,12 @@ from validation_pkg.utils.path_utils import strip_all_extensions
 
 
 class BaseValidator(ABC):
-    """
-    Abstract base class providing common infrastructure for all validators.
-
-    Subclasses must implement:
-    - _validator_type property (returns 'genome', 'read', or 'feature')
-    - OutputMetadata property (returns the metadata class)
-    - _parse_file() method
-    - _validate_sequences() method
-    - _apply_edits() method
-    - _save_output() method
-    - _fill_output_metadata() method
-    """
+    """Abstract base class providing common infrastructure for all validators."""
     # Subclasses must define their own Settings class
     Settings: Type[BaseSettings]
 
     def __init__(self, config: Any, settings: Optional[BaseSettings] = None):
-        """
-        Initialize common validator infrastructure.
-
-        Args:
-            config: Configuration object (genome_config, read_config, or feature_config)
-            settings: Validator-specific settings (optional, uses defaults if not provided)
-        """
+        """Initialize common validator infrastructure."""
         # Common infrastructure
         self.logger = get_logger()
         self.config = config
@@ -66,21 +48,7 @@ class BaseValidator(ABC):
             self.threads = DEFAULT_THREADS
 
     def run(self) -> Any:
-        """
-        Execute validation workflow with timing and error handling.
-
-        Template method that orchestrates:
-        1. Build output path (early)
-        2. Start timer and log start
-        3. Handle minimal mode OR call _run_validation()
-        4. Stop timer and log completion
-        5. Record file timing
-        6. Set elapsed time in metadata
-        7. Return metadata
-
-        Returns:
-            OutputMetadata object with validation results
-        """
+        """Execute validation workflow with timing and error handling."""
         # Build output path once at the beginning
         self.output_path = self._build_output_path()
 
@@ -127,18 +95,7 @@ class BaseValidator(ABC):
             raise
 
     def _open_file(self, mode: str = 'rt') -> IO:
-        """
-        Open file with automatic decompression based on config.
-
-        Args:
-            mode: File open mode (default: 'rt' for text reading)
-
-        Returns:
-            File handle with automatic decompression
-
-        Raises:
-            CompressionError: If decompression fails
-        """
+        """Open file with automatic decompression based on config."""
         try:
             return open_file_with_coding_type(
                 self.input_path,
@@ -155,14 +112,7 @@ class BaseValidator(ABC):
             raise
 
     def _fill_base_metadata(self, output_path: Path) -> None:
-        """
-        Fill common output metadata fields.
-
-        Subclasses should call this first, then add their specific fields.
-
-        Args:
-            output_path: Path to output file
-        """
+        """Fill common output metadata fields."""
         self.output_metadata.input_file = self.config.filename
         self.output_metadata.output_file = str(output_path) if output_path else None
         self.output_metadata.output_filename = output_path.name if output_path else None
@@ -176,25 +126,7 @@ class BaseValidator(ABC):
         suffix: Optional[str] = None,
         input_path: Optional[Path] = None
     ) -> str:
-        """
-        Build output filename with consistent naming convention.
-
-        Args:
-            input_filename: Original input filename
-            output_format: Output format extension (e.g., 'fasta', 'fastq', 'gff')
-            coding_type: Optional compression type (adds .gz, .bz2, etc.)
-            suffix: Optional custom suffix to add before extension
-            input_path: Optional input Path object for accurate extension stripping
-
-        Returns:
-            Output filename with proper extensions
-
-        Examples:
-            >>> build_output_filename("genome.fa.gz", "fasta", CodingType.GZIP, "validated")
-            'genome_validated.fasta.gz'
-            >>> build_output_filename("reads.fq", "fastq", CodingType.NONE)
-            'reads.fastq'
-        """
+        """Build output filename with consistent naming convention."""
         # Strip all extensions from input filename
         base_name = strip_all_extensions(input_filename, input_path)
 
@@ -211,43 +143,7 @@ class BaseValidator(ABC):
         return filename
 
     def _build_output_path(self) -> Path:
-        """
-        Build complete output path with consistent naming and directory structure.
-
-        This is the main entry point for building output paths. It handles:
-        - Safe subdirectory creation (with path traversal protection)
-        - Extension stripping
-        - Custom suffix addition
-        - Compression extension handling
-
-        Args:
-            base_dir: Base output directory
-            input_filename: Original input filename
-            output_format: Output format extension (e.g., 'fasta', 'fastq', 'gff')
-            coding_type: Optional compression type
-            subdir_name: Optional subdirectory name (will be sanitized)
-            filename_suffix: Optional suffix to add to filename
-            input_path: Optional input Path for accurate extension handling
-            create_dirs: Whether to create directories (default: True)
-
-        Returns:
-            Complete output path
-
-        Raises:
-            ValueError: If subdir_name contains illegal characters
-            ConfigurationError: If path would escape base_dir
-
-        Examples:
-            >>> build_output_path(
-            ...     Path("/output"),
-            ...     "genome.fasta.gz",
-            ...     "fasta",
-            ...     CodingType.GZIP,
-            ...     subdir_name="validated",
-            ...     filename_suffix="filtered"
-            ... )
-            Path("/output/validated/genome_filtered.fasta.gz")
-        """
+        """Build complete output path with consistent naming and directory structure."""
         from validation_pkg.utils.path_utils import build_safe_output_dir
 
         # Build safe output directory (with path traversal protection)
@@ -265,18 +161,7 @@ class BaseValidator(ABC):
         return output_dir / output_filename
 
     def _handle_minimal_mode(self) -> Path:
-        """
-        Handle minimal validation mode.
-
-        Validates that input format and compression match requirements,
-        then copies file without parsing.
-
-        Returns:
-            Path to output file
-
-        Raises:
-            ValidationError: If format or compression doesn't match requirements
-        """
+        """Handle minimal validation mode."""
         self.logger.debug("Minimal mode - validating format and coding requirements")
 
         try:
@@ -345,100 +230,48 @@ class BaseValidator(ABC):
         from validation_pkg.utils.file_handler import copy_file
         return copy_file(self.input_path, self.output_path, self.logger)
 
-    # Abstract properties and methods that subclasses must implement
+    # ===== Abstract Properties and Methods =====
 
     @property
     @abstractmethod
     def _validator_type(self) -> str:
-        """
-        Return validator type string.
-
-        Returns:
-            'genome', 'read', or 'feature'
-        """
+        """Return validator type string."""
         pass
 
     @property
     @abstractmethod
     def OutputMetadata(self) -> Type:
-        """
-        Return OutputMetadata class for this validator.
-
-        Returns:
-            OutputMetadata class (not instance)
-        """
+        """Return OutputMetadata class for this validator."""
         pass
 
     @property
     @abstractmethod
     def _output_format(self) -> str:
-        """
-        Return output format string for build_output_path.
-
-        Returns:
-            Format string: 'fasta', 'fastq', or 'gff'
-        """
+        """Return output format string for build_output_path."""
         pass
 
     @property
     @abstractmethod
     def _expected_format(self) -> Any:
-        """
-        Return expected format for minimal mode validation.
-
-        Returns:
-            Format enum value (e.g., GenomeFormat.FASTA, ReadFormat.FASTQ, FeatureFormat.GFF)
-        """
+        """Return expected format for minimal mode validation."""
         pass
 
     @abstractmethod
     def _get_validator_exception(self) -> Type[Exception]:
-        """
-        Return the validator-specific exception class.
-
-        Returns:
-            Exception class: GenomeValidationError, ReadValidationError, or FeatureValidationError
-        """
+        """Return the validator-specific exception class."""
         pass
 
     @abstractmethod
     def _run_validation(self) -> Path:
-        """
-        Execute the validation workflow for trust/strict modes.
-
-        This is where the main validation logic goes:
-        - Parse file
-        - Validate sequences
-        - Apply edits
-        - Save output
-
-        Returns:
-            Path to output file
-        """
+        """Execute the validation workflow for trust/strict modes."""
         pass
 
     @abstractmethod
     def _write_output(self) -> Path:
-        """
-        Write processed data to output file.
-
-        Subclass-specific implementation for writing output.
-        Uses self.output_path which is already built.
-
-        Returns:
-            Path to output file (should return self.output_path)
-        """
+        """Write processed data to output file."""
         pass
 
     @abstractmethod
     def _fill_output_metadata(self, output_path: Path) -> None:
-        """
-        Populate output metadata with validation results.
-
-        Should call self._fill_base_metadata(output_path) first,
-        then add validator-specific fields.
-
-        Args:
-            output_path: Path to output file
-        """
+        """Populate output metadata with validation results."""
         pass

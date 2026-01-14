@@ -13,7 +13,7 @@ from validation_pkg.utils.file_handler import open_compressed_writer, check_tool
 from validation_pkg.utils.base_validator import BaseValidator
 
 @dataclass
-class OutputMetadata(BaseOutputMetadata):
+class FeatureOutputMetadata(BaseOutputMetadata):
     """Metadata returned from feature validation."""
     # Feature-specific fields
     num_features: int = None
@@ -21,16 +21,7 @@ class OutputMetadata(BaseOutputMetadata):
     sequence_ids: List[str] = None
 
     def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
-        """
-        Format feature-specific statistics for report output.
-
-        Args:
-            indent: Indentation string (default: 4 spaces)
-            input_settings: Optional settings dict (not currently used but kept for consistency)
-
-        Returns:
-            List of formatted strings with feature statistics
-        """
+        """Format feature-specific statistics for report output."""
         lines = []
 
         # Helper to format values
@@ -144,9 +135,9 @@ class FeatureValidator(BaseValidator):
         return 'feature'
 
     @property
-    def OutputMetadata(self) -> Type:
-        """Return OutputMetadata class for this validator."""
-        return OutputMetadata
+    def FeatureOutputMetadata(self) -> Type:
+        """Return FeatureOutputMetadata class for this validator."""
+        return FeatureOutputMetadata
 
     @property
     def _output_format(self) -> str:
@@ -271,7 +262,7 @@ class FeatureValidator(BaseValidator):
         input_file: Path,
         output_file: Path
     ) -> Path:
-        """Run gffread to parse and validate input file. """
+        """Run gffread to parse and validate input file."""
 
         if not check_tool_available('gffread'):
             raise FeatureValidationError(

@@ -21,7 +21,7 @@ from validation_pkg.utils.base_validator import BaseValidator
 from validation_pkg.utils.sequence_stats import calculate_n50
 
 @dataclass
-class OutputMetadata(BaseOutputMetadata):
+class GenomeOutputMetadata(BaseOutputMetadata):
     """Metadata returned from genome validation."""
     # Genome-specific fields
     num_sequences: int = None
@@ -39,16 +39,7 @@ class OutputMetadata(BaseOutputMetadata):
     sequence_lengths: dict = None
 
     def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
-        """
-        Format genome-specific statistics for report output.
-
-        Args:
-            indent: Indentation string (default: 4 spaces)
-            input_settings: Optional settings dict for additional context (e.g., plasmid handling)
-
-        Returns:
-            List of formatted strings with genome statistics
-        """
+        """Format genome-specific statistics for report output."""
         lines = []
 
         # Helper to format values
@@ -171,9 +162,9 @@ class GenomeValidator(BaseValidator):
         return 'genome'
 
     @property
-    def OutputMetadata(self) -> Type:
-        """Return OutputMetadata class for this validator."""
-        return OutputMetadata
+    def GenomeOutputMetadata(self) -> Type:
+        """Return GenomeOutputMetadata class for this validator."""
+        return GenomeOutputMetadata
 
     @property
     def _output_format(self) -> str:
@@ -260,7 +251,7 @@ class GenomeValidator(BaseValidator):
             # N50
             self.output_metadata.n50 = self._calculate_n50(self.sequences)
 
-    #   Validator help functions
+    # ===== Validator Helper Functions =====
 
     def _calculate_gc_content(self, sequences: List[SeqRecord]) -> float:
         """Calculate GC content percentage for all sequences using BioPython."""

@@ -41,13 +41,13 @@ __all__ = [
 ]
 
 
-# Cache for tool availability checks to avoid repeated subprocess calls
+# ===== Cache for Tool Availability =====
 # Protected by _TOOL_CACHE_LOCK for thread-safe access
 _TOOL_CACHE = {}
 _TOOL_CACHE_LOCK = threading.Lock()
 _LOGGER_INITIALIZED = False
 
-# Compression tool configuration mapping
+# ===== Compression Tool Configuration =====
 # Format: coding_type -> (parallel_tool, standard_tool, install_message)
 _COMPRESSION_TOOLS = {
     CodingType.GZIP: {
@@ -62,7 +62,7 @@ _COMPRESSION_TOOLS = {
     }
 }
 
-# Command arguments for different tools and modes
+# ===== Command Arguments for Tools =====
 # Format: (tool_name, mode) -> args_generator_function
 _COMMAND_ARGS = {
     ('pigz', 'compress'): lambda threads: ['-c', '-p', str(threads)],
@@ -464,26 +464,7 @@ def convert_file_compression(
     output_coding: CodingType,
     threads: int = None
 ) -> None:
-    """
-    Convert file from one compression type to another.
-
-    This is a unified interface for all compression conversions.
-    If input and output coding are the same, the file is simply copied.
-
-    Args:
-        input_path: Source file path
-        output_path: Destination file path
-        input_coding: Input compression type
-        output_coding: Output compression type
-        threads: Number of threads for parallel compression (optional)
-
-    Raises:
-        CompressionError: If conversion fails or is not supported
-
-    Examples:
-        >>> convert_file_compression('data.gz', 'data.bz2', CodingType.GZIP, CodingType.BZIP2)
-        >>> convert_file_compression('data.txt', 'data.gz', CodingType.NONE, CodingType.GZIP)
-    """
+    """Convert file from one compression type to another."""
     input_path = Path(input_path)
     output_path = Path(output_path)
 
@@ -517,25 +498,7 @@ def copy_file(
     output_path: Union[str, Path],
     logger=None
 ) -> Path:
-    """
-    Copy file with optional logging.
-
-    Uses shutil.copy2 to preserve metadata (timestamps, permissions).
-
-    Args:
-        input_path: Source file path
-        output_path: Destination file path
-        logger: Optional logger instance for logging copy operation
-
-    Returns:
-        Output path (as Path object)
-
-    Examples:
-        >>> copy_file('input.txt', 'output.txt')
-        PosixPath('output.txt')
-        >>> copy_file('data.gz', 'backup/data.gz', logger)
-        PosixPath('backup/data.gz')
-    """
+    """Copy file with optional logging."""
     input_path = Path(input_path)
     output_path = Path(output_path)
 

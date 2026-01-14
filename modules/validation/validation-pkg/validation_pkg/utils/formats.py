@@ -28,20 +28,7 @@ class CodingType(Enum):
 
     @classmethod
     def normalize(cls, value):
-        """
-        Convert various input formats to CodingType enum.
-
-        This method allows flexible input:
-        - Strings: 'gz', 'gzip', '.gz', 'bz2', 'bzip2', '.bz2', 'none', None
-        - Enums: CodingType.GZIP, etc.
-        - Filenames: 'file.gz' extracts '.gz'
-
-        Args:
-            value: Input value to normalize
-
-        Returns:
-            CodingType enum member
-        """
+        """Convert various input formats to CodingType enum."""
         # If already a CodingType, return as-is
         if isinstance(value, cls):
             return value
@@ -97,6 +84,7 @@ class GenomeFormat(Enum):
         return self.value
     
     def to_extension(self) -> str:
+        """Return file extension for this genome format."""
         return f'.{self.value}'
     
     @classmethod
@@ -139,8 +127,9 @@ class ReadFormat(Enum):
     def to_biopython(self) -> str:
         """Return format string for BioPython SeqIO."""
         return self.value
-    
+
     def to_extension(self) -> str:
+        """Return file extension for this read format."""
         return f'.{self.value}'
     
     @classmethod
@@ -180,8 +169,9 @@ class FeatureFormat(Enum):
     def to_biopython(self) -> str:
         """Return format string for file parsing."""
         return self.value
-    
+
     def to_extension(self) -> str:
+        """Return file extension for this feature format."""
         return f'.{self.value}'
 
     @classmethod

@@ -95,7 +95,7 @@ def _validate_single_read(record, check_invalid_chars: bool, allow_empty_id: boo
 
 
 @dataclass
-class OutputMetadata(BaseOutputMetadata):
+class ReadOutputMetadata(BaseOutputMetadata):
     """Metadata returned from read validation."""
     # Read-specific fields
     base_name: str = None
@@ -112,16 +112,7 @@ class OutputMetadata(BaseOutputMetadata):
     shortest_read_length: int = None
 
     def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
-        """
-        Format read-specific statistics for report output.
-
-        Args:
-            indent: Indentation string (default: 4 spaces)
-            input_settings: Optional settings dict (not currently used but kept for consistency)
-
-        Returns:
-            List of formatted strings with read statistics
-        """
+        """Format read-specific statistics for report output."""
         lines = []
 
         # Helper to check if key has value
@@ -244,9 +235,9 @@ class ReadValidator(BaseValidator):
         return 'read'
 
     @property
-    def OutputMetadata(self) -> Type:
-        """Return OutputMetadata class for this validator."""
-        return OutputMetadata
+    def ReadOutputMetadata(self) -> Type:
+        """Return ReadOutputMetadata class for this validator."""
+        return ReadOutputMetadata
 
     @property
     def _output_format(self) -> str:
