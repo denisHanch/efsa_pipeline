@@ -1,7 +1,12 @@
 """
-Tests for inter-file read validation (ReadXReadSettings, readxread_validation).
+Tests for inter-file read validation.
 
-Tests paired-end read completeness validation.
+Tests cover:
+- Paired-end read completeness validation
+- Read ID matching between R1 and R2 files
+- ReadXReadSettings configuration
+- readxread_validation function
+- Error handling for incomplete pairs
 """
 
 import pytest

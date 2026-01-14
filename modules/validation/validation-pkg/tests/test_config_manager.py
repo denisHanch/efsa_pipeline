@@ -1,5 +1,13 @@
 """
 Comprehensive tests for Config and ConfigManager classes.
+
+Tests cover:
+- Configuration file parsing and validation
+- File path resolution and security checks
+- Global options handling (threads, validation_level, logging_level)
+- Genome, read, and feature configuration parsing
+- Error handling and validation
+- Directory processing for read files
 """
 
 import pytest

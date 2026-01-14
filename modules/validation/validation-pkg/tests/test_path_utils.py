@@ -1,8 +1,13 @@
 """
 Tests for path utility functions.
 
-This module tests path resolution and security utilities in the path_utils module,
-including path traversal protection.
+Tests cover:
+- Path resolution relative to base directory
+- Path traversal attack prevention
+- Safe output directory creation
+- Extension stripping utilities
+- Incremental path generation
+- Security validation and error handling
 """
 
 import pytest

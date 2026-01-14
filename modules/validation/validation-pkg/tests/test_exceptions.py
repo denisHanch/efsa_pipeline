@@ -1,11 +1,13 @@
 """
-Unit tests for the custom exceptions module.
+Tests for the custom exceptions module.
 
-Tests the exception hierarchy and ensures all custom exceptions:
-1. Can be raised and caught correctly
-2. Inherit from the proper base classes
-3. Store and display error messages correctly
-4. Follow the documented hierarchy
+Tests cover:
+- Exception hierarchy and inheritance
+- Raising and catching custom exceptions
+- Error message storage and display
+- Base class relationships (ValidationError, FileFormatError)
+- Validator-specific exceptions (GenomeValidationError, ReadValidationError, FeatureValidationError)
+- Configuration and compression errors
 """
 
 import pytest

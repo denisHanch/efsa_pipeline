@@ -1,4 +1,14 @@
-"""Tests for FeatureValidator."""
+"""
+Comprehensive tests for FeatureValidator.
+
+Tests cover:
+- File format detection and parsing (GFF, GTF, BED)
+- Compression handling (gzip, bzip2, uncompressed)
+- Validation rules and feature processing
+- Coordinate validation and sorting
+- Output generation with various compression formats
+- GFFRead integration and error handling
+"""
 
 import pytest
 import tempfile

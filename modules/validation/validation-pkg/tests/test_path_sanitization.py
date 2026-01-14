@@ -1,4 +1,13 @@
-"""Tests for path sanitization utilities."""
+"""
+Tests for path sanitization utilities.
+
+Tests cover:
+- Path component sanitization
+- Safe output directory creation
+- Path traversal attack prevention
+- Illegal character handling
+- Security validation
+"""
 
 import pytest
 from pathlib import Path

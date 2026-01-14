@@ -1,13 +1,13 @@
 """
-Unit tests for the formats module.
+Tests for the formats module.
 
-Tests format enums including:
-- CodingType enum (compression types)
-- GenomeFormat enum
-- ReadFormat enum
-- FeatureFormat enum
-- _missing_ method for flexible input
-- to_biopython() conversion
+Tests cover:
+- CodingType enum (compression types and normalization)
+- GenomeFormat enum (FASTA, GenBank)
+- ReadFormat enum (FASTQ, BAM)
+- FeatureFormat enum (GFF, GTF, BED)
+- Flexible input handling via _missing_ method
+- Format conversion methods (to_biopython, to_extension)
 """
 
 import pytest

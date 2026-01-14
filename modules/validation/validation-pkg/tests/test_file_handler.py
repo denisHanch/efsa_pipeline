@@ -1,12 +1,13 @@
 """
-Unit tests for the file_handler module.
+Tests for the file_handler module.
 
-Tests file handling utilities including:
+Tests cover:
 - File opening with automatic decompression
-- Compression detection
-- Format detection
-- Filename processing
-- Compression conversion functions
+- Compression detection and type handling
+- Format detection for genome, read, and feature files
+- Filename processing and path utilities
+- Compression conversion functions (gzip, bzip2)
+- Parallel compression tool selection and usage
 """
 
 import pytest

@@ -1,12 +1,14 @@
 """
-Unit tests for the settings module.
+Tests for the settings module.
 
-Tests BaseSettings class including:
+Tests cover:
+- BaseSettings class functionality
 - Immutable update pattern
 - Deep copy functionality
 - Dictionary conversion (to_dict/from_dict)
 - Validation of setting names
 - String representations
+- Validator-specific settings (GenomeValidator.Settings, ReadValidator.Settings, FeatureValidator.Settings)
 """
 
 import pytest
