@@ -135,7 +135,7 @@ class FeatureValidator(BaseValidator):
         return 'feature'
 
     @property
-    def FeatureOutputMetadata(self) -> Type:
+    def OutputMetadata(self) -> Type:
         """Return FeatureOutputMetadata class for this validator."""
         return FeatureOutputMetadata
 

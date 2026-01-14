@@ -6,7 +6,7 @@ Tests genome-to-genome consistency checks.
 
 import pytest
 from validation_pkg.validators.interfile_genome import GenomeXGenomeSettings, genomexgenome_validation
-from validation_pkg.validators.genome_validator import OutputMetadata as GenomeOutputMetadata
+from validation_pkg.validators.genome_validator import GenomeOutputMetadata
 from validation_pkg.exceptions import GenomeValidationError
 
 

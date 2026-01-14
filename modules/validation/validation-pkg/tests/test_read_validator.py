@@ -21,7 +21,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 from validation_pkg.config_manager import ReadConfig
-from validation_pkg.validators.read_validator import ReadValidator, OutputMetadata
+from validation_pkg.validators.read_validator import ReadValidator, ReadOutputMetadata
 from validation_pkg.exceptions import (
     ReadValidationError,
     FastqFormatError,
@@ -1475,7 +1475,7 @@ class TestIlluminaPatternDetection:
             basename = filename.rsplit('.', 1)[0] if '.' in filename else filename
 
         validator = ReadValidator.__new__(ReadValidator)
-        validator.output_metadata = OutputMetadata()
+        validator.output_metadata = ReadOutputMetadata()
         validator.read_config = Mock()
         validator.read_config.basename = basename
 

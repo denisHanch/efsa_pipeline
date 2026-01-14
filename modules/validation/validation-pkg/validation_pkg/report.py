@@ -6,9 +6,9 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any, Union
 import json
 from validation_pkg.utils.path_utils import get_incremented_path
-from validation_pkg.validators.genome_validator import OutputMetadata as GenomeOutputMetadata
-from validation_pkg.validators.read_validator import OutputMetadata as ReadOutputMetadata
-from validation_pkg.validators.feature_validator import OutputMetadata as FeatureOutputMetadata
+from validation_pkg.validators.genome_validator import GenomeOutputMetadata
+from validation_pkg.validators.read_validator import ReadOutputMetadata
+from validation_pkg.validators.feature_validator import FeatureOutputMetadata
 
 
 @dataclass

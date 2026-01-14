@@ -162,7 +162,7 @@ class GenomeValidator(BaseValidator):
         return 'genome'
 
     @property
-    def GenomeOutputMetadata(self) -> Type:
+    def OutputMetadata(self) -> Type:
         """Return GenomeOutputMetadata class for this validator."""
         return GenomeOutputMetadata
 

@@ -235,7 +235,7 @@ class ReadValidator(BaseValidator):
         return 'read'
 
     @property
-    def ReadOutputMetadata(self) -> Type:
+    def OutputMetadata(self) -> Type:
         """Return ReadOutputMetadata class for this validator."""
         return ReadOutputMetadata
 

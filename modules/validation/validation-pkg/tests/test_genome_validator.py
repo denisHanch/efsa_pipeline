@@ -1355,8 +1355,8 @@ class TestGenomeValidatorOutputMetadata:
         result = validator.run()
 
         # Verify return type
-        from validation_pkg.validators.genome_validator import OutputMetadata
-        assert isinstance(result, OutputMetadata), "run() should return OutputMetadata instance"
+        from validation_pkg.validators.genome_validator import GenomeOutputMetadata
+        assert isinstance(result, GenomeOutputMetadata), "run() should return GenomeOutputMetadata instance"
 
     def test_strict_mode_all_fields(self, sample_fasta_file, output_dir):
         """Test that strict mode populates all metadata fields."""
