@@ -253,6 +253,6 @@ process vcf_to_table_long {
     output="${vcf.simpleName}_sv_summary.tsv"
 
     echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_reads\tscore" > "\${output}"
-    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t[%SUPP]\t%QUAL\n' "${vcf}" >> "\${output}"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SUPP\t%QUAL\n' "${vcf}" >> "\${output}"
     """
 }
