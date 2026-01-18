@@ -14,6 +14,8 @@ include { truvari_comparison } from './modules/compare_vcfs.nf'
 include { qc } from './modules/subworkflow.nf'
 include { describePipeline; logWorkflowCompletion; loadLongFastqFiles; loadShortFastqFiles } from './modules/logs.nf'
 
+include { restructure_sv_table } from './modules/sv_calling.nf'
+
 
 // Help message
 def helpMessage() {
@@ -58,6 +60,7 @@ workflow {
     ref_mod(ref_fasta, mod_fasta)
     
     def vcfs = ref_mod.out.sv_vcf
+    def sv_table = ref_mod.out.sv_table
 
     pipelines_running++
 
@@ -78,6 +81,7 @@ workflow {
         compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
 
         vcfs = vcfs.mix(long_ref_pacbio.out.sv_vcf.map { it[1] })
+        sv_table = sv_table.mix(long_ref_pacbio.out.sv_table.map { it[3] })
 
         pipelines_running++
     }
@@ -99,6 +103,8 @@ workflow {
         compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
 
         vcfs = vcfs.mix(long_ref_ont.out.sv_vcf.map { it[1] })
+        sv_table = sv_table.mix(long_ref_ont.out.sv_table.map { it[3] })
+
 
         pipelines_running++
     }
@@ -120,8 +126,12 @@ workflow {
         compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
 
         vcfs = vcfs.mix(short_ref.out.sv_vcf)
+        sv_table = sv_table.mix(short_ref.out.sv_table.map { it[3] })
 
         pipelines_running++
+        
+        restructure_sv_table(sv_table)
+
     }
 
     if (pipelines_running == 0) {

@@ -241,18 +241,36 @@ process vcf_to_table_long {
     publishDir "${params.out_dir}/tables", mode: 'copy'
 
     input:
-    path vcf
+    tuple val(pair_id), path(vcf)
 
     output:
-    path "${vcf.simpleName}_sv_summary.tsv"
+    path "${pair_id}_sv_summary.tsv"
 
     script:
     """
     set -euxo pipefail
 
-    output="${vcf.simpleName}_sv_summary.tsv"
+    output="${pair_id}_sv_summary.tsv"
 
     echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_reads\tscore" > "\${output}"
     bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SUPP\t%QUAL\n' "${vcf}" >> "\${output}"
+    """
+}
+
+process restructure_sv_table {
+
+    publishDir "${params.out_dir}/tables", mode: 'copy'
+
+    input:
+    path assembly_tsv
+    path short_tsv
+    path long_tsv
+
+    output:
+    path "*.xlsx"
+
+    script:
+    """
+    python3 modules/utils/create_sv_output_xlsx.py --assembly ${assembly_tsv} --short ${short_tsv} --long ${long_tsv} --out variants.xlsx
     """
 }

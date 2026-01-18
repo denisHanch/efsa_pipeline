@@ -22,10 +22,11 @@ workflow ref_mod {
         deltaFilter(prefix_name, delta) | set { filtered_delta }
         showCoords(prefix_name, filtered_delta) | set { coords }
         syri(ref_mod_fasta, coords, filtered_delta) | set { sv_vcf }
-        vcf_to_table(sv_vcf)
+        vcf_to_table(sv_vcf)  | set { sv_table }
 
     emit: 
         sv_vcf
+        sv_table
 }
 
 workflow {
