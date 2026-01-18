@@ -5,7 +5,7 @@
  * Index fasta file with samtools
 */
 process samtools_index {
-    container 'staphb/samtools:latest'
+    container 'staphb/samtools:1.23'
     publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
 
     input:
@@ -46,7 +46,7 @@ process picard_dict {
  * Running delly SV caller
 */
 process delly {
-    container 'dellytools/delly:latest'
+    container 'dellytools/delly:v1.7.2'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -71,7 +71,7 @@ process delly {
  * Convert bcf (default delly output) to vcf
 */
 process convert_bcf_to_vcf {
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.23'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -205,7 +205,7 @@ process survivor {
 */
 process vcf_to_table {
 
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.23'
     publishDir "${params.out_dir}/tables", mode: 'copy'
 
     input:

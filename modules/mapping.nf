@@ -52,7 +52,7 @@ process bwa_mapping {
  * Indexing BAM file
 */
 process samtool_index_bam {
-    container 'staphb/samtools:latest'
+    container 'staphb/samtools:1.23'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/bam", mode: 'copy'
 
@@ -101,7 +101,7 @@ process picard {
  * Running samtools stats to get mapping statistics
 */
 process samtool_stats {
-    container 'staphb/samtools:latest'
+    container 'staphb/samtools:1.23'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/samtools_stats", mode: 'copy'
 
@@ -125,7 +125,7 @@ process samtool_stats {
  * Map long reads
 */
 process minimap2 {
-    container 'staphb/minimap2:latest'
+    container 'staphb/minimap2:2.30'
     tag "$pair_id"
 
     input:
@@ -148,7 +148,7 @@ process minimap2 {
  * Sort reads with samtools
 */
 process samtools_sort {
-    container 'staphb/samtools:latest'
+    container 'staphb/samtools:1.23'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/bam", mode: 'copy'
 
@@ -169,7 +169,7 @@ process samtools_sort {
  * Calculate total reads
 */
 process calc_total_reads {
-    container 'staphb/samtools:latest'
+    container 'staphb/samtools:1.23'
     tag "$pair_id"
 
     input:
@@ -227,7 +227,7 @@ process calc_unmapped {
  * Export unmapped reads to fastq file
 */
 process get_unmapped_reads {
-    container 'staphb/samtools:latest'
+    container 'staphb/samtools:1.23'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/unmapped_fastq", mode: 'copy'
 
