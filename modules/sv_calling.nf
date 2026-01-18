@@ -96,7 +96,7 @@ process convert_bcf_to_vcf {
  * variant calling with cuteSV
 */
 process cute_sv {
-    container "${params.registry}/cutesv:latest"
+    container "${params.registry}/cutesv:v1.0.1"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: 'copy'
 
@@ -121,7 +121,7 @@ process cute_sv {
  * variant calling with debreak
 */
 process debreak {
-    container "${params.registry}/debreak:latest"
+    container "${params.registry}/debreak:v1.0.1"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: 'copy'
 
@@ -145,7 +145,7 @@ process debreak {
  * variant calling with sniffles
 */
 process sniffles {
-    container "${params.registry}/sniffles:latest"
+    container "${params.registry}/sniffles:v1.0.1"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: 'copy'
 
@@ -168,7 +168,7 @@ process sniffles {
  * merging SV
 */
 process survivor {
-    container "${params.registry}/survivor:latest"
+    container "${params.registry}/survivor:v1.0.1"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: 'copy'
 
