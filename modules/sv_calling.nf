@@ -5,7 +5,7 @@
  * Index fasta file with samtools
 */
 process samtools_index {
-    container 'staphb/samtools:latest'
+    container 'staphb/samtools:1.23'
     publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
 
     input:
@@ -46,7 +46,7 @@ process picard_dict {
  * Running delly SV caller
 */
 process delly {
-    container 'dellytools/delly:latest'
+    container 'dellytools/delly:v1.7.2'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -71,7 +71,7 @@ process delly {
  * Convert bcf (default delly output) to vcf
 */
 process convert_bcf_to_vcf {
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.23'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -96,7 +96,7 @@ process convert_bcf_to_vcf {
  * variant calling with cuteSV
 */
 process cute_sv {
-    container "${params.registry}/cutesv:latest"
+    container "${params.registry}/cutesv:v1.0.1"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: 'copy'
 
@@ -122,7 +122,7 @@ process cute_sv {
  * variant calling with debreak
 */
 process debreak {
-    container "${params.registry}/debreak:latest"
+    container "${params.registry}/debreak:v1.0.1"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: 'copy'
 
@@ -146,7 +146,7 @@ process debreak {
  * variant calling with sniffles
 */
 process sniffles {
-    container "${params.registry}/sniffles:latest"
+    container "${params.registry}/sniffles:v1.0.1"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: 'copy'
 
@@ -169,7 +169,7 @@ process sniffles {
  * merging SV
 */
 process survivor {
-    container "${params.registry}/survivor:latest"
+    container "${params.registry}/survivor:v1.0.1"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: 'copy'
 
@@ -205,7 +205,7 @@ process survivor {
 */
 process vcf_to_table {
 
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.23'
     publishDir "${params.out_dir}/tables", mode: 'copy'
 
     input:
