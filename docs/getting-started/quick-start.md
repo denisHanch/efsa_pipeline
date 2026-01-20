@@ -31,15 +31,14 @@ git clone https://github.com/denisHanch/efsa_pipeline.git
 
 ### 3. Run Input Validation
 
-Running QC on the input data and processing data for the Nextflow pipeline to `data/valid` folder:
+Running quality control (QC) on the input data and processing data for the Nextflow pipeline to `data/valid` folder:
 
 ```bash
 python3 ./modules/validation/main.py ./data/inputs/config.json
 ```
 
-### 4. Execute the Pipeline
+### 4. Execute the Nextflow Pipeline
 
-Use the GitHub token provided in the Slack channel, then start the pipeline:
 
 ```bash
 nextflow run main.nf \
