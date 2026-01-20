@@ -222,14 +222,37 @@ process vcf_to_table {
 
     if [[ "${vcf.simpleName}" == "ref_x_modsyri" ]]; then
         {
-            echo -e "chrom\tstart\tend\tsvtype\"
+            echo -e "chrom\tstart\tend\tsvtype"
             bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
         } > "\${output}"
     else
         {
-            echo -e "chrom\tstart\tend\tsvtype\tdebreak_type\tsupporting_reads"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\t[%DR]\n' "${vcf}" 
+            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tdebreak_type\tsupporting_reads\tscore"
+            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%ALT\t[%RC]\t%QUAL\n' "${vcf}"
         } > "\${output}"
     fi
+    """
+}
+
+
+process vcf_to_table_long {
+
+    container 'staphb/bcftools:latest'
+    publishDir "${params.out_dir}/tables", mode: 'copy'
+
+    input:
+    path vcf
+
+    output:
+    path "${vcf.simpleName}_sv_summary.tsv"
+
+    script:
+    """
+    set -euxo pipefail
+
+    output="${vcf.simpleName}_sv_summary.tsv"
+
+    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_reads\tscore" > "\${output}"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SUPP\t%QUAL\n' "${vcf}" >> "\${output}"
     """
 }
