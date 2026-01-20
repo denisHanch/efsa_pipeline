@@ -47,7 +47,7 @@
 > Create configuration file `config.json` on `data/inputs`.
 > 
 
-3. **Running QC** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder:
+3. **Running quality control (QC)** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder:
 
    ```bash
    python3 ./modules/validation/main.py ./data/inputs/config.json
