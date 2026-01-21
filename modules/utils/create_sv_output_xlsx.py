@@ -1,306 +1,379 @@
 #!/usr/bin/env python3
+"""
+Merge SV summaries from:
+  1) assembly/syri summary (required columns: chrom, start, end, svtype)
+  2) long-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score)
+  3) short-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score)
 
+Outputs a single XLSX with 5 tabs:
+  Insertions, Deletions, Replacements, Inversions, Translocations
+
+Events are clustered by (chrom, standardized_svtype) using interval overlap with an optional tolerance (bp),
+PLUS breakpoint proximity (start or end must be within tol bp). This avoids merging very large calls with
+many unrelated smaller calls.
+
+Within each event, at most one record per source is chosen (best by supporting_reads then score).
+
+Usage:
+  python merge_sv_results_v2.py --asm assembly.tsv --long long.tsv --short short.tsv --out merged.xlsx --tol 10
+Any of --asm/--long/--short may be omitted; columns for missing sources are still present but empty.
+"""
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+import os
+import re
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
 
-SHEETS_IN_ORDER = ["Insertions", "Deletions", "Replacements", "Inversions", "Translocations"]
+# ----------------------------
+# SV type standardization
+# ----------------------------
 
-# Curated column headers (row 1 in Excel)
-DISPLAY_HEADERS: List[str] = [
-    "SV unique ID",
-    "which type of event is taking place (possibly dismissable)",
-    "which fasta sequence the given SV is occuring",
-    "assembly-based SV start",
-    "assembly-based SV end",
-    "assembly-based SV length",
-    "long-reads-based SV start (median)",
-    "long-reads-based SV start (standard deviation)",
-    "long-reads-based SV end (median)",
-    "long-reads-based SV end (standard deviation)",
-    "long-reads-based SV length (median)",
-    "short-reads-based SV start (median)",
-    "short-reads-based SV start (standard deviation)",
-    "short-reads-based SV end (median)",
-    "short-reads-based SV end (standard deviation)",
-    "short-reads-based SV length (median)",
-    "long-reads-based support (how many long-reads supporting the SV)",
-    "long-reads-based confidence score (%, p-value, e-value, etc)",
-    "short-reads-based support (how many short-reads supporting the SV)",
-    "short-reads-based confidence score (%, p-value, e-value, etc)",
-    "assembly-based estimate number of copies",
-    "long-reads-based estimate number of copies",
-    "short-reads-based estimate number of copies",
-]
-
-# Internal field names row (row 2 in Excel)
-FIELD_ROW: List[str] = [
-    "event_id",
-    "event_type",
-    "sequence_id",
-    "asm_start",
-    "asm_end",
-    "asm_length_bp",
-    "long_reads_start_median",
-    "long_reads_start_std",
-    "long_reads_end_median",
-    "long_reads_end_std",
-    "long_reads_length_median",
-    "short_reads_start_median",
-    "short_reads_start_std",
-    "short_reads_end_median",
-    "short_reads_end_std",
-    "short_reads_length_median",
-    "long_reads_support",
-    "long_reads_score",
-    "short_reads_support",
-    "short_reads_score",
-    "asm_copy_number_estimate",
-    "long_reads_copy_number_estimate",
-    "short_reads_copy_number_estimate",
-]
-
-# Mapping from standardized SVTYPE (info_svtype) to sheet + event_id prefix + event_type label
-SVTYPE_MAP: Dict[str, Tuple[str, str, str]] = {
-    "INS": ("Insertions", "INS", "insertion"),
-    "DEL": ("Deletions", "DEL", "deletion"),
-    "DUP": ("Replacements", "REP", "replacement"),  # best-fit mapping for this workflow
-    "INV": ("Inversions", "INV", "inversion"),
-    "TRA": ("Translocations", "TRA", "translocation"),
-    "BND": ("Translocations", "TRA", "translocation"),  # common breakend label
+TAB_BY_TYPE = {
+    "INS": "Insertions",
+    "DEL": "Deletions",
+    "RPL": "Replacements",
+    "INV": "Inversions",
+    "TRA": "Translocations",
 }
 
+# Common caller types -> standardized
+INFO_MAP = {
+    "INS": "INS",
+    "DEL": "DEL",
+    "INV": "INV",
+    "TRA": "TRA",
+    "TRANS": "TRA",
+    "BND": "TRA",
+    "CTX": "TRA",
+    # IMPORTANT: user requested DUP events to be treated as REPLACEMENTS
+    "DUP": "RPL",
+    "DUP:TANDEM": "RPL",
+    "DUP:INT": "RPL",
+    "RPL": "RPL",
+    "REPL": "RPL",
+    "SUB": "RPL",
+    "SNV": "RPL",
+}
 
-def _to_numeric(series: pd.Series) -> pd.Series:
-    """Convert to numeric where possible; non-numeric become NaN."""
-    return pd.to_numeric(series, errors="coerce")
+# Assembly/syri-ish svtype prefixes -> standardized (best-effort; adjust if needed)
+ASM_PREFIX_MAP = [
+    (r"^DEL", "DEL"),
+    (r"^INS", "INS"),
+    (r"^INV", "INV"),
+    (r"^TRANS", "TRA"),
+    (r"^TRA", "TRA"),
+    (r"^BND", "TRA"),
+    (r"^DUP", "RPL"),
+    # example types seen in some assembly/syri summaries:
+    (r"^CPG", "INS"),  # best-effort: "copy gain" -> insertion-like
+    (r"^CPL", "DEL"),  # best-effort: "copy loss" -> deletion-like
+    (r"^SYN", "RPL"),  # best-effort: treat synteny-alignment blocks as replacements
+]
 
 
-def _median(series: pd.Series) -> Optional[float]:
-    s = _to_numeric(series).dropna()
-    if s.empty:
+def _to_int(x) -> Optional[int]:
+    if x is None or (isinstance(x, float) and np.isnan(x)):
         return None
-    return float(np.median(s.to_numpy()))
-
-
-def _std(series: pd.Series) -> Optional[float]:
-    s = _to_numeric(series).dropna()
-    if s.empty:
+    s = str(x).strip()
+    if s == "" or s == "." or s.lower() == "nan":
         return None
-    # population std (ddof=0) so n=1 yields 0.0 rather than NaN
-    return float(np.std(s.to_numpy(), ddof=0))
-
-
-def _lengths(starts: pd.Series, ends: pd.Series) -> pd.Series:
-    return _to_numeric(ends) - _to_numeric(starts) + 1
-
-
-def _safe_int_sum(series: pd.Series) -> Optional[int]:
-    s = _to_numeric(series).dropna()
-    if s.empty:
+    try:
+        return int(float(s))
+    except Exception:
         return None
-    return int(s.sum())
 
 
-def _score_aggregate(series: pd.Series) -> Optional[float]:
-    """
-    Aggregate score column.
-    - If any numeric values exist -> median of numeric values
-    - Else -> None
-    """
-    s = _to_numeric(series).dropna()
-    if s.empty:
+def _to_float(x) -> Optional[float]:
+    if x is None or (isinstance(x, float) and np.isnan(x)):
         return None
-    return float(np.median(s.to_numpy()))
+    s = str(x).strip()
+    if s == "" or s == "." or s.lower() == "nan":
+        return None
+    try:
+        return float(s)
+    except Exception:
+        return None
 
 
-def _overlap_mask(asm_start: int, asm_end: int, starts: pd.Series, ends: pd.Series) -> pd.Series:
-    s = _to_numeric(starts)
-    e = _to_numeric(ends)
-    return (s <= asm_end) & (e >= asm_start)
-
-
-def read_inputs(assembly_path: Path, long_path: Path, short_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    asm = pd.read_csv(assembly_path, sep="\t", dtype={"chrom": str})
-    long_df = pd.read_csv(long_path, sep="\t", dtype={"chrom": str})
-    short_df = pd.read_csv(short_path, sep="\t", dtype={"chrom": str})
-
-    required_asm = {"chrom", "start", "end", "svtype"}
-    required_reads = {"chrom", "start", "end", "info_svtype", "supporting_reads", "score"}
-
-    missing_asm = required_asm - set(asm.columns)
-    if missing_asm:
-        raise ValueError(f"Assembly file is missing required columns: {sorted(missing_asm)}")
-
-    missing_long = required_reads - set(long_df.columns)
-    if missing_long:
-        raise ValueError(f"Long-read file is missing required columns: {sorted(missing_long)}")
-
-    missing_short = required_reads - set(short_df.columns)
-    if missing_short:
-        raise ValueError(f"Short-read file is missing required columns: {sorted(missing_short)}")
-
-    # Normalize svtype strings
-    long_df["info_svtype"] = long_df["info_svtype"].astype(str).str.upper()
-    short_df["info_svtype"] = short_df["info_svtype"].astype(str).str.upper()
-
-    return asm, long_df, short_df
-
-
-def build_event_rows_for_interval(
-    asm_row: pd.Series,
-    long_df: pd.DataFrame,
-    short_df: pd.DataFrame,
-    svtype: str,
-    event_id: str,
-    event_type_label: str,
-) -> Dict[str, object]:
-    asm_start = int(asm_row["start"])
-    asm_end = int(asm_row["end"])
-    chrom = str(asm_row["chrom"])
-
-    long_sub = long_df[(long_df["chrom"].astype(str) == chrom) & (long_df["info_svtype"] == svtype)]
-    short_sub = short_df[(short_df["chrom"].astype(str) == chrom) & (short_df["info_svtype"] == svtype)]
-
-    long_ov = long_sub[_overlap_mask(asm_start, asm_end, long_sub["start"], long_sub["end"])]
-    short_ov = short_sub[_overlap_mask(asm_start, asm_end, short_sub["start"], short_sub["end"])]
-
-    # Stats for long reads
-    long_start_med = _median(long_ov["start"]) if not long_ov.empty else None
-    long_start_std = _std(long_ov["start"]) if not long_ov.empty else None
-    long_end_med = _median(long_ov["end"]) if not long_ov.empty else None
-    long_end_std = _std(long_ov["end"]) if not long_ov.empty else None
-    long_len_med = _median(_lengths(long_ov["start"], long_ov["end"])) if not long_ov.empty else None
-    long_support = _safe_int_sum(long_ov["supporting_reads"]) if not long_ov.empty else None
-    long_score = _score_aggregate(long_ov["score"]) if not long_ov.empty else None
-
-    # Stats for short reads
-    short_start_med = _median(short_ov["start"]) if not short_ov.empty else None
-    short_start_std = _std(short_ov["start"]) if not short_ov.empty else None
-    short_end_med = _median(short_ov["end"]) if not short_ov.empty else None
-    short_end_std = _std(short_ov["end"]) if not short_ov.empty else None
-    short_len_med = _median(_lengths(short_ov["start"], short_ov["end"])) if not short_ov.empty else None
-    short_support = _safe_int_sum(short_ov["supporting_reads"]) if not short_ov.empty else None
-    short_score = _score_aggregate(short_ov["score"]) if not short_ov.empty else None
-
-    asm_length_bp = asm_end - asm_start + 1
-
-    return {
-        "event_id": event_id,
-        "event_type": event_type_label,
-        "sequence_id": chrom,
-        "asm_start": asm_start,
-        "asm_end": asm_end,
-        "asm_length_bp": asm_length_bp,
-        "long_reads_start_median": long_start_med,
-        "long_reads_start_std": long_start_std,
-        "long_reads_end_median": long_end_med,
-        "long_reads_end_std": long_end_std,
-        "long_reads_length_median": long_len_med,
-        "short_reads_start_median": short_start_med,
-        "short_reads_start_std": short_start_std,
-        "short_reads_end_median": short_end_med,
-        "short_reads_end_std": short_end_std,
-        "short_reads_length_median": short_len_med,
-        "long_reads_support": long_support,
-        "long_reads_score": long_score,
-        "short_reads_support": short_support,
-        "short_reads_score": short_score,
-        "asm_copy_number_estimate": None,
-        "long_reads_copy_number_estimate": None,
-        "short_reads_copy_number_estimate": None,
-    }
-
-
-def merge_to_workbook(asm: pd.DataFrame, long_df: pd.DataFrame, short_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def standardize_type(raw_svtype: str, info_svtype: Optional[str], source: str) -> str:
     """
-    Returns dict: sheet_name -> dataframe ready to write,
-    including the internal field-name row as first record (after headers).
+    Standardize to one of: INS, DEL, RPL, INV, TRA
     """
-    # Prepare empty containers per sheet
-    sheet_rows: Dict[str, List[Dict[str, object]]] = {s: [] for s in SHEETS_IN_ORDER}
+    # Prefer info_svtype when present (long/short summaries)
+    if info_svtype is not None:
+        key = str(info_svtype).strip().upper()
+        if key in INFO_MAP:
+            return INFO_MAP[key]
 
-    # Counters for event IDs per SVTYPE_MAP entry/prefix
-    counters: Dict[str, int] = {}
+    raw = ("" if raw_svtype is None else str(raw_svtype)).strip()
+    raw_u = raw.upper()
 
-    # Determine which svtypes appear in reads (restrict to recognized)
-    observed_svtypes = sorted(set(long_df["info_svtype"]).union(set(short_df["info_svtype"])))
-    observed_svtypes = [t for t in observed_svtypes if t in SVTYPE_MAP]
+    # Generic parsing: if it contains something like ".DEL." etc.
+    for token, mapped in INFO_MAP.items():
+        if token in raw_u:
+            return mapped
 
-    for _, asm_row in asm.iterrows():
-        asm_start = int(asm_row["start"])
-        asm_end = int(asm_row["end"])
-        chrom = str(asm_row["chrom"])
+    if source == "asm":
+        for pat, mapped in ASM_PREFIX_MAP:
+            if re.search(pat, raw_u):
+                return mapped
 
-        # For each SV type, check if there is any overlapping call in either long or short
-        for svt in observed_svtypes:
-            # Filter quickly by chrom+svt
-            long_sub = long_df[(long_df["chrom"].astype(str) == chrom) & (long_df["info_svtype"] == svt)]
-            short_sub = short_df[(short_df["chrom"].astype(str) == chrom) & (short_df["info_svtype"] == svt)]
+    # Fallback
+    return "RPL"
 
-            has_long = False
-            has_short = False
-            if not long_sub.empty:
-                has_long = bool(_overlap_mask(asm_start, asm_end, long_sub["start"], long_sub["end"]).any())
-            if not short_sub.empty:
-                has_short = bool(_overlap_mask(asm_start, asm_end, short_sub["start"], short_sub["end"]).any())
 
-            if not (has_long or has_short):
-                continue
+# ----------------------------
+# Event clustering
+# ----------------------------
 
-            sheet_name, prefix, event_type_label = SVTYPE_MAP[svt]
-            counters.setdefault(prefix, 0)
-            counters[prefix] += 1
-            event_id = f"{prefix}_{counters[prefix]}"
+@dataclass
+class Record:
+    source: str  # asm, long, short
+    chrom: str
+    start: int
+    end: int
+    std_type: str
+    raw_svtype: str
+    info_svtype: Optional[str] = None
+    supporting_reads: Optional[int] = None
+    score: Optional[float] = None
 
-            row = build_event_rows_for_interval(
-                asm_row=asm_row,
-                long_df=long_df,
-                short_df=short_df,
-                svtype=svt,
-                event_id=event_id,
-                event_type_label=event_type_label,
+
+@dataclass
+class EventCluster:
+    chrom: str
+    std_type: str
+    start: int
+    end: int
+    members: List[Record]
+
+
+def intervals_overlap(a_start: int, a_end: int, b_start: int, b_end: int, tol: int) -> bool:
+    """True if intervals likely describe the same SV event.
+
+    Require:
+      1) interval overlap (with gap tolerance), AND
+      2) at least one breakpoint close (start or end within tol)
+    """
+    overlap = (b_start <= a_end + tol) and (b_end >= a_start - tol)
+    if not overlap:
+        return False
+    return (abs(a_start - b_start) <= tol) or (abs(a_end - b_end) <= tol)
+
+
+def cluster_records(records: List[Record], tol: int) -> List[EventCluster]:
+    clusters: List[EventCluster] = []
+    if not records:
+        return clusters
+
+    key_to_recs: Dict[Tuple[str, str], List[Record]] = {}
+    for r in records:
+        key_to_recs.setdefault((r.chrom, r.std_type), []).append(r)
+
+    for (chrom, std_type), recs in key_to_recs.items():
+        recs_sorted = sorted(recs, key=lambda x: (x.start, x.end))
+        cur_start = recs_sorted[0].start
+        cur_end = recs_sorted[0].end
+        cur_members = [recs_sorted[0]]
+
+        for r in recs_sorted[1:]:
+            if intervals_overlap(cur_start, cur_end, r.start, r.end, tol):
+                cur_end = max(cur_end, r.end)
+                cur_start = min(cur_start, r.start)
+                cur_members.append(r)
+            else:
+                clusters.append(
+                    EventCluster(chrom=chrom, std_type=std_type, start=cur_start, end=cur_end, members=cur_members)
+                )
+                cur_start, cur_end, cur_members = r.start, r.end, [r]
+
+        clusters.append(EventCluster(chrom=chrom, std_type=std_type, start=cur_start, end=cur_end, members=cur_members))
+
+    clusters.sort(key=lambda c: (c.std_type, c.chrom, c.start, c.end))
+    return clusters
+
+
+def choose_best_record(recs: List[Record]) -> Optional[Record]:
+    if not recs:
+        return None
+
+    def key(r: Record):
+        sup = r.supporting_reads if r.supporting_reads is not None else -1
+        sc = r.score if r.score is not None else -1.0
+        length = (r.end - r.start + 1)
+        return (sup, sc, -length)
+
+    return sorted(recs, key=key, reverse=True)[0]
+
+
+# ----------------------------
+# IO helpers
+# ----------------------------
+
+def read_tsv(path: str) -> pd.DataFrame:
+    return pd.read_csv(path, sep="\t", dtype=str, comment="#")
+
+
+def load_records(path: Optional[str], source: str) -> List[Record]:
+    if not path:
+        return []
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"{source} file not found: {path}")
+
+    df = read_tsv(path)
+
+    required = {"chrom", "start", "end", "svtype"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"{source} file is missing required columns: {sorted(missing)}")
+
+    out: List[Record] = []
+    for _, row in df.iterrows():
+        chrom = str(row["chrom"])
+        start = _to_int(row["start"])
+        end = _to_int(row["end"])
+        if start is None or end is None:
+            continue
+        if start > end:
+            start, end = end, start
+
+        raw_svtype = str(row["svtype"]) if row["svtype"] is not None else ""
+        info_svtype = row.get("info_svtype", None)
+        std_type = standardize_type(raw_svtype, info_svtype, source)
+
+        supporting_reads = _to_int(row.get("supporting_reads", None))
+        score = _to_float(row.get("score", None))
+
+        out.append(
+            Record(
+                source=source,
+                chrom=chrom,
+                start=start,
+                end=end,
+                std_type=std_type,
+                raw_svtype=raw_svtype,
+                info_svtype=(None if info_svtype is None else str(info_svtype)),
+                supporting_reads=supporting_reads,
+                score=score,
             )
-            sheet_rows[sheet_name].append(row)
-
-    # Convert to DataFrames and add internal field-name row at the top
-    out: Dict[str, pd.DataFrame] = {}
-    for sheet_name in SHEETS_IN_ORDER:
-        df = pd.DataFrame(sheet_rows[sheet_name], columns=FIELD_ROW)
-        # Prepend the internal field-name row (matches the example GMO_output format)
-        field_df = pd.DataFrame([dict(zip(FIELD_ROW, FIELD_ROW))], columns=FIELD_ROW)
-        df2 = pd.concat([field_df, df], ignore_index=True)
-        out[sheet_name] = df2
-
+        )
     return out
 
 
-def write_excel(sheets: Dict[str, pd.DataFrame], output_path: Path) -> None:
-    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-        for sheet_name in SHEETS_IN_ORDER:
-            df = sheets[sheet_name]
-            # Write with display headers as the header row
-            df.to_excel(writer, sheet_name=sheet_name, index=False, header=DISPLAY_HEADERS)
+def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
+    rows: List[Dict[str, object]] = []
+
+    counters: Dict[str, int] = {t: 0 for t in TAB_BY_TYPE.keys()}
+
+    for c in clusters:
+        counters.setdefault(c.std_type, 0)
+        counters[c.std_type] += 1
+        # IMPORTANT: no zero padding (INV_1 not INV_000001)
+        event_id = f"{c.std_type}_{counters[c.std_type]}"
+
+        by_source: Dict[str, List[Record]] = {"asm": [], "long": [], "short": []}
+        for m in c.members:
+            by_source.setdefault(m.source, []).append(m)
+
+        asm = choose_best_record(by_source.get("asm", []))
+        lng = choose_best_record(by_source.get("long", []))
+        sht = choose_best_record(by_source.get("short", []))
+
+        row = {
+            "event_id": event_id,
+            "chrom": c.chrom,
+            "std_svtype": c.std_type,
+            "event_start": c.start,
+            "event_end": c.end,
+            "event_length_bp": (c.end - c.start + 1),
+
+            # assembly/syri
+            "asm_start": (asm.start if asm else np.nan),
+            "asm_end": (asm.end if asm else np.nan),
+            "asm_svtype_raw": (asm.raw_svtype if asm else ""),
+            "asm_length_bp": ((asm.end - asm.start + 1) if asm else np.nan),
+
+            # long reads
+            "long_start": (lng.start if lng else np.nan),
+            "long_end": (lng.end if lng else np.nan),
+            "long_svtype_raw": (lng.raw_svtype if lng else ""),
+            "long_info_svtype": (lng.info_svtype if lng else ""),
+            "long_length_bp": ((lng.end - lng.start + 1) if lng else np.nan),
+            "long_score": (lng.score if lng else np.nan),
+            "long_supporting_reads": (lng.supporting_reads if lng else np.nan),
+
+            # short reads
+            "short_start": (sht.start if sht else np.nan),
+            "short_end": (sht.end if sht else np.nan),
+            "short_svtype_raw": (sht.raw_svtype if sht else ""),
+            "short_info_svtype": (sht.info_svtype if sht else ""),
+            "short_length_bp": ((sht.end - sht.start + 1) if sht else np.nan),
+            "short_score": (sht.score if sht else np.nan),
+            "short_supporting_reads": (sht.supporting_reads if sht else np.nan),
+        }
+        rows.append(row)
+
+    df = pd.DataFrame(rows)
+
+    col_order = [
+        "event_id", "chrom", "std_svtype",
+        "event_start", "event_end", "event_length_bp",
+        "asm_start", "asm_end", "asm_svtype_raw", "asm_length_bp",
+        "long_start", "long_end", "long_svtype_raw", "long_info_svtype",
+        "long_length_bp", "long_score", "long_supporting_reads",
+        "short_start", "short_end", "short_svtype_raw", "short_info_svtype",
+        "short_length_bp", "short_score", "short_supporting_reads",
+    ]
+    for c in col_order:
+        if c not in df.columns:
+            df[c] = np.nan
+    df = df[col_order]
+    return df
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(description="Merge assembly + long/short SV summaries into GMO-style Excel output.")
-    p.add_argument("--assembly", required=True, type=Path, help="assembly_ref_x_modsyri_sv_summary.tsv")
-    p.add_argument("--long", required=True, type=Path, help="long_read_sv_summary.tsv")
-    p.add_argument("--short", required=True, type=Path, help="short_read_sv_summary.tsv")
-    p.add_argument("--output", required=True, type=Path, help="output .xlsx path")
+def write_xlsx(df: pd.DataFrame, out_path: str):
+    with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
+        for std_type, sheet in TAB_BY_TYPE.items():
+            sub = df[df["std_svtype"] == std_type].copy()
+            sub.sort_values(["chrom", "event_start", "event_end"], inplace=True, kind="mergesort")
+            sub.to_excel(writer, sheet_name=sheet, index=False)
+
+        unknown = df[~df["std_svtype"].isin(list(TAB_BY_TYPE.keys()))]
+        if len(unknown) > 0:
+            sub = unknown.copy()
+            sub.sort_values(["chrom", "event_start", "event_end"], inplace=True, kind="mergesort")
+            sub.to_excel(writer, sheet_name="Other", index=False)
+
+
+def main():
+    p = argparse.ArgumentParser(description="Merge SV summaries into a single XLSX with tabs by SV type.")
+    p.add_argument("--asm", default=None, help="Assembly/syri SV summary TSV")
+    p.add_argument("--long", dest="long_reads", default=None, help="Long-read SV summary TSV")
+    p.add_argument("--short", dest="short_reads", default=None, help="Short-read SV summary TSV")
+    p.add_argument("--out", required=True, help="Output XLSX path")
+    p.add_argument("--tol", type=int, default=10, help="Clustering tolerance in bp (default: 10)")
     args = p.parse_args()
 
-    asm, long_df, short_df = read_inputs(args.assembly, args.long, args.short)
-    sheets = merge_to_workbook(asm, long_df, short_df)
-    write_excel(sheets, args.output)
-    print(f"Wrote: {args.output}")
+    records: List[Record] = []
+    records.extend(load_records(args.asm, "asm"))
+    records.extend(load_records(args.long_reads, "long"))
+    records.extend(load_records(args.short_reads, "short"))
+
+    clusters = cluster_records(records, tol=args.tol)
+    df = build_output_table(clusters)
+
+    write_xlsx(df, args.out)
+
+    print(f"Wrote: {args.out}")
+    print(f"Total events: {len(df)}")
+    for t, sheet in TAB_BY_TYPE.items():
+        print(f"  {sheet}: {int((df['std_svtype']==t).sum())}")
 
 
 if __name__ == "__main__":
