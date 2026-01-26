@@ -67,6 +67,9 @@ class GenomeConfig:
         if self.global_options is None:
             self.global_options = {}
 
+        if self.detected_format is None:
+            raise ValueError(f"Could not detect format for genome file: {self.filename}")
+
         # Extract basename (filename without extension)
         # Handle files with or without extensions safely
         if self.coding_type:
@@ -108,6 +111,9 @@ class ReadConfig:
         if self.global_options is None:
             self.global_options = {}
 
+        if self.detected_format is None:
+            raise ValueError(f"Could not detect format for read file: {self.filename}")
+
         # Extract basename (filename without extension)
         # Handle files with or without extensions safely
         if self.coding_type:
@@ -144,6 +150,9 @@ class FeatureConfig:
     def __post_init__(self):
         if self.global_options is None:
             self.global_options = {}
+
+        if self.detected_format is None:
+            raise ValueError(f"Could not detect format for feature file: {self.filename}")
 
         # Extract basename (filename without extension)
         # Handle files with or without extensions safely
