@@ -40,10 +40,14 @@ MIN_CHUNK_SIZE = 1000  # Minimum chunk size for parallel processing
 
 # Illumina paired-end filename patterns (compiled regex for performance)
 # Pattern format: (regex, read_number_group_index)
+# IMPORTANT: Order matters! More specific patterns must come before more general ones.
 ILLUMINA_PAIRED_END_PATTERNS = [
     # With lane numbers: _R1_001, _R2_001
     (re.compile(r'(.+)_(R[12])_\d+$'), 2),
-    # With lane numbers: _1_001, _2_001
+    # Lane number BEFORE read number (no R prefix): _001_1, _001_2, _1_1, _1_2
+    # This pattern must come before _([12])_\d+$ to correctly handle _X_1/_X_2 suffixes
+    (re.compile(r'(.+)_\d+_([12])$'), 2),
+    # With lane numbers AFTER read number: _1_001, _2_001
     (re.compile(r'(.+)_([12])_\d+$'), 2),
     # With arbitrary suffix: _R1_combined, _R2_final
     (re.compile(r'(.+)_(R[12])_[A-Za-z0-9_]+$'), 2),

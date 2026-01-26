@@ -225,12 +225,25 @@ class FeatureValidator(BaseValidator):
             temp_gff3 = Path(temp_gff3_file.name)
             temp_files.append(temp_gff3)
 
-            self._run_gffread(temp_input, temp_gff3)
+            try:
+                self._run_gffread(temp_input, temp_gff3)
 
-            with open(temp_gff3, 'r') as f:
-                self.features = self._parse_gff(f)
+                with open(temp_gff3, 'r') as f:
+                    self.features = self._parse_gff(f)
 
-            self.logger.info(f"Parsed {len(self.features)} features")
+                self.logger.info(f"Parsed {len(self.features)} features")
+
+            except FeatureValidationError as e:
+                # Log error and skip file instead of crashing (for file parsing failures)
+                self.logger.warning(f"gffread failed for {self.feature_config.filename}: {e}")
+                self.logger.add_validation_issue(
+                    level='WARNING',
+                    category='feature',
+                    message=f"Failed to parse feature file with gffread: {e}",
+                    details={'file': self.feature_config.filename, 'error': str(e)}
+                )
+                self.features = []
+                self.logger.info(f"Skipping feature file due to parsing error")
 
         finally:
             for temp_file in temp_files:
