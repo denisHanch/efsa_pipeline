@@ -82,6 +82,13 @@ class FeatureValidator:
         output_filename_suffix: Optional[str] = None
         output_subdir_name: Optional[str] = None
 
+        def __post_init__(self):
+            # Normalize coding_type: None or string -> CodingType enum
+            if self.coding_type is None:
+                self.coding_type = CT.NONE
+            elif not isinstance(self.coding_type, CT):
+                self.coding_type = CT(self.coding_type)
+
     def __init__(self, feature_config, settings: Optional[Settings] = None) -> None:
         self.logger = get_logger()
         self.feature_config = feature_config
@@ -190,7 +197,7 @@ class FeatureValidator:
         return features
 
     def _parse_input(self) -> None:
-        """Parse and convert input file to GFF3 using gffread."""
+        """Parse and convert input file to GFF3 using gffread, with fallback to direct parsing."""
         if self.validation_level == 'minimal':
             return
 
@@ -317,6 +324,14 @@ class FeatureValidator:
         """Save processed features to output directory."""
         self.logger.debug("Saving output file...")
 
+        # Normalize coding_type: None or string -> CodingType enum
+        # (Settings.__post_init__ handles creation, but .update() bypasses it)
+        coding = self.settings.coding_type
+        if coding is None:
+            coding = CT.NONE
+        elif not isinstance(coding, CT):
+            coding = CT(coding)
+
         output_dir = self.output_dir
         if self.settings.output_subdir_name:
             output_dir = output_dir / self.settings.output_subdir_name
@@ -332,7 +347,7 @@ class FeatureValidator:
         else:
             output_filename = f"{base_name}.gff"
 
-        output_filename += self.settings.coding_type.to_extension()
+        output_filename += coding.to_extension()
 
         if self.validation_level == 'minimal':
             self.logger.debug("Minimal mode - validating format and coding requirements")
@@ -348,7 +363,7 @@ class FeatureValidator:
                 raise FeatureValidationError(error_msg)
 
             input_coding = self.feature_config.coding_type
-            required_coding = self.settings.coding_type
+            required_coding = coding
 
             if input_coding != required_coding:
                 error_msg = f'Minimal mode requires input coding to match output coding. Input: {input_coding}, Required: {required_coding}. Use validation_level "trust" or "strict" to change compression.'
@@ -369,7 +384,7 @@ class FeatureValidator:
         output_path = output_dir / output_filename
         self.logger.debug(f"Writing output to: {output_path}")
 
-        with open_compressed_writer(output_path, self.settings.coding_type, threads=self.threads) as handle:
+        with open_compressed_writer(output_path, coding, threads=self.threads) as handle:
             handle.write("##gff-version 3\n")
 
             feature_count = len(self.features)

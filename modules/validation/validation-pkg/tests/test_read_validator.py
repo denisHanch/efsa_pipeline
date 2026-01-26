@@ -1565,6 +1565,45 @@ class TestIlluminaPatternDetection:
         assert validator2.output_metadata.base_name == "SRR837394"
         assert validator2.output_metadata.read_number == 2
 
+    def test_lane_before_read_number_suffix(self):
+        """Test filenames with _X_1 and _X_2 patterns where X is a lane number and 1/2 is read number.
+
+        This handles the case where the read number is at the END after a lane/run number,
+        e.g., NG-9904_PG4602EAc01_lib132096_4703_1_1.fastq.bz2 (R1) and
+              NG-9904_PG4602EAc01_lib132096_4703_1_2.fastq.bz2 (R2)
+        The last digit (1 or 2) is the read number, not the middle digit.
+        """
+        # NG-9904_PG4602EAc01_lib132096_4703_1_1.fastq.bz2 (R1)
+        validator = self._create_validator_with_basename("NG-9904_PG4602EAc01_lib132096_4703_1_1.fastq.bz2")
+        validator._detect_illumina_pattern("NG-9904_PG4602EAc01_lib132096_4703_1_1.fastq.bz2")
+        assert validator.output_metadata.base_name == "NG-9904_PG4602EAc01_lib132096_4703"
+        assert validator.output_metadata.read_number == 1
+        assert validator.output_metadata.ngs_type_detected == "illumina"
+
+        # NG-9904_PG4602EAc01_lib132096_4703_1_2.fastq.bz2 (R2)
+        validator2 = self._create_validator_with_basename("NG-9904_PG4602EAc01_lib132096_4703_1_2.fastq.bz2")
+        validator2._detect_illumina_pattern("NG-9904_PG4602EAc01_lib132096_4703_1_2.fastq.bz2")
+        assert validator2.output_metadata.base_name == "NG-9904_PG4602EAc01_lib132096_4703"
+        assert validator2.output_metadata.read_number == 2
+        assert validator2.output_metadata.ngs_type_detected == "illumina"
+
+        # Both files should have the SAME base_name (critical for pairing)
+        assert validator.output_metadata.base_name == validator2.output_metadata.base_name
+
+    def test_lane_before_read_number_with_longer_lane(self):
+        """Test _XXX_1/_XXX_2 patterns with multi-digit lane numbers."""
+        # sample_001_1.fastq.gz (R1 with lane 001)
+        validator = self._create_validator_with_basename("sample_001_1.fastq.gz")
+        validator._detect_illumina_pattern("sample_001_1.fastq.gz")
+        assert validator.output_metadata.base_name == "sample"
+        assert validator.output_metadata.read_number == 1
+
+        # sample_001_2.fastq.gz (R2 with lane 001)
+        validator2 = self._create_validator_with_basename("sample_001_2.fastq.gz")
+        validator2._detect_illumina_pattern("sample_001_2.fastq.gz")
+        assert validator2.output_metadata.base_name == "sample"
+        assert validator2.output_metadata.read_number == 2
+
     def test_no_separator_r_prefix(self):
         """Test filenames with R1/R2 directly attached (no separator)."""
         # SRR834393R1_combined.fq.gz
