@@ -494,7 +494,7 @@ class TestTextReportGeneration:
         content = temp_report_path.read_text()
         assert "Files Processed: 2" in content
         assert "Genomes:  1" in content
-        assert "Reads:    1" in content
+        assert "Reads:  1" in content
 
     def test_text_report_interfile_status(self, temp_report_path):
         """Test that inter-file validation status is shown."""
@@ -563,7 +563,7 @@ class TestTextReportGeneration:
         # Verify the report was generated
         assert "VALIDATION PIPELINE REPORT" in content
         assert "Files Processed: 1" in content
-        assert "Reads:    1" in content
+        assert "Reads:  1" in content
 
         # Verify that None values are not displayed in the report
         # (they should be skipped, not formatted as "None bp")

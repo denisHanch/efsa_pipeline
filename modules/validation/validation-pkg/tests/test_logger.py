@@ -1,6 +1,13 @@
 """
-Basic tests for the logging functionality.
-Tests core features without over-testing Python's logging module.
+Tests for the logging functionality.
+
+Tests cover:
+- Logger initialization and configuration
+- Log level management
+- Timer functionality for performance tracking
+- Validation issue tracking
+- File timing summary
+- Console and file output formatting
 """
 
 import pytest

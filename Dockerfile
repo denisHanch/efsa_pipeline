@@ -11,8 +11,6 @@ RUN apk update && \
         mc \
         python3 \
         py3-pip \
-        py3-pandas \
-        py3-openpyxl \
         openssh-client \
         git \
         curl \

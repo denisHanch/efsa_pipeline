@@ -1,7 +1,7 @@
 
 include { fastqc; multiqc; trimgalore } from './qc.nf'
 include { bwa_mapping; samtool_index_bam; samtools_sort; samtool_stats; picard; calc_unmapped; minimap2 } from './mapping.nf'
-include { convert_bcf_to_vcf; delly; samtools_index; picard_dict; sniffles; debreak; cute_sv; survivor; vcf_to_table; vcf_to_table_long } from '../modules/sv_calling.nf'
+include { convert_bcf_to_vcf; delly; samtools_index; picard_dict; sniffles; debreak; cute_sv; survivor } from '../modules/sv_calling.nf'
 include { snpeff; build_config; bcftools_stats; sortVcf; indexVcf; truvari } from '../modules/variant_calling.nf'
 
 
@@ -56,7 +56,6 @@ workflow sv {
         picard_dict(fasta, out_folder_name) | set { dict }
         delly(indexed_bam, fasta, fai, dict, out_folder_name) | set { bcf }
         convert_bcf_to_vcf(bcf, out_folder_name) | set { sv_vcf }
-        vcf_to_table(sv_vcf)
 
     emit:
         sv_vcf
@@ -117,8 +116,6 @@ workflow sv_long {
 
         survivor(cute_vcf, debreak_vcf, sniffles_vcf, mapping_tag, out_folder_name) | set { merged_vcf }
         bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
-        sv_vcf_ch = merged_vcf.map { pair_id, vcf -> vcf }
-        vcf_to_table_long(sv_vcf_ch) 
 
     emit:
         merged_vcf

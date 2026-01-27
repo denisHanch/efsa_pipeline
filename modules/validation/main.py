@@ -42,8 +42,7 @@ def main():
     # ========================================================================
 
     # Settings for reference genome
-    ref_genome_settings = GenomeValidator.Settings()
-    ref_genome_settings = ref_genome_settings.update(
+    ref_genome_settings = GenomeValidator.Settings(
         plasmids_to_one=True,
         main_longest=True,
         coding_type=None,
@@ -53,19 +52,17 @@ def main():
     )
 
     # Settings for modified genome
-    mod_genome_settings = GenomeValidator.Settings()
-    mod_genome_settings = mod_genome_settings.update(
+    mod_genome_settings = GenomeValidator.Settings(
         plasmids_to_one=True,
         main_longest=True,
         coding_type=None,
         output_filename_suffix='mod',
         replace_id_with='chr',
-        min_sequence_length=100,
+        min_sequence_length=100
     )
 
     # Settings for plasmid genomes (if you have them)
-    plasmid_settings = GenomeValidator.Settings()
-    plasmid_settings = plasmid_settings.update(
+    plasmid_settings = GenomeValidator.Settings(
         is_plasmid=True,
         plasmids_to_one=True,
         coding_type=None,
@@ -73,15 +70,13 @@ def main():
     )
     
     # Settings for reads
-    reads_settings = ReadValidator.Settings()
-    reads_settings = reads_settings.update(
+    reads_settings = ReadValidator.Settings(
         coding_type='gz',
-        outdir_by_ngs_type = True,
+        outdir_by_ngs_type=True
     )
 
-    # Settings for features
-    ref_feature_settings = FeatureValidator.Settings()
-    ref_feature_settings = ref_feature_settings.update(
+    # Settings for reference features
+    ref_feature_settings = FeatureValidator.Settings(
         sort_by_position=False,
         check_coordinates=False,
         replace_id_with='chr',
@@ -89,10 +84,8 @@ def main():
         output_filename_suffix='ref'
     )
 
-        # Settings for features
-    
-    mod_feature_settings = FeatureValidator.Settings()
-    mod_feature_settings = mod_feature_settings.update(
+    # Settings for modified features
+    mod_feature_settings = FeatureValidator.Settings(
         sort_by_position=False,
         check_coordinates=False,
         replace_id_with='chr',
@@ -100,17 +93,11 @@ def main():
         output_filename_suffix='mod'
     )
     
-    # Inter genome validation settings
+    # Inter genome validation settings (using defaults)
     genomexgenome_settings = GenomeXGenomeSettings()
-    genomexgenome_settings.update(
-        same_number_of_sequences = True
-    )
 
-    # Inter read validation settings
+    # Inter read validation settings (using defaults)
     readxread_settings = ReadXReadSettings()
-    readxread_settings.update(
-        pair_end_basename = True
-    )
 
     # ========================================================================
     # Step 3: Run validation using functional API
@@ -155,7 +142,7 @@ def main():
         res = validate_feature(config.mod_feature, mod_feature_settings)
         report.write(res,file_type = "feature")
 
-    report.flush()
+    report.flush(format='text')
     return 0
 
 

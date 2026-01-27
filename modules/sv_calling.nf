@@ -5,7 +5,7 @@
  * Index fasta file with samtools
 */
 process samtools_index {
-    container 'staphb/samtools:1.23'
+    container 'staphb/samtools:latest'
     publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
 
     input:
@@ -46,7 +46,7 @@ process picard_dict {
  * Running delly SV caller
 */
 process delly {
-    container 'dellytools/delly:v1.7.2'
+    container 'dellytools/delly:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -71,7 +71,7 @@ process delly {
  * Convert bcf (default delly output) to vcf
 */
 process convert_bcf_to_vcf {
-    container 'staphb/bcftools:1.23'
+    container 'staphb/bcftools:latest'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -96,7 +96,7 @@ process convert_bcf_to_vcf {
  * variant calling with cuteSV
 */
 process cute_sv {
-    container "${params.registry}/cutesv:v1.0.1"
+    container "${params.registry}/cutesv:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: 'copy'
 
@@ -122,7 +122,7 @@ process cute_sv {
  * variant calling with debreak
 */
 process debreak {
-    container "${params.registry}/debreak:v1.0.1"
+    container "${params.registry}/debreak:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: 'copy'
 
@@ -132,12 +132,12 @@ process debreak {
     val out_folder_name
 
     output:
-    tuple val(pair_id), path("${pair_id}_debreak.vcf")
+    tuple val(pair_id), path("debreak_out/${pair_id}_debreak.vcf")
 
     script:
     """
     debreak --bam $bam_file -r $fasta_file -o debreak_out -t ${params.max_cpu}
-    mv debreak_out/debreak.vcf ${pair_id}_debreak.vcf
+    mv debreak_out/debreak.vcf debreak_out/${pair_id}_debreak.vcf
     """
 }
 
@@ -146,7 +146,7 @@ process debreak {
  * variant calling with sniffles
 */
 process sniffles {
-    container "${params.registry}/sniffles:v1.0.1"
+    container "${params.registry}/sniffles:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: 'copy'
 
@@ -169,7 +169,7 @@ process sniffles {
  * merging SV
 */
 process survivor {
-    container "${params.registry}/survivor:v1.0.1"
+    container "${params.registry}/survivor:latest"
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: 'copy'
 
@@ -196,63 +196,5 @@ process survivor {
 
     # Run the SURVIVOR merge command
     SURVIVOR merge vcf_list.txt 1000 1 1 1 0 30 ${pair_id}_${mapping_tag}_sv_long_read.vcf
-    """
-}
-
-
-/*
- * Convert vcf file to tsv table 
-*/
-process vcf_to_table {
-
-    container 'staphb/bcftools:1.23'
-    publishDir "${params.out_dir}/tables", mode: 'copy'
-
-    input:
-    path vcf
-
-    output:
-    path "${vcf.simpleName}_sv_summary.tsv"
-
-    script:
-    """
-    set -euxo pipefail
-
-    output="${vcf.simpleName}_sv_summary.tsv"
-
-    if [[ "${vcf.simpleName}" == "ref_x_modsyri" ]]; then
-        {
-            echo -e "chrom\tstart\tend\tsvtype"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
-        } > "\${output}"
-    else
-        {
-            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tdebreak_type\tsupporting_reads\tscore"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%ALT\t[%RC]\t%QUAL\n' "${vcf}"
-        } > "\${output}"
-    fi
-    """
-}
-
-
-process vcf_to_table_long {
-
-    container 'staphb/bcftools:latest'
-    publishDir "${params.out_dir}/tables", mode: 'copy'
-
-    input:
-    path vcf
-
-    output:
-    path "${vcf.simpleName}_sv_summary.tsv"
-
-    script:
-    """
-    set -euxo pipefail
-
-    output="${vcf.simpleName}_sv_summary.tsv"
-
-    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_reads\tscore" > "\${output}"
-    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SUPP\t%QUAL\n' "${vcf}" >> "\${output}"
     """
 }

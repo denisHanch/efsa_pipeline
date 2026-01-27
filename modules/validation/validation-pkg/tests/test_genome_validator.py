@@ -28,7 +28,8 @@ from validation_pkg.exceptions import (
     GenBankFormatError,
     CompressionError,
 )
-from validation_pkg.utils.formats import GenomeFormat, CodingType
+from validation_pkg.utils.formats import GenomeFormat
+from validation_pkg.utils.formats import CodingType as CT
 
 
 class TestGenomeValidatorInitialization:
@@ -62,7 +63,7 @@ class TestGenomeValidatorInitialization:
             filename="genome.fasta",
             basename="genome",
             filepath=simple_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -88,7 +89,7 @@ class TestGenomeValidatorInitialization:
             filename="genome.fasta",
             basename="genome",
             filepath=simple_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -168,7 +169,7 @@ class TestGenomeValidatorParsing:
             filename="genome.fasta",
             basename="genome",
             filepath=simple_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -190,7 +191,7 @@ class TestGenomeValidatorParsing:
             filename="genome.gbk",
             basename="genome",
             filepath=simple_genbank,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.GENBANK,
             output_dir=output_dir,
             global_options={}
@@ -208,7 +209,7 @@ class TestGenomeValidatorParsing:
             filename="empty.fasta",
             basename="empty",
             filepath=empty_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -225,7 +226,7 @@ class TestGenomeValidatorParsing:
             filename="invalid.fasta",
             basename="invalid",
             filepath=invalid_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -280,7 +281,7 @@ class TestGenomeValidatorCompression:
             filename="genome.fasta.gz",
             basename="genome",
             filepath=compressed_fasta_gz,
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -298,7 +299,7 @@ class TestGenomeValidatorCompression:
             filename="genome.fasta.bz2",
             basename="genome",
             filepath=compressed_fasta_bz2,
-            coding_type=CodingType.BZIP2,
+            coding_type=CT.BZIP2,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -367,7 +368,7 @@ class TestGenomeValidatorValidation:
             filename="empty_seq.fasta",
             basename="empty_seq",
             filepath=fasta_with_empty_sequence,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -414,7 +415,7 @@ class TestGenomeValidatorEditing:
             filename="mixed_lengths.fasta",
             basename="mixed_lengths",
             filepath=fasta_with_mixed_lengths,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -440,7 +441,7 @@ class TestGenomeValidatorEditing:
             filename="mixed_lengths.fasta",
             basename="mixed_lengths",
             filepath=fasta_with_mixed_lengths,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -460,6 +461,7 @@ class TestGenomeValidatorEditing:
         assert any("short_seq" in seq.description for seq in validator.sequences)
         assert any("medium_seq" in seq.description for seq in validator.sequences)
         assert any("long_seq" in seq.description for seq in validator.sequences)
+
 
 class TestGenomeValidatorOutput:
     """Test output generation."""
@@ -506,13 +508,13 @@ class TestGenomeValidatorOutput:
 
     def test_output_uncompressed(self, simple_fasta, output_dir, default_settings):
         """Test generating uncompressed output."""
-        settings = GenomeValidator.Settings(coding_type=None, min_sequence_length=0)
+        settings = GenomeValidator.Settings(coding_type=CT.NONE, min_sequence_length=0)
 
         genome_config = GenomeConfig(
             filename="genome.fasta",
             basename="genome",
             filepath=simple_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -528,13 +530,13 @@ class TestGenomeValidatorOutput:
 
     def test_output_gzip_compressed(self, simple_fasta, output_dir, default_settings):
         """Test generating gzip compressed output."""
-        settings = GenomeValidator.Settings(coding_type='gz', min_sequence_length=0)
+        settings = GenomeValidator.Settings(coding_type=CT.GZIP, min_sequence_length=0)
 
         genome_config = GenomeConfig(
             filename="genome.fasta",
             basename="genome",
             filepath=simple_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -554,13 +556,13 @@ class TestGenomeValidatorOutput:
 
     def test_output_bzip2_compressed(self, simple_fasta, output_dir, default_settings):
         """Test generating bzip2 compressed output."""
-        settings = GenomeValidator.Settings(coding_type='bz2', min_sequence_length=0)
+        settings = GenomeValidator.Settings(coding_type=CT.BZIP2, min_sequence_length=0)
 
         genome_config = GenomeConfig(
             filename="genome.fasta",
             basename="genome",
             filepath=simple_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -586,7 +588,7 @@ class TestGenomeValidatorOutput:
             filename="genome.fasta",
             basename="genome",
             filepath=simple_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -606,7 +608,7 @@ class TestGenomeValidatorOutput:
             filename="genome.fasta",
             basename="genome",
             filepath=simple_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -626,7 +628,7 @@ class TestGenomeValidatorOutput:
             filename="genome.gbk",
             basename="genome",
             filepath=simple_genbank,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.GENBANK,
             output_dir=output_dir,
             global_options={}
@@ -693,7 +695,7 @@ class TestGenomeValidatorPlasmidSplit:
             filename="genome_plasmids.fasta",
             basename="genome_plasmids",
             filepath=fasta_with_plasmids,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -747,7 +749,7 @@ class TestGenomeValidatorPlasmidSplit:
             filename="genome_plasmids.fasta",
             basename="genome_plasmids",
             filepath=fasta_with_plasmids,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -781,7 +783,7 @@ class TestGenomeValidatorPlasmidSplit:
             filename="genome_two_seqs.fasta",
             basename="genome_two_seqs",
             filepath=fasta_with_two_sequences,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -811,7 +813,7 @@ class TestGenomeValidatorPlasmidSplit:
             filename="genome_plasmids.fasta",
             basename="genome_plasmids",
             filepath=fasta_with_plasmids,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -842,7 +844,7 @@ class TestGenomeValidatorPlasmidSplit:
             filename="genome_plasmids.fasta",
             basename="genome_plasmids",
             filepath=fasta_with_plasmids,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -850,7 +852,7 @@ class TestGenomeValidatorPlasmidSplit:
 
         settings = GenomeValidator.Settings(
             plasmid_split=True,
-            coding_type='gz',
+            coding_type=CT.GZIP,
             min_sequence_length=0
         )
 
@@ -886,7 +888,7 @@ class TestGenomeValidatorPlasmidSplit:
             filename="genome_plasmids.fasta",
             basename="genome_plasmids",
             filepath=fasta_with_plasmids,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={}
@@ -957,7 +959,7 @@ class TestGenomeValidatorValidationLevels:
             filename="genome.fasta",
             basename="genome",
             filepath=multi_seq_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}
@@ -982,7 +984,7 @@ class TestGenomeValidatorValidationLevels:
             filename="damaged.fasta",
             basename="damaged",
             filepath=damaged_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}
@@ -1002,7 +1004,7 @@ class TestGenomeValidatorValidationLevels:
             filename="genome.fasta",
             basename="genome",
             filepath=multi_seq_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}
@@ -1030,7 +1032,7 @@ class TestGenomeValidatorValidationLevels:
             filename="genome.fasta",
             basename="genome",
             filepath=multi_seq_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'trust'}
@@ -1054,7 +1056,7 @@ class TestGenomeValidatorValidationLevels:
             filename="damaged.fasta",
             basename="damaged",
             filepath=damaged_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'trust'}
@@ -1076,7 +1078,7 @@ class TestGenomeValidatorValidationLevels:
             filename="genome.fasta",
             basename="genome",
             filepath=multi_seq_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'trust'}
@@ -1110,7 +1112,7 @@ class TestGenomeValidatorValidationLevels:
             filename="genome.fasta",
             basename="genome",
             filepath=multi_seq_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'trust'}
@@ -1131,7 +1133,7 @@ class TestGenomeValidatorValidationLevels:
             filename="genome.fasta",
             basename="genome",
             filepath=multi_seq_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'trust'}
@@ -1162,7 +1164,7 @@ class TestGenomeValidatorValidationLevels:
             filename="genome.fasta",
             basename="genome",
             filepath=multi_seq_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'minimal'}
@@ -1186,7 +1188,7 @@ class TestGenomeValidatorValidationLevels:
             filename="damaged.fasta",
             basename="damaged",
             filepath=damaged_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'minimal'}
@@ -1208,7 +1210,7 @@ class TestGenomeValidatorValidationLevels:
             filename="genome.fasta",
             basename="genome",
             filepath=multi_seq_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'minimal'}
@@ -1234,7 +1236,7 @@ class TestGenomeValidatorValidationLevels:
             filename="genome.fasta",
             basename="genome",
             filepath=multi_seq_fasta,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'minimal'}
@@ -1271,7 +1273,7 @@ class TestGenomeValidatorValidationLevels:
             filename="genome.fasta.gz",
             basename="genome",
             filepath=fasta_file,
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'trust'}
@@ -1296,7 +1298,7 @@ class TestGenomeValidatorValidationLevels:
             filename="genome.fasta.bz2",
             basename="genome",
             filepath=fasta_file,
-            coding_type=CodingType.BZIP2,
+            coding_type=CT.BZIP2,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'minimal'}
@@ -1343,7 +1345,7 @@ class TestGenomeValidatorOutputMetadata:
         genome_config = GenomeConfig(
             filepath=sample_fasta_file,
             filename=sample_fasta_file.name,
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}
@@ -1353,15 +1355,15 @@ class TestGenomeValidatorOutputMetadata:
         result = validator.run()
 
         # Verify return type
-        from validation_pkg.validators.genome_validator import OutputMetadata
-        assert isinstance(result, OutputMetadata), "run() should return OutputMetadata instance"
+        from validation_pkg.validators.genome_validator import GenomeOutputMetadata
+        assert isinstance(result, GenomeOutputMetadata), "run() should return GenomeOutputMetadata instance"
 
     def test_strict_mode_all_fields(self, sample_fasta_file, output_dir):
         """Test that strict mode populates all metadata fields."""
         genome_config = GenomeConfig(
             filepath=sample_fasta_file,
             filename=sample_fasta_file.name,
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}
@@ -1399,7 +1401,7 @@ class TestGenomeValidatorOutputMetadata:
         genome_config = GenomeConfig(
             filepath=sample_fasta_file,
             filename=sample_fasta_file.name,
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'trust'}
@@ -1429,13 +1431,13 @@ class TestGenomeValidatorOutputMetadata:
         genome_config = GenomeConfig(
             filepath=sample_fasta_file,
             filename=sample_fasta_file.name,
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'minimal'}
         )
 
-        settings = GenomeValidator.Settings(coding_type='gz')
+        settings = GenomeValidator.Settings(coding_type=CT.GZIP)
         validator = GenomeValidator(genome_config, settings)
         metadata = validator.run()
 
@@ -1457,7 +1459,7 @@ class TestGenomeValidatorOutputMetadata:
         genome_config = GenomeConfig(
             filepath=sample_fasta_file,
             filename=sample_fasta_file.name,
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}
@@ -1488,7 +1490,7 @@ class TestGenomeValidatorOutputMetadata:
         genome_config = GenomeConfig(
             filepath=sample_fasta_file,
             filename=sample_fasta_file.name,
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}
@@ -1509,7 +1511,7 @@ class TestGenomeValidatorOutputMetadata:
         genome_config = GenomeConfig(
             filepath=sample_fasta_file,
             filename=sample_fasta_file.name,
-            coding_type=CodingType.GZIP,
+            coding_type=CT.GZIP,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}
@@ -1535,7 +1537,7 @@ class TestGenomeValidatorOutputMetadata:
         genome_config = GenomeConfig(
             filepath=fasta_path,
             filename=fasta_path.name,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}
@@ -1564,7 +1566,7 @@ class TestGenomeValidatorOutputMetadata:
         genome_config = GenomeConfig(
             filepath=fasta_path,
             filename=fasta_path.name,
-            coding_type=CodingType.NONE,
+            coding_type=CT.NONE,
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={'validation_level': 'strict'}

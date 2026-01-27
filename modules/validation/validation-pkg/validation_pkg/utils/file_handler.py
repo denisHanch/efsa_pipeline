@@ -1,20 +1,11 @@
-"""
-Utility functions for file handling with compression support.
-
-Provides unified utilities for:
-- File opening with automatic decompression
-- Compression detection
-- Format detection
-- File validation
-- ConfigManager parsing helpers
-"""
+"""Utility functions for file handling with compression support."""
 
 import gzip
 import bz2
 import re
 import threading
 from pathlib import Path
-from typing import Union, TextIO, Type, Tuple, Any, Dict
+from typing import Union, TextIO, Type, Tuple, Any, Dict, Optional
 
 from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, FeatureFormat
 from validation_pkg.exceptions import CompressionError
@@ -30,6 +21,7 @@ __all__ = [
     # File operations
     'open_file_with_coding_type',
     'open_compressed_writer',
+    'copy_file',
 
     # Detection functions
     'detect_compression_type',
@@ -45,19 +37,17 @@ __all__ = [
     'gz_to_none',
     'bz2_to_none',
     'none_to_bz2',
-
-    # Path utilities
-    'get_incremented_path',
+    'convert_file_compression',
 ]
 
 
-# Cache for tool availability checks to avoid repeated subprocess calls
+# ===== Cache for Tool Availability =====
 # Protected by _TOOL_CACHE_LOCK for thread-safe access
 _TOOL_CACHE = {}
 _TOOL_CACHE_LOCK = threading.Lock()
 _LOGGER_INITIALIZED = False
 
-# Compression tool configuration mapping
+# ===== Compression Tool Configuration =====
 # Format: coding_type -> (parallel_tool, standard_tool, install_message)
 _COMPRESSION_TOOLS = {
     CodingType.GZIP: {
@@ -72,7 +62,7 @@ _COMPRESSION_TOOLS = {
     }
 }
 
-# Command arguments for different tools and modes
+# ===== Command Arguments for Tools =====
 # Format: (tool_name, mode) -> args_generator_function
 _COMMAND_ARGS = {
     ('pigz', 'compress'): lambda threads: ['-c', '-p', str(threads)],
@@ -89,22 +79,7 @@ _COMMAND_ARGS = {
 
 
 def check_tool_available(tool_name: str) -> bool:
-    """
-    Check if a tool is available on the system.
-
-    Results are cached to avoid repeated subprocess calls.
-    Thread-safe: uses lock to protect cache access.
-
-    Args:
-        tool_name: Name of the tool to check (e.g., 'pigz', 'pbzip2', 'gzip', 'bzip2', 'gffread')
-
-    Returns:
-        True if tool is available, False otherwise
-
-    Example:
-        >>> if check_tool_available('pigz'):
-        ...     print("pigz is available for faster compression")
-    """
+    """Check if a tool is available on the system."""
     # Fast path: check cache without lock (safe for reads)
     if tool_name in _TOOL_CACHE:
         return _TOOL_CACHE[tool_name]
@@ -123,15 +98,7 @@ def check_tool_available(tool_name: str) -> bool:
 
 
 def _log_compression_tool(tool_name: str, threads: int, is_parallel: bool, install_msg: str = None):
-    """
-    Log compression tool usage (one-time initialization message).
-
-    Args:
-        tool_name: Name of the compression tool
-        threads: Number of threads to use
-        is_parallel: Whether this is a parallel tool
-        install_msg: Installation instruction for parallel tool (if not available)
-    """
+    """Log compression tool usage (one-time initialization message)."""
     global _LOGGER_INITIALIZED
 
     if _LOGGER_INITIALIZED:
@@ -154,15 +121,7 @@ def _log_compression_tool(tool_name: str, threads: int, is_parallel: bool, insta
 
 
 def _select_compression_tool(coding_type: CodingType) -> tuple:
-    """
-    Select the best available compression tool for the given coding type.
-
-    Args:
-        coding_type: CodingType enum (GZIP, BZIP2, or NONE)
-
-    Returns:
-        Tuple of (tool_name, is_parallel, install_msg)
-    """
+    """Select the best available compression tool for the given coding type."""
     # Handle no compression case
     if coding_type == CodingType.NONE:
         return ('cat', False, None)
@@ -184,27 +143,7 @@ def _select_compression_tool(coding_type: CodingType) -> tuple:
 
 
 def get_compression_command(coding_type: CodingType, mode: str = 'compress', threads: int = None) -> tuple:
-    """
-    Get the best available compression command for the given coding type.
-
-    Prefers parallel tools (pigz, pbzip2) over standard tools (gzip, bzip2)
-    ONLY when threads > 1. With threads=1, uses standard tools for better performance
-    (pigz/pbzip2 have overhead even with 1 thread).
-
-    Args:
-        coding_type: CodingType enum (GZIP, BZIP2, or NONE)
-        mode: 'compress' or 'decompress'
-        threads: Number of threads to use (None = use default of 1)
-
-    Returns:
-        Tuple of (command_name, [args]) for subprocess
-
-    Example:
-        >>> cmd, args = get_compression_command(CodingType.GZIP, 'compress', threads=4)
-        >>> # Returns ('pigz', ['-c', '-p', '4']) if pigz available
-        >>> cmd, args = get_compression_command(CodingType.GZIP, 'compress', threads=1)
-        >>> # Returns ('gzip', ['-c']) - standard tool for single thread
-    """
+    """Get the best available compression command for the given coding type."""
     # Default to 1 thread if not specified
     if threads is None:
         threads = 1
@@ -244,31 +183,7 @@ def open_file_with_coding_type(
     coding_type: CodingType,
     mode: str = 'rt'
 ) -> TextIO:
-    """
-    Open a file with automatic decompression based on CodingType enum.
-
-    This function provides centralized file opening logic for all validators,
-    eliminating code duplication and ensuring consistent compression handling.
-
-    Args:
-        filepath: Path to file
-        coding_type: CodingType enum indicating compression
-        mode: Opening mode (default: 'rt' for text read)
-
-    Returns:
-        File handle with automatic decompression
-
-    Raises:
-        CompressionError: If file cannot be opened or decompressed
-
-    Example:
-        >>> from validation_pkg.utils.formats import CodingType
-        >>> from pathlib import Path
-        >>> filepath = Path('genome.fasta.gz')
-        >>> coding = CodingType.GZIP
-        >>> with open_file_with_coding_type(filepath, coding) as f:
-        ...     content = f.read()
-    """
+    """Open a file with automatic decompression based on CodingType enum."""
     filepath = Path(filepath)
 
     try:
@@ -284,35 +199,7 @@ def open_file_with_coding_type(
 
 
 def detect_compression_type(filepath: Path) -> CodingType:
-    """
-    Detect compression type from file path and return CodingType enum.
-
-    Checks the last extension to determine compression:
-    - .gz or .gzip → CodingType.GZIP
-    - .bz2 or .bzip2 → CodingType.BZIP2
-    - other → CodingType.NONE
-
-    Args:
-        filepath: Path to file
-
-    Returns:
-        CodingType enum indicating compression
-
-    Examples:
-        >>> detect_compression_type(Path('genome.fasta'))
-        CodingType.NONE
-        >>> detect_compression_type(Path('genome.fasta.gz'))
-        CodingType.GZIP
-        >>> detect_compression_type(Path('genome.fasta.gzip'))
-        CodingType.GZIP
-        >>> detect_compression_type(Path('reads.fastq.bz2'))
-        CodingType.BZIP2
-
-    Note:
-        The function will detect .gz from file.tar.gz, which will
-        cause issues since validators do not handle TAR extraction.
-        Users must extract TAR archives before processing.
-    """
+    """Detect compression type from file path and return CodingType enum."""
     suffixes = Path(filepath).suffixes
 
     if not suffixes:
@@ -330,32 +217,7 @@ def detect_compression_type(filepath: Path) -> CodingType:
 
 
 def detect_file_format(filepath: Path, format_enum: Type[Union[GenomeFormat, ReadFormat, FeatureFormat]]) -> Union[GenomeFormat, ReadFormat, FeatureFormat]:
-    """
-    Detect file format from extension.
-
-    Only examines the last 2 extensions:
-    - Last extension: Compression (.gz, .bz2, or none)
-    - Second-to-last extension: Format (.fastq, .fq, .bam, etc.)
-
-    This approach ignores any prefix extensions like .R1, .R2, .1, .2, etc.
-
-    Examples:
-        sample.fastq.gz       → format: .fastq
-        sample.R1.fastq.gz    → format: .fastq
-        sample.1.fq.bz2       → format: .fq
-        sample.bam            → format: .bam
-        sample.R1.fastq       → format: .fastq (no compression)
-
-    Args:
-        filepath: Path to file
-        format_enum: Format enum class (ReadFormat, GenomeFormat, FeatureFormat)
-
-    Returns:
-        Format enum value
-
-    Raises:
-        ValueError: If format cannot be determined
-    """
+    """Detect file format from extension."""
     suffixes = Path(filepath).suffixes
 
     if not suffixes:
@@ -396,31 +258,7 @@ def parse_config_file_value(
     value: Any,
     field_name: str
 ) -> Tuple[str, Dict[str, Any]]:
-    """
-    Parse file configuration value from JSON config.
-
-    Handles both dict and string formats:
-    - Dict: {"filename": "genome.fasta", "extra_key": "value"}
-    - String: "genome.fasta" (backwards compatibility)
-
-    Args:
-        value: Configuration value (dict or string)
-        field_name: Name of configuration field (for error messages)
-
-    Returns:
-        Tuple of (filename, extra_fields_dict)
-
-    Raises:
-        ValueError: If value is invalid format
-
-    Examples:
-        >>> parse_config_file_value({"filename": "genome.fasta"}, "ref_genome")
-        ("genome.fasta", {})
-        >>> parse_config_file_value({"filename": "reads.fastq", "ngs_type": "illumina"}, "reads")
-        ("reads.fastq", {"ngs_type": "illumina"})
-        >>> parse_config_file_value("genome.fasta", "ref_genome")
-        ("genome.fasta", {})
-    """
+    """Parse file configuration value from JSON config."""
     filename = None
     extra = {}
 
@@ -442,24 +280,7 @@ def parse_config_file_value(
 
 
 def gz_to_bz2(gz_file: Path, bz2_file: Path, threads: int = None):
-    """
-    Convert gzip compressed file to bzip2.
-
-    Uses parallel tools (pigz/pbzip2) if available, falls back to gzip/bzip2.
-    Securely pipes decompression to compression using subprocess.Popen without shell.
-
-    Args:
-        gz_file: Path to input .gz file
-        bz2_file: Path to output .bz2 file
-        threads: Number of threads to use (None = auto-detect)
-
-    Raises:
-        CompressionError: If conversion fails
-
-    Security:
-        Uses subprocess.Popen with list arguments (no shell=True) to prevent
-        command injection attacks through malicious filenames.
-    """
+    """Convert gzip compressed file to bzip2."""
     # Get best available compression commands
     decompress_cmd, decompress_args = get_compression_command(CodingType.GZIP, 'decompress', threads)
     compress_cmd, compress_args = get_compression_command(CodingType.BZIP2, 'compress', threads)
@@ -507,24 +328,7 @@ def gz_to_bz2(gz_file: Path, bz2_file: Path, threads: int = None):
 
 
 def bz2_to_gz(bz2_file: Path, gz_file: Path, threads: int = None):
-    """
-    Convert bzip2 compressed file to gzip.
-
-    Uses parallel tools (pbzip2/pigz) if available, falls back to bzip2/gzip.
-    Securely pipes decompression to compression using subprocess.Popen without shell.
-
-    Args:
-        bz2_file: Path to input .bz2 file
-        gz_file: Path to output .gz file
-        threads: Number of threads to use (None = auto-detect)
-
-    Raises:
-        CompressionError: If conversion fails
-
-    Security:
-        Uses subprocess.Popen with list arguments (no shell=True) to prevent
-        command injection attacks through malicious filenames.
-    """
+    """Convert bzip2 compressed file to gzip."""
     # Get best available compression commands
     decompress_cmd, decompress_args = get_compression_command(CodingType.BZIP2, 'decompress', threads)
     compress_cmd, compress_args = get_compression_command(CodingType.GZIP, 'compress', threads)
@@ -572,23 +376,7 @@ def bz2_to_gz(bz2_file: Path, gz_file: Path, threads: int = None):
 
 
 def none_to_gz(none_file: Path, gz_file: Path, threads: int = None):
-    """
-    Compress uncompressed file to gzip.
-
-    Uses pigz if available for parallel compression, falls back to gzip.
-
-    Args:
-        none_file: Path to input uncompressed file
-        gz_file: Path to output .gz file
-        threads: Number of threads to use (None = auto-detect)
-
-    Raises:
-        CompressionError: If compression fails
-
-    Security:
-        Uses subprocess with list arguments (no shell=True) to prevent
-        command injection attacks through malicious filenames.
-    """
+    """Compress uncompressed file to gzip."""
     compress_cmd, compress_args = get_compression_command(CodingType.GZIP, 'compress', threads)
 
     try:
@@ -609,23 +397,7 @@ def none_to_gz(none_file: Path, gz_file: Path, threads: int = None):
 
 
 def gz_to_none(gz_file: Path, none_file: Path, threads: int = None):
-    """
-    Decompress gzip file to uncompressed file.
-
-    Uses pigz if available for parallel decompression, falls back to gzip.
-
-    Args:
-        gz_file: Path to input .gz file
-        none_file: Path to output uncompressed file
-        threads: Number of threads to use (None = auto-detect)
-
-    Raises:
-        CompressionError: If decompression fails
-
-    Security:
-        Uses subprocess with list arguments (no shell=True) to prevent
-        command injection attacks through malicious filenames.
-    """
+    """Decompress gzip file to uncompressed file."""
     decompress_cmd, decompress_args = get_compression_command(CodingType.GZIP, 'decompress', threads)
 
     try:
@@ -645,23 +417,7 @@ def gz_to_none(gz_file: Path, none_file: Path, threads: int = None):
 
 
 def bz2_to_none(bz2_file: Path, none_file: Path, threads: int = None):
-    """
-    Decompress bzip2 file to uncompressed file.
-
-    Uses pbzip2 if available for parallel decompression, falls back to bzip2.
-
-    Args:
-        bz2_file: Path to input .bz2 file
-        none_file: Path to output uncompressed file
-        threads: Number of threads to use (None = auto-detect)
-
-    Raises:
-        CompressionError: If decompression fails
-
-    Security:
-        Uses subprocess with list arguments (no shell=True) to prevent
-        command injection attacks through malicious filenames.
-    """
+    """Decompress bzip2 file to uncompressed file."""
     decompress_cmd, decompress_args = get_compression_command(CodingType.BZIP2, 'decompress', threads)
 
     try:
@@ -681,23 +437,7 @@ def bz2_to_none(bz2_file: Path, none_file: Path, threads: int = None):
 
 
 def none_to_bz2(none_file: Path, bz2_file: Path, threads: int = None):
-    """
-    Compress uncompressed file to bzip2.
-
-    Uses pbzip2 if available for parallel compression, falls back to bzip2.
-
-    Args:
-        none_file: Path to input uncompressed file
-        bz2_file: Path to output .bz2 file
-        threads: Number of threads to use (None = auto-detect)
-
-    Raises:
-        CompressionError: If compression fails
-
-    Security:
-        Uses subprocess with list arguments (no shell=True) to prevent
-        command injection attacks through malicious filenames.
-    """
+    """Compress uncompressed file to bzip2."""
     compress_cmd, compress_args = get_compression_command(CodingType.BZIP2, 'compress', threads)
 
     try:
@@ -717,34 +457,64 @@ def none_to_bz2(none_file: Path, bz2_file: Path, threads: int = None):
         raise CompressionError(f"Compression tool not found: {e}") from e
 
 
+def convert_file_compression(
+    input_path: Union[str, Path],
+    output_path: Union[str, Path],
+    input_coding: CodingType,
+    output_coding: CodingType,
+    threads: int = None
+) -> None:
+    """Convert file from one compression type to another."""
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+
+    # If coding types match, just copy the file
+    if input_coding == output_coding:
+        import shutil
+        shutil.copy2(input_path, output_path)
+        return
+
+    # Map (input, output) pairs to conversion functions
+    conversion_map = {
+        (CodingType.BZIP2, CodingType.GZIP): bz2_to_gz,
+        (CodingType.NONE, CodingType.GZIP): none_to_gz,
+        (CodingType.GZIP, CodingType.NONE): gz_to_none,
+        (CodingType.BZIP2, CodingType.NONE): bz2_to_none,
+        (CodingType.NONE, CodingType.BZIP2): none_to_bz2,
+        (CodingType.GZIP, CodingType.BZIP2): gz_to_bz2,
+    }
+
+    conversion_func = conversion_map.get((input_coding, output_coding))
+    if conversion_func:
+        conversion_func(input_path, output_path, threads=threads)
+    else:
+        raise CompressionError(
+            f"Unsupported compression conversion: {input_coding} -> {output_coding}"
+        )
+
+
+def copy_file(
+    input_path: Union[str, Path],
+    output_path: Union[str, Path],
+    logger=None
+) -> Path:
+    """Copy file with optional logging."""
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+
+    if logger:
+        logger.debug(f"Copying {input_path} to {output_path}")
+
+    shutil.copy2(input_path, output_path)
+
+    if logger:
+        logger.info(f"File copied: {output_path}")
+
+    return output_path
+
+
 def open_compressed_writer(filepath: Union[str, Path], coding_type: CodingType, use_parallel: bool = True, threads: int = None):
-    """
-    Open a file handle for writing compressed data efficiently.
-
-    Prefers parallel compression tools (pigz/pbzip2) when use_parallel=True.
-    Falls back to Python gzip/bz2 libraries for compatibility.
-
-    This function returns a context manager that should be used with 'with' statement.
-
-    Args:
-        filepath: Path to output file
-        coding_type: CodingType enum (GZIP, BZIP2, or NONE)
-        use_parallel: If True, use parallel tools (pigz/pbzip2) when available
-        threads: Number of threads to use (None = auto-detect)
-
-    Returns:
-        File handle for writing (text mode)
-
-    Example:
-        >>> from validation_pkg.utils.formats import CodingType
-        >>> from pathlib import Path
-        >>> with open_compressed_writer('output.gz', CodingType.GZIP, threads=4) as f:
-        ...     f.write("Hello, world!\\n")
-
-    Note:
-        For parallel tools to work, pigz or pbzip2 must be installed.
-        If not available or use_parallel=False, falls back to Python libraries.
-    """
+    """Open a file handle for writing compressed data efficiently."""
     filepath = Path(filepath)
 
     # If parallel compression is requested and available, use subprocess approach
@@ -804,68 +574,3 @@ def open_compressed_writer(filepath: Union[str, Path], coding_type: CodingType, 
         # No compression
         return open(filepath, 'w')
 
-
-def get_incremented_path(path: Path, separator: str = "_") -> Path:
-    """
-    Get next available filename by auto-incrementing if file exists.
-
-    Prevents overwriting existing files by adding an incremented number suffix.
-    If the file doesn't exist, returns the original path.
-    If it exists, adds _001, _002, etc. before the extension.
-
-    Args:
-        path: Original file path (can be Path object or string)
-        separator: Separator before number (default: "_")
-
-    Returns:
-        Path: Next available path (original if doesn't exist, incremented if exists)
-
-    Examples:
-        >>> # If report.txt doesn't exist:
-        >>> get_incremented_path(Path("report.txt"))
-        Path("report.txt")
-
-        >>> # If report.txt exists:
-        >>> get_incremented_path(Path("report.txt"))
-        Path("report_001.txt")
-
-        >>> # If report_001.txt also exists:
-        >>> get_incremented_path(Path("report.txt"))
-        Path("report_002.txt")
-
-        >>> # If given report_001.txt and it exists:
-        >>> get_incremented_path(Path("report_001.txt"))
-        Path("report_002.txt")
-    """
-    # Ensure path is a Path object
-    path = Path(path)
-
-    # If file doesn't exist, return original path
-    if not path.exists():
-        return path
-
-    stem = path.stem
-    suffix = path.suffix
-    parent = path.parent
-
-    # Check if stem already has increment pattern (e.g., report_001)
-    match = re.match(r'^(.+)_(\d+)$', stem)
-    if match:
-        base_stem = match.group(1)
-        start_counter = int(match.group(2)) + 1
-    else:
-        base_stem = stem
-        start_counter = 1
-
-    # Find next available number
-    counter = start_counter
-    while True:
-        new_name = f"{base_stem}{separator}{counter:03d}{suffix}"
-        new_path = parent / new_name
-        if not new_path.exists():
-            return new_path
-        counter += 1
-
-        # Safety check to avoid infinite loop
-        if counter > 9999:
-            raise RuntimeError(f"Too many incremented files for {path}. Maximum is 9999.")

@@ -1,7 +1,6 @@
 #!/usr/bin/env nextflow
 
 include { nucmer; deltaFilter; showCoords; syri } from '../modules/ref_x_mod.nf'
-include { vcf_to_table }  from '../modules/sv_calling.nf'
 include { logWorkflowCompletion } from '../modules/logs.nf'
 
 
@@ -22,8 +21,6 @@ workflow ref_mod {
         deltaFilter(prefix_name, delta) | set { filtered_delta }
         showCoords(prefix_name, filtered_delta) | set { coords }
         syri(ref_mod_fasta, coords, filtered_delta) | set { sv_vcf }
-        vcf_to_table(sv_vcf)
-
     emit: 
         sv_vcf
 }

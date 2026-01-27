@@ -1,15 +1,4 @@
-"""
-File format and compression type enumerations.
-
-Provides enums for:
-    - CodingType: Compression formats (GZIP, BZIP2, NONE)
-    - GenomeFormat: Genome file formats (FASTA, GENBANK)
-    - ReadFormat: Read file formats (FASTQ, BAM)
-    - FeatureFormat: Feature file formats (GFF, GTF, BED)
-
-Each enum supports flexible input via _missing_ methods, allowing
-extensions, filenames, and format names as input.
-"""
+"""File format and compression type enumerations."""
 
 from enum import Enum
 from pathlib import Path
@@ -23,21 +12,11 @@ __all__ = [
 
 
 class CodingType(Enum):
-    """
-    Supported compression types for genomic data files.
-
-    Supported formats:
-    - GZIP: .gz files (gzip compression)
-    - BZIP2: .bz2 files (bzip2 compression)
-    - NONE: Uncompressed files
-
-    Note: TAR archives (.tar.gz, .tgz) are NOT supported.
-    Please extract archives before processing.
-    """
+    """Supported compression types for genomic data files."""
     GZIP = "gzip"
     BZIP2 = "bzip2"
     NONE = "none"
-    
+
     def to_extension(self) -> str:
         """Return file extension for this compression type."""
         extension_map = {
@@ -46,24 +25,18 @@ class CodingType(Enum):
             CodingType.NONE: ''
         }
         return extension_map[self]
-    
+
     @classmethod
-    def _missing_(cls, value):
-        """
-        Called when enum lookup fails. Allows flexible input formats.
+    def normalize(cls, value):
+        """Convert various input formats to CodingType enum."""
+        # If already a CodingType, return as-is
+        if isinstance(value, cls):
+            return value
 
-        Supports:
-        - CodingType('gz') or CodingType('.gz') → GZIP
-        - CodingType('bz2') or CodingType('.bz2') → BZIP2
-        - CodingType('file.fasta.gz') → GZIP (extracts from filename)
-        - CodingType('') or invalid → NONE
+        # Handle None
+        if value is None:
+            return cls.NONE
 
-        Args:
-            value: String value to convert (extension, filename, or format name)
-
-        Returns:
-            CodingType enum member
-        """
         # Normalize the input
         value_lower = str(value).lower().strip()
 
@@ -77,6 +50,8 @@ class CodingType(Enum):
             'gzip': cls.GZIP,
             'bz2': cls.BZIP2,
             'bzip2': cls.BZIP2,
+            'none': cls.NONE,
+            '': cls.NONE
         }
 
         # Try to find matching enum
@@ -89,10 +64,15 @@ class CodingType(Enum):
             ext = path.suffix.lower()
             if ext:
                 # Remove dot and try again
-                return cls._missing_(ext)
+                return cls.normalize(ext)
 
         # Default to NONE if nothing matches
         return cls.NONE
+
+    @classmethod
+    def _missing_(cls, value):
+        """Called when enum lookup fails - allows flexible input formats."""
+        return cls.normalize(value)
 
 
 class GenomeFormat(Enum):
@@ -100,30 +80,16 @@ class GenomeFormat(Enum):
     GENBANK = "genbank"
 
     def to_biopython(self) -> str:
-        """
-        Return format string for BioPython SeqIO.
-
-        BioPython expects lowercase format names like "fasta", "genbank".
-        This method provides a safe, explicit conversion instead of fragile
-        string manipulation.
-
-        Returns:
-            Format string compatible with BioPython SeqIO
-
-        Example:
-            >>> fmt = GenomeFormat.FASTA
-            >>> Bio.SeqIO.parse(file, fmt.to_biopython())
-        """
+        """Return format string for BioPython SeqIO."""
         return self.value
     
     def to_extension(self) -> str:
+        """Return file extension for this genome format."""
         return f'.{self.value}'
     
     @classmethod
     def _missing_(cls, value):
-        """
-        Handle GenomeFormat('fasta'), GenomeFormat('.fa'), GenomeFormat('file.fasta')
-        """
+        """Handle flexible input formats for GenomeFormat."""
         value_lower = str(value).lower().strip()
         
         # Remove leading dot
@@ -159,30 +125,16 @@ class ReadFormat(Enum):
     BAM = "bam"
 
     def to_biopython(self) -> str:
-        """
-        Return format string for BioPython SeqIO.
-
-        BioPython expects lowercase format names like "fastq", "bam".
-        This method provides a safe, explicit conversion instead of fragile
-        string manipulation like `str(format).lower().replace('readformat.', '')`.
-
-        Returns:
-            Format string compatible with BioPython SeqIO
-
-        Example:
-            >>> fmt = ReadFormat.FASTQ
-            >>> Bio.SeqIO.parse(file, fmt.to_biopython())
-        """
+        """Return format string for BioPython SeqIO."""
         return self.value
-    
+
     def to_extension(self) -> str:
+        """Return file extension for this read format."""
         return f'.{self.value}'
     
     @classmethod
     def _missing_(cls, value):
-        """
-        Handle ReadFormat('fastq'), ReadFormat('.fq'), ReadFormat('file.fastq')
-        """
+        """Handle flexible input formats for ReadFormat."""
         value_lower = str(value).lower().strip()
         
         # Remove leading dot
@@ -215,29 +167,16 @@ class FeatureFormat(Enum):
     BED = "bed"
 
     def to_biopython(self) -> str:
-        """
-        Return format string for file parsing.
-
-        Note: FeatureFormat doesn't use BioPython, but we provide this method
-        for API consistency with GenomeFormat and ReadFormat.
-
-        Returns:
-            Format string ("gff" or "bed")
-
-        Example:
-            >>> fmt = FeatureFormat.GFF
-            >>> format_name = fmt.to_biopython()  # "gff"
-        """
+        """Return format string for file parsing."""
         return self.value
-    
+
     def to_extension(self) -> str:
+        """Return file extension for this feature format."""
         return f'.{self.value}'
 
     @classmethod
     def _missing_(cls, value):
-        """
-        Handle FeatureFormat('bed'), FeatureFormat('.gtf'), FeatureFormat('file.gff')
-        """
+        """Handle flexible input formats for FeatureFormat."""
         value_lower = str(value).lower().strip()
         
         # Remove leading dot
