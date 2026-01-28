@@ -119,6 +119,8 @@ class Record:
     supporting_reads: Optional[int] = None
     score: Optional[float] = None
     copy_number: Optional[int] = None
+    supporting_methods: Optional[str] = None
+
 
 
 @dataclass
@@ -220,7 +222,10 @@ def load_records(path, source):
 
         std = standardize_type(row["svtype"], row.get("info_svtype"), source)
 
-        copy_number = None
+        supporting_methods, copy_number = None, None
+        if source == "long":
+            supporting_methods = row.get("supporting_methods")
+
         if source == "short":
             copy_number = _to_int(row.get("RDCN"))
 
@@ -236,6 +241,7 @@ def load_records(path, source):
                 _to_int(row.get("supporting_reads")),
                 _to_float(row.get("score")),
                 _to_int(row.get("RDCN")),
+                _to_int(row.get("supporting_methods")),
                 
             )
         )
@@ -277,6 +283,7 @@ def build_output_table(clusters):
             "long_info_svtype": lng.info_svtype if lng else "",
             "long_score": lng.score if lng else np.nan,
             "long_supporting_reads": lng.supporting_reads if lng else np.nan,
+            "long_supporting_methods": lng.supporting_methods if lng else np.nan,
 
             "short_start": sht.start if sht else np.nan,
             "short_end": sht.end if sht else np.nan,
