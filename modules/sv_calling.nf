@@ -117,7 +117,6 @@ process cute_sv {
 }
 
 
-
 /*
  * variant calling with debreak
 */
@@ -196,5 +195,63 @@ process survivor {
 
     # Run the SURVIVOR merge command
     SURVIVOR merge vcf_list.txt 1000 1 1 1 0 30 ${pair_id}_${mapping_tag}_sv_long_read.vcf
+    """
+}
+
+
+/*
+ * Convert vcf file to tsv table 
+*/
+process vcf_to_table {
+
+    container 'staphb/bcftools:1.23'
+    publishDir "${params.out_dir}/tables", mode: 'copy'
+
+    input:
+    path vcf
+
+    output:
+    path "${vcf.simpleName}_sv_summary.tsv"
+
+    script:
+    """
+    set -euxo pipefail
+
+    output="${vcf.simpleName}_sv_summary.tsv"
+
+    if [[ "${vcf.simpleName}" == "ref_x_modsyri" ]]; then
+        {
+            echo -e "chrom\tstart\tend\tsvtype"
+            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
+        } > "\${output}"
+    else
+        {
+            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tdebreak_type\tsupporting_reads\tscore\tCN_short"
+            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%ALT\t[%RC]\t%QUAL\t[%RDCN]\n' "${vcf}"
+        } >> "\${output}"
+    fi
+    """
+}
+
+
+process vcf_to_table_long {
+
+    container 'staphb/bcftools:latest'
+    publishDir "${params.out_dir}/tables", mode: 'copy'
+
+    input:
+    path vcf
+
+    output:
+    path "${vcf.simpleName}_sv_summary.tsv"
+
+    script:
+    """
+    set -euxo pipefail
+
+    output="${vcf.simpleName}_sv_summary.tsv"
+
+    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_methods\tscore\tsupporting_reads" > "\${output}"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SUPP\t%QUAL\t[%DR]\n' "${vcf}" >> "\${output}"
     """
 }
