@@ -252,6 +252,12 @@ process vcf_to_table_long {
     output="${vcf.simpleName}_sv_summary.tsv"
 
     echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_methods\tscore\tsupporting_reads" > "\${output}"
-    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SUPP\t%QUAL\t[%DR]\n' "${vcf}" >> "\${output}"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SUPP\t%QUAL\t[%DR{1}\t]\n' "${vcf}" | awk -F '\t' '{
+    sum = 0;
+    for(i=8; i<=NF; i++){
+        if(\$i != "." && \$i != "") sum += (\$i + 0);
+    }
+    print \$1"\t"\$2"\t"\$3"\t"\$4"\t"\$5"\t"\$6"\t"\$7"\t"sum;
+    }' >> "\${output}"
     """
 }
