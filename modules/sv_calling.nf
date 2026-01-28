@@ -226,7 +226,7 @@ process vcf_to_table {
         } > "\${output}"
     else
         {
-            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tdebreak_type\tsupporting_reads\tscore\tCN_short"
+            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tdebreak_type\tsupporting_reads\tscore\tRDCN"
             bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%ALT\t[%RC]\t%QUAL\t[%RDCN]\n' "${vcf}"
         } >> "\${output}"
     fi

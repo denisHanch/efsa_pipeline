@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-#!/usr/bin/env python3
 """
 Same description as before, but outputs CSV files instead of a single XLSX.
 
@@ -119,6 +118,7 @@ class Record:
     info_svtype: Optional[str] = None
     supporting_reads: Optional[int] = None
     score: Optional[float] = None
+    copy_number: Optional[int] = None
 
 
 @dataclass
@@ -220,6 +220,10 @@ def load_records(path, source):
 
         std = standardize_type(row["svtype"], row.get("info_svtype"), source)
 
+        copy_number = None
+        if source == "short":
+            copy_number = _to_int(row.get("RDCN"))
+
         out.append(
             Record(
                 source,
@@ -231,6 +235,8 @@ def load_records(path, source):
                 row.get("info_svtype"),
                 _to_int(row.get("supporting_reads")),
                 _to_float(row.get("score")),
+                _to_int(row.get("RDCN")),
+                
             )
         )
     return out
@@ -278,6 +284,7 @@ def build_output_table(clusters):
             "short_info_svtype": sht.info_svtype if sht else "",
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
+            "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan)
         })
 
     return pd.DataFrame(rows)
