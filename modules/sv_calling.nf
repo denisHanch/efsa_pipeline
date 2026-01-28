@@ -236,7 +236,7 @@ process vcf_to_table {
 
 process vcf_to_table_long {
 
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.23'
     publishDir "${params.out_dir}/tables", mode: 'copy'
 
     input:
