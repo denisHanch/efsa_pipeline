@@ -160,7 +160,7 @@ process indexVcf {
  * Running comparision btw files
 */
 process truvari {
-    container "${params.registry}/truvari:latest"
+    container "${params.registry}/truvari:v1.0.1"
     tag "$pair_id1 & $pair_id2"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 
