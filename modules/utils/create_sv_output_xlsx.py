@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
 """
-Same description as before, but outputs CSV files instead of a single XLSX.
+Merge SV summaries from:
+  1) assembly/syri summary (required columns: chrom, start, end, svtype)
+  2) long-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score)
+  3) short-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score)
 
-Outputs:
-  <outdir>/Insertions.csv
-  <outdir>/Deletions.csv
-  <outdir>/Replacements.csv
-  <outdir>/Inversions.csv
-  <outdir>/Translocations.csv
-  <outdir>/Other.csv (if needed)
+Outputs a folder with single CSV for each type of variations:
+  Insertions, Deletions, Replacements, Inversions, Translocations
+
+Events are clustered by (chrom, standardized_svtype) using interval overlap with an optional tolerance (bp),
+PLUS breakpoint proximity (start or end must be within tol bp). This avoids merging very large calls with
+many unrelated smaller calls.
+
+Within each event, at most one record per source is chosen (best by supporting_reads then score).
+
+Usage:
+  python create_sv_output_xlsx.py --asm assembly.tsv --long long.tsv --short short.tsv --out merged.xlsx --tol 10
+Any of --asm/--long/--short may be omitted; columns for missing sources are still present but empty.
 """
 from __future__ import annotations
 
@@ -263,6 +271,7 @@ def build_output_table(clusters):
         asm = choose_best_record(by_src["asm"])
         lng = choose_best_record(by_src["long"])
         sht = choose_best_record(by_src["short"])
+        pipelines_confirmed = sum(x is not None for x in (asm, lng, sht))
 
         rows.append({
             "event_id": eid,
@@ -291,7 +300,9 @@ def build_output_table(clusters):
             "short_info_svtype": sht.info_svtype if sht else "",
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
-            "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan)
+            "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
+
+            "support_score": pipelines_confirmed,
         })
 
     return pd.DataFrame(rows)
