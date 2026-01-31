@@ -1,34 +1,66 @@
 """Feature file validator and processor for GFF, GTF, and BED formats."""
 
 from pathlib import Path
-from typing import Optional, List, IO
+from typing import Optional, List, Type, Any
 from dataclasses import dataclass
-import shutil
 import tempfile
 import subprocess
 
-from validation_pkg.logger import get_logger
-from validation_pkg.utils.settings import BaseSettings
-from validation_pkg.exceptions import (
-    FeatureValidationError,
-    CompressionError,
-)
-from validation_pkg.utils.formats import CodingType as CT
-from validation_pkg.utils.formats import FeatureFormat
-from validation_pkg.utils.file_handler import open_compressed_writer, check_tool_available, open_file_with_coding_type
-
+from validation_pkg.utils.base_settings import BaseOutputMetadata, BaseValidatorSettings
+from validation_pkg.exceptions import FeatureValidationError
+from validation_pkg.utils.formats import CodingType as CT, FeatureFormat
+from validation_pkg.utils.file_handler import open_compressed_writer, check_tool_available
+from validation_pkg.utils.base_validator import BaseValidator
 
 @dataclass
-class OutputMetadata(BaseSettings):
+class FeatureOutputMetadata(BaseOutputMetadata):
     """Metadata returned from feature validation."""
-    input_file: str = None
-    output_file: str = None
-    output_filename: str = None
+    # Feature-specific fields
     num_features: int = None
     feature_types: List[str] = None
     sequence_ids: List[str] = None
-    validation_level: str = None
-    elapsed_time: float = None
+
+    def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
+        """Format feature-specific statistics for report output."""
+        lines = []
+
+        # Helper to format values
+        def format_value(value):
+            if isinstance(value, float):
+                return f"{value:.2f}"
+            elif isinstance(value, int) and value > 999:
+                return f"{value:,}"
+            return str(value)
+
+        # Iterate through all fields, skipping common ones
+        skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
+        special_fields = {'feature_types', 'sequence_ids'}
+
+        data = self.to_dict()
+
+        for key, value in data.items():
+            if key in skip_fields or value is None:
+                continue
+
+            # Special handling for specific fields
+            if key == 'feature_types' and isinstance(value, list):
+                if len(value) <= 5:
+                    lines.append(f"{indent}feature_types: {', '.join(value)}")
+                else:
+                    lines.append(f"{indent}feature_types: {', '.join(list(value)[:5])}, ... (+{len(value)-5} more)")
+
+            elif key == 'sequence_ids' and isinstance(value, list):
+                if len(value) <= 3:
+                    lines.append(f"{indent}sequence_ids: {', '.join(value)}")
+                else:
+                    lines.append(f"{indent}sequence_ids: {value[0]}, {value[1]}, ... (+{len(value)-2} more)")
+
+            elif key not in special_fields:
+                # Generic field formatting
+                formatted_value = format_value(value)
+                lines.append(f"{indent}{key}: {formatted_value}")
+
+        return lines
 
     def __str__(self):
         parts = [f"Validation Level: {self.validation_level or 'N/A'}"]
@@ -69,87 +101,75 @@ class Feature:
         return self.end - self.start
 
 
-class FeatureValidator:
+class FeatureValidator(BaseValidator):
     """Validates and processes GFF, GTF, and BED feature annotation files."""
 
     @dataclass
-    class Settings(BaseSettings):
+    class Settings(BaseValidatorSettings):
         """Settings for feature validation and processing."""
+        # Feature-specific settings
         sort_by_position: bool = True
         check_coordinates: bool = True
         replace_id_with: Optional[str] = None
-        coding_type: Optional[CT] = CT.NONE
-        output_filename_suffix: Optional[str] = None
-        output_subdir_name: Optional[str] = None
+
+        def __post_init__(self):
+            """Normalize settings after initialization."""
+            # Normalize coding_type from base class
+            self._normalize_coding_type()
 
     def __init__(self, feature_config, settings: Optional[Settings] = None) -> None:
-        self.logger = get_logger()
+        # Call base class initialization
+        super().__init__(feature_config, settings)
+
+        # Keep feature_config for type safety and specific access
         self.feature_config = feature_config
-        self.output_dir = feature_config.output_dir
-        self.validation_level = feature_config.global_options.get("validation_level")
-        self.threads = feature_config.global_options.get("threads")
-        self.input_path = feature_config.filepath
-        self.settings = settings if settings is not None else self.Settings()
-        self.output_metadata = OutputMetadata()
+
+        # Validator-specific data
         self.features: List[Feature] = []
 
-        if not self.validation_level:
-            self.validation_level = 'strict'
+    # Required abstract properties and methods from BaseValidator
+
+    @property
+    def _validator_type(self) -> str:
+        """Return validator type string."""
+        return 'feature'
+
+    @property
+    def OutputMetadata(self) -> Type:
+        """Return FeatureOutputMetadata class for this validator."""
+        return FeatureOutputMetadata
+
+    @property
+    def _output_format(self) -> str:
+        """Return output format string for build_output_path."""
+        return 'gff'
+
+    @property
+    def _expected_format(self) -> Any:
+        """Return expected format for minimal mode validation."""
+        return FeatureFormat.GFF
+
+    def _get_validator_exception(self) -> Type[Exception]:
+        """Return the validator-specific exception class."""
+        return FeatureValidationError
 
     def _fill_output_metadata(self, output_path: Path) -> None:
         """Populate output metadata with validation results."""
-        self.output_metadata.input_file = self.feature_config.filename
-        self.output_metadata.output_file = str(output_path) if output_path else None
-        self.output_metadata.output_filename = output_path.name if output_path else None
+        # Fill common fields from base class
+        self._fill_base_metadata(output_path)
+
+        # Add feature-specific fields
         self.output_metadata.num_features = len(self.features) if self.features else None
         self.output_metadata.feature_types = list(set(f.feature_type for f in self.features)) if self.features else None
         self.output_metadata.sequence_ids = list(set(f.seqname for f in self.features)) if self.features else None
-        self.output_metadata.validation_level = self.validation_level
 
-    def run(self) -> OutputMetadata:
-        """Execute validation and processing workflow."""
-        self.logger.start_timer("feature_validation")
-        self.logger.info(f"Processing feature file: {self.feature_config.filename}")
-        self.logger.debug(f"Format: {self.feature_config.detected_format}, Compression: {self.feature_config.coding_type}")
-
-        try:
-            self._parse_input()
-            self._edit_features()
-            output_path = self._save_output()
-
-            elapsed = self.logger.stop_timer("feature_validation")
-            self.logger.info(f"✓ Feature validation completed in {elapsed:.2f}s")
-
-            self.logger.add_file_timing(
-                self.feature_config.filename,
-                "feature",
-                elapsed
-            )
-
-            self._fill_output_metadata(output_path)
-            self.output_metadata.elapsed_time = elapsed
-            return self.output_metadata
-
-        except Exception as e:
-            self.logger.error(f"Feature validation failed: {e}")
-            raise
-
-    def _open_file(self, mode: str = 'rt') -> IO:
-        """Open file with automatic decompression based on feature_config."""
-        try:
-            return open_file_with_coding_type(
-                self.input_path,
-                self.feature_config.coding_type,
-                mode
-            )
-        except CompressionError as e:
-            self.logger.add_validation_issue(
-                level='ERROR',
-                category='feature',
-                message=str(e),
-                details={'file': str(self.input_path)}
-            )
-            raise
+    def _run_validation(self) -> Path:
+        """Execute validation and processing workflow for trust/strict modes."""
+        # Trust/Strict modes - full validation and processing
+        self._parse_input()
+        self._edit_features()
+        output_path = self._write_output()
+        return output_path
 
     def _parse_gff(self, handle) -> List[Feature]:
         """Parse GFF3 format file."""
@@ -191,8 +211,6 @@ class FeatureValidator:
 
     def _parse_input(self) -> None:
         """Parse and convert input file to GFF3 using gffread."""
-        if self.validation_level == 'minimal':
-            return
 
         self.logger.debug("Parsing input using gffread...")
 
@@ -207,12 +225,25 @@ class FeatureValidator:
             temp_gff3 = Path(temp_gff3_file.name)
             temp_files.append(temp_gff3)
 
-            self._run_gffread(temp_input, temp_gff3)
+            try:
+                self._run_gffread(temp_input, temp_gff3)
 
-            with open(temp_gff3, 'r') as f:
-                self.features = self._parse_gff(f)
+                with open(temp_gff3, 'r') as f:
+                    self.features = self._parse_gff(f)
 
-            self.logger.info(f"Parsed {len(self.features)} features")
+                self.logger.info(f"Parsed {len(self.features)} features")
+
+            except FeatureValidationError as e:
+                # Log error and skip file instead of crashing (for file parsing failures)
+                self.logger.warning(f"gffread failed for {self.feature_config.filename}: {e}")
+                self.logger.add_validation_issue(
+                    level='WARNING',
+                    category='feature',
+                    message=f"Failed to parse feature file with gffread: {e}",
+                    details={'file': self.feature_config.filename, 'error': str(e)}
+                )
+                self.features = []
+                self.logger.info(f"Skipping feature file due to parsing error")
 
         finally:
             for temp_file in temp_files:
@@ -244,19 +275,7 @@ class FeatureValidator:
         input_file: Path,
         output_file: Path
     ) -> Path:
-        """
-        Run gffread to parse and validate input file.
-
-        Args:
-            input_file: Input GFF/GTF/BED file (uncompressed)
-            output_file: Output GFF3 file
-
-        Returns:
-            Path to output GFF3 file
-
-        Raises:
-            FeatureValidationError: If gffread fails
-        """
+        """Run gffread to parse and validate input file."""
 
         if not check_tool_available('gffread'):
             raise FeatureValidationError(
@@ -306,70 +325,18 @@ class FeatureValidator:
 
         self.logger.debug(f"Decompressing {self.input_path} to {temp_file.name}")
 
-        with self._open_file() as input_handle:
+        with self._open_file('rt') as input_handle:
             with temp_file as output_handle:
                 for line in input_handle:
                     output_handle.write(line)
 
         return Path(temp_file.name)
 
-    def _save_output(self) -> Path:
-        """Save processed features to output directory."""
-        self.logger.debug("Saving output file...")
+    def _write_output(self) -> Path:
+        """Write processed features to output file."""
+        self.logger.debug(f"Writing output to: {self.output_path}")
 
-        output_dir = self.output_dir
-        if self.settings.output_subdir_name:
-            output_dir = output_dir / self.settings.output_subdir_name
-
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        base_name = self.feature_config.filename
-        for suffix in self.input_path.suffixes:
-            base_name = base_name.replace(suffix, '')
-
-        if self.settings.output_filename_suffix:
-            output_filename = f"{base_name}_{self.settings.output_filename_suffix}.gff"
-        else:
-            output_filename = f"{base_name}.gff"
-
-        output_filename += self.settings.coding_type.to_extension()
-
-        if self.validation_level == 'minimal':
-            self.logger.debug("Minimal mode - validating format and coding requirements")
-
-            if self.feature_config.detected_format != FeatureFormat.GFF:
-                error_msg = f'Minimal mode requires GFF format, got {self.feature_config.detected_format}. Use validation_level "trust" or "strict" to convert.'
-                self.logger.add_validation_issue(
-                    level='ERROR',
-                    category='feature',
-                    message=error_msg,
-                    details={'file': self.feature_config.filename, 'detected_format': str(self.feature_config.detected_format)}
-                )
-                raise FeatureValidationError(error_msg)
-
-            input_coding = self.feature_config.coding_type
-            required_coding = self.settings.coding_type
-
-            if input_coding != required_coding:
-                error_msg = f'Minimal mode requires input coding to match output coding. Input: {input_coding}, Required: {required_coding}. Use validation_level "trust" or "strict" to change compression.'
-                self.logger.add_validation_issue(
-                    level='ERROR',
-                    category='feature',
-                    message=error_msg,
-                    details={'file': self.feature_config.filename, 'input_coding': str(input_coding), 'required_coding': str(required_coding)}
-                )
-                raise FeatureValidationError(error_msg)
-
-            output_path_minimal = output_dir / output_filename
-            self.logger.debug(f"Copying {self.input_path} to {output_path_minimal}")
-            shutil.copy2(self.input_path, output_path_minimal)
-            self.logger.info(f"Output saved: {output_path_minimal}")
-            return output_path_minimal
-
-        output_path = output_dir / output_filename
-        self.logger.debug(f"Writing output to: {output_path}")
-
-        with open_compressed_writer(output_path, self.settings.coding_type, threads=self.threads) as handle:
+        with open_compressed_writer(self.output_path, self.settings.coding_type, threads=self.threads) as handle:
             handle.write("##gff-version 3\n")
 
             feature_count = len(self.features)
@@ -390,5 +357,5 @@ class FeatureValidator:
                 ])
                 handle.write(line + '\n')
 
-        self.logger.info(f"Output saved: {output_path}")
-        return output_path
+        self.logger.info(f"Output saved: {self.output_path}")
+        return self.output_path

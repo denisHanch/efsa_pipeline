@@ -2,7 +2,7 @@
 
 include { nanoplot; multiqc } from '../modules/qc.nf'
 include { sv_long; mapping_long; mapping_long as mapping_long_plasmid; sv_long as sv_long_plasmid }  from '../modules/subworkflow.nf'
-include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadLongFastqFiles } from '../modules/logs.nf'
+include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadFastqFiles } from '../modules/logs.nf'
 include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads;get_unmapped_reads as get_unmapped_reads_plasmid } from '../modules/mapping.nf'
 include { vcf_to_table_long }  from '../modules/sv_calling.nf'
 
@@ -61,8 +61,8 @@ workflow {
     // Processing inputs
     log.info  "Processing files in directory: ${params.in_dir}"
 
-    pacbio_fastqs = loadLongFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
-    ont_fastqs = loadLongFastqFiles("${params.in_dir}/ont/*.fastq.gz")
+    pacbio_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
+    ont_fastqs = loadFastqFiles("${params.in_dir}/ont/*.fastq.gz")
 
     def ref_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
     def mod_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /mod_plasmid\.(fa|fna|fasta)$/ } ?: []

@@ -20,7 +20,6 @@
       - [`truvari/`](#truvari)
       - [`unmapped_stats/`](#unmapped_stats)
   - [Graphical Representation of the Pipeline](#graphical-representation-of-the-pipeline)
-- [Parse VCF data](#parse-vcf)
       
 
 # Quick Start
@@ -1544,5 +1543,5 @@ At the second step python script is used to parse the output of 3 tables into on
 To parse VCF table run: 
 
 ```
-python3 modules/utils/create_sv_output_xlsx.py --assembly ASSEMBLY.tsv --short SHORT_READS.tsv --long LONG_READS.tsv   --out OUTPUT_FILENAME.xlsx
+python3 modules/utils/create_sv_output_xlsx.py --asm ASSEMBLY.tsv --short SHORT_READS.tsv --long LONG_READS.tsv   --out OUTPUT_FILENAME.xlsx
 ```

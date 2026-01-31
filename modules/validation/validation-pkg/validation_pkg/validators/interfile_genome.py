@@ -1,19 +1,14 @@
-"""
-Inter-file validation for genome files.
-
-Provides validation functions for checking consistency between genome
-files, such as comparing reference vs modified genomes.
-"""
+"""Inter-file validation for genome files."""
 
 from dataclasses import dataclass
 from typing import Dict, Optional, Any
-from ..utils.settings import BaseSettings
+from ..utils.base_settings import BaseSettings
 from ..exceptions import GenomeValidationError
 from ..logger import get_logger
 
 
 def _get_metadata_field(metadata_obj, field_name, default=None):
-    """Helper to get field from either OutputMetadata object or dict."""
+    """Get field from either OutputMetadata object or dict."""
     if hasattr(metadata_obj, field_name):
         # OutputMetadata object - use attribute access
         return getattr(metadata_obj, field_name, default)
@@ -24,21 +19,12 @@ def _get_metadata_field(metadata_obj, field_name, default=None):
 
 @dataclass
 class GenomeXGenomeSettings(BaseSettings):
-    """
-    Settings for genome-to-genome inter-file validation.
-
-    Attributes:
-        same_number_of_sequences: Require same number of sequences (chromosomes/contigs)
-        same_sequence_ids: Require matching sequence IDs (order-independent)
-        same_sequence_lengths: Require matching sequence lengths for common IDs
-    """
+    """Settings for genome-to-genome inter-file validation."""
     same_number_of_sequences: bool = True
     same_sequence_ids: bool = False
     same_sequence_lengths: bool = False
 
     def __post_init__(self):
-        """Validate settings."""
-        # If checking lengths, must also check IDs
         if self.same_sequence_lengths and not self.same_sequence_ids:
             raise ValueError(
                 "same_sequence_lengths requires same_sequence_ids=True "
@@ -51,25 +37,7 @@ def genomexgenome_validation(
     mod_genome_result,  # OutputMetadata or Dict[str, Any]
     settings: Optional[GenomeXGenomeSettings] = None
 ) -> Dict[str, Any]:
-    """
-    Validate consistency between two genome files (e.g., reference vs modified).
-
-    Currently supports:
-    - Sequence count matching
-    - Sequence ID matching (order-independent)
-    - Sequence length matching for common IDs
-
-    Args:
-        ref_genome_result: Result dict from validate_genome() for reference genome
-        mod_genome_result: Result dict from validate_genome() for modified genome
-        settings: Validation settings (uses defaults if not provided)
-
-    Returns:
-        Dict with validation results and metadata
-
-    Raises:
-        GenomeValidationError: If critical validation fails
-    """
+    """Validate consistency between two genome files (reference vs modified)."""
     settings = settings or GenomeXGenomeSettings()
     logger = get_logger()
 

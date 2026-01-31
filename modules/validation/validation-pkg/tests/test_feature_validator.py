@@ -1,4 +1,14 @@
-"""Tests for FeatureValidator."""
+"""
+Comprehensive tests for FeatureValidator.
+
+Tests cover:
+- File format detection and parsing (GFF, GTF, BED)
+- Compression handling (gzip, bzip2, uncompressed)
+- Validation rules and feature processing
+- Coordinate validation and sorting
+- Output generation with various compression formats
+- GFFRead integration and error handling
+"""
 
 import pytest
 import tempfile
@@ -1066,7 +1076,7 @@ class TestGTFConversionWithGffread:
         assert len(validator.features) == 2  # mRNA + exon
 
     def test_gffread_not_available_error(self, temp_dir, output_dir, monkeypatch):
-        """Test error handling when gffread is not available."""
+        """Test error handling when gffread is not available - logs error and skips file."""
         # Create GTF file
         gtf_file = temp_dir / "test.gtf"
         with open(gtf_file, "w") as f:
@@ -1087,11 +1097,12 @@ class TestGTFConversionWithGffread:
 
         validator = FeatureValidator(feature_config, FeatureValidator.Settings())
 
-        # Should raise error about missing gffread
-        with pytest.raises(FeatureValidationError) as exc_info:
-            validator.run()
+        # Should log error and skip file instead of crashing
+        result = validator.run()
 
-        assert 'gffread' in str(exc_info.value).lower()
+        # Validator should complete with empty features
+        assert validator.features == []
+        assert result.num_features is None or result.num_features == 0
 
 
 

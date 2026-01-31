@@ -58,7 +58,7 @@ process fastqc {
  * Generate multiqc report
  */
 process multiqc {
-    container 'staphb/multiqc'
+    container 'staphb/multiqc:1.33'
     publishDir "${params.out_dir}/${out_folder_name}/multiqc", mode: "copy"
 
     input:
@@ -82,7 +82,7 @@ process multiqc {
  * Check QC of input samples
 */
 process nanoplot {
-container 'staphb/nanoplot:latest'
+container 'staphb/nanoplot:1.46.2'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/nanoplot", mode: 'copy'
 

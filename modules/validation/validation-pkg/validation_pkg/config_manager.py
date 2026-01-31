@@ -1,23 +1,4 @@
-"""
-Configuration management for bioinformatics file validation.
-
-This module provides classes and utilities for loading and validating JSON configuration
-files that specify input files, output directories, and validation settings.
-
-Main Components:
-    - GenomeConfig: Configuration for genome/plasmid files
-    - ReadConfig: Configuration for sequencing read files
-    - FeatureConfig: Configuration for feature annotation files
-    - Config: Main configuration container
-    - ConfigManager: JSON parser and validator
-
-Key Features:
-    - Automatic path resolution relative to config file location
-    - Compression and format detection
-    - Directory-based read loading
-    - Validator-specific settings extraction from config
-    - Thread count configuration for parallel compression
-"""
+"""Configuration management for bioinformatics file validation."""
 
 import json
 import os
@@ -32,44 +13,33 @@ from validation_pkg.exceptions import (
     ConfigurationError,
     FileNotFoundError as ValidationFileNotFoundError
 )
+from typing import Type, TypeVar
+
+# Type variable for config classes
+T = TypeVar('T', bound='BaseValidatorConfig')
 
 # ===== Global Configuration Constants =====
 # Only these fields can be specified in config.json "options" section
-# These are the only settings that make sense to apply globally to all files
 ALLOWED_GLOBAL_OPTIONS = {'threads', 'validation_level', 'logging_level'}
 MAX_RECOMMENDED_THREADS = 16
 
 # Default thread count when not specified in config
 DEFAULT_THREADS = 8
 
-@dataclass
-class GenomeConfig:
-    """
-    Configuration for genome or plasmid files.
 
-    Attributes:
-        filename: Original filename (relative to config)
-        filepath: Absolute resolved path
-        coding_type: Compression format (GZIP, BZIP2, or NONE)
-        detected_format: File format (FASTA or GENBANK)
-        output_dir: Base output directory from config
-        options: Merged global + file-level options (threads, validation_level only)
-    """
+@dataclass
+class BaseValidatorConfig:
+    """Base configuration class with common fields for all validator configs."""
     filename: str
     filepath: Path
     basename: str = None
-    coding_type: CodingType = None
-    detected_format: GenomeFormat = None
+    coding_type: CodingType = CodingType.NONE
     output_dir: Path = None
     global_options: Dict[str, Any] = None
 
-    def __post_init__(self):
-        if self.global_options is None:
-            self.global_options = {}
-
-        # Extract basename (filename without extension)
-        # Handle files with or without extensions safely
-        if self.coding_type:
+    def _extract_basename(self):
+        """Extract basename (filename without extension) based on compression type."""
+        if self.coding_type and self.coding_type != CodingType.NONE:
             # Compressed file: remove both compression and format extensions (e.g., .fasta.gz)
             parts = self.filename.rsplit('.', 2)
             self.basename = parts[0] if len(parts) >= 2 else self.filename
@@ -78,104 +48,47 @@ class GenomeConfig:
             parts = self.filename.rsplit('.', 1)
             self.basename = parts[0] if len(parts) >= 2 else self.filename
 
+    def _initialize_defaults(self):
+        """Initialize default values for optional fields."""
+        if self.global_options is None:
+            self.global_options = {}
+
+    
+@dataclass
+class GenomeConfig(BaseValidatorConfig):
+    """Configuration for genome or plasmid files."""
+    detected_format: GenomeFormat = None
+
+    def __post_init__(self):
+        self._initialize_defaults()
+        self._extract_basename()
+
 
 @dataclass
-class ReadConfig:
-    """
-    Configuration for sequencing read files.
-
-    Attributes:
-        filename: Original filename (relative to config)
-        filepath: Absolute resolved path
-        ngs_type: Sequencing platform ("illumina", "ont", or "pacbio")
-        coding_type: Compression format (GZIP, BZIP2, or NONE)
-        detected_format: File format (FASTQ or BAM)
-        output_dir: Base output directory from config
-        global_options: Merged global + file-level options (threads, validation_level only)
-    """
-    filename: str
-    filepath: Path
-    basename: str = None
+class ReadConfig(BaseValidatorConfig):
+    """Configuration for sequencing read files."""
     ngs_type: str = None
-    coding_type: CodingType = None
     detected_format: ReadFormat = None
-    output_dir: Path = None
-    global_options: Dict[str, Any] = None
 
     def __post_init__(self):
         if self.ngs_type not in ["illumina", "ont", "pacbio"]:
             raise ValueError(f"Invalid ngs_type: {self.ngs_type}")
-        if self.global_options is None:
-            self.global_options = {}
-
-        # Extract basename (filename without extension)
-        # Handle files with or without extensions safely
-        if self.coding_type:
-            # Compressed file: remove both compression and format extensions (e.g., .fastq.gz)
-            parts = self.filename.rsplit('.', 2)
-            self.basename = parts[0] if len(parts) >= 2 else self.filename
-        else:
-            # Uncompressed file: remove only format extension (e.g., .fastq)
-            parts = self.filename.rsplit('.', 1)
-            self.basename = parts[0] if len(parts) >= 2 else self.filename
+        self._initialize_defaults()
+        self._extract_basename()
 
 
 @dataclass
-class FeatureConfig:
-    """
-    Configuration for feature annotation files.
-
-    Attributes:
-        filename: Original filename (relative to config)
-        filepath: Absolute resolved path
-        coding_type: Compression format (GZIP, BZIP2, or NONE)
-        detected_format: File format (GFF, GTF, or BED)
-        output_dir: Base output directory from config
-        options: Merged global + file-level options (threads, validation_level only)
-    """
-    filename: str
-    filepath: Path
-    basename: str = None
-    coding_type: CodingType = None
+class FeatureConfig(BaseValidatorConfig):
+    """Configuration for feature annotation files."""
     detected_format: FeatureFormat = None
-    output_dir: Path = None
-    global_options: Dict[str, Any] = None
 
     def __post_init__(self):
-        if self.global_options is None:
-            self.global_options = {}
-
-        # Extract basename (filename without extension)
-        # Handle files with or without extensions safely
-        if self.coding_type:
-            # Compressed file: remove both compression and format extensions (e.g., .gff.gz)
-            parts = self.filename.rsplit('.', 2)
-            self.basename = parts[0] if len(parts) >= 2 else self.filename
-        else:
-            # Uncompressed file: remove only format extension (e.g., .gff)
-            parts = self.filename.rsplit('.', 1)
-            self.basename = parts[0] if len(parts) >= 2 else self.filename
+        self._initialize_defaults()
+        self._extract_basename()
 
 
 class Config:
-    """
-    Main configuration container for validation workflow.
-
-    Stores validated configuration data loaded from JSON file, including file paths,
-    compression/format details, and options. Provides helper methods for path resolution.
-
-    Attributes:
-        ref_genome: Reference genome configuration (required)
-        mod_genome: Modified genome configuration (required)
-        reads: List of read file configurations (required, non-empty)
-        ref_plasmid: Reference plasmid configuration (optional)
-        mod_plasmid: Modified plasmid configuration (optional)
-        ref_feature: Reference feature configuration (optional)
-        mod_feature: Modified feature configuration (optional)
-        options: Additional options (e.g., thread count)
-        config_dir: Directory containing config file
-        output_dir: Base output directory for validated files
-    """
+    """Main configuration container for validation workflow."""
 
     def __init__(self):
         # Required fields
@@ -194,75 +107,54 @@ class Config:
         self.config_dir: Optional[Path] = None
         self.output_dir: Optional[Path] = None
 
-    def get_threads(self) -> Optional[int]:
-        """
-        Get thread count from options, or None for auto-detection.
-
-        Returns:
-            Thread count if specified in options, None for auto-detection
-
-        Example:
-            >>> config = Config()
-            >>> config.options = {'threads': 4}
-            >>> config.get_threads()
-            4
-            >>> config.options = {}
-            >>> config.get_threads()
-            None
-        """
+    @property
+    def threads(self) -> Optional[int]:
+        """Get thread count from options, or None for auto-detection."""
         return self.options.get('threads')
 
-    def get_logging_level(self) -> str:
-        """
-        Get logging level from options, or default to 'INFO'.
-
-        Returns:
-            Logging level string ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
-        """
+    @property
+    def logging_level(self) -> str:
+        """Get logging level from options, or default to 'INFO'."""
         return self.options.get('logging_level', 'INFO')
 
+    @property
+    def validation_level(self) -> str:
+        """Get validation level from options, or default to 'STRICT'."""
+        return self.options.get('validation_level', 'STRICT')
+
     def __repr__(self):
-        return (
-            f"Config(\n"
-            f"  ref_genome={self.ref_genome},\n"
-            f"  mod_genome={self.mod_genome},\n"
-            f"  reads={len(self.reads)} file(s),\n"
-            f"  ref_plasmid={self.ref_plasmid},\n"
-            f"  mod_plasmid={self.mod_plasmid},\n"
-            f"  ref_feature={self.ref_feature},\n"
-            f"  mod_feature={self.mod_feature}\n"
-            f")"
-        )
+        """Return a detailed string representation of the configuration."""
+        parts = ["Config("]
+
+        # Required fields
+        parts.append(f"  ref_genome={self.ref_genome.filename if self.ref_genome else None}")
+        parts.append(f"  mod_genome={self.mod_genome.filename if self.mod_genome else None}")
+        parts.append(f"  reads={len(self.reads)} file(s)")
+
+        # Optional fields (only show if present)
+        if self.ref_plasmid:
+            parts.append(f"  ref_plasmid={self.ref_plasmid.filename}")
+        if self.mod_plasmid:
+            parts.append(f"  mod_plasmid={self.mod_plasmid.filename}")
+        if self.ref_feature:
+            parts.append(f"  ref_feature={self.ref_feature.filename}")
+        if self.mod_feature:
+            parts.append(f"  mod_feature={self.mod_feature.filename}")
+
+        # Options
+        if self.options:
+            parts.append(f"  options={self.options}")
+
+        parts.append(")")
+        return "\n".join(parts)
 
 
 class ConfigManager:
-    """
-    Configuration file parser and validator.
-
-    Responsible for loading JSON configuration files, validating their structure,
-    resolving file paths, detecting formats/compression, and extracting validator
-    settings.
-
-    Primary usage:
-        config = ConfigManager.load("config.json")
-    """
+    """Configuration file parser and validator."""
     
     @staticmethod
     def load(config_path: str) -> Config:
-        """
-        Load and validate configuration from JSON file.
-        
-        Args:
-            config_path: Path to config.json
-            
-        Returns:
-            Validated Config object
-            
-        Raises:
-            FileNotFoundError: If config file doesn't exist
-            ValueError: If configuration is invalid
-            json.JSONDecodeError: If JSON is malformed
-        """
+        """Load and validate configuration from JSON file."""
         logger = get_logger()
         logger.info(f"Loading configuration from: {config_path}")
         
@@ -360,26 +252,41 @@ class ConfigManager:
             )
 
     @staticmethod
-    def _parse_genome_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> GenomeConfig:
+    def _parse_file_config(
+        value: Any,
+        field_name: str,
+        config_dir: Path,
+        output_dir: Path,
+        config_class: Type[T],
+        format_class: Type,
+        global_options: Dict[str, Any] = None,
+        extra_fields: Optional[Dict[str, Any]] = None
+    ) -> T:
         """
-        Parse a genome configuration entry.
+        Generic file configuration parser for genome, read, and feature files.
+
+        Consolidates common parsing logic across all file types to reduce code duplication.
 
         Args:
-            value: Config value (dict with 'filename' or string)
-            field_name: Name of field for error messages
+            value: Configuration value (string or dict) containing filename/options
+            field_name: Name of the configuration field (e.g., 'ref_genome_filename')
             config_dir: Base directory for resolving relative paths
-            output_dir: Output directory for validated files
-            global_options: Global options from config (threads, validation_level)
+            output_dir: Output directory for processed files
+            config_class: Dataclass type to instantiate (GenomeConfig, ReadConfig, or FeatureConfig)
+            format_class: Format enum class for file type detection (GenomeFormat, ReadFormat, or FeatureFormat)
+            global_options: Global configuration options to merge
+            extra_fields: Additional type-specific fields (e.g., ngs_type for reads)
 
         Returns:
-            GenomeConfig with resolved paths and detected format/compression
-        """
-        logger = get_logger()
+            Instance of config_class with resolved paths and detected format/compression
 
+        Raises:
+            ValidationFileNotFoundError: If the file doesn't exist
+        """
         # Parse filename and extra fields using unified utility
         filename, extra = file_handler.parse_config_file_value(value, field_name)
 
-        # Extract file-level global options (threads, validation_level only)
+        # Merge file-level global options (threads, validation_level only)
         filelvl_options = ConfigManager._merge_options(field_name, global_options, extra)
 
         # Resolve absolute path with security validation
@@ -391,15 +298,35 @@ class ConfigManager:
 
         # Detect compression and format using unified utilities
         coding_type = file_handler.detect_compression_type(filepath)
-        detected_format = file_handler.detect_file_format(filepath, GenomeFormat)
+        detected_format = file_handler.detect_file_format(filepath, format_class)
 
-        return GenomeConfig(
-            filename=filepath.name,
-            filepath=filepath,
-            coding_type=coding_type,
-            detected_format=detected_format,
+        # Build config arguments
+        config_args = {
+            'filename': filepath.name,
+            'filepath': filepath,
+            'coding_type': coding_type,
+            'detected_format': detected_format,
+            'output_dir': output_dir,
+            'global_options': filelvl_options,
+        }
+
+        # Add any extra type-specific fields (e.g., ngs_type for ReadConfig)
+        if extra_fields:
+            config_args.update(extra_fields)
+
+        return config_class(**config_args)
+
+    @staticmethod
+    def _parse_genome_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> GenomeConfig:
+        """Parse a genome configuration entry."""
+        return ConfigManager._parse_file_config(
+            value=value,
+            field_name=field_name,
+            config_dir=config_dir,
             output_dir=output_dir,
-            global_options=filelvl_options,
+            config_class=GenomeConfig,
+            format_class=GenomeFormat,
+            global_options=global_options
         )
 
     @staticmethod
@@ -467,52 +394,25 @@ class ConfigManager:
 
     @staticmethod
     def _parse_read_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> ReadConfig:
-        """
-        Parse a read configuration entry.
-
-        Args:
-            value: Config value (dict with 'filename' and 'ngs_type' or string)
-            field_name: Name of field for error messages
-            config_dir: Base directory for resolving relative paths
-            output_dir: Output directory for validated files
-            global_options: Global options from config (threads, validation_level)
-
-        Returns:
-            ReadConfig with resolved paths and detected format/compression
-        """
-        logger = get_logger()
-
-        # Parse filename and extra fields using unified utility
-        filename, extra = file_handler.parse_config_file_value(value, field_name)
-
-        # Extract ngs_type first (it's a required field, not a global option)
-        ngs_type = extra.pop('ngs_type', 'illumina')
+        """Parse a read configuration entry."""
+        # Extract ngs_type from the value before parsing
+        if isinstance(value, dict):
+            ngs_type = value.get('ngs_type', 'illumina')
+        else:
+            ngs_type = 'illumina'  # Default for string-only values
 
         if not ngs_type:
             raise ValueError("Missing required 'ngs_type'")
 
-        # Extract file-level global options (threads, validation_level only)
-        filelvl_options = ConfigManager._merge_options(field_name,global_options,extra)
-
-        # Resolve absolute path with security validation
-        filepath = path_utils.resolve_filepath(config_dir, filename)
-
-        if not filepath.exists():
-            raise ValidationFileNotFoundError(
-                f"The following file was not found: {filepath}\n")
-
-        # Detect compression and format using unified utilities
-        coding_type = file_handler.detect_compression_type(filepath)
-        detected_format = file_handler.detect_file_format(filepath, ReadFormat)
-
-        return ReadConfig(
-            filename=filepath.name,
-            filepath=filepath,
-            ngs_type=ngs_type,
-            coding_type=coding_type,
-            detected_format=detected_format,
+        return ConfigManager._parse_file_config(
+            value=value,
+            field_name=field_name,
+            config_dir=config_dir,
             output_dir=output_dir,
-            global_options=filelvl_options
+            config_class=ReadConfig,
+            format_class=ReadFormat,
+            global_options=global_options,
+            extra_fields={'ngs_type': ngs_type}
         )
 
     @staticmethod
@@ -530,70 +430,20 @@ class ConfigManager:
 
     @staticmethod
     def _parse_feature_config(value: Any, field_name: str, config_dir: Path, output_dir : Path, global_options: Dict[str, Any] = None) -> FeatureConfig:
-        """
-        Parse a single feature config entry and resolve paths.
-
-        Uses unified utilities from file_handler for consistent parsing.
-
-        Args:
-            value: Config value (dict with 'filename' or string)
-            field_name: Name of field for error messages
-            config_dir: Base directory for resolving relative paths
-            output_dir: Output directory for validated files
-            global_options: Global options from config (threads, validation_level)
-
-        Returns:
-            FeatureConfig with resolved paths and detected format/compression
-
-        Raises:
-            ValueError: If value format is invalid
-        """
-        logger = get_logger()
-
-        # Parse filename and extra fields using unified utility
-        filename, extra = file_handler.parse_config_file_value(value, field_name)
-
-        # Extract file-level global options (threads, validation_level only)
-        filelvl_options = ConfigManager._merge_options(field_name,global_options,extra)
-
-        # Resolve absolute path with security validation
-        filepath = path_utils.resolve_filepath(config_dir, filename)
-        if not filepath.exists():
-            raise ValidationFileNotFoundError(
-                f"The following file was not found: {filepath}\n")
-
-        # Detect compression and format using unified utilities
-        coding_type = file_handler.detect_compression_type(filepath)
-        detected_format = file_handler.detect_file_format(filepath, FeatureFormat)
-
-        return FeatureConfig(
-            filename=filepath.name,
-            filepath=filepath,
-            coding_type=coding_type,
-            detected_format=detected_format,
+        """Parse a single feature config entry and resolve paths."""
+        return ConfigManager._parse_file_config(
+            value=value,
+            field_name=field_name,
+            config_dir=config_dir,
             output_dir=output_dir,
-            global_options=filelvl_options
+            config_class=FeatureConfig,
+            format_class=FeatureFormat,
+            global_options=global_options
         )
 
     @staticmethod
     def _parse_options(data: dict, config: Config):
-        """
-        Parse and validate global configuration options.
-
-        Global options apply to ALL files in the config and can only contain:
-        - threads: Number of threads for parallelization (positive integer or null)
-        - validation_level: Validation strategy ('strict', 'trust', or 'minimal')
-        - logging_level: Console logging verbosity ('DEBUG', 'INFO', 'WARNING', 'ERROR')
-
-        Other settings must be specified per-file in the config, not globally.
-
-        Args:
-            data: Configuration dictionary
-            config: Config object to update
-
-        Raises:
-            ConfigurationError: If invalid options provided or invalid values
-        """
+        """Parse and validate global configuration options."""
         logger = get_logger()
 
         # Get options dict from config, or empty dict if not present
@@ -747,21 +597,7 @@ class ConfigManager:
 
     @staticmethod
     def _setup_output_directory(config: Config):
-        """
-        Set up output directory for validation results.
-
-        Creates the output directory at config_dir/output/ if it doesn't exist.
-        Sets config.output_dir to the created directory path.
-
-        Note: Individual validators can use output_subdir_name in their settings
-        to create subdirectories within this base output directory.
-
-        Args:
-            config: Config object to update with output directory
-
-        Raises:
-            OSError: If directory creation fails
-        """
+        """Set up output directory for validation results."""
         logger = get_logger()
 
         # Create output directory path

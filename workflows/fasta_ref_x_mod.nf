@@ -1,7 +1,6 @@
 #!/usr/bin/env nextflow
 
 include { nucmer; deltaFilter; showCoords; syri } from '../modules/ref_x_mod.nf'
-include { vcf_to_table }  from '../modules/sv_calling.nf'
 include { logWorkflowCompletion } from '../modules/logs.nf'
 
 

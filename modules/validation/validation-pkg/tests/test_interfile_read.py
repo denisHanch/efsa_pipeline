@@ -1,12 +1,17 @@
 """
-Tests for inter-file read validation (ReadXReadSettings, readxread_validation).
+Tests for inter-file read validation.
 
-Tests paired-end read completeness validation.
+Tests cover:
+- Paired-end read completeness validation
+- Read ID matching between R1 and R2 files
+- ReadXReadSettings configuration
+- readxread_validation function
+- Error handling for incomplete pairs
 """
 
 import pytest
 from validation_pkg.validators.interfile_read import ReadXReadSettings, readxread_validation
-from validation_pkg.validators.read_validator import OutputMetadata
+from validation_pkg.validators.read_validator import ReadOutputMetadata
 from validation_pkg.exceptions import ReadValidationError
 
 
@@ -34,18 +39,18 @@ class TestPairedEndValidation:
     def test_complete_pairs_pass(self):
         """Test that complete R1+R2 pairs pass validation."""
         reads_results = [
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample_R1.fastq.gz',
                 base_name='sample',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample_R2.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -60,11 +65,11 @@ class TestPairedEndValidation:
     def test_missing_r1_fails(self):
         """Test that R2 without R1 raises error."""
         reads_results = [
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample_R2.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -78,11 +83,11 @@ class TestPairedEndValidation:
     def test_r1_only_passes(self):
         """Test that R1-only files pass (no R2 required)."""
         reads_results = [
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample_R1.fastq.gz',
                 base_name='sample',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -95,18 +100,18 @@ class TestPairedEndValidation:
     def test_multiple_missing_r1(self):
         """Test multiple R2 files without R1."""
         reads_results = [
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample1_R2.fastq.gz',
                 base_name='sample1',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample2_R2.fastq.gz',
                 base_name='sample2',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -122,26 +127,26 @@ class TestPairedEndValidation:
         """Test mix of complete and incomplete pairs."""
         reads_results = [
             # Complete pair
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample1_R1.fastq.gz',
                 base_name='sample1',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample1_R2.fastq.gz',
                 base_name='sample1',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
             # Incomplete pair (R2 only)
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample2_R2.fastq.gz',
                 base_name='sample2',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -154,9 +159,9 @@ class TestPairedEndValidation:
     def test_no_patterns_detected_passes(self):
         """Test that files without paired-end patterns pass."""
         reads_results = [
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample.fastq.gz',
-                ngs_type_detected='ont',
+                illumina_pairing_detected='ont',
                 num_reads=1000
             )
         ]
@@ -169,11 +174,11 @@ class TestPairedEndValidation:
     def test_allow_missing_r1_passes(self):
         """Test that allow_missing_r1=True allows orphan R2."""
         reads_results = [
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample_R2.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -188,18 +193,18 @@ class TestPairedEndValidation:
     def test_duplicate_r1_warns(self):
         """Test that multiple R1 files with same base name warn."""
         reads_results = [
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample_R1_copy1.fastq.gz',
                 base_name='sample',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample_R1_copy2.fastq.gz',
                 base_name='sample',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -213,25 +218,25 @@ class TestPairedEndValidation:
     def test_duplicate_r2_warns(self):
         """Test that multiple R2 files with same base name warn."""
         reads_results = [
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample_R1.fastq.gz',
                 base_name='sample',
                 read_number=1,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample_R2_copy1.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             ),
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample_R2_copy2.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]
@@ -252,11 +257,11 @@ class TestPairedEndValidation:
     def test_check_disabled_passes(self):
         """Test that validation passes when check is disabled."""
         reads_results = [
-            OutputMetadata(
+            ReadOutputMetadata(
                 output_file='sample_R2.fastq.gz',
                 base_name='sample',
                 read_number=2,
-                ngs_type_detected='illumina',
+                illumina_pairing_detected='illumina',
                 num_reads=1000
             )
         ]

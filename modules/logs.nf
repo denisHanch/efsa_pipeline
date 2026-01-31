@@ -12,6 +12,7 @@ def logUnmapped(reads, total_reads, out_folder_name, reference) {
         def percentage = (unmapped * 100.0) / totalInput
         def pctStr = String.format('%.2f', percentage)
 
+        // Build a plain String
         String msg = "📊 ${out_folder_name} mapping${reference}:\n" +
                      "    Unmapped reads: ${String.format('%,d', unmapped)} (${pctStr}%)\n" +
                      "    Total input reads: ${String.format('%,d', totalInput)}\n"
@@ -65,10 +66,11 @@ def logWorkflowCompletion(out_folder_name) {
 }
 
 
-def loadLongFastqFiles(long_read_files) { 
-    return Channel.fromPath(long_read_files)
+def loadFastqFiles(pathPattern) { 
+    return Channel.fromPath(pathPattern)
                   .map { file ->
-                      [file.simpleName, file]
+                      def name = file.baseName.replaceFirst(/\.fastq/, '')
+                      [name, file]
                   }
 }
 

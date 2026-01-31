@@ -1,26 +1,7 @@
-"""
-Read file validator and processor.
-
-This module provides comprehensive validation and processing for sequencing read files in FASTQ
-and BAM formats. It handles decompression, parsing, validation, and various quality control
-operations for next-generation sequencing data.
-
-Key Features:
-    - Multi-format support: FASTQ and BAM (with optional conversion)
-    - Compression handling: gzip, bzip2, and uncompressed files
-    - Three validation levels: strict (full validation), trust (fast validation), minimal (copy only)
-    - BAM to FASTQ conversion using pysam or samtools
-    - Fast line counting for trust mode validation
-    - NGS type-based output directory organization
-    - Parallel compression support: automatic detection of pigz/pbzip2
-
-Classes:
-    ReadValidator: Main validator class for sequencing read files
-    ReadValidator.Settings: Configuration dataclass for validation behavior
-"""
+"""Read file validator and processor for FASTQ and BAM formats."""
 
 from pathlib import Path
-from typing import Optional, List, IO, Union, Dict, Any
+from typing import Optional, List, Union, Dict, Any, Type
 from dataclasses import dataclass, asdict
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -30,18 +11,27 @@ from multiprocessing import Pool
 from functools import partial
 import re
 
-
-from validation_pkg.logger import get_logger
-from validation_pkg.utils.settings import BaseSettings
+from validation_pkg.utils.base_settings import BaseOutputMetadata, BaseValidatorSettings
 from validation_pkg.exceptions import (
     ReadValidationError,
     FileFormatError,
     FastqFormatError,
-    BamFormatError,
-    CompressionError
+    BamFormatError
 )
 from validation_pkg.utils.formats import ReadFormat
-from validation_pkg.utils.formats import CodingType as CT
+from validation_pkg.utils.base_validator import BaseValidator
+from validation_pkg.utils.file_handler import (
+    convert_file_compression,
+    open_compressed_writer
+)
+from validation_pkg.utils.file_handler import copy_file
+from validation_pkg.utils.sequence_stats import calculate_n50
+from collections import Counter
+from io import StringIO
+import subprocess
+from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
+
+
 
 # Constants
 TRUST_MODE_SAMPLE_SIZE = 10  # Number of records to validate in trust mode
@@ -50,10 +40,14 @@ MIN_CHUNK_SIZE = 1000  # Minimum chunk size for parallel processing
 
 # Illumina paired-end filename patterns (compiled regex for performance)
 # Pattern format: (regex, read_number_group_index)
+# IMPORTANT: Order matters! More specific patterns must come before more general ones.
 ILLUMINA_PAIRED_END_PATTERNS = [
     # With lane numbers: _R1_001, _R2_001
     (re.compile(r'(.+)_(R[12])_\d+$'), 2),
-    # With lane numbers: _1_001, _2_001
+    # Lane number BEFORE read number (no R prefix): _001_1, _001_2, _1_1, _1_2
+    # This pattern must come before _([12])_\d+$ to correctly handle _X_1/_X_2 suffixes
+    (re.compile(r'(.+)_\d+_([12])$'), 2),
+    # With lane numbers AFTER read number: _1_001, _2_001
     (re.compile(r'(.+)_([12])_\d+$'), 2),
     # With arbitrary suffix: _R1_combined, _R2_final
     (re.compile(r'(.+)_(R[12])_[A-Za-z0-9_]+$'), 2),
@@ -73,32 +67,9 @@ ILLUMINA_PAIRED_END_PATTERNS = [
     (re.compile(r'(.+)(R[12])$'), 2),
 ]
 
-from validation_pkg.utils.file_handler import (
-    bz2_to_gz,
-    none_to_gz,
-    gz_to_bz2,
-    gz_to_none,
-    bz2_to_none,
-    none_to_bz2,
-    open_compressed_writer
-)
-
-
 # Standalone function for parallel processing (must be picklable - defined at module level)
 def _validate_single_read(record, check_invalid_chars: bool, allow_empty_id: bool):
-    """
-    Validate a single read record (parallelizable).
-
-    This function is standalone (not a method) to be picklable for multiprocessing.
-
-    Args:
-        record: BioPython SeqRecord object
-        check_invalid_chars: If True, check for non-ATCGN characters
-        allow_empty_id: If True, allow empty sequence IDs
-
-    Returns:
-        dict: {'success': True} if valid, or {'error': str, 'record_id': str, 'details': dict} if invalid
-    """
+    """Validate a single read record (parallelizable)."""
     # Check empty ID
     if not record.id and not allow_empty_id:
         return {
@@ -128,42 +99,14 @@ def _validate_single_read(record, check_invalid_chars: bool, allow_empty_id: boo
 
 
 @dataclass
-class OutputMetadata(BaseSettings):
-    """
-    Metadata returned from read validation.
-
-    Fields are populated based on validation_level:
-    - minimal: Only output_file, output_filename, validation_level
-    - trust: + num_reads, Illumina pattern info
-    - strict: All fields (includes n50, total_bases, mean_read_length)
-
-    Attributes:
-        input_file: Full path to input file
-        output_file: Full path to main output file
-        output_filename: Name of output file
-        base_name: Illumina paired-end base name (pattern detection)
-        read_number: Illumina read number (1 or 2) from pattern detection
-        ngs_type_detected: NGS platform type from read header
-        num_reads: Total number of reads in output
-        validation_level: Validation level used ('strict'/'trust'/'minimal')
-        elapsed_time: Time taken for validation in seconds
-
-        # Strict mode only statistics:
-        n50: N50 read length metric in bp (strict only)
-        total_bases: Sum of all read lengths in bp (strict only)
-        mean_read_length: Average read length in bp (strict only)
-        longest_read_length: Length of longest read in bp (strict only)
-        shortest_read_length: Length of shortest read in bp (strict only)
-    """
-    input_file: str = None
-    output_file: str = None
-    output_filename: str = None
+class ReadOutputMetadata(BaseOutputMetadata):
+    """Metadata returned from read validation."""
+    # Read-specific fields
     base_name: str = None
     read_number: int = None
-    ngs_type_detected: str = None
+    ngs_type: str = None  # Configured NGS type from config (pacbio, illumina, ont, etc.)
+    illumina_pairing_detected: str = None  # "illumina" if Illumina paired-end pattern detected
     num_reads: int = None
-    validation_level: str = None
-    elapsed_time: float = None
 
     # Strict mode statistics
     n50: int = None
@@ -172,17 +115,68 @@ class OutputMetadata(BaseSettings):
     longest_read_length: int = None
     shortest_read_length: int = None
 
+    def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
+        """Format read-specific statistics for report output."""
+        lines = []
+
+        # Helper to check if key has value
+        def has_value(key):
+            data = self.to_dict()
+            return key in data and data[key] is not None
+
+        # Helper to format values
+        def format_value(value):
+            if isinstance(value, float):
+                return f"{value:.2f}"
+            elif isinstance(value, int) and value > 999:
+                return f"{value:,}"
+            return str(value)
+
+        # Iterate through all fields, skipping common ones
+        skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
+        special_fields = {'base_name', 'read_number', 'illumina_pairing_detected', 'longest_read_length', 'shortest_read_length'}
+
+        data = self.to_dict()
+
+        for key, value in data.items():
+            if key in skip_fields or value is None:
+                continue
+
+            # Special handling for specific fields
+            if key == 'base_name' and has_value('read_number'):
+                lines.append(f"{indent}paired_end: R{data['read_number']} (base: {value})")
+            elif key == 'read_number' and not has_value('base_name'):
+                # Only show if base_name wasn't already handled
+                lines.append(f"{indent}{key}: R{value}")
+            elif key == 'illumina_pairing_detected':
+                # Show Illumina pairing detection status
+                if value == 'illumina':
+                    lines.append(f"{indent}illumina_pairing_detected: yes")
+            elif key == 'longest_read_length' and has_value('shortest_read_length'):
+                # Show length range
+                lines.append(f"{indent}length_range: {data['shortest_read_length']:,} - {value:,} bp")
+            elif key == 'shortest_read_length':
+                # Skip, handled with longest_read_length
+                continue
+            elif key not in special_fields:
+                # Generic field formatting
+                formatted_value = format_value(value)
+                lines.append(f"{indent}{key}: {formatted_value}")
+
+        return lines
+
     def __str__(self):
         parts = [f"Validation Level: {self.validation_level or 'N/A'}"]
         parts.append(f"Output File: {self.output_file or 'N/A'}")
         parts.append(f"Output Filename: {self.output_filename or 'N/A'}")
 
         # Add Illumina pattern info if available
-        if self.base_name or self.read_number or self.ngs_type_detected or self.num_reads is not None:
+        if self.base_name or self.read_number or self.ngs_type or self.illumina_pairing_detected or self.num_reads is not None:
             parts.append("\n--- Pattern & Read Info ---")
+            parts.append(f"NGS Type: {self.ngs_type or 'N/A'}")
             parts.append(f"Base Name: {self.base_name or 'N/A'}")
             parts.append(f"Read Number: {self.read_number if self.read_number is not None else 'N/A'}")
-            parts.append(f"NGS Type Detected: {self.ngs_type_detected or 'N/A'}")
+            parts.append(f"Illumina Pairing Detected: {self.illumina_pairing_detected or 'N/A'}")
             parts.append(f"Number of Reads: {self.num_reads if self.num_reads is not None else 'N/A'}")
 
         # Add strict statistics if present
@@ -198,102 +192,38 @@ class OutputMetadata(BaseSettings):
         return "\n".join(parts)
 
 
-class ReadValidator:
-    """
-    Validates and processes sequencing read files in FASTQ and BAM formats.
-
-    This validator provides three validation levels:
-        - 'strict': Full parsing and validation of all reads (slowest, most thorough)
-        - 'trust': Fast validation - check line count (FASTQ) or header (BAM) and first records (~10-15x faster)
-        - 'minimal': Only verify file format and copy as-is (fastest, FASTQ only)
-
-    Processing Workflow:
-        FASTQ: Parse → Validate → Apply edits → Save with optional compression
-        BAM: Optionally copy original → Convert to FASTQ → Parse → Validate → Save
-
-    Key Features:
-        - FASTQ line count validation (must be divisible by 4)
-        - Invalid character detection (non-ATCGN nucleotides)
-        - Duplicate ID detection
-        - BAM to FASTQ conversion (requires pysam or samtools)
-        - NGS type-based output directory organization
-        - Efficient compression conversion without full decompression
-
-    Attributes:
-        read_config: ReadConfig object with file path, format, and NGS type
-        output_dir: Directory for output files
-        settings: Settings object controlling validation and processing behavior
-        sequences: List of parsed SeqRecord objects (populated during validation)
-
-    """
+class ReadValidator(BaseValidator):
+    """Validates and processes sequencing read files in FASTQ and BAM formats."""
 
     @dataclass
-    class Settings(BaseSettings):
-        """
-        Settings for read validation and processing.
-
-        Attributes:
-            check_invalid_chars: If True, validates that sequences contain only valid nucleotides (ATCGN)
-            allow_empty_id: If True, allows sequences without IDs
-            allow_duplicate_ids: If True, allows duplicate sequence IDs across the file
-            keep_bam: If True, keeps a copy of the original BAM file when converting to FASTQ
-            coding_type: Output compression type ('gz', 'bz2', or None for uncompressed)
-            output_filename_suffix: Optional suffix to add to output filename (e.g., 'filtered')
-            output_subdir_name: Optional subdirectory name within output_dir for saving files
-            outdir_by_ngs_type: If True, automatically set output_subdir_name to ngs_type (default: False)
-
-        Note:
-            When outdir_by_ngs_type=True, output_subdir_name will be automatically set to the
-            read's ngs_type (illumina/ont/pacbio), overriding any manually set value.
-
-        """
+    class Settings(BaseValidatorSettings):
+        """Settings for read validation and processing."""
         # Validation options
-        check_invalid_chars: bool = False 
+        check_invalid_chars: bool = False
         allow_empty_id: bool = False
         allow_duplicate_ids: bool = True
 
         # Editing specifications
-        keep_bam: bool = True 
+        keep_bam: bool = True
         ignore_bam: bool = True
 
-        # Output format
-        coding_type: Optional[str] = None
-        output_filename_suffix: Optional[str] = None
-        output_subdir_name: Optional[str] = None
+        # Read-specific output options
         outdir_by_ngs_type: bool = False
 
+        def __post_init__(self):
+            """Normalize settings after initialization."""
+            # Normalize coding_type from base class
+            self._normalize_coding_type()
+
     def __init__(self, read_config, settings: Optional[Settings] = None) -> None:
-        """
-        Initialize read validator.
+        # Call base class initialization
+        super().__init__(read_config, settings)
 
-        Args:
-            read_config: ReadConfig object from ConfigManager with file info
-            settings: Settings object with validation parameters.
-                If None, uses options from read_config.options (threads, validation_level),
-                otherwise uses defaults.
-        """
-        self.logger = get_logger()
-
-        # From genome global configuration
+        # Keep read_config for type safety and specific access
         self.read_config = read_config
-        self.output_dir = read_config.output_dir
-        self.validation_level = read_config.global_options.get("validation_level")   
-        self.threads = read_config.global_options.get("threads") 
-        self.input_path = read_config.filepath
 
-        # From settings
-        self.settings = settings if settings is not None else self.Settings() 
-        self.output_metadata = OutputMetadata()
-
-        # Parsed data
+        # Validator-specific data
         self.sequences = []  # List of SeqRecord objects
-
-        if not self.validation_level:
-            self.validation_level = 'strict'    #   default global value
-
-        if not self.threads:
-            from validation_pkg.config_manager import DEFAULT_THREADS
-            self.threads = DEFAULT_THREADS    #   default global value
 
         # Apply outdir_by_ngs_type if enabled
         if self.settings.outdir_by_ngs_type:
@@ -301,13 +231,139 @@ class ReadValidator:
             self.settings = self.settings.update(output_subdir_name=self.read_config.ngs_type)
             self.logger.debug(f"Applied outdir_by_ngs_type: output_subdir_name set to '{self.read_config.ngs_type}'")
 
-    def _calculate_read_statistics(self) -> dict:
-        """
-        Calculate read statistics for strict mode.
+    # Required abstract properties and methods from BaseValidator
 
-        Returns:
-            dict with keys: n50, total_bases, mean_read_length, longest_read_length, shortest_read_length
-        """
+    @property
+    def _validator_type(self) -> str:
+        """Return validator type string."""
+        return 'read'
+
+    @property
+    def OutputMetadata(self) -> Type:
+        """Return ReadOutputMetadata class for this validator."""
+        return ReadOutputMetadata
+
+    @property
+    def _output_format(self) -> str:
+        """Return output format string for build_output_path."""
+        return 'fastq'
+
+    @property
+    def _expected_format(self) -> Any:
+        """Return expected format for minimal mode validation."""
+        return ReadFormat.FASTQ
+
+    def _get_validator_exception(self) -> Type[Exception]:
+        """Return the validator-specific exception class."""
+        return ReadValidationError
+
+    def _handle_minimal_mode(self) -> Path:
+        """Handle minimal validation mode with FASTQ-specific checks."""
+        # Call base implementation for format/compression validation
+        self.logger.debug("Minimal mode - validating format and coding requirements")
+
+        # Validate format matches
+        if self.config.detected_format != self._expected_format:
+            error_msg = (
+                f'Minimal mode requires {self._expected_format} format, '
+                f'got {self.config.detected_format}. '
+                f'Use validation_level "trust" or "strict" to convert.'
+            )
+            self.logger.add_validation_issue(
+                level='ERROR',
+                category=self._validator_type,
+                message=error_msg,
+                details={
+                    'file': self.config.filename,
+                    'detected_format': str(self.config.detected_format),
+                    'expected_format': str(self._expected_format)
+                }
+            )
+            raise ReadValidationError(error_msg)
+
+        # Validate coding matches
+        if self.config.coding_type != self.settings.coding_type:
+            error_msg = (
+                f'Minimal mode requires input coding to match output coding. '
+                f'Input: {self.config.coding_type}, Required: {self.settings.coding_type}. '
+                f'Use validation_level "trust" or "strict" to change compression.'
+            )
+            self.logger.add_validation_issue(
+                level='ERROR',
+                category=self._validator_type,
+                message=error_msg,
+                details={
+                    'file': self.config.filename,
+                    'input_coding': str(self.config.coding_type),
+                    'required_coding': str(self.settings.coding_type)
+                }
+            )
+            raise ReadValidationError(error_msg)
+
+        # Additional FASTQ-specific validation: check line count divisible by 4
+        try:
+            line_count = self._count_lines_fast()
+            if line_count % 4 != 0:
+                error_msg = f"Invalid FASTQ: {line_count:,} lines not divisible by 4"
+                self.logger.add_validation_issue(
+                    level='ERROR',
+                    category='read',
+                    message=error_msg,
+                    details={'file': self.read_config.filename, 'line_count': line_count}
+                )
+                raise FastqFormatError(error_msg)
+            num_sequences = line_count // 4
+            self.logger.info(f"Minimal mode - verified {num_sequences:,} sequences (line count check)")
+        except FastqFormatError:
+            raise
+        except Exception as e:
+            error_msg = f"Minimal mode validation failed: {e}"
+            self.logger.add_validation_issue(
+                level='ERROR',
+                category='read',
+                message=error_msg,
+                details={'file': self.read_config.filename, 'error': str(e)}
+            )
+            raise ReadValidationError(error_msg) from e
+
+        # Copy file to output
+        return copy_file(self.input_path, self.output_path, self.logger)
+
+    def _build_output_filename(
+        self,
+        input_filename: str,
+        output_format: str,
+        coding_type: Optional[Any] = None,
+        suffix: Optional[str] = None,
+        input_path: Optional[Path] = None
+    ) -> str:
+        """Build output filename with Illumina pattern detection for reads."""
+        # Detect Illumina pattern if ngs_type is illumina
+        if self.read_config.ngs_type == 'illumina':
+            self._detect_illumina_pattern(input_filename)
+
+        # Generate base name based on detected pattern
+        if self.output_metadata.base_name and self.output_metadata.read_number:
+            # Paired-end detected: use detected base name with R1/R2 suffix
+            base_name = f"{self.output_metadata.base_name}_R{self.output_metadata.read_number}"
+        else:
+            # Single-end (no pattern detected): use basename with _R1 suffix
+            base_name = f"{self.read_config.basename}_R1"
+
+        # Add custom suffix if provided
+        if suffix:
+            filename = f"{base_name}_{suffix}.{output_format}"
+        else:
+            filename = f"{base_name}.{output_format}"
+
+        # Add compression extension if specified
+        if coding_type:
+            filename += coding_type.to_extension()
+
+        return filename
+
+    def _calculate_read_statistics(self) -> dict:
+        """Calculate read statistics for strict mode."""
         if not self.sequences:
             return {
                 'n50': 0,
@@ -320,16 +376,9 @@ class ReadValidator:
         # Get read lengths
         lengths = [len(seq.seq) for seq in self.sequences]
 
-        # Calculate N50
-        sorted_lengths = sorted(lengths, reverse=True)
-        total_length = sum(sorted_lengths)
-        cumulative_length = 0
-        n50 = 0
-        for length in sorted_lengths:
-            cumulative_length += length
-            if cumulative_length >= total_length / 2:
-                n50 = length
-                break
+        # Calculate statistics
+        total_length = sum(lengths)
+        n50 = calculate_n50(lengths)
 
         return {
             'n50': n50,
@@ -340,19 +389,15 @@ class ReadValidator:
         }
 
     def _fill_output_metadata(self, output_path: Path) -> None:
-        """
-        Create OutputMetadata object based on validation level.
+        """Populate output metadata with validation results."""
+        # Fill common fields from base class
+        self._fill_base_metadata(output_path)
 
-        Args:
-            output_path: Path to the main output file
-
-        """
-        # Populate and return OutputMetadata
-        self.output_metadata.input_file = self.read_config.filename
-        self.output_metadata.output_file = str(output_path) if output_path else None
-        self.output_metadata.output_filename = output_path.name if output_path else None
+        # Add read-specific fields
         self.output_metadata.num_reads = len(self.sequences)
-        self.output_metadata.validation_level = self.validation_level
+
+        # Store configured NGS type
+        self.output_metadata.ngs_type = self.read_config.ngs_type
 
         # Calculate read statistics in strict mode only
         if self.validation_level == 'strict' and self.sequences:
@@ -363,267 +408,58 @@ class ReadValidator:
             self.output_metadata.longest_read_length = stats['longest_read_length']
             self.output_metadata.shortest_read_length = stats['shortest_read_length']
 
+    def _run_validation(self) -> Path:
+        """Execute validation and processing workflow for trust/strict modes."""
+        # Special workflow for BAM files
+        if self.read_config.detected_format == ReadFormat.BAM:
+            if self.settings.ignore_bam:
+                self.logger.warning(f"Cannot process BAM files, the file will be ignored")
+                # Return None to indicate file was skipped
+                return None
 
-    def run(self) -> OutputMetadata:
-        """
-        Main validation and processing workflow.
+            # Step 1: Copy original BAM to output (if keep_bam is enabled)
+            if self.settings.keep_bam:
+                self._copy_bam_to_output()
 
-        Uses read_config data (format, compression) provided by ConfigManager.
+            # Step 2: Convert BAM to FASTQ (populates self.sequences)
+            self._convert_bam_to_fastq()
 
-        Workflow differs based on input format:
-        - FASTQ: Parse → Validate → Edit → Save
-        - BAM: Copy original → Convert to FASTQ → Parse → Validate → Edit → Save
+            # Step 3: Validate sequences
+            self._validate_sequences()
 
-        Returns:
-            OutputMetadata: Metadata object containing:
-                - output_file: Full path to output file
-                - output_filename: Name of output file
-                - Illumina pattern detection (base_name, read_number)
-                - num_reads: Total number of reads
-                - validation_level: Validation mode used
+            # Step 4: Apply editing specifications
+            self._apply_edits()
 
-        Raises:
-            ReadValidationError: If validation fails
-        """
-        self.logger.start_timer("read_validation")
-        self.logger.info(f"Processing read file: {self.read_config.filename}")
-        self.logger.debug(f"Format: {self.read_config.detected_format}, Compression: {self.read_config.coding_type}")
+            # Step 5: Save FASTQ output
+            output_path = self._write_output()
 
-        try:
-            # Special workflow for BAM files
-            if self.read_config.detected_format == ReadFormat.BAM:
-                if self.settings.ignore_bam:
-                    self.logger.warning(f"Cannot process BAM files, the file will be ignored")
-                    # Return minimal metadata indicating the file was skipped
-                    return OutputMetadata(
-                        input_file=str(self.input_path),
-                        output_file=None,
-                        output_filename=None,
-                        num_reads=0,
-                        validation_level=self.settings.validation_level,
-                        elapsed_time=0.0
-                    )
+        else:
+            # Standard FASTQ workflow
+            # Step 1: Parse and validate
+            self._parse_file()
 
-                # Step 1: Copy original BAM to output (if keep_bam is enabled)
-                if self.settings.keep_bam:
-                    self._copy_bam_to_output()
+            # Validate sequences
+            self._validate_sequences()
 
-                # Step 2: Convert BAM to FASTQ (populates self.sequences)
-                self._convert_bam_to_fastq()
+            # Step 2: Apply editing specifications
+            self._apply_edits()
 
-                # Step 3: Validate sequences
-                self._validate_sequences()
+            # Step 3: Save to output directory (already FASTQ)
+            output_path = self._write_output()
 
-                # Step 4: Apply editing specifications
-                self._apply_edits()
-
-                # Step 6: Save FASTQ output
-                output_path = self._save_output()
-
-            else:
-                # Standard FASTQ workflow
-                # Step 1: Parse and validate
-                self._parse_file()
-
-                # Validate sequences
-                self._validate_sequences()
-
-                # Step 2: Apply editing specifications
-                self._apply_edits()
-
-                # Step 3: If ilumina, detect file read number and basename
-                if self.read_config.ngs_type == 'illumina':
-                    self._detect_illumina_pattern(self.read_config.filename)
-
-                # Step 4: Save to output directory (already FASTQ)
-                output_path = self._save_output()
-
-            elapsed = self.logger.stop_timer("read_validation")
-            self.logger.info(f"✓ Read validation completed in {elapsed:.2f}s")
-
-            # Record file timing for report
-            self.logger.add_file_timing(
-                self.read_config.filename,
-                "read",
-                elapsed
-            )
-
-            # Create and return OutputMetadata
-            self._fill_output_metadata(output_path)
-            self.output_metadata.elapsed_time = elapsed
-            return self.output_metadata
-
-        except Exception as e:
-            self.logger.error(f"Read validation failed: {e}")
-            raise
-
-    def _open_file(self, mode: str = 'rt') -> IO:
-        """
-        Open file with automatic decompression based on read_config.
-
-        Uses centralized file opening from file_handler.py to eliminate code duplication.
-
-        Args:
-            mode: File opening mode (default: 'rt' for text read)
-
-        Returns:
-            File handle
-
-        Raises:
-            CompressionError: If file cannot be opened or decompressed
-        """
-        try:
-            from validation_pkg.utils.file_handler import open_file_with_coding_type
-            return open_file_with_coding_type(
-                self.input_path,
-                self.read_config.coding_type,
-                mode
-            )
-        except CompressionError as e:
-            self.logger.add_validation_issue(
-                level='ERROR',
-                category='read',
-                message=str(e),
-                details={'file': str(self.input_path)}
-            )
-            raise
+        return output_path
 
     def _count_lines_fast(self) -> int:
-        """
-        Fast line counting using Python file iteration.
-
-        Uses Python's built-in gzip/bz2 libraries for secure line counting:
-        - gzip (.gz): gzip.open() with text mode
-        - bzip2 (.bz2): bz2.open() with text mode
-        - uncompressed: open() with text mode
-
-        This method is secure against command injection attacks (no shell commands)
-        and works efficiently by iterating over lines without loading entire file
-        into memory.
-
-        Returns:
-            Number of lines in the file
-
-        Raises:
-            ReadValidationError: If line counting fails
-
-        Security:
-            This implementation uses Python libraries exclusively (no subprocess or
-            shell commands), preventing command injection vulnerabilities.
-        """
-        from validation_pkg.utils.file_handler import open_file_with_coding_type
-
+        """Fast line counting using Python file iteration."""
         try:
-            # Count lines using Python file iteration (no shell commands)
-            # This is secure against command injection and works for all compression types
-            with open_file_with_coding_type(self.input_path, self.read_config.coding_type, mode='rt') as f:
-                line_count = sum(1 for _ in f)
-
-            return line_count
-
-        except TimeoutError:
-            raise ReadValidationError("Line counting timed out - file too large")
-        except (ValueError, IndexError) as e:
-            raise ReadValidationError(f"Failed to parse line count: {e}")
+            with self._open_file('rt') as f:
+                return sum(1 for _ in f)
         except Exception as e:
             raise ReadValidationError(f"Line counting failed: {e}")
 
-    def _validate_first_fastq_record(self) -> Optional[SeqRecord]:
-        """
-        Validate only the first FASTQ record for format correctness.
-
-        This method performs fast validation by checking only the first record
-        without parsing the entire file. Used in trust mode for performance.
-
-        Validation Checks:
-            1. Line 1 starts with '@' (sequence ID)
-            2. Line 2 contains sequence
-            3. Line 3 starts with '+' (separator)
-            4. Line 4 contains quality scores (same length as sequence)
-
-        Returns:
-            First SeqRecord if valid, None if validation fails
-
-        Raises:
-            FastqFormatError: If first record is not in valid FASTQ format
-        """
-        self.logger.debug("Validating first FASTQ record...")
-
-        try:
-            handle = self._open_file()
-            try:
-                # Read first 4 lines
-                lines = []
-                for i in range(4):
-                    line = handle.readline()
-                    if not line:
-                        raise FastqFormatError(
-                            f"File has fewer than 4 lines - not a valid FASTQ file"
-                        )
-                    lines.append(line.rstrip('\n\r'))
-
-                # Validate FASTQ format
-                if not lines[0].startswith('@'):
-                    raise FastqFormatError(
-                        f"First line must start with '@', found: {lines[0][:50]}"
-                    )
-
-                if not lines[2].startswith('+'):
-                    raise FastqFormatError(
-                        f"Third line must start with '+', found: {lines[2][:50]}"
-                    )
-
-                # Check that sequence and quality have same length
-                seq_len = len(lines[1])
-                qual_len = len(lines[3])
-                if seq_len != qual_len:
-                    raise FastqFormatError(
-                        f"Sequence length ({seq_len}) doesn't match quality length ({qual_len})"
-                    )
-
-                # Parse first record using BioPython to ensure it's valid
-                from io import StringIO
-                first_record_text = '\n'.join(lines)
-                record = next(SeqIO.parse(StringIO(first_record_text), 'fastq'))
-
-                self.logger.debug(f"✓ First record validated: {record.id}, length={len(record.seq)}")
-                return record
-
-            finally:
-                handle.close()
-
-        except FastqFormatError:
-            raise
-        except Exception as e:
-            error_msg = f"Failed to validate first FASTQ record: {e}"
-            self.logger.add_validation_issue(
-                level='ERROR',
-                category='read',
-                message=error_msg,
-                details={'file': self.read_config.filename, 'error': str(e)}
-            )
-            raise FastqFormatError(error_msg) from e
-    
     def _parse_file(self) -> None:
-        """
-        Parse FASTQ file using BioPython and validate format from read_config.
-
-        Behavior depends on validation_level:
-        - 'strict': Full parsing and validation of all sequences
-        - 'trust': Only validate first record and check line count
-        - 'minimal': No parsing or validation
-
-        Note: BAM files are handled separately in the validate() method.
-        This method only processes FASTQ files.
-        """
+        """Parse FASTQ file using BioPython (trust/strict modes only)."""
         self.logger.debug(f"Parsing {self.read_config.detected_format} file (validation_level={self.validation_level})...")
-
-        # Minimal mode - skip all parsing and validation except CodingType
-        if self.validation_level == 'minimal':
-            self.logger.info("Minimal validation mode - skipping file parsing")
-            # Set empty sequences list - file will be copied as-is in _save_output
-            self.sequences = []
-            return
 
         # Trust mode: Parse only first TRUST_MODE_SAMPLE_SIZE sequences for validation
         # Strict mode: Parse all sequences
@@ -652,7 +488,7 @@ class ReadValidator:
                 progress_interval = None
 
             # Open file with automatic decompression
-            handle = self._open_file()
+            handle = self._open_file('rt')
             try:
                 # Parse using BioPython with clean enum conversion
                 biopython_format = self.read_config.detected_format.to_biopython()
@@ -716,20 +552,7 @@ class ReadValidator:
             raise exception_class(error_msg) from e
     
     def _validate_sequences(self) -> None:
-        """
-        Validate parsed sequences with optional parallelization.
-
-        Behavior depends on validation_level:
-        - 'strict': Validate all sequences (optionally in parallel if threads > 1)
-        - 'trust': Validate only first 10 sequences (sequential)
-        - 'minimal': Skip (no sequences parsed)
-
-        Parallelization:
-        - Only enabled in strict mode when self.threads > 1
-        - Uses multiprocessing.Pool for true parallelism (bypasses GIL)
-        - Chunk-based processing to amortize overhead
-        - All validation errors are collected before raising
-        """
+        """Validate parsed sequences with optional parallelization."""
         # Determine how many sequences to validate
         if self.validation_level == 'trust':
             validate_count = min(10, len(self.sequences))
@@ -808,41 +631,25 @@ class ReadValidator:
             for idx in range(validate_count):
                 record = self.sequences[idx]
 
-                # Check sequence ID
-                if not record.id and not self.settings.allow_empty_id:
-                    error_msg = f"Sequence at index {idx} has no ID"
+                # Use the same validation function as parallel mode
+                result = _validate_single_read(
+                    record,
+                    check_invalid_chars=self.settings.check_invalid_chars,
+                    allow_empty_id=self.settings.allow_empty_id
+                )
+
+                if 'error' in result:
+                    error_msg = f"Sequence '{result['record_id']}': {result['error']}"
                     self.logger.add_validation_issue(
                         level='ERROR',
                         category='read',
                         message=error_msg,
-                        details={'sequence_index': idx, 'sequence_id': str(record.id)}
+                        details={**result['details'], 'sequence_index': idx}
                     )
                     raise ReadValidationError(error_msg)
 
-                # Check for valid nucleotides
-                if self.settings.check_invalid_chars:
-                    valid_chars = set('ATCGNatcgn')
-                    seq_str = str(record.seq)
-                    invalid_chars = set(seq_str) - valid_chars
-
-                    if invalid_chars:
-                        char_count = sum(1 for c in seq_str if c in invalid_chars)
-                        error_msg = f"Sequence '{record.id}' contains {char_count} invalid character(s): {', '.join(sorted(invalid_chars))}"
-                        self.logger.add_validation_issue(
-                            level='ERROR',
-                            category='read',
-                            message=error_msg,
-                            details={
-                                'sequence_id': record.id,
-                                'invalid_chars': list(invalid_chars),
-                                'count': char_count
-                            }
-                        )
-                        raise ReadValidationError(error_msg)
-
         # Check for duplicate IDs (always sequential - requires full list)
         if not self.settings.allow_duplicate_ids:
-            from collections import Counter
             seq_ids = [record.id for record in self.sequences]
             if len(seq_ids) != len(set(seq_ids)):
                 # Use Counter for O(n) instead of O(n²) duplicate detection
@@ -862,17 +669,7 @@ class ReadValidator:
             self.logger.debug("✓ Sequence validation passed")
     
     def _apply_edits(self) -> None:
-        """
-        Apply editing specifications to sequences based on settings.
-
-        Future edits may include:
-        - Remove short sequences (min_read_length)
-        - Quality filtering
-        - Adapter trimming
-        - Read ID prefix/suffix modification
-
-        Note: Parallelization should be added here when edits are implemented.
-        """
+        """Apply editing specifications to sequences based on settings."""
         self.logger.debug("Applying editing specifications from settings...")
 
         # Currently no edits are implemented
@@ -881,32 +678,7 @@ class ReadValidator:
         self.logger.debug(f"✓ Edits applied, {len(self.sequences)} sequence(s) remaining")
     
     def _convert_bam_to_fastq(self) -> None:
-        """
-        Convert BAM file to FASTQ format using pysam or samtools.
-
-        This method attempts to use pysam (Python library) first for better
-        performance and control. If pysam is not available, it falls back to
-        the samtools command-line tool.
-
-        Behavior by validation level:
-            - 'strict': Full conversion of all reads (skips unmapped/secondary/supplementary)
-            - 'trust': Only validate BAM header and first 10 reads for format correctness
-            - 'minimal': Skip conversion entirely
-
-        Progress Reporting:
-            Reports progress every 5% or 100k reads (whichever is appropriate)
-
-        Raises:
-            ReadValidationError: If conversion fails or neither pysam nor samtools is available
-            BamFormatError: If BAM file is malformed or missing header
-        """
-        import subprocess
-
-        # Minimal mode - skip conversion
-        if self.validation_level == 'minimal':
-            self.logger.info("Minimal validation mode - skipping BAM conversion")
-            self.sequences = []
-            return
+        """Convert BAM file to FASTQ format using pysam or samtools (trust/strict modes only)."""
 
         # Trust mode - validate header and first few reads only
         if self.validation_level == 'trust':
@@ -1065,7 +837,6 @@ class ReadValidator:
                 raise ReadValidationError(error_msg)
 
             # Parse FASTQ output from samtools
-            from io import StringIO
             fastq_data = StringIO(result.stdout)
             self.sequences = list(SeqIO.parse(fastq_data, "fastq"))
 
@@ -1087,29 +858,22 @@ class ReadValidator:
             raise ReadValidationError(error_msg) from e
     
     def _copy_bam_to_output(self) -> Path:
-        """
-        Copy BAM file to output directory without processing.
+        """Copy BAM file to output directory without processing."""
 
-        Returns:
-            Path to output file
-        """
         self.logger.debug("Copying BAM file to output directory...")
 
-        # Determine output directory (with optional subdirectory)
-        output_dir = self.output_dir
-        if self.settings.output_subdir_name:
-            output_dir = output_dir / self.settings.output_subdir_name
-
-        # Create output directory
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Build safe output directory (with path traversal protection)
+        output_dir = build_safe_output_dir(
+            self.output_dir,
+            self.settings.output_subdir_name,
+            create=True
+        )
 
         # Generate output filename - keep original name and compression
         output_filename = self.read_config.filename
         if self.settings.output_filename_suffix:
             # Insert suffix before extensions
-            base_name = self.read_config.filename
-            for suffix in self.input_path.suffixes:
-                base_name = base_name.replace(suffix, '')
+            base_name = strip_all_extensions(self.read_config.filename, self.input_path)
             # Reconstruct with suffix and original extensions
             extensions = ''.join(self.input_path.suffixes)
             output_filename = f"{base_name}_{self.settings.output_filename_suffix}{extensions}"
@@ -1123,166 +887,36 @@ class ReadValidator:
         self.logger.info(f"BAM file copied: {output_path}")
         return output_path
 
-    def _save_output(self) -> Path:
-        """
-        Save processed read to output directory using settings.
-
-        Behavior depends on validation_level:
-        - 'strict': Write sequences using BioPython
-        - 'trust' or 'minimal': Copy file as-is (preserve original format)
-
-        Note: Compression handling will be moved to utils/file_handler.py in future.
-
-        Returns:
-            Path to output file
-        """
-        self.logger.debug("Saving output file...")
-
-        # Determine output directory (with optional subdirectory)
-        output_dir = self.output_dir
-        if self.settings.output_subdir_name:
-            output_dir = output_dir / self.settings.output_subdir_name
-
-        # Create output directory
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Generate output filename from original filename (without compression extension)
-        # Get base name without any extensions
-        if self.output_metadata.base_name and self.output_metadata.read_number:
-            # Paired-end detected: use detected base name with R1/R2 suffix
-            base_name = f"{self.output_metadata.base_name}_R{self.output_metadata.read_number}"
-        else:
-            # Single-end (no pattern detected): use basename with _R1 suffix
-            # This ensures all Illumina reads have consistent _R1 or _R2 naming
-            base_name = f"{self.read_config.basename}_R1"
-
-        # Add suffix if specified
-        if self.settings.output_filename_suffix:
-            output_filename = f"{base_name}_{self.settings.output_filename_suffix}.fastq"
-        else:
-            output_filename = f"{base_name}.fastq"
-
-        # Add compression extension if requested (from settings)
-        # Normalize settings.coding_type to CodingType enum
-        coding = CT(self.settings.coding_type) if self.settings.coding_type else CT.NONE
-
-        if coding == CT.GZIP:
-            output_filename += '.gz'
-        elif coding == CT.BZIP2:
-            output_filename += '.bz2'
-
-        output_path = output_dir / output_filename
-
-        # Minimal mode - copy file as-is without parsing
-        # Required: FASTQ format + coding must match settings.coding_type
-        if self.validation_level == 'minimal':
-            self.logger.debug("Minimal mode - validating format and coding requirements")
-
-            # Check format - must be FASTQ
-            if self.read_config.detected_format != ReadFormat.FASTQ:
-                error_msg = f'Minimal mode requires FASTQ format, got {self.read_config.detected_format}. Use validation_level "trust" or "strict" to convert.'
-                self.logger.add_validation_issue(
-                    level='ERROR',
-                    category='read',
-                    message=error_msg,
-                    details={'file': self.read_config.filename, 'detected_format': str(self.read_config.detected_format)}
-                )
-                raise ReadValidationError(error_msg)
-
-            # Check coding - must match settings.coding_type
-            # read_config.coding_type is CodingType enum, coding is normalized above
-            input_coding = self.read_config.coding_type
-            required_coding = coding
-
-            if input_coding != required_coding:
-                error_msg = f'Minimal mode requires input coding to match output coding. Input: {input_coding}, Required: {required_coding}. Use validation_level "trust" or "strict" to change compression.'
-                self.logger.add_validation_issue(
-                    level='ERROR',
-                    category='read',
-                    message=error_msg,
-                    details={'file': self.read_config.filename, 'input_coding': str(input_coding), 'required_coding': str(required_coding)}
-                )
-                raise ReadValidationError(error_msg)
-
-            # Check line count divisible by 4 (fast validation)
-            try:
-                line_count = self._count_lines_fast()
-                if line_count % 4 != 0:
-                    error_msg = f"Invalid FASTQ: {line_count:,} lines not divisible by 4"
-                    self.logger.add_validation_issue(
-                        level='ERROR',
-                        category='read',
-                        message=error_msg,
-                        details={'file': self.read_config.filename, 'line_count': line_count}
-                    )
-                    raise FastqFormatError(error_msg)
-                num_sequences = line_count // 4
-                self.logger.info(f"Minimal mode - verified {num_sequences:,} sequences (line count check)")
-            except FastqFormatError:
-                raise
-            except Exception as e:
-                error_msg = f"Minimal mode validation failed: {e}"
-                self.logger.add_validation_issue(
-                    level='ERROR',
-                    category='read',
-                    message=error_msg,
-                    details={'file': self.read_config.filename, 'error': str(e)}
-                )
-                raise ReadValidationError(error_msg) from e
-
-            # Use the output_filename already constructed (includes correct extension)
-            output_path_minimal = output_dir / output_filename
-
-            # Copy file
-            self.logger.debug(f"Copying {self.input_path} to {output_path_minimal}")
-            shutil.copy2(self.input_path, output_path_minimal)
-
-            self.logger.info(f"Output saved: {output_path_minimal}")
-            return output_path_minimal
+    def _write_output(self) -> Path:
+        """Write processed read to output file (trust/strict modes only)."""
+        # Store input and required coding for later use
+        input_coding = self.read_config.coding_type
+        required_coding = self.settings.coding_type
 
         # Trust mode - copy original file with coding conversion
         # Trust mode parsed only first 10 sequences for validation, so we copy the original file
         if self.validation_level == 'trust':
             self.logger.debug("Trust mode - copying original file with coding conversion")
 
-            # Both are CodingType enum: read_config.coding_type and coding (normalized above)
-            input_coding = self.read_config.coding_type
-            output_coding = coding
+            # Convert coding using unified file_handler utility
+            if input_coding != required_coding:
+                self.logger.debug(f"Converting {input_coding} -> {required_coding}")
 
-            # If input and output coding match, simple copy
-            if input_coding == output_coding:
-                self.logger.debug(f"Copying {self.input_path} to {output_path} (same coding)")
-                shutil.copy2(self.input_path, output_path)
-            else:
-                # Convert coding using file_handler utilities
-                self.logger.debug(f"Converting {input_coding} -> {output_coding}")
+            convert_file_compression(
+                self.input_path,
+                self.output_path,
+                input_coding,
+                required_coding,
+                threads=self.threads
+            )
 
-                # Map (input, output) pairs to conversion functions
-                conversion_map = {
-                    (CT.BZIP2, CT.GZIP): bz2_to_gz,
-                    (CT.NONE, CT.GZIP): none_to_gz,
-                    (CT.GZIP, CT.NONE): gz_to_none,
-                    (CT.BZIP2, CT.NONE): bz2_to_none,
-                    (CT.NONE, CT.BZIP2): none_to_bz2,
-                    (CT.GZIP, CT.BZIP2): gz_to_bz2,
-                }
-
-                conversion_func = conversion_map.get((input_coding, output_coding))
-                if conversion_func:
-                    conversion_func(self.input_path, output_path, threads=self.threads)
-                else:
-                    error_msg = f"Unsupported coding conversion: {input_coding} -> {output_coding}"
-                    raise ReadValidationError(error_msg)
-
-            self.logger.info(f"Output saved: {output_path}")
-            return output_path
+            self.logger.info(f"Output saved: {self.output_path}")
+            return self.output_path
 
         # Strict mode - optimize based on whether edits were applied
         # If input is FASTQ, coding matches, and no edits were made, use simple copy
         # Otherwise, write sequences using BioPython
 
-        input_coding = self.read_config.coding_type
-        output_coding = coding
         input_format = self.read_config.detected_format
 
         # Check if we can use optimized copy (no edits, same format and coding)
@@ -1290,42 +924,29 @@ class ReadValidator:
         # In the future, check if edits were actually applied (e.g., sequences removed/modified)
         can_optimize = (
             input_format == ReadFormat.FASTQ and  # Input is FASTQ
-            input_coding == output_coding  # Compression matches
+            input_coding == required_coding  # Compression matches
             # Future: add check for "no edits were actually applied"
         )
 
         if can_optimize:
             # Optimized path: simple copy (no need to parse/write)
-            self.logger.debug(f"Optimized copy: {self.input_path} to {output_path} (no edits, same format/coding)")
-            shutil.copy2(self.input_path, output_path)
+            self.logger.debug(f"Optimized copy: {self.input_path} to {self.output_path} (no edits, same format/coding)")
+            shutil.copy2(self.input_path, self.output_path)
         else:
             # Standard path: write sequences using BioPython
             # Used when: BAM conversion, compression change, or future edits
-            self.logger.debug(f"Writing output to: {output_path}")
+            self.logger.debug(f"Writing output to: {self.output_path}")
 
             # Use optimized compression writer
-            with open_compressed_writer(output_path, coding, threads=self.threads) as handle:
+            with open_compressed_writer(self.output_path, self.settings.coding_type, threads=self.threads) as handle:
                 SeqIO.write(self.sequences, handle, 'fastq')
 
-        self.logger.info(f"Output saved: {output_path}")
+        self.logger.info(f"Output saved: {self.output_path}")
 
-        return output_path
+        return self.output_path
     
     def _detect_illumina_pattern(self, filename: str) -> None:
-        """
-        Detect Illumina paired-end naming patterns in filename.
-
-        Supports common Illumina naming conventions:
-        - _R1, _R2 (standard Illumina)
-        - _1, _2 (SRA/NCBI style)
-        - .R1, .R2 (dot separator)
-        - .1, .2 (dot separator)
-        - _R1_001, _R2_001 (with lane numbers)
-        - R1, R2 (no separator, at end of basename)
-
-        Args:
-            filename: Input filename (with or without extension)
-        """
+        """Detect Illumina paired-end naming patterns in filename."""
 
         # Strip only the last 2 extensions (format + compression)
         base = self.read_config.basename
@@ -1347,7 +968,7 @@ class ReadValidator:
 
                 self.output_metadata.base_name = base_name
                 self.output_metadata.read_number = read_number
-                self.output_metadata.ngs_type_detected = 'illumina'
+                self.output_metadata.illumina_pairing_detected = 'illumina'
 
                 if hasattr(self, 'logger') and self.logger:
                     self.logger.debug(
@@ -1356,10 +977,10 @@ class ReadValidator:
                 return  # Early return after successful match
 
         # No paired-end pattern matched - fallback for single-end or non-standard naming
-        # Always set ngs_type_detected for Illumina files, even without pairing info
+        # Always set illumina_pairing_detected for Illumina files, even without pairing info
         self.output_metadata.base_name = base
         self.output_metadata.read_number = 1  # Default to R1 for single-end
-        self.output_metadata.ngs_type_detected = 'illumina'
+        self.output_metadata.illumina_pairing_detected = 'illumina'
 
         if hasattr(self, 'logger') and self.logger:
             self.logger.debug(

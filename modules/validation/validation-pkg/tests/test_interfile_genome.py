@@ -1,12 +1,17 @@
 """
-Tests for inter-file genome validation (GenomeXGenomeSettings, genomexgenome_validation).
+Tests for inter-file genome validation.
 
-Tests genome-to-genome consistency checks.
+Tests cover:
+- Genome-to-genome consistency checks
+- Sequence ID matching between reference and modified genomes
+- GenomeXGenomeSettings configuration
+- genomexgenome_validation function
+- Error handling for mismatched genomes
 """
 
 import pytest
 from validation_pkg.validators.interfile_genome import GenomeXGenomeSettings, genomexgenome_validation
-from validation_pkg.validators.genome_validator import OutputMetadata as GenomeOutputMetadata
+from validation_pkg.validators.genome_validator import GenomeOutputMetadata
 from validation_pkg.exceptions import GenomeValidationError
 
 

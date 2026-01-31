@@ -24,7 +24,7 @@ process freebayes {
 }
 
 /*
-*  Building SNPEff config for vcf annotations
+* SNPEff build
 */
 
 process build_config {
@@ -96,7 +96,7 @@ process snpeff {
  * Getting variants statistics with bcftools stats
 */
 process bcftools_stats {
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.23'
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/bcftools_stats", mode: 'copy'
 
@@ -119,7 +119,7 @@ process bcftools_stats {
  * Truvari requires sorted vcfs for comparision
 */
 process sortVcf {
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.23'
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 
@@ -139,7 +139,7 @@ process sortVcf {
  * Truvari require indexed vcfs for comparision
 */
 process indexVcf {
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.23'
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 
@@ -157,10 +157,10 @@ process indexVcf {
 }
 
 /*
- * Compare vcf files from subworkflows
+ * Running comparision btw files
 */
 process truvari {
-    container "${params.registry}/truvari:latest"
+    container "${params.registry}/truvari:v1.0.1"
     tag "$pair_id1 & $pair_id2"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 

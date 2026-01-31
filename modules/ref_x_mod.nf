@@ -59,7 +59,7 @@ process showCoords {
 }
 
 process syri {
-    container "${params.registry}/syri:latest"
+    container "${params.registry}/syri:v1.0.1"
     publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
 
 
