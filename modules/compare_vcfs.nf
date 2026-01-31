@@ -13,14 +13,12 @@ workflow truvari_comparison {
 
         // Preprocessing channel for Truvari input
         split_ch = indexed_vcfs.branch {
-            ref_mod: it[0] == "ref_x_modsyri"
-            others:  it[0] != "ref_x_modsyri"
+            assembly: it[0] == "assembly"
+            others:  it[0] != "assembly"
         }
 
-        ref_mod_ch = split_ch.ref_mod.collect()
-        others_ch  = split_ch.others
-
-        vcf_pairs_ch = ref_mod_ch.combine(others_ch)
+        assembly_vcfs = split_ch.assembly.collect()
+        vcf_pairs_ch  = assembly_vcfs.combine(split_ch.others)
 
         // Run Truvari comparison
         truvari(ref_fasta, vcf_pairs_ch)

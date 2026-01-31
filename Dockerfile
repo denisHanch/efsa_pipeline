@@ -61,6 +61,8 @@ RUN apk add --no-cache --virtual .build-deps \
     && rm -rf /tmp/validation/ \
     && apk del .build-deps
 
+RUN apk add --no-cache py3-pandas
+
 # Copy the Nextflow binary from VM and make it executable
 COPY nextflow /usr/local/bin/nextflow
 RUN chmod +x /usr/local/bin/nextflow

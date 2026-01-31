@@ -80,8 +80,8 @@ workflow {
 
         compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
 
-        vcfs = vcfs.mix(long_ref_pacbio.out.sv_vcf.map { it[1] })
-        sv_table = sv_table.mix(long_ref_pacbio.out.sv_table.map { it[3] })
+        vcfs = vcfs.mix(long_ref_pacbio.out.sv_vcf)
+        sv_table = sv_table.mix(long_ref_pacbio.out.sv_table)
 
         pipelines_running++
     }
@@ -102,9 +102,8 @@ workflow {
 
         compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
 
-        vcfs = vcfs.mix(long_ref_ont.out.sv_vcf.map { it[1] })
-        sv_table = sv_table.mix(long_ref_ont.out.sv_table.map { it[3] })
-
+        vcfs = vcfs.mix(long_ref_ont.out.sv_vcf)
+        sv_table = sv_table.mix(long_ref_ont.out.sv_table)
 
         pipelines_running++
     }
@@ -126,11 +125,10 @@ workflow {
         compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
 
         vcfs = vcfs.mix(short_ref.out.sv_vcf)
-        sv_table = sv_table.mix(short_ref.out.sv_table.map { it[3] })
+        sv_table = sv_table.mix(short_ref.out.sv_table)
 
         pipelines_running++
-        
-        restructure_sv_table(sv_table)
+    
 
     }
 
@@ -145,15 +143,14 @@ workflow {
 
     if (pipelines_running >= 2) {
 
-        vcfs = vcfs
-        .flatten()
-        .map { file ->
-            def name = file.getFileName().toString().replaceFirst(/\.vcf$/, '')
-            return [name, file]
-        }
-
         truvari_comparison(ref_fasta, vcfs)
     }
+
+    // sv_table.collect().view()
+    
+    script = file("${workflow.projectDir}/modules/utils/create_sv_output_xlsx.py")
+
+    restructure_sv_table(script, sv_table.collect())
 }
 
 logWorkflowCompletion("execution of main.nf")

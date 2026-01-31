@@ -70,7 +70,7 @@ process syri {
 
 
     output:
-    path("${prefix}syri*.vcf")
+    tuple val(prefix), path("${prefix}syri*.vcf")
 
 
     script:

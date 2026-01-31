@@ -2,6 +2,7 @@
 
 include { nucmer; deltaFilter; showCoords; syri } from '../modules/ref_x_mod.nf'
 include { logWorkflowCompletion } from '../modules/logs.nf'
+include { vcf_to_table } from '../modules/sv_calling.nf'
 
 
 workflow ref_mod {
@@ -11,7 +12,7 @@ workflow ref_mod {
     main:
         log.info "▶ Running pipeline comparing reference and modified fasta."
 
-        def prefix_name = "ref_x_mod"
+        def prefix_name = "assembly"
 
         ref_mod_fasta = ref_fasta
             .combine(mod_fasta)

@@ -80,7 +80,7 @@ process convert_bcf_to_vcf {
     val out_folder_name
 
     output:
-    path("${pair_id}_sv_short_read.vcf")
+    tuple val(pair_id),path("${pair_id}_sv_short_read.vcf")
 
     script:
     """
@@ -208,18 +208,18 @@ process vcf_to_table {
     publishDir "${params.out_dir}/tables", mode: 'copy'
 
     input:
-    path vcf
+    tuple val(name), path(vcf)
 
     output:
-    path "${vcf.simpleName}_sv_summary.tsv"
+    path "${name}_sv_summary.tsv"
 
     script:
     """
     set -euxo pipefail
 
-    output="${vcf.simpleName}_sv_summary.tsv"
+    output="${name}_sv_summary.tsv"
 
-    if [[ "${vcf.simpleName}" == "ref_x_modsyri" ]]; then
+    if [[ "${name}" == "assembly" ]]; then
         {
             echo -e "chrom\tstart\tend\tsvtype"
             bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
@@ -267,15 +267,14 @@ process restructure_sv_table {
     publishDir "${params.out_dir}/tables", mode: 'copy'
 
     input:
-    path assembly_tsv
-    path short_tsv
-    path long_tsv
+    path script
+    tuple path(assembly_tsv), path(long_tsv), path(short_tsv)
 
     output:
-    path "*.xlsx"
+    path "tsv_output_files"
 
     script:
     """
-    python3 modules/utils/create_sv_output_xlsx.py --assembly ${assembly_tsv} --short ${short_tsv} --long ${long_tsv} --out variants.xlsx
+    python ${script} --asm ${assembly_tsv} --short ${short_tsv} --long ${long_tsv} --out tsv_output_files
     """
 }
