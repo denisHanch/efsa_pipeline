@@ -1,8 +1,8 @@
 
-include { fastqc; multiqc; trimgalore } from './qc.nf'
-include { bwa_mapping; samtool_index_bam; samtools_sort; samtool_stats; picard; calc_unmapped; minimap2 } from './mapping.nf'
-include { convert_bcf_to_vcf; delly; samtools_index; picard_dict; sniffles; debreak; cute_sv; survivor; vcf_to_table; vcf_to_table_long } from '../modules/sv_calling.nf'
-include { snpeff; build_config; bcftools_stats; sortVcf; indexVcf; truvari } from '../modules/variant_calling.nf'
+include { fastqc; multiqc; trimgalore } from "./qc.nf"
+include { bwa_mapping; samtool_index_bam; samtools_sort; samtool_stats; picard; calc_unmapped; minimap2 } from "./mapping.nf"
+include { convert_bcf_to_vcf; delly; samtools_index; picard_dict; sniffles; debreak; cute_sv; survivor; vcf_to_table; vcf_to_table_long } from "../modules/sv_calling.nf"
+include { snpeff; build_config; bcftools_stats; sortVcf; indexVcf; truvari } from "../modules/variant_calling.nf"
 
 
 // short-reads pipeline
@@ -15,7 +15,7 @@ workflow qc {
     main:
         trimgalore(fastqs, out_folder_name) | set { trimmed }
         fastqc(trimmed, out_folder_name) | set {fastqc_out}
-        multiqc(fastqc_out, out_folder_name, 'qc')
+        multiqc(fastqc_out, out_folder_name, "qc")
 
     emit:
         trimmed
@@ -37,7 +37,7 @@ workflow mapping {
         picard(fasta, indexed_bam, out_folder_name) | set { picard_out }
         
         picard_out.collect() | set { qc_out }
-        multiqc(qc_out, out_folder_name, 'mapping')
+        multiqc(qc_out, out_folder_name, "mapping")
 
 
     emit:

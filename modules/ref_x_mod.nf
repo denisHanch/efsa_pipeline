@@ -2,7 +2,7 @@ params.workflow_id = "fasta_ref_mod"
 
 process nucmer {
     container params.containers.mummer
-    publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
+    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
 
     input:
     tuple val(prefix), path(ref), path(mod)
@@ -22,7 +22,7 @@ process nucmer {
 
 process deltaFilter {
     container params.containers.mummer
-    publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
+    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
 
     input:
     val prefix 
@@ -40,7 +40,7 @@ process deltaFilter {
 
 process showCoords {
     container params.containers.mummer
-    publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
+    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
 
     input:
     val prefix
@@ -60,7 +60,7 @@ process showCoords {
 
 process syri {
     container params.containers.syri
-    publishDir "${params.out_dir}/${params.workflow_id}", mode: 'copy'
+    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
 
 
     input:

@@ -17,7 +17,7 @@ process trimgalore {
     val out_folder_name
 
     output:
-    tuple val(pair_id), path('*.fq.gz')
+    tuple val(pair_id), path("*.fq.gz")
 
     script:
     """
@@ -37,7 +37,7 @@ process trimgalore {
 process fastqc {
     container params.containers.fastqc
     tag "FASTQC on $pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/fastqc_out", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/fastqc_out", mode: "copy"
 
 
     input:
@@ -67,7 +67,7 @@ process multiqc {
     val filename
 
     output:
-    file('*.html')
+    file("*.html")
 
     script:
     """
@@ -84,7 +84,7 @@ process multiqc {
 process nanoplot {
 container params.containers.nanoplot
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/nanoplot", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/nanoplot", mode: "copy"
 
     input:
     tuple val(pair_id), path(reads)

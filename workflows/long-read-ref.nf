@@ -1,10 +1,10 @@
 #!/usr/bin/env nextflow
 
-include { nanoplot; multiqc } from '../modules/qc.nf'
-include { sv_long; mapping_long; mapping_long as mapping_long_plasmid; sv_long as sv_long_plasmid }  from '../modules/subworkflow.nf'
-include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadFastqFiles } from '../modules/logs.nf'
-include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads;get_unmapped_reads as get_unmapped_reads_plasmid } from '../modules/mapping.nf'
-include { vcf_to_table_long }  from '../modules/sv_calling.nf'
+include { nanoplot; multiqc } from "../modules/qc.nf"
+include { sv_long; mapping_long; mapping_long as mapping_long_plasmid; sv_long as sv_long_plasmid }  from "../modules/subworkflow.nf"
+include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadFastqFiles } from "../modules/logs.nf"
+include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads;get_unmapped_reads as get_unmapped_reads_plasmid } from "../modules/mapping.nf"
+include { vcf_to_table_long }  from "../modules/sv_calling.nf"
 
 
 workflow long_ref {
@@ -42,15 +42,15 @@ workflow long_ref {
         // SV calling against the reference
         if (out_folder_name == "ont/long-ref" || out_folder_name == "pacbio/long-ref") { 
             sv_long(fasta, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
-            vcf_to_table_long(mapping_tag, sv_vcf) | set { sv_table }
+            vcf_to_table_long(mapping_tag, sv_vcf) | set { sv_tbl }
 
         } else {
             sv_vcf = Channel.empty()
-            sv_table = Channel.empty()
+            sv_tbl = Channel.empty()
         }
 
     emit:
         sv_vcf
         unmapped_fastq
-        sv_table
+        sv_tbl
 }

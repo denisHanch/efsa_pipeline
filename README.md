@@ -20,7 +20,7 @@
       - [`truvari/`](#truvari)
       - [`unmapped_stats/`](#unmapped_stats)
   - [Graphical Representation of the Pipeline](#graphical-representation-of-the-pipeline)
-  - [Generation of per structral variation (SV) type CSV tables](#generation-of-per-structral-variation-sv-type-csv-tables)
+  - [Generation of per structural variation (SV) type CSV tables](#generation-of-per-structral-variation-sv-type-csv-tables)
       
 
 # Quick Start
@@ -409,7 +409,7 @@ nextflow run workflows/fasta_ref_x_mod.nf \
 ```
 
  
-## Generation of per structral variation (SV) type CSV tables
+## Generation of per structural variation (SV) type CSV tables
 
 These utilities convert SV VCFs into compact TSV summaries and then merge available summaries into per-SV-type CSV tables.
 
@@ -421,19 +421,19 @@ flowchart LR
   end
   A --> C[params.out_dir/tables/tsv]
   B --> C
-  C --> D[restructure_sv_table]
+  C --> D[restructure_sv_tbl]
   D --> E[params.out_dir/tables/csv_per_sv_sumary]
 ```
 
 Key points:
 - Variants are extracted into a table format with processes `vcf_to_table` and `vcf_to_table_long`
 - if one of the pipelines was not running (shourt/long/assembly) an empty tsv file is generated with a process create_empty_tbl
-- `restructure_sv_table` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
+- `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
 - Outputs overview:
 ```
 data/outputs/tables/
-├── csv_per_sv_sumary
+├── csv_per_sv_summary
 │   ├── Deletions.csv
 │   ├── Insertions.csv
 │   ├── Inversions.csv
@@ -613,6 +613,7 @@ data/outputs
 ├── logs                → Pipeline logs and Nextflow reports
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
+├── tables              → Per-SV csv tables
 ├── truvari             → Variant comparison results from Truvari
 └── unmapped_stats      → Summary statistics of unmapped reads for each workflow
 

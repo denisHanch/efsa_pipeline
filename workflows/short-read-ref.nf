@@ -1,11 +1,11 @@
 #!/usr/bin/env nextflow
 
-include { multiqc } from '../modules/qc.nf'
-include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid } from '../modules/mapping.nf'
-include { freebayes; bcftools_stats; bcftools_stats as bcftools_stats_plasmid } from '../modules/variant_calling.nf'
-include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from '../modules/subworkflow.nf'
-include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadShortFastqFiles } from '../modules/logs.nf'
-include { vcf_to_table }  from '../modules/sv_calling.nf'
+include { multiqc } from "../modules/qc.nf"
+include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid } from "../modules/mapping.nf"
+include { freebayes; bcftools_stats; bcftools_stats as bcftools_stats_plasmid } from "../modules/variant_calling.nf"
+include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from "../modules/subworkflow.nf"
+include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadShortFastqFiles } from "../modules/logs.nf"
+include { vcf_to_table }  from "../modules/sv_calling.nf"
 
 
 workflow short_ref {
@@ -52,22 +52,22 @@ workflow short_ref {
                 annotate_vcf(fasta, gff, vcf, "gff", "gff3", out_folder_name) | set {qc_vcf}
             
                 qc_vcf.mix(bcftools_out).collect() | set { qc_out }
-                multiqc(qc_out, out_folder_name, 'varint_calling')
+                multiqc(qc_out, out_folder_name, "varint_calling")
             } else {
-                multiqc(bcftools_out, out_folder_name, 'varint_calling')
+                multiqc(bcftools_out, out_folder_name, "varint_calling")
             }
         
             // SVs variant calling
             sv(fasta, indexed_bam, out_folder_name) | set { sv_vcf }
-            vcf_to_table(sv_vcf) | set { sv_table }
+            vcf_to_table(sv_vcf) | set { sv_tbl }
         } else {
             sv_vcf = Channel.empty()
-            sv_table = Channel.empty()
+            sv_tbl = Channel.empty()
         }
     emit:
         sv_vcf
         unmapped_fastq
-        sv_table
+        sv_tbl
 
 }
 

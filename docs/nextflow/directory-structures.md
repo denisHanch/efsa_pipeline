@@ -48,6 +48,7 @@ data/outputs
 ├── logs                → Pipeline logs and Nextflow reports
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
+├── tables              → Per-SV csv tables
 ├── truvari             → Variant comparison results from Truvari
 └── unmapped_stats      → Summary statistics of unmapped reads for each workflow
 ```

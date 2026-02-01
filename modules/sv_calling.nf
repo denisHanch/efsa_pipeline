@@ -17,7 +17,7 @@ process samtools_index {
 
     script:
     """
-    samtools faidx "$fasta_file
+    samtools faidx "$fasta_file"
     """   
 }
 
@@ -99,6 +99,7 @@ process cute_sv {
     container params.containers.cutesv
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: 'copy'
+        publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
 
     input:
     each path(fasta_file)
@@ -124,6 +125,7 @@ process debreak {
     container params.containers.debreak
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: 'copy'
+        publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
 
     input:
     each path(fasta_file)
@@ -148,6 +150,7 @@ process sniffles {
     container params.containers.sniffles
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: 'copy'
+        publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: "copy"
 
     input:
     each path(fasta_file)
@@ -171,6 +174,7 @@ process survivor {
     container params.containers.survivor
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: 'copy'
+        publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: "copy"
 
     input:
     tuple val(pair_id), path(sniffles_vcf)
@@ -206,6 +210,7 @@ process vcf_to_table {
 
     container params.containers.bcftools
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+        publishDir "${params.out_dir}/tables/tsv", mode: "copy"
 
     input:
     tuple val(name), path(vcf)
@@ -236,6 +241,7 @@ process vcf_to_table_long {
 
     container params.containers.bcftools
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+        publishDir "${params.out_dir}/tables/tsv", mode: "copy"
 
     input:
     val tag
@@ -261,20 +267,21 @@ process vcf_to_table_long {
     """
 }
 
-process restructure_sv_table {
+process restructure_sv_tbl {
 
     publishDir "${params.out_dir}/tables", mode: 'copy'
+        publishDir "${params.out_dir}/tables", mode: "copy"
 
     input:
     path script
     tuple path(assembly_tsv), path(long_ont_tsv), path(long_pb_tsv), path(short_tsv)
 
     output:
-    path "csv_per_sv_sumary"
+    path "csv_per_sv_summary"
 
     script:
     """
-    python ${script} --asm ${assembly_tsv} --short ${short_tsv} --long_ont ${long_ont_tsv} --long_pacbio ${long_pb_tsv} --out csv_per_sv_sumary
+    python ${script} --asm ${assembly_tsv} --short ${short_tsv} --long_ont ${long_ont_tsv} --long_pacbio ${long_pb_tsv} --out csv_per_sv_summary
     """
 }
 
@@ -282,6 +289,7 @@ process restructure_sv_table {
 process create_empty_tbl {
     
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+        publishDir "${params.out_dir}/tables/tsv", mode: "copy"
     
     input:
     val prefix

@@ -1,8 +1,8 @@
 #!/usr/bin/env nextflow
 
-include { nucmer; deltaFilter; showCoords; syri } from '../modules/ref_x_mod.nf'
-include { logWorkflowCompletion } from '../modules/logs.nf'
-include { vcf_to_table } from '../modules/sv_calling.nf'
+include { nucmer; deltaFilter; showCoords; syri } from "../modules/ref_x_mod.nf"
+include { logWorkflowCompletion } from "../modules/logs.nf"
+include { vcf_to_table } from "../modules/sv_calling.nf"
 
 
 workflow ref_mod {
@@ -22,11 +22,11 @@ workflow ref_mod {
         deltaFilter(prefix_name, delta) | set { filtered_delta }
         showCoords(prefix_name, filtered_delta) | set { coords }
         syri(ref_mod_fasta, coords, filtered_delta) | set { sv_vcf }
-        vcf_to_table(sv_vcf)  | set { sv_table }
+        vcf_to_table(sv_vcf)  | set { sv_tbl }
 
     emit: 
         sv_vcf
-        sv_table
+        sv_tbl
 }
 
 workflow {
