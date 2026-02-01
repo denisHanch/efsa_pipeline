@@ -17,7 +17,7 @@ process samtools_index {
 
     script:
     """
-    samtools faidx $fasta_file
+    samtools faidx "$fasta_file
     """   
 }
 
@@ -287,10 +287,10 @@ process create_empty_tbl {
     val prefix
 
     output:
-    path "empty_${prefix}_summary.tsv"
+    path "empty_${prefix}_sv_summary.tsv"
 
     script:
     """
-    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_methods\tscore\tsupporting_reads" > empty_${prefix}_summary.tsv
+    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_methods\tscore\tsupporting_reads" > empty_${prefix}_sv_summary.tsv
     """
 }
