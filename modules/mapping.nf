@@ -6,7 +6,7 @@
  * Index the genome
 */
 process bwa_index {
-    container 'biocontainers/bwa:v0.7.17_cv1'
+    container params.containers.bwa
     tag "$fasta_file"
     publishDir "${params.out_dir}/${out_folder_name}/bwa_index", mode: 'copy'
 
@@ -29,7 +29,7 @@ process bwa_index {
  * Mapping reads to the genome
 */
 process bwa_mapping {
-    container 'biocontainers/bwa:v0.7.17_cv1'
+    container params.containers.bwa
     tag "$pair_id"
 
     input:
@@ -53,7 +53,7 @@ process bwa_mapping {
  * Indexing BAM file
 */
 process samtool_index_bam {
-    container 'staphb/samtools:1.23'
+    container params.containers.samtools
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/bam", mode: 'copy'
 
@@ -75,7 +75,7 @@ process samtool_index_bam {
  * Running picard to get mapping statistics
 */
 process picard {
-    container 'quay.io/biocontainers/picard:2.26.10--hdfd78af_0'
+    container params.containers.picard
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/picard", mode: 'copy'
     
@@ -102,7 +102,7 @@ process picard {
  * Running samtools stats to get mapping statistics
 */
 process samtool_stats {
-    container 'staphb/samtools:1.23'
+    container params.containers.samtools
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/samtools_stats", mode: 'copy'
 
@@ -126,7 +126,7 @@ process samtool_stats {
  * Map long reads
 */
 process minimap2 {
-    container 'staphb/minimap2:2.30'
+    container params.containers.minimap2
     tag "$pair_id"
 
     input:
@@ -149,7 +149,7 @@ process minimap2 {
  * Sort reads with samtools
 */
 process samtools_sort {
-    container 'staphb/samtools:1.23'
+    container params.containers.samtools
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/bam", mode: 'copy'
 
@@ -167,7 +167,7 @@ process samtools_sort {
 }
 
 process calc_total_reads {
-    container 'staphb/samtools:1.23'
+    container params.containers.samtools
     tag "$pair_id"
 
     input:
@@ -219,7 +219,7 @@ process calc_unmapped {
 
 
 process get_unmapped_reads {
-    container 'staphb/samtools:1.23'
+    container params.containers.samtools
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/unmapped_fastq", mode: 'copy'
 

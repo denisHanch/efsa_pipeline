@@ -7,7 +7,7 @@
  */
 process trimgalore {
 
-    container 'vibsinglecellnf/trimgalore:trimgalore-0.6.7-cutadapt-4.1'
+    container params.containers.trimgalore
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/trimmed_reads", mode: 'copy'
     cpus = 4
@@ -35,7 +35,7 @@ process trimgalore {
  * Check quality of reads
  */
 process fastqc {
-    container 'biocontainers/fastqc:v0.11.9_cv8'
+    container params.containers.fastqc
     tag "FASTQC on $pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/fastqc_out", mode: 'copy'
 
@@ -58,7 +58,7 @@ process fastqc {
  * Generate multiqc report
  */
 process multiqc {
-    container 'staphb/multiqc:1.33'
+    container params.containers.multiqc
     publishDir "${params.out_dir}/${out_folder_name}/multiqc", mode: "copy"
 
     input:
@@ -82,7 +82,7 @@ process multiqc {
  * Check QC of input samples
 */
 process nanoplot {
-container 'staphb/nanoplot:1.46.2'
+container params.containers.nanoplot
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/nanoplot", mode: 'copy'
 

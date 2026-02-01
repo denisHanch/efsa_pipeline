@@ -5,7 +5,7 @@
  * Index fasta file with samtools
 */
 process samtools_index {
-    container 'staphb/samtools:1.23'
+    container params.containers.samtools
     publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
 
     input:
@@ -25,7 +25,7 @@ process samtools_index {
  * Create picard dictionary to run delly
 */
 process picard_dict {
-    container 'quay.io/biocontainers/picard:2.26.10--hdfd78af_0'
+    container params.containers.picard
     publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
     
     input:
@@ -46,7 +46,7 @@ process picard_dict {
  * Running delly SV caller
 */
 process delly {
-    container 'dellytools/delly:v1.7.2'
+    container params.containers.delly
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -71,7 +71,7 @@ process delly {
  * Convert bcf (default delly output) to vcf
 */
 process convert_bcf_to_vcf {
-    container 'staphb/bcftools:1.23'
+    container params.containers.bcftools
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -96,7 +96,7 @@ process convert_bcf_to_vcf {
  * variant calling with cuteSV
 */
 process cute_sv {
-    container "${params.registry}/cutesv:v1.0.1"
+    container params.containers.cutesv
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: 'copy'
 
@@ -121,7 +121,7 @@ process cute_sv {
  * variant calling with debreak
 */
 process debreak {
-    container "${params.registry}/debreak:v1.0.1"
+    container params.containers.debreak
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: 'copy'
 
@@ -145,7 +145,7 @@ process debreak {
  * variant calling with sniffles
 */
 process sniffles {
-    container "${params.registry}/sniffles:v1.0.1"
+    container params.containers.sniffles
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: 'copy'
 
@@ -168,7 +168,7 @@ process sniffles {
  * merging SV
 */
 process survivor {
-    container "${params.registry}/survivor:v1.0.1"
+    container params.containers.survivor
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: 'copy'
 
@@ -204,7 +204,7 @@ process survivor {
 */
 process vcf_to_table {
 
-    container 'staphb/bcftools:1.23'
+    container params.containers.bcftools
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
 
     input:
@@ -234,7 +234,7 @@ process vcf_to_table {
 
 process vcf_to_table_long {
 
-    container 'staphb/bcftools:1.23'
+    container params.containers.bcftools
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
 
     input:

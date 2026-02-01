@@ -5,7 +5,7 @@
  * Calling short variants with FreeBayes
 */
 process freebayes {
-    container 'biocontainers/freebayes:v1.2.0-2-deb_cv1'
+    container params.containers.freebayes
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -28,7 +28,7 @@ process freebayes {
 */
 
 process build_config {
-    container 'biocontainers/snpeff:v4.1k_cv3'
+    container params.containers.snpeff
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
 
@@ -68,7 +68,7 @@ process build_config {
  * Annotating variants with SNPeff
 */
 process snpeff {
-    container 'biocontainers/snpeff:v4.1k_cv3'
+    container params.containers.snpeff
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -96,7 +96,7 @@ process snpeff {
  * Getting variants statistics with bcftools stats
 */
 process bcftools_stats {
-    container 'staphb/bcftools:1.23'
+    container params.containers.bcftools
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/bcftools_stats", mode: 'copy'
 
@@ -119,7 +119,7 @@ process bcftools_stats {
  * Truvari requires sorted vcfs for comparision
 */
 process sortVcf {
-    container 'staphb/bcftools:1.23'
+    container params.containers.bcftools
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 
@@ -139,7 +139,7 @@ process sortVcf {
  * Truvari require indexed vcfs for comparision
 */
 process indexVcf {
-    container 'staphb/bcftools:1.23'
+    container params.containers.bcftools
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 
@@ -160,7 +160,7 @@ process indexVcf {
  * Running comparision btw files
 */
 process truvari {
-    container "${params.registry}/truvari:v1.0.1"
+    container params.containers.truvari
     tag "$pair_id1 & $pair_id2"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 

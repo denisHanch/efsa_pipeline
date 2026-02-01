@@ -16,6 +16,7 @@ Within each event, at most one record per source is chosen (best by supporting_r
 
 Usage:
     python create_sv_output_xlsx.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10
+
 Any of the inputs may be omitted; the script will process whichever of the assembly, long_ont,
 long_pacbio or short tables are provided. Long-read inputs (ONT and PacBio) are treated
 the same for clustering and merged into the "long" source.
