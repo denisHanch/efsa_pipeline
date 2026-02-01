@@ -20,6 +20,7 @@
       - [`truvari/`](#truvari)
       - [`unmapped_stats/`](#unmapped_stats)
   - [Graphical Representation of the Pipeline](#graphical-representation-of-the-pipeline)
+  - [Generation of per structral variation (SV) type CSV tables](#generation-of-per-structral-variation-sv-type-csv-tables)
       
 
 # Quick Start
