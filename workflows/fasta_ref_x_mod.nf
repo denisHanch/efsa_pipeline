@@ -1,6 +1,22 @@
 #!/usr/bin/env nextflow
 
-include { nucmer; deltaFilter; showCoords; syri } from "../modules/ref_x_mod.nf"
+/*
+  workflow: fasta_ref_x_mod.nf
+  Purpose: Compare a reference FASTA to a modified/assembled FASTA, run nucmer -> deltaFilter -> show-coords -> syri,
+           and convert resulting SV VCFs to TSV summary tables.
+
+  Contract:
+  - Inputs:
+      - Channel of reference fasta (globbed from params.in_dir)
+      - Channel of modified/assembled fasta (globbed from params.in_dir)
+  - Outputs:
+      - Channel of structural variant VCFs (per-assembly)
+      - Channel of SV summary TSVs (per-assembly)
+  - Success:
+      - For each reference/modified pair, produce a VCF and a corresponding TSV summary.
+*/
+
+include { nucmer; deltaFilter; showCoords; syri } from "../modules/assembly.nf"
 include { logWorkflowCompletion } from "../modules/logs.nf"
 include { vcf_to_table } from "../modules/sv_calling.nf"
 

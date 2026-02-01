@@ -1,13 +1,13 @@
 #!/usr/bin/env nextflow
 
 include { nanoplot; multiqc } from "../modules/qc.nf"
-include { sv_long; mapping_long; mapping_long as mapping_long_plasmid; sv_long as sv_long_plasmid }  from "../modules/subworkflow.nf"
+include { sv_long; mapping_long; mapping_long as mapping_long_plasmid; sv_long as sv_long_plasmid }  from "../workflows/subworkflows.nf"
 include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadFastqFiles } from "../modules/logs.nf"
 include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads;get_unmapped_reads as get_unmapped_reads_plasmid } from "../modules/mapping.nf"
 include { vcf_to_table_long }  from "../modules/sv_calling.nf"
 
 
-workflow long_ref {
+workflow long_read {
 
     take:
         fastqs

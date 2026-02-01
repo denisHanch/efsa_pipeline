@@ -3,16 +3,15 @@
 // Include workflows
 include { ref_mod } from "./workflows/fasta_ref_x_mod.nf"
 
-include { long_ref as long_ref_pacbio; long_ref as long_ref_ont; long_ref as long_mod_pacbio; long_ref as long_mod_ont} from "./workflows/long-read-ref.nf"
-include { short_ref; short_ref as short_mod } from "./workflows/short-read-ref.nf"
+include { long_read as long_ref_pacbio; long_read as long_ref_ont; long_read as long_mod_pacbio; long_read as long_mod_ont} from "./workflows/long_read.nf"
+include { short_read as short_ref; short_read as short_mod } from "./workflows/short_read.nf"
+include { truvari_comparison } from "./workflows/vcf_comparison.nf"
+include { qc } from "./workflows/subworkflows.nf"
 
 include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_unmapped as compare_unmapped_pacbio } from "./modules/mapping.nf"
 include { nanoplot as nanoplo_pacbio } from "./modules/qc.nf"
 include { nanoplot as nanoplot_pacbio; nanoplot as nanoplot_ont } from "./modules/qc.nf"
-include { truvari_comparison } from "./modules/compare_vcfs.nf"
 include { restructure_sv_tbl; create_empty_tbl as create_ont_tbl; create_empty_tbl as create_asm_tbl; create_empty_tbl as create_pacbio_tbl; create_empty_tbl as create_short_tbl } from "./modules/sv_calling.nf"
-
-include { qc } from "./modules/subworkflow.nf"
 include { describePipeline; logWorkflowCompletion; loadFastqFiles; loadShortFastqFiles } from "./modules/logs.nf"
 
 

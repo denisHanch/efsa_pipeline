@@ -98,8 +98,7 @@ process convert_bcf_to_vcf {
 process cute_sv {
     container params.containers.cutesv
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: 'copy'
-        publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
+    publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
 
     input:
     each path(fasta_file)
@@ -124,7 +123,6 @@ process cute_sv {
 process debreak {
     container params.containers.debreak
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: 'copy'
         publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
 
     input:
@@ -149,7 +147,6 @@ process debreak {
 process sniffles {
     container params.containers.sniffles
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: 'copy'
         publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: "copy"
 
     input:
@@ -173,7 +170,6 @@ process sniffles {
 process survivor {
     container params.containers.survivor
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: 'copy'
         publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: "copy"
 
     input:

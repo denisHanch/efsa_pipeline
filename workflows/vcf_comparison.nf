@@ -1,4 +1,4 @@
-include { sortVcf; indexVcf; truvari } from './variant_calling.nf'
+include { sortVcf; indexVcf; truvari } from '../modules/variant_calling.nf'
 
 workflow truvari_comparison {
 

@@ -3,12 +3,12 @@
 include { multiqc } from "../modules/qc.nf"
 include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid } from "../modules/mapping.nf"
 include { freebayes; bcftools_stats; bcftools_stats as bcftools_stats_plasmid } from "../modules/variant_calling.nf"
-include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from "../modules/subworkflow.nf"
+include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from "../workflows/subworkflows.nf"
 include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadShortFastqFiles } from "../modules/logs.nf"
 include { vcf_to_table }  from "../modules/sv_calling.nf"
 
 
-workflow short_ref {
+workflow short_read {
     take:
         trimmed
         fasta
@@ -86,7 +86,7 @@ workflow {
 
     qc(fastqs, "illumina/qc_trimming") | set { trimmed }
 
-    short_ref(trimmed, fasta, out_folder_name, plasmid_files)
+    short_read(trimmed, fasta, out_folder_name, plasmid_files)
 }
 
 
