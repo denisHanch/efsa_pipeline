@@ -205,30 +205,28 @@ process survivor {
 process vcf_to_table {
 
     container 'staphb/bcftools:1.23'
-    publishDir "${params.out_dir}/tables", mode: 'copy'
+    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
 
     input:
     tuple val(name), path(vcf)
 
     output:
-    path "${name}_sv_summary.tsv"
+    path "*_sv_summary.tsv"
 
     script:
     """
     set -euxo pipefail
 
-    output="${name}_sv_summary.tsv"
-
     if [[ "${name}" == "assembly" ]]; then
         {
             echo -e "chrom\tstart\tend\tsvtype"
             bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
-        } > "\${output}"
+        } > "${name}_sv_summary.tsv"
     else
         {
-            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tdebreak_type\tsupporting_reads\tscore\tRDCN"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%ALT\t[%RC]\t%QUAL\t[%RDCN]\n' "${vcf}"
-        } >> "\${output}"
+            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_reads\tscore\tRDCN"
+            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\t[%RC]\t%QUAL\t[%RDCN]\n' "${vcf}"
+        } >> "${name}_short_sv_summary.tsv"
     fi
     """
 }
@@ -237,19 +235,20 @@ process vcf_to_table {
 process vcf_to_table_long {
 
     container 'staphb/bcftools:1.23'
-    publishDir "${params.out_dir}/tables", mode: 'copy'
+    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
 
     input:
+    val tag
     tuple val(pair_id), path(vcf)
 
     output:
-    path "${pair_id}_sv_summary.tsv"
+    path "${pair_id}_${tag}_sv_summary.tsv"
 
     script:
     """
     set -euxo pipefail
 
-    output="${pair_id}_sv_summary.tsv"
+    output="${pair_id}_${tag}_sv_summary.tsv"
 
     echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_methods\tscore\tsupporting_reads" > "\${output}"
     bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SUPP\t%QUAL\t[%DR{1}\t]\n' "${vcf}" | awk -F '\t' '{
@@ -268,13 +267,30 @@ process restructure_sv_table {
 
     input:
     path script
-    tuple path(assembly_tsv), path(long_tsv), path(short_tsv)
+    tuple path(assembly_tsv), path(long_ont_tsv), path(long_pb_tsv), path(short_tsv)
 
     output:
-    path "tsv_output_files"
+    path "csv_per_sv_sumary"
 
     script:
     """
-    python ${script} --asm ${assembly_tsv} --short ${short_tsv} --long ${long_tsv} --out tsv_output_files
+    python ${script} --asm ${assembly_tsv} --short ${short_tsv} --long_ont ${long_ont_tsv} --long_pacbio ${long_pb_tsv} --out csv_per_sv_sumary
+    """
+}
+
+
+process create_empty_tbl {
+    
+    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+    
+    input:
+    val prefix
+
+    output:
+    path "empty_${prefix}_summary.tsv"
+
+    script:
+    """
+    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_methods\tscore\tsupporting_reads" > empty_${prefix}_summary.tsv
     """
 }

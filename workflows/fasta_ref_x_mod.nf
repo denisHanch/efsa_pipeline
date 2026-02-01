@@ -36,5 +36,4 @@ workflow {
     ref_mod(ref_fasta, mod_fasta)
 }
 
-
 logWorkflowCompletion("reference to modified fasta comparision")

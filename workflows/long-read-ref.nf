@@ -42,7 +42,7 @@ workflow long_ref {
         // SV calling against the reference
         if (out_folder_name == "ont/long-ref" || out_folder_name == "pacbio/long-ref") { 
             sv_long(fasta, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
-            vcf_to_table_long(sv_vcf) | set { sv_table }
+            vcf_to_table_long(mapping_tag, sv_vcf) | set { sv_table }
 
         } else {
             sv_vcf = Channel.empty()
@@ -54,27 +54,3 @@ workflow long_ref {
         unmapped_fastq
         sv_table
 }
-
-out_folder_name = "pacbio/long-ref"
-
-workflow {
-    // Processing inputs
-    log.info  "Processing files in directory: ${params.in_dir}"
-
-    pacbio_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
-    ont_fastqs = loadFastqFiles("${params.in_dir}/ont/*.fastq.gz")
-
-    def ref_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
-    def mod_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /mod_plasmid\.(fa|fna|fasta)$/ } ?: []
-
-    Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
-    
-    if (pacbio_fastqs) {
-
-        nanoplot(pacbio_fastqs, "pacbio")
-
-        long_ref(pacbio_fastqs, ref_fasta, "map-pb", ref_plasmid, out_folder_name)
-    }
-}
-
-logWorkflowCompletion(out_folder_name)

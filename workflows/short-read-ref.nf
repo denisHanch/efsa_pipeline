@@ -84,7 +84,6 @@ workflow {
         
     fastqs = loadShortFastqFiles(short_read_files)
 
-    // QC and trimming module
     qc(fastqs, "illumina/qc_trimming") | set { trimmed }
 
     short_ref(trimmed, fasta, out_folder_name, plasmid_files)

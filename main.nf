@@ -10,11 +10,11 @@ include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_un
 include { nanoplot as nanoplo_pacbio } from './modules/qc.nf'
 include { nanoplot as nanoplot_pacbio; nanoplot as nanoplot_ont } from './modules/qc.nf'
 include { truvari_comparison } from './modules/compare_vcfs.nf'
+include { restructure_sv_table; create_empty_tbl as create_ont_tbl; create_empty_tbl as create_asm_tbl; create_empty_tbl as create_pacbio_tbl; create_empty_tbl as create_short_tbl } from './modules/sv_calling.nf'
 
 include { qc } from './modules/subworkflow.nf'
 include { describePipeline; logWorkflowCompletion; loadFastqFiles; loadShortFastqFiles } from './modules/logs.nf'
 
-include { restructure_sv_table } from './modules/sv_calling.nf'
 
 
 // Help message
@@ -47,7 +47,7 @@ workflow {
     // Inputs
     Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
     Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
-    
+
     def ref_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
     def mod_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /mod_plasmid\.(fa|fna|fasta)$/ } ?: []
 
@@ -56,11 +56,11 @@ workflow {
     def short_read_files = file("$params.in_dir/illumina/").listFiles()?.findAll { it.name =~ /\.(fastq|fq)(\.gz)?$/ } ?: []
 
 
-    // Reference to modified fasta comparison
+    // Reference to modified fasta comparison - assembly pipeline
     ref_mod(ref_fasta, mod_fasta)
     
     def vcfs = ref_mod.out.sv_vcf
-    def sv_table = ref_mod.out.sv_table
+    def sv_tbl = ref_mod.out.sv_table
 
     pipelines_running++
 
@@ -81,9 +81,11 @@ workflow {
         compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
 
         vcfs = vcfs.mix(long_ref_pacbio.out.sv_vcf)
-        sv_table = sv_table.mix(long_ref_pacbio.out.sv_table)
+        sv_tbl = sv_tbl.mix(long_ref_pacbio.out.sv_table)
 
         pipelines_running++
+    } else {
+        sv_tbl = sv_tbl.mix(create_pacbio_tbl("pb"))
     }
 
     // nanopore reads pipeline
@@ -103,9 +105,11 @@ workflow {
         compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
 
         vcfs = vcfs.mix(long_ref_ont.out.sv_vcf)
-        sv_table = sv_table.mix(long_ref_ont.out.sv_table)
+        sv_tbl = sv_tbl.mix(long_ref_ont.out.sv_table)
 
         pipelines_running++
+    } else {
+        sv_tbl = sv_tbl.mix(create_ont_tbl("ont"))
     }
 
     // short reads pipeline
@@ -125,18 +129,19 @@ workflow {
         compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
 
         vcfs = vcfs.mix(short_ref.out.sv_vcf)
-        sv_table = sv_table.mix(short_ref.out.sv_table)
+        sv_tbl = sv_tbl.mix(short_ref.out.sv_table)
 
         pipelines_running++
     
-
+    } else {
+        sv_tbl = sv_tbl.mix(create_short_tbl("short"))
     }
 
     if (pipelines_running == 0) {
         log.error "❌  No valid inputs found. Skipping workflows.\n"
         exit 0
     } else {
-         int comparisons = pipelines_running - 1
+        int comparisons = pipelines_running - 1
         String plural = comparisons == 1 ? "" : "s"
         log.info "ℹ️  Truvari: performing ${comparisons} comparison${plural}.\n"
     }
@@ -145,12 +150,18 @@ workflow {
 
         truvari_comparison(ref_fasta, vcfs)
     }
-
-    // sv_table.collect().view()
     
     script = file("${workflow.projectDir}/modules/utils/create_sv_output_xlsx.py")
 
-    restructure_sv_table(script, sv_table.collect())
+    def tbl_channel = sv_tbl.collect().map { list ->
+        def asm = list.find { it.name.toLowerCase().contains('assembly') }
+        def long_pb = list.find { it.name.toLowerCase().contains('pb') }
+        def long_ont = list.find { it.name.toLowerCase().contains('ont') }
+        def sht = list.find { it.name.toLowerCase().contains('short') }
+        tuple(asm, long_ont, long_pb, sht)
+    }
+
+    restructure_sv_table(script, tbl_channel)
 }
 
 logWorkflowCompletion("execution of main.nf")
