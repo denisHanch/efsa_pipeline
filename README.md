@@ -418,10 +418,10 @@ flowchart LR
     A[vcf_to_table / vcf_to_table_long]
     B[create_empty_tbl]
   end
-  A --> C[${params.out_dir}/tables/tsv]
+  A --> C[params.out_dir/tables/tsv]
   B --> C
   C --> D[restructure_sv_table]
-  D --> E[${params.out_dir}/tables/csv_per_sv_sumary]
+  D --> E[params.out_dir/tables/csv_per_sv_sumary]
 ```
 
 Key points:
