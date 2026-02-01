@@ -24,13 +24,16 @@ def helpMessage() {
     nextflow run main.nf -resume
     
     Options:
-    -resume          Run pipeline from the point where it was interrupted or previously failed
+    -resume          Run pipeline from the point where it was interrupted or previously failed (Nextflow built-in)
     --out_dir        Output directory             (default: ${params.out_dir})
     --in_dir         Input directory              (default: ${params.in_dir})
     --registry       Docker/Singularity registry  (default: ${params.registry})
     --max_cpu        Maximum CPUs per process     (default: ${params.max_cpu})
     --log            Enable logging               (default: ${params.log})
     --clean_work     Remove workdir after success (default: ${params.clean_work})
+    -with-report     Generate HTML execution report (Nextflow built-in)
+    -with-timeline   Produce timeline visualization (Nextflow built-in)
+    -with-dag        Produce DAG of workflow (Nextflow built-in)
     --help           Show this help message
     """.stripIndent()
 }
