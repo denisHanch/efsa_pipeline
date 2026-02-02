@@ -1,5 +1,25 @@
 #!/usr/bin/env nextflow
 
+/*
+  workflow: long_read.nf
+  Purpose: Process long-read sequencing data (ONT / PacBio): map reads to a reference,
+           extract and report unmapped reads, optionally remap unmapped reads to a plasmid
+           reference, call structural variants (SVs) for long-read runs, and convert SV VCFs
+           to tabular summaries.
+
+  Contract:
+  - Inputs:
+      - Channel of long-read FASTQ files (e.g., from params.in_dir/ont or /pacbio)
+      - Channel of reference FASTA to map against
+      - mapping_tag: string used as mapping identifier (e.g., "map-ont" or "map-pb")
+      - Optional plasmid FASTA (used to remap unmapped reads)
+      - out_folder_name: output path prefix / label (controls conditional SV calling)
+  - Outputs:
+      - Channel of structural variant VCFs (per-run) or Channel.empty() when skipped
+      - Channel of unmapped FASTQ reads (after reference and optional plasmid mapping)
+      - Channel of SV summary tables (per-run) or Channel.empty() when skipped
+*/
+
 include { nanoplot; multiqc } from "../modules/qc.nf"
 include { sv_long; mapping_long; mapping_long as mapping_long_plasmid; sv_long as sv_long_plasmid }  from "../workflows/subworkflows.nf"
 include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadFastqFiles } from "../modules/logs.nf"

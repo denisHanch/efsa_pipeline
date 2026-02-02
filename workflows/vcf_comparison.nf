@@ -1,3 +1,22 @@
+#!/usr/bin/env nextflow
+
+/*
+  workflow: vcf_comparison.nf
+  Purpose: Prepare and run pairwise VCF comparisons using Truvari. This workflow
+           sorts and indexes VCFs, splits assembly-derived VCFs from others,
+           pairs assemblies with other callsets, and executes Truvari comparisons
+           to assess structural variant concordance.
+
+  Contract:
+  - Inputs:
+      - ref_fasta: reference FASTA used by Truvari for sequence context
+      - vcfs_ch: channel of tuples (name, vcf_path) or similar VCF channel produced
+                by upstream workflows (e.g., assembly and long/short-read callers)
+  - Outputs:
+      - Truvari outputs are produced in configured output locations per comparison.
+      - (No direct channel emit here; Truvari run produces files/dirs consumed by downstream reporting.)
+*/
+
 include { sortVcf; indexVcf; truvari } from '../modules/variant_calling.nf'
 
 workflow truvari_comparison {

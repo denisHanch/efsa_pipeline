@@ -1,4 +1,22 @@
 #!/usr/bin/env nextflow
+/*
+  workflow: short_read.nf
+  Purpose: Process short-read (Illumina) sequencing data: run QC and trimming,
+           map reads to reference and optional plasmid sequences, call SNPs and
+           structural variants (SVs) where applicable, collect unmapped reads,
+           perform basic VCF QC, and convert SV VCFs to TSV summary tables.
+
+  Contract:
+  - Inputs:
+      - Channel of trimmed short-read FASTQ files (produced by QC/trimming step)
+      - Channel of reference FASTA to map against
+      - out_folder_name: output prefix / label (controls which analyses run)
+      - Optional plasmid FASTA (used to remap unmapped reads)
+  - Outputs:
+      - Channel of variant VCFs (SNP / SV) or Channel.empty() when skipped
+      - Channel of unmapped FASTQ reads (after reference and optional plasmid mapping)
+      - Channel of SV summary TSVs (per-run) or Channel.empty() when skipped
+*/
 
 include { multiqc } from "../modules/qc.nf"
 include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid } from "../modules/mapping.nf"
