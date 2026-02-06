@@ -5,7 +5,7 @@
  * Index fasta file with samtools
 */
 process samtools_index {
-    container 'staphb/samtools:1.23'
+    container params.containers.samtools
     publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
 
     input:
@@ -17,7 +17,7 @@ process samtools_index {
 
     script:
     """
-    samtools faidx $fasta_file
+    samtools faidx "$fasta_file"
     """   
 }
 
@@ -25,7 +25,7 @@ process samtools_index {
  * Create picard dictionary to run delly
 */
 process picard_dict {
-    container 'quay.io/biocontainers/picard:2.26.10--hdfd78af_0'
+    container params.containers.picard
     publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
     
     input:
@@ -46,7 +46,7 @@ process picard_dict {
  * Running delly SV caller
 */
 process delly {
-    container 'dellytools/delly:v1.7.2'
+    container params.containers.delly
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -71,7 +71,7 @@ process delly {
  * Convert bcf (default delly output) to vcf
 */
 process convert_bcf_to_vcf {
-    container 'staphb/bcftools:1.23'
+    container params.containers.bcftools
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -80,7 +80,7 @@ process convert_bcf_to_vcf {
     val out_folder_name
 
     output:
-    path("${pair_id}_sv_short_read.vcf")
+    tuple val(pair_id),path("${pair_id}_sv_short_read.vcf")
 
     script:
     """
@@ -96,9 +96,9 @@ process convert_bcf_to_vcf {
  * variant calling with cuteSV
 */
 process cute_sv {
-    container "${params.registry}/cutesv:v1.0.1"
+    container params.containers.cutesv
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: 'copy'
+    publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
 
     input:
     each path(fasta_file)
@@ -121,9 +121,9 @@ process cute_sv {
  * variant calling with debreak
 */
 process debreak {
-    container "${params.registry}/debreak:v1.0.1"
+    container params.containers.debreak
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: 'copy'
+        publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
 
     input:
     each path(fasta_file)
@@ -145,9 +145,9 @@ process debreak {
  * variant calling with sniffles
 */
 process sniffles {
-    container "${params.registry}/sniffles:v1.0.1"
+    container params.containers.sniffles
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: 'copy'
+        publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: "copy"
 
     input:
     each path(fasta_file)
@@ -168,9 +168,9 @@ process sniffles {
  * merging SV
 */
 process survivor {
-    container "${params.registry}/survivor:v1.0.1"
+    container params.containers.survivor
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: 'copy'
+        publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: "copy"
 
     input:
     tuple val(pair_id), path(sniffles_vcf)
@@ -204,31 +204,30 @@ process survivor {
 */
 process vcf_to_table {
 
-    container 'staphb/bcftools:1.23'
-    publishDir "${params.out_dir}/tables", mode: 'copy'
+    container params.containers.bcftools
+    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+        publishDir "${params.out_dir}/tables/tsv", mode: "copy"
 
     input:
-    path vcf
+    tuple val(name), path(vcf)
 
     output:
-    path "${vcf.simpleName}_sv_summary.tsv"
+    path "*_sv_summary.tsv"
 
     script:
     """
     set -euxo pipefail
 
-    output="${vcf.simpleName}_sv_summary.tsv"
-
-    if [[ "${vcf.simpleName}" == "ref_x_modsyri" ]]; then
+    if [[ "${name}" == "assembly" ]]; then
         {
             echo -e "chrom\tstart\tend\tsvtype"
             bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
-        } > "\${output}"
+        } > "${name}_sv_summary.tsv"
     else
         {
-            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tdebreak_type\tsupporting_reads\tscore\tRDCN"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%ALT\t[%RC]\t%QUAL\t[%RDCN]\n' "${vcf}"
-        } >> "\${output}"
+            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_reads\tscore\tRDCN"
+            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\t[%RC]\t%QUAL\t[%RDCN]\n' "${vcf}"
+        } >> "${name}_short_sv_summary.tsv"
     fi
     """
 }
@@ -236,20 +235,22 @@ process vcf_to_table {
 
 process vcf_to_table_long {
 
-    container 'staphb/bcftools:1.23'
-    publishDir "${params.out_dir}/tables", mode: 'copy'
+    container params.containers.bcftools
+    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+        publishDir "${params.out_dir}/tables/tsv", mode: "copy"
 
     input:
-    path vcf
+    val tag
+    tuple val(pair_id), path(vcf)
 
     output:
-    path "${vcf.simpleName}_sv_summary.tsv"
+    path "${pair_id}_${tag}_sv_summary.tsv"
 
     script:
     """
     set -euxo pipefail
 
-    output="${vcf.simpleName}_sv_summary.tsv"
+    output="${pair_id}_${tag}_sv_summary.tsv"
 
     echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_methods\tscore\tsupporting_reads" > "\${output}"
     bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SUPP\t%QUAL\t[%DR{1}\t]\n' "${vcf}" | awk -F '\t' '{
@@ -259,5 +260,41 @@ process vcf_to_table_long {
     }
     print \$1"\t"\$2"\t"\$3"\t"\$4"\t"\$5"\t"\$6"\t"\$7"\t"sum;
     }' >> "\${output}"
+    """
+}
+
+process restructure_sv_tbl {
+
+    publishDir "${params.out_dir}/tables", mode: 'copy'
+        publishDir "${params.out_dir}/tables", mode: "copy"
+
+    input:
+    path script
+    tuple path(assembly_tsv), path(long_ont_tsv), path(long_pb_tsv), path(short_tsv)
+
+    output:
+    path "csv_per_sv_summary"
+
+    script:
+    """
+    python ${script} --asm ${assembly_tsv} --short ${short_tsv} --long_ont ${long_ont_tsv} --long_pacbio ${long_pb_tsv} --out csv_per_sv_summary
+    """
+}
+
+
+process create_empty_tbl {
+    
+    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+        publishDir "${params.out_dir}/tables/tsv", mode: "copy"
+    
+    input:
+    val prefix
+
+    output:
+    path "empty_${prefix}_sv_summary.tsv"
+
+    script:
+    """
+    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_methods\tscore\tsupporting_reads" > empty_${prefix}_sv_summary.tsv
     """
 }

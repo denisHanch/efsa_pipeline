@@ -15,8 +15,11 @@ many unrelated smaller calls.
 Within each event, at most one record per source is chosen (best by supporting_reads then score).
 
 Usage:
-  python create_sv_output_xlsx.py --asm assembly.tsv --long long.tsv --short short.tsv --out merged.xlsx --tol 10
-Any of --asm/--long/--short may be omitted; columns for missing sources are still present but empty.
+    python create_sv_output_xlsx.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10
+
+Any of the inputs may be omitted; the script will process whichever of the assembly, long_ont,
+long_pacbio or short tables are provided. Long-read inputs (ONT and PacBio) are treated
+the same for clustering and merged into the "long" source.
 """
 from __future__ import annotations
 
@@ -26,8 +29,8 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
 
 # ----------------------------
@@ -214,45 +217,60 @@ def read_tsv(path):
 
 
 def load_records(path, source):
+    """Load records from a TSV file into Record objects.
+
+    - path: path to tsv (str or None). If falsy, returns empty list.
+    - source: one of 'asm', 'long_ont', 'long_pacbio', 'long' or 'short'.
+      Sources starting with 'long' are treated as long-read sources and stored
+      separately (e.g. 'long_ont' vs 'long_pacbio').
+    """
     if not path:
         return []
 
-    df = read_tsv(path)
+    try:
+        df = read_tsv(path)
+    except Exception:
+        return []
+
     out = []
 
+    # defensive: accept files that may be missing optional columns
     for _, row in df.iterrows():
-        start = _to_int(row["start"])
-        end = _to_int(row["end"])
+        chrom = row.get("chrom") or row.get("#chrom")
+        raw_svtype = row.get("svtype")
+        if chrom is None or raw_svtype is None:
+            # malformed row -> skip
+            continue
+
+        start = _to_int(row.get("start"))
+        end = _to_int(row.get("end"))
         if start is None or end is None:
             continue
         if start > end:
             start, end = end, start
 
-        std = standardize_type(row["svtype"], row.get("info_svtype"), source)
+        std = standardize_type(raw_svtype, row.get("info_svtype"), source)
 
-        supporting_methods, copy_number = None, None
-        if source == "long":
-            supporting_methods = row.get("supporting_methods")
-
-        if source == "short":
-            copy_number = _to_int(row.get("RDCN"))
+        # treat any long* sources as long for supporting_methods
+        supporting_methods = row.get("supporting_methods") if str(source).startswith("long") else None
+        copy_number = _to_int(row.get("RDCN")) if source == "short" else None
 
         out.append(
             Record(
                 source,
-                row["chrom"],
+                chrom,
                 start,
                 end,
                 std,
-                row["svtype"],
+                raw_svtype,
                 row.get("info_svtype"),
                 _to_int(row.get("supporting_reads")),
                 _to_float(row.get("score")),
-                _to_int(row.get("RDCN")),
-                _to_int(row.get("supporting_methods")),
-                
+                copy_number,
+                supporting_methods,
             )
         )
+
     return out
 
 
@@ -264,14 +282,23 @@ def build_output_table(clusters):
         counters[c.std_type] += 1
         eid = f"{c.std_type}_{counters[c.std_type]}"
 
-        by_src = {"asm": [], "long": [], "short": []}
+        by_src = {"asm": [], "long_ont": [], "long_pacbio": [], "short": []}
         for m in c.members:
-            by_src[m.source].append(m)
+            # if source is a generic 'long', try to place into long_ont if unclear
+            src = m.source
+            if src == "long":
+                # prefer pacbio if token in raw svtype or supporting_methods hints? fallback to long_ont
+                src = "long_ont"
+            if src not in by_src:
+                by_src.setdefault(src, []).append(m)
+            else:
+                by_src[src].append(m)
 
-        asm = choose_best_record(by_src["asm"])
-        lng = choose_best_record(by_src["long"])
-        sht = choose_best_record(by_src["short"])
-        pipelines_confirmed = sum(x is not None for x in (asm, lng, sht))
+        asm = choose_best_record(by_src.get("asm", []))
+        long_ont = choose_best_record(by_src.get("long_ont", []))
+        long_pacbio = choose_best_record(by_src.get("long_pacbio", []))
+        sht = choose_best_record(by_src.get("short", []))
+        pipelines_confirmed = sum(x is not None for x in (asm, long_ont, long_pacbio, sht))
 
         rows.append({
             "event_id": eid,
@@ -286,13 +313,21 @@ def build_output_table(clusters):
             "asm_svtype_raw": asm.raw_svtype if asm else "",
             "asm_score" : 1,
 
-            "long_start": lng.start if lng else np.nan,
-            "long_end": lng.end if lng else np.nan,
-            "long_svtype_raw": lng.raw_svtype if lng else "",
-            "long_info_svtype": lng.info_svtype if lng else "",
-            "long_score": lng.score if lng else np.nan,
-            "long_supporting_reads": lng.supporting_reads if lng else np.nan,
-            "long_supporting_methods": lng.supporting_methods if lng else np.nan,
+            "long_ont_start": long_ont.start if long_ont else np.nan,
+            "long_ont_end": long_ont.end if long_ont else np.nan,
+            "long_ont_svtype_raw": long_ont.raw_svtype if long_ont else "",
+            "long_ont_info_svtype": long_ont.info_svtype if long_ont else "",
+            "long_ont_score": long_ont.score if long_ont else np.nan,
+            "long_ont_supporting_reads": long_ont.supporting_reads if long_ont else np.nan,
+            "long_ont_supporting_methods": long_ont.supporting_methods if long_ont else np.nan,
+
+            "long_pacbio_start": long_pacbio.start if long_pacbio else np.nan,
+            "long_pacbio_end": long_pacbio.end if long_pacbio else np.nan,
+            "long_pacbio_svtype_raw": long_pacbio.raw_svtype if long_pacbio else "",
+            "long_pacbio_info_svtype": long_pacbio.info_svtype if long_pacbio else "",
+            "long_pacbio_score": long_pacbio.score if long_pacbio else np.nan,
+            "long_pacbio_supporting_reads": long_pacbio.supporting_reads if long_pacbio else np.nan,
+            "long_pacbio_supporting_methods": long_pacbio.supporting_methods if long_pacbio else np.nan,
 
             "short_start": sht.start if sht else np.nan,
             "short_end": sht.end if sht else np.nan,
@@ -329,21 +364,43 @@ def write_csv_tables(df, outdir):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--asm")
-    p.add_argument("--long", dest="long_reads")
+    p.add_argument("--long_ont", dest="long_ont")
+    p.add_argument("--long_pacbio", dest="long_pacbio")
     p.add_argument("--short", dest="short_reads")
     p.add_argument("--out", required=True, help="Output directory")
     p.add_argument("--tol", type=int, default=10)
     args = p.parse_args()
-
     records = []
     records += load_records(args.asm, "asm")
-    records += load_records(args.long_reads, "long")
+
+    # long inputs: accept both ONT and PacBio; also support legacy --long
+    records += load_records(getattr(args, "long_reads", None), "long")
+    records += load_records(getattr(args, "long_ont", None), "long_ont")
+    records += load_records(getattr(args, "long_pacbio", None), "long_pacbio")
+
     records += load_records(args.short_reads, "short")
 
+    if not records:
+        # No valid records parsed; create output dir and exit gracefully
+        os.makedirs(args.out, exist_ok=True)
+        print("No valid input records found; created output directory and exiting.")
+        return
+
     clusters = cluster_records(records, args.tol)
-    df = build_output_table(clusters)
-    mask = df["long_info_svtype"].notna() & (df["long_info_svtype"] != "")
-    df.loc[mask, "long_score"] = df.loc[mask, "long_score"].fillna(0)
+
+    if not clusters:
+        df = pd.DataFrame()
+    else:
+        df = build_output_table(clusters)
+
+    # fix scores for long_ont and long_pacbio when info_svtype present
+    if "long_ont_info_svtype" in df.columns:
+        mask = df["long_ont_info_svtype"].notna() & (df["long_ont_info_svtype"] != "")
+        df.loc[mask, "long_ont_score"] = df.loc[mask, "long_ont_score"].fillna(0)
+    if "long_pacbio_info_svtype" in df.columns:
+        mask = df["long_pacbio_info_svtype"].notna() & (df["long_pacbio_info_svtype"] != "")
+        df.loc[mask, "long_pacbio_score"] = df.loc[mask, "long_pacbio_score"].fillna(0)
+
     write_csv_tables(df, args.out)
 
     print(f"Wrote CSV tables to: {args.out}")

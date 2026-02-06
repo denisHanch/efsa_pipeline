@@ -10,12 +10,12 @@ def logUnmapped(reads, total_reads, out_folder_name, reference) {
         long totalInput = total as long
 
         def percentage = (unmapped * 100.0) / totalInput
-        def pctStr = String.format('%.2f', percentage)
+        def pctStr = String.format("%.2f", percentage)
 
         // Build a plain String
         String msg = "📊 ${out_folder_name} mapping${reference}:\n" +
-                     "    Unmapped reads: ${String.format('%,d', unmapped)} (${pctStr}%)\n" +
-                     "    Total input reads: ${String.format('%,d', totalInput)}\n"
+                     "    Unmapped reads: ${String.format("%,d", unmapped)} (${pctStr}%)\n" +
+                     "    Total input reads: ${String.format("%,d", totalInput)}\n"
 
         log.info(msg)
     }

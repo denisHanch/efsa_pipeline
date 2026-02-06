@@ -1,13 +1,32 @@
 #!/usr/bin/env nextflow
+/*
+  workflow: short_read.nf
+  Purpose: Process short-read (Illumina) sequencing data: run QC and trimming,
+           map reads to reference and optional plasmid sequences, call SNPs and
+           structural variants (SVs) where applicable, collect unmapped reads,
+           perform basic VCF QC, and convert SV VCFs to TSV summary tables.
 
-include { multiqc } from '../modules/qc.nf'
-include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid } from '../modules/mapping.nf'
-include { freebayes; bcftools_stats; bcftools_stats as bcftools_stats_plasmid } from '../modules/variant_calling.nf'
-include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from '../modules/subworkflow.nf'
-include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadShortFastqFiles } from '../modules/logs.nf'
+  Contract:
+  - Inputs:
+      - Channel of trimmed short-read FASTQ files (produced by QC/trimming step)
+      - Channel of reference FASTA to map against
+      - out_folder_name: output prefix / label (controls which analyses run)
+      - Optional plasmid FASTA (used to remap unmapped reads)
+  - Outputs:
+      - Channel of variant VCFs (SNP / SV) or Channel.empty() when skipped
+      - Channel of unmapped FASTQ reads (after reference and optional plasmid mapping)
+      - Channel of SV summary TSVs (per-run) or Channel.empty() when skipped
+*/
+
+include { multiqc } from "../modules/qc.nf"
+include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid } from "../modules/mapping.nf"
+include { freebayes; bcftools_stats; bcftools_stats as bcftools_stats_plasmid } from "../modules/variant_calling.nf"
+include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from "../workflows/subworkflows.nf"
+include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadShortFastqFiles } from "../modules/logs.nf"
+include { vcf_to_table }  from "../modules/sv_calling.nf"
 
 
-workflow short_ref {
+workflow short_read {
     take:
         trimmed
         fasta
@@ -51,19 +70,22 @@ workflow short_ref {
                 annotate_vcf(fasta, gff, vcf, "gff", "gff3", out_folder_name) | set {qc_vcf}
             
                 qc_vcf.mix(bcftools_out).collect() | set { qc_out }
-                multiqc(qc_out, out_folder_name, 'varint_calling')
+                multiqc(qc_out, out_folder_name, "varint_calling")
             } else {
-                multiqc(bcftools_out, out_folder_name, 'varint_calling')
+                multiqc(bcftools_out, out_folder_name, "varint_calling")
             }
         
             // SVs variant calling
             sv(fasta, indexed_bam, out_folder_name) | set { sv_vcf }
+            vcf_to_table(sv_vcf) | set { sv_tbl }
         } else {
             sv_vcf = Channel.empty()
+            sv_tbl = Channel.empty()
         }
     emit:
         sv_vcf
         unmapped_fastq
+        sv_tbl
 
 }
 
@@ -80,10 +102,9 @@ workflow {
         
     fastqs = loadShortFastqFiles(short_read_files)
 
-    // QC and trimming module
     qc(fastqs, "illumina/qc_trimming") | set { trimmed }
 
-    short_ref(trimmed, fasta, out_folder_name, plasmid_files)
+    short_read(trimmed, fasta, out_folder_name, plasmid_files)
 }
 
 

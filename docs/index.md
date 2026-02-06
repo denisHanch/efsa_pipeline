@@ -32,6 +32,7 @@ Welcome to the EFSA Pipeline documentation. This pipeline provides comprehensive
 - [VCF Comparison Pipeline Output](outputs/truvari.md)
 - [Unmapped Reads Statistics](outputs/unmapped-stats.md)
 - [Logs](outputs/logs.md)
+- [Generation of per structural variation type CSV tables](outputs/sv-tables.md)
 
 ## About
 

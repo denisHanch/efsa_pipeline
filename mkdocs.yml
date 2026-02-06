@@ -106,6 +106,7 @@ nav:
     - Short-Read Results: outputs/illumina.md
     - Long-Read Results: outputs/long-reads.md
     - VCF Comparison: outputs/truvari.md
+    - Generation of per structural variation type CSV tables: outputs/sv-tables.md
     - Unmapped Statistics: outputs/unmapped-stats.md
     - Logs: outputs/logs.md
 

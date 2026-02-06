@@ -51,7 +51,7 @@ You can run each of the three sub-pipelines independently.
 For Illumina short-read data:
 
 ```bash
-nextflow run workflows/short-read-ref.nf \
+nextflow run workflows/short_read.nf \
   -process.containerOptions "-u $(id -u):$(id -g)" \
   --max_cpu $(nproc) \
   -resume
@@ -62,7 +62,7 @@ nextflow run workflows/short-read-ref.nf \
 For Oxford Nanopore / PacBio long-read data:
 
 ```bash
-nextflow run workflows/long-read-ref.nf \
+nextflow run workflows/long_read.nf \
   -process.containerOptions "-u $(id -u):$(id -g)" \
   --max_cpu $(nproc) \
   -resume
