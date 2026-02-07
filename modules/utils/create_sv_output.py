@@ -15,7 +15,7 @@ many unrelated smaller calls.
 Within each event, at most one record per source is chosen (best by supporting_reads then score).
 
 Usage:
-    python create_sv_output_xlsx.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10
+    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10
 
 Any of the inputs may be omitted; the script will process whichever of the assembly, long_ont,
 long_pacbio or short tables are provided. Long-read inputs (ONT and PacBio) are treated
@@ -114,9 +114,8 @@ def standardize_type(raw_svtype, info_svtype, source):
     return "RPL"
 
 
-# ----------------------------
 # Data models
-# ----------------------------
+
 
 @dataclass
 class Record:
@@ -145,9 +144,7 @@ class EventCluster:
     percentage_overlaps: List[float] = field(default_factory=list)
 
 
-# ----------------------------
 # Clustering
-# ----------------------------
 
 def intervals_overlap(a_start, a_end, b_start, b_end, tol):
     overlap = (b_start <= a_end + tol) and (b_end >= a_start - tol)
@@ -165,19 +162,15 @@ def cluster_records(records, tol):
 
     for (chrom, std_type), recs in key_to_recs.items():
         recs = sorted(recs, key=lambda r: (r.start, r.end))
-        # cur holds records in the current cluster; cur_percs stores the daisy-chain overlap percentages
         cur = [recs[0]]
         cur_percs: List[float] = []
 
         for r in recs[1:]:
             last = cur[-1]
             if intervals_overlap(last.start, last.end, r.start, r.end, tol):
-                # compute overlap length between `last` and `r`
                 overlap_len = max(0, min(last.end, r.end) - max(last.start, r.start) + 1)
                 len_last = last.end - last.start + 1
                 len_r = r.end - r.start + 1
-                # percent overlap relative to the larger of the two events so that small events
-                # inside very large ones result in a small percentage (e.g. 100/1000 -> 10%)
                 denom = max(len_last, len_r) if max(len_last, len_r) > 0 else 1
                 pct = (overlap_len / denom) * 100 if denom else 0.0
                 cur.append(r)
@@ -224,9 +217,6 @@ def choose_best_record(recs):
     return max(recs, key=key)
 
 
-# ----------------------------
-# IO
-# ----------------------------
 
 def read_tsv(path):
     return pd.read_csv(path, sep="\t", dtype=str, comment="#")
@@ -300,11 +290,7 @@ def build_output_table(clusters):
 
         by_src = {"asm": [], "long_ont": [], "long_pacbio": [], "short": []}
         for m in c.members:
-            # if source is a generic 'long', try to place into long_ont if unclear
             src = m.source
-            if src == "long":
-                # prefer pacbio if token in raw svtype or supporting_methods hints? fallback to long_ont
-                src = "long_ont"
             if src not in by_src:
                 by_src.setdefault(src, []).append(m)
             else:
@@ -324,7 +310,6 @@ def build_output_table(clusters):
                     pf = float(p)
                 except Exception:
                     return str(p)
-                # show integer percentages without decimals
                 if pf.is_integer():
                     return f"{int(pf)}%"
                 return f"{pf:.2f}%"
@@ -391,9 +376,7 @@ def write_csv_tables(df, outdir):
         other.to_csv(os.path.join(outdir, "Other.csv"), index=False)
 
 
-# ----------------------------
 # Main
-# ----------------------------
 
 def main():
     p = argparse.ArgumentParser()
@@ -415,7 +398,6 @@ def main():
     records += load_records(args.short_reads, "short")
 
     if not records:
-        # No valid records parsed; create output dir and exit gracefully
         os.makedirs(args.out, exist_ok=True)
         print("No valid input records found; created output directory and exiting.")
         return

@@ -150,7 +150,7 @@ workflow {
         truvari_comparison(ref_fasta, vcfs)
     }
     
-    script = file("${workflow.projectDir}/modules/utils/create_sv_output_xlsx.py")
+    script = file("${workflow.projectDir}/modules/utils/create_sv_output.py")
 
     def tbl_channel = sv_tbl.collect().map { list ->
     def asm = list.find { it.name.toLowerCase().contains("assembly") }
