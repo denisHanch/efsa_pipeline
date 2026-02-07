@@ -136,18 +136,23 @@ class TestConfigManager:
         with pytest.raises((ConfigurationError, ValueError), match="Missing required field: ref_genome_filename"):
             ConfigManager.load(str(config_file))
     
-    def test_missing_required_field_mod_genome(self, temp_dir):
-        """Test error when mod_genome_filename is missing."""
+    def test_mod_genome_is_optional(self, temp_dir):
+        """Test that mod_genome_filename is optional."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "reads.fastq").write_text("@read1\nATCG\n+\nIIII\n")
+
         config = {
             "ref_genome_filename": {"filename": "ref.fasta"},
             "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}]
         }
-        
+
         config_file = temp_dir / "config.json"
         config_file.write_text(json.dumps(config))
-        
-        with pytest.raises((ConfigurationError, ValueError), match="Missing required field: mod_genome_filename"):
-            ConfigManager.load(str(config_file))
+
+        loaded_config = ConfigManager.load(str(config_file))
+        assert loaded_config.ref_genome is not None
+        assert loaded_config.mod_genome is None
+        assert len(loaded_config.reads) == 1
     
     def test_missing_required_field_reads(self, temp_dir):
         """Test error when reads field is missing."""
