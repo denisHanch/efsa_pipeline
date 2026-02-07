@@ -15,7 +15,7 @@ many unrelated smaller calls.
 Within each event, at most one record per source is chosen (best by supporting_reads then score).
 
 Usage:
-    python create_sv_output_xlsx.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10
+    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10
 
 Any of the inputs may be omitted; the script will process whichever of the assembly, long_ont,
 long_pacbio or short tables are provided. Long-read inputs (ONT and PacBio) are treated
@@ -26,7 +26,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -114,9 +114,8 @@ def standardize_type(raw_svtype, info_svtype, source):
     return "RPL"
 
 
-# ----------------------------
 # Data models
-# ----------------------------
+
 
 @dataclass
 class Record:
@@ -141,11 +140,11 @@ class EventCluster:
     start: int
     end: int
     members: List[Record]
+    # sequence of overlap percentages (floats, 0-100) collected during daisy-chain merges
+    percentage_overlaps: List[float] = field(default_factory=list)
 
 
-# ----------------------------
 # Clustering
-# ----------------------------
 
 def intervals_overlap(a_start, a_end, b_start, b_end, tol):
     overlap = (b_start <= a_end + tol) and (b_end >= a_start - tol)
@@ -164,11 +163,18 @@ def cluster_records(records, tol):
     for (chrom, std_type), recs in key_to_recs.items():
         recs = sorted(recs, key=lambda r: (r.start, r.end))
         cur = [recs[0]]
+        cur_percs: List[float] = []
 
         for r in recs[1:]:
             last = cur[-1]
             if intervals_overlap(last.start, last.end, r.start, r.end, tol):
+                overlap_len = max(0, min(last.end, r.end) - max(last.start, r.start) + 1)
+                len_last = last.end - last.start + 1
+                len_r = r.end - r.start + 1
+                denom = max(len_last, len_r) if max(len_last, len_r) > 0 else 1
+                pct = (overlap_len / denom) * 100 if denom else 0.0
                 cur.append(r)
+                cur_percs.append(pct)
             else:
                 clusters.append(
                     EventCluster(
@@ -177,9 +183,11 @@ def cluster_records(records, tol):
                         min(x.start for x in cur),
                         max(x.end for x in cur),
                         cur,
+                        percentage_overlaps=cur_percs,
                     )
                 )
                 cur = [r]
+                cur_percs = []
 
         clusters.append(
             EventCluster(
@@ -188,6 +196,7 @@ def cluster_records(records, tol):
                 min(x.start for x in cur),
                 max(x.end for x in cur),
                 cur,
+                percentage_overlaps=cur_percs,
             )
         )
 
@@ -208,9 +217,6 @@ def choose_best_record(recs):
     return max(recs, key=key)
 
 
-# ----------------------------
-# IO
-# ----------------------------
 
 def read_tsv(path):
     return pd.read_csv(path, sep="\t", dtype=str, comment="#")
@@ -284,11 +290,7 @@ def build_output_table(clusters):
 
         by_src = {"asm": [], "long_ont": [], "long_pacbio": [], "short": []}
         for m in c.members:
-            # if source is a generic 'long', try to place into long_ont if unclear
             src = m.source
-            if src == "long":
-                # prefer pacbio if token in raw svtype or supporting_methods hints? fallback to long_ont
-                src = "long_ont"
             if src not in by_src:
                 by_src.setdefault(src, []).append(m)
             else:
@@ -299,6 +301,22 @@ def build_output_table(clusters):
         long_pacbio = choose_best_record(by_src.get("long_pacbio", []))
         sht = choose_best_record(by_src.get("short", []))
         pipelines_confirmed = sum(x is not None for x in (asm, long_ont, long_pacbio, sht))
+
+        # format percentage overlaps collected during clustering into a human-friendly string
+        percs = getattr(c, "percentage_overlaps", []) or []
+        if percs:
+            def fmt(p):
+                try:
+                    pf = float(p)
+                except Exception:
+                    return str(p)
+                if pf.is_integer():
+                    return f"{int(pf)}%"
+                return f"{pf:.2f}%"
+
+            pct_str = ", ".join(fmt(p) for p in percs)
+        else:
+            pct_str = ""
 
         rows.append({
             "event_id": eid,
@@ -336,6 +354,7 @@ def build_output_table(clusters):
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
             "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
+            "percentage_overlap": pct_str,
 
             "support_score": pipelines_confirmed,
         })
@@ -357,9 +376,7 @@ def write_csv_tables(df, outdir):
         other.to_csv(os.path.join(outdir, "Other.csv"), index=False)
 
 
-# ----------------------------
 # Main
-# ----------------------------
 
 def main():
     p = argparse.ArgumentParser()
@@ -381,7 +398,6 @@ def main():
     records += load_records(args.short_reads, "short")
 
     if not records:
-        # No valid records parsed; create output dir and exit gracefully
         os.makedirs(args.out, exist_ok=True)
         print("No valid input records found; created output directory and exiting.")
         return

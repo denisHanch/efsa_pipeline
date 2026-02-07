@@ -448,7 +448,7 @@ data/outputs/tables/
 
 Example (local):
 ```bash
-python3 modules/utils/create_sv_output_xlsx.py --asm assembly_sv_summary.tsv \
+python3 modules/utils/create_sv_output.py --asm assembly_sv_summary.tsv \
   --long_ont sample1_ont_sv_summary.tsv --long_pacbio sample1_pacbio_sv_summary.tsv \
   --short sample1_short_sv_summary.tsv --out csv_per_sv_sumary
 ```

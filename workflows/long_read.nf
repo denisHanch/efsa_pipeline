@@ -47,7 +47,6 @@ workflow long_read {
         calc_unmapped(unmapped_fastq) | set { nreads }
         logUnmapped(nreads, total_reads, out_folder_name, "")
 
-        
         // mapping reads to plasmid & variant calling
         if (plasmid_fasta) {
             Channel.from(plasmid_fasta) | set { plasmid_fasta }
