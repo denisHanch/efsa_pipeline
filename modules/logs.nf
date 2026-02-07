@@ -84,7 +84,7 @@ def loadShortFastqFiles(short_read_files) {
         .groupTuple(sort: true)
 }
 
-def listFastqFiles(String dirPath, String pattern = ".*\\.(fastq|fq)(\\.gz)?\$") {
+def listFiles(String dirPath, String pattern = ".*\\.(fastq|fq)(\\.gz)?\$") {
     def dir = file(dirPath)
     if (!dir.exists() || !dir.isDirectory()) {
         log.warn "Directory not found or not a directory: ${dirPath}"

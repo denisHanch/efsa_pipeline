@@ -12,7 +12,7 @@ include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_un
 include { nanoplot as nanoplo_pacbio } from "./modules/qc.nf"
 include { nanoplot as nanoplot_pacbio; nanoplot as nanoplot_ont } from "./modules/qc.nf"
 include { restructure_sv_tbl; create_empty_tbl as create_ont_tbl; create_empty_tbl as create_asm_tbl; create_empty_tbl as create_pacbio_tbl; create_empty_tbl as create_short_tbl } from "./modules/sv_calling.nf"
-include { describePipeline; logWorkflowCompletion; loadFastqFiles; loadShortFastqFiles; listFastqFiles } from "./modules/logs.nf"
+include { describePipeline; logWorkflowCompletion; loadFastqFiles; loadShortFastqFiles; listFiles } from "./modules/logs.nf"
 
 
 
@@ -51,12 +51,12 @@ workflow {
 
     def mod_fasta_avail = !file("${params.in_dir}").listFiles()?.findAll { it.name ==~ /.*(assembled_genome|mod)\.(fa|fna|fasta)$/ }.isEmpty()
 
-    def ref_plasmid = listFastqFiles("${params.in_dir}", ".*ref_plasmid\\.(fa|fna|fasta)")
-    def mod_plasmid = listFastqFiles("${params.in_dir}", ".*mod_plasmid\\.(fa|fna|fasta)")
+    def ref_plasmid = listFiles("${params.in_dir}", ".*ref_plasmid\\.(fa|fna|fasta)")
+    def mod_plasmid = listFiles("${params.in_dir}", ".*mod_plasmid\\.(fa|fna|fasta)")
 
-    def ont_files = listFastqFiles("${params.in_dir}/ont/")
-    def pacbio_files = listFastqFiles("${params.in_dir}/pacbio/")
-    def illumina_files = listFastqFiles("${params.in_dir}/illumina/")
+    def ont_files = listFiles("${params.in_dir}/ont/")
+    def pacbio_files = listFiles("${params.in_dir}/pacbio/")
+    def illumina_files = listFiles("${params.in_dir}/illumina/")
 
     def activePipelines = []
     def sv_tbl = Channel.empty()
