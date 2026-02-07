@@ -26,7 +26,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -141,6 +141,8 @@ class EventCluster:
     start: int
     end: int
     members: List[Record]
+    # sequence of overlap percentages (floats, 0-100) collected during daisy-chain merges
+    percentage_overlaps: List[float] = field(default_factory=list)
 
 
 # ----------------------------
@@ -163,12 +165,23 @@ def cluster_records(records, tol):
 
     for (chrom, std_type), recs in key_to_recs.items():
         recs = sorted(recs, key=lambda r: (r.start, r.end))
+        # cur holds records in the current cluster; cur_percs stores the daisy-chain overlap percentages
         cur = [recs[0]]
+        cur_percs: List[float] = []
 
         for r in recs[1:]:
             last = cur[-1]
             if intervals_overlap(last.start, last.end, r.start, r.end, tol):
+                # compute overlap length between `last` and `r`
+                overlap_len = max(0, min(last.end, r.end) - max(last.start, r.start) + 1)
+                len_last = last.end - last.start + 1
+                len_r = r.end - r.start + 1
+                # percent overlap relative to the larger of the two events so that small events
+                # inside very large ones result in a small percentage (e.g. 100/1000 -> 10%)
+                denom = max(len_last, len_r) if max(len_last, len_r) > 0 else 1
+                pct = (overlap_len / denom) * 100 if denom else 0.0
                 cur.append(r)
+                cur_percs.append(pct)
             else:
                 clusters.append(
                     EventCluster(
@@ -177,9 +190,11 @@ def cluster_records(records, tol):
                         min(x.start for x in cur),
                         max(x.end for x in cur),
                         cur,
+                        percentage_overlaps=cur_percs,
                     )
                 )
                 cur = [r]
+                cur_percs = []
 
         clusters.append(
             EventCluster(
@@ -188,6 +203,7 @@ def cluster_records(records, tol):
                 min(x.start for x in cur),
                 max(x.end for x in cur),
                 cur,
+                percentage_overlaps=cur_percs,
             )
         )
 
@@ -300,6 +316,23 @@ def build_output_table(clusters):
         sht = choose_best_record(by_src.get("short", []))
         pipelines_confirmed = sum(x is not None for x in (asm, long_ont, long_pacbio, sht))
 
+        # format percentage overlaps collected during clustering into a human-friendly string
+        percs = getattr(c, "percentage_overlaps", []) or []
+        if percs:
+            def fmt(p):
+                try:
+                    pf = float(p)
+                except Exception:
+                    return str(p)
+                # show integer percentages without decimals
+                if pf.is_integer():
+                    return f"{int(pf)}%"
+                return f"{pf:.2f}%"
+
+            pct_str = ", ".join(fmt(p) for p in percs)
+        else:
+            pct_str = ""
+
         rows.append({
             "event_id": eid,
             "chrom": c.chrom,
@@ -336,6 +369,7 @@ def build_output_table(clusters):
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
             "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
+            "percentage_overlap": pct_str,
 
             "support_score": pipelines_confirmed,
         })
