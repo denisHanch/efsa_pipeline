@@ -2,18 +2,15 @@
 
 // Include workflows
 include { ref_mod } from "./workflows/fasta_ref_x_mod.nf"
-
 include { long_read as long_ref_pacbio; long_read as long_ref_ont; long_read as long_mod_pacbio; long_read as long_mod_ont} from "./workflows/long_read.nf"
 include { short_read as short_ref; short_read as short_mod } from "./workflows/short_read.nf"
 include { truvari_comparison } from "./workflows/vcf_comparison.nf"
 include { qc } from "./workflows/subworkflows.nf"
 
 include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_unmapped as compare_unmapped_pacbio } from "./modules/mapping.nf"
-include { nanoplot as nanoplo_pacbio } from "./modules/qc.nf"
 include { nanoplot as nanoplot_pacbio; nanoplot as nanoplot_ont } from "./modules/qc.nf"
 include { restructure_sv_tbl; create_empty_tbl as create_ont_tbl; create_empty_tbl as create_asm_tbl; create_empty_tbl as create_pacbio_tbl; create_empty_tbl as create_short_tbl } from "./modules/sv_calling.nf"
 include { describePipeline; logWorkflowCompletion; loadFastqFiles; loadShortFastqFiles } from "./modules/logs.nf"
-
 
 
 // Help message
@@ -47,8 +44,8 @@ def pipelines_running = 0
 
 workflow {
     // Inputs
-    Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true) | set { ref_fasta }
-    Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true) | set { mod_fasta }
+    def ref_fasta = Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true)
+    def mod_fasta = Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true)
 
     def ref_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
     def mod_plasmid = file("$params.in_dir").listFiles()?.findAll { it.name =~ /mod_plasmid\.(fa|fna|fasta)$/ } ?: []
@@ -153,7 +150,7 @@ workflow {
         truvari_comparison(ref_fasta, vcfs)
     }
     
-    script = file("${workflow.projectDir}/modules/utils/create_sv_output_xlsx.py")
+    script = file("${workflow.projectDir}/modules/utils/create_sv_output.py")
 
     def tbl_channel = sv_tbl.collect().map { list ->
     def asm = list.find { it.name.toLowerCase().contains("assembly") }

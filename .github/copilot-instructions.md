@@ -18,7 +18,7 @@
   - `modules/` — building blocks (mapping.nf, qc.nf, sv_calling.nf, logs.nf). Edit here to change process commands and channels.
   - `nextflow.config` — global params (containers map, default dirs, docker enable flag). Update `params.containers` to change tool images.
   - `modules/validation/` — Python validation package and tests; input config format in `data/inputs/config_template.json` and docs in `validation/CONFIG_GUIDE.md`.
-  - `modules/utils/create_sv_output_xlsx.py` — final SV table assembler called from `main.nf`.
+  - `modules/utils/create_sv_output.py` — final SV table assembler called from `main.nf`.
 
 - Project conventions and patterns (project-specific)
   - Data layout: `data/inputs/` (raw), `data/valid/` (validated), `data/outputs/` (results). Readers and workflows expect this structure.
