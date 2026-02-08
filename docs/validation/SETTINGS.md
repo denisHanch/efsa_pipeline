@@ -19,12 +19,10 @@ The validation module supports three validation levels to balance thoroughness a
 - Performs comprehensive quality checks
 - Generates detailed statistics
 - Recommended for first-time data processing
-- Ensures highest data quality
 
 **Use when:**
 - Processing data for the first time
 - Data quality is uncertain
-- Detailed statistics are needed
 
 ### Trust Mode
 - Validates only the first sequence
