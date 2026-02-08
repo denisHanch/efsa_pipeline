@@ -147,7 +147,7 @@ process debreak {
 process sniffles {
     container params.containers.sniffles
     tag "$pair_id"
-        publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: "copy"
+    publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: "copy"
 
     input:
     each path(fasta_file)
@@ -170,7 +170,7 @@ process sniffles {
 process survivor {
     container params.containers.survivor
     tag "$pair_id"
-        publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: "copy"
+    publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: "copy"
 
     input:
     tuple val(pair_id), path(sniffles_vcf)
@@ -206,7 +206,6 @@ process vcf_to_table {
 
     container params.containers.bcftools
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
-        publishDir "${params.out_dir}/tables/tsv", mode: "copy"
 
     input:
     tuple val(name), path(vcf)
@@ -237,7 +236,6 @@ process vcf_to_table_long {
 
     container params.containers.bcftools
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
-        publishDir "${params.out_dir}/tables/tsv", mode: "copy"
 
     input:
     val tag
@@ -266,7 +264,6 @@ process vcf_to_table_long {
 process restructure_sv_tbl {
 
     publishDir "${params.out_dir}/tables", mode: 'copy'
-        publishDir "${params.out_dir}/tables", mode: "copy"
 
     input:
     path script
@@ -285,7 +282,6 @@ process restructure_sv_tbl {
 process create_empty_tbl {
     
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
-        publishDir "${params.out_dir}/tables/tsv", mode: "copy"
     
     input:
     val prefix
