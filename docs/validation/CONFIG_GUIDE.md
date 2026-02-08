@@ -31,7 +31,7 @@ This document defines the **JSON** configuration file that `ConfigManager` uses 
 | Key | Type | Required | Description |
 |---|---|:---:|---|
 | `ref_genome_filename` | GenomeConfig | ✅ | Reference genome (FASTA or GenBank) |
-| `mod_genome_filename` | GenomeConfig | ✅ | Modified genome (FASTA or GenBank) |
+| `mod_genome_filename` | GenomeConfig | ❌ | Modified genome (FASTA or GenBank) |
 | `ref_plasmid_filename` | GenomeConfig | ❌ | Reference plasmid (FASTA or GenBank) |
 | `mod_plasmid_filename` | GenomeConfig | ❌ | Modified plasmid (FASTA or GenBank) |
 | `reads` | List[ReadConfig] | ✅ | Read files (FASTQ/BAM), minimum one |
@@ -41,7 +41,7 @@ This document defines the **JSON** configuration file that `ConfigManager` uses 
 
 **Important:**
 - All file paths must be **relative to the config file directory**
-- At minimum, provide `ref_genome_filename`,`mod_genome_filename` and `reads`
+- At minimum, provide `ref_genome_filename` and `reads`
 
 ---
 
@@ -51,7 +51,7 @@ This document defines the **JSON** configuration file that `ConfigManager` uses 
 
 | Format | Extensions | 
 |--------|-----------|
-| FASTA | `.fa`, `.fasta`, `.fna` | 
+| FASTA | `.fa`, `.fasta`, `.fna`, `.faa` |
 | GenBank | `.gb`, `.gbk`, `.genbank` |
 
 ### Feature Files
@@ -59,7 +59,7 @@ This document defines the **JSON** configuration file that `ConfigManager` uses 
 | Format | Extensions | 
 |--------|-----------|
 | GFF | `.gff`, `.gff3` |
-| GTF | `.gtf` | 
+| GTF | `.gtf`, `.gff2` |
 | BED | `.bed` | 
 
 ### Read Files
@@ -211,10 +211,11 @@ These settings customize validation behavior without modifying code.
 ### Global Options (`options` field)
 
 **Allowed global options:**
-- `threads`: Number of threads for parallel processing (positive integer, default: 8)
-  - System automatically detects CPU cores and warns if threads exceed available cores
+- `threads`: Number of threads for parallel processing (positive integer, default: auto-detect)
+  - When omitted or set to `null`, the system auto-detects based on available CPU cores
+  - System warns if threads exceed available cores
 - `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (default: `"strict"`)
-- `logging_level`: `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, or `"CRITICAL"` (default: `"INFO"`)
+- `logging_level`: `"DEBUG"`, `"INFO"`, `"WARNING"`, or `"ERROR"` (default: `"INFO"`)
   - Controls console logging verbosity
 
 **Example:**
@@ -262,7 +263,6 @@ Simplest valid configuration with required fields only:
 ```json
 {
   "ref_genome_filename": {"filename": "ref.fasta"},
-  "mod_genome_filename": {"filename": "mod.fasta"},
   "reads": [
     {"filename": "reads.fastq", "ngs_type": "illumina"}
   ]

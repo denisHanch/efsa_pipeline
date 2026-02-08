@@ -17,8 +17,8 @@ sudo apt-get install pigz pbzip2
 ```
 
 **Performance gains:**
-- `pigz` - parallel gzip (2-4x faster)
-- `pbzip2` - parallel bzip2 (3-6x faster)
+- `pigz` - parallel gzip 
+- `pbzip2` - parallel bzip2 
 
 ## Validation Level Selection
 

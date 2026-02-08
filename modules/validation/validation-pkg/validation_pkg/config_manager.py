@@ -21,6 +21,8 @@ T = TypeVar('T', bound='BaseValidatorConfig')
 # ===== Global Configuration Constants =====
 # Only these fields can be specified in config.json "options" section
 ALLOWED_GLOBAL_OPTIONS = {'threads', 'validation_level', 'logging_level'}
+# Only these fields can be overridden at the file level
+ALLOWED_FILE_OPTIONS = {'threads', 'validation_level'}
 MAX_RECOMMENDED_THREADS = 16
 
 # Default thread count when not specified in config
@@ -93,10 +95,10 @@ class Config:
     def __init__(self):
         # Required fields
         self.ref_genome: Optional[GenomeConfig] = None
-        self.mod_genome: Optional[GenomeConfig] = None
         self.reads: List[ReadConfig] = []
 
         # Optional fields
+        self.mod_genome: Optional[GenomeConfig] = None
         self.ref_plasmid: Optional[GenomeConfig] = None
         self.mod_plasmid: Optional[GenomeConfig] = None
         self.ref_feature: Optional[FeatureConfig] = None
@@ -119,8 +121,8 @@ class Config:
 
     @property
     def validation_level(self) -> str:
-        """Get validation level from options, or default to 'STRICT'."""
-        return self.options.get('validation_level', 'STRICT')
+        """Get validation level from options, or default to 'strict'."""
+        return self.options.get('validation_level', 'strict')
 
     def __repr__(self):
         """Return a detailed string representation of the configuration."""
@@ -219,7 +221,7 @@ class ConfigManager:
     @staticmethod
     def _validate_required_fields(data: dict):
         """Validate that required top-level fields exist (internal method)."""
-        required = ['ref_genome_filename', 'mod_genome_filename', 'reads']
+        required = ['ref_genome_filename', 'reads']
         
         for field in required:
             if field not in data:
@@ -236,9 +238,11 @@ class ConfigManager:
         config.ref_genome = ConfigManager._parse_genome_config(
             data['ref_genome_filename'], 'ref_genome_filename', config.config_dir, config.output_dir, config.options
         )
-        config.mod_genome = ConfigManager._parse_genome_config(
-            data['mod_genome_filename'], 'mod_genome_filename', config.config_dir, config.output_dir, config.options
-        )
+        # Optional modified genome
+        if 'mod_genome_filename' in data and data['mod_genome_filename']:
+            config.mod_genome = ConfigManager._parse_genome_config(
+                data['mod_genome_filename'], 'mod_genome_filename', config.config_dir, config.output_dir, config.options
+            )
 
         # Optional plasmids
         if 'ref_plasmid_filename' in data and data['ref_plasmid_filename']:
@@ -537,7 +541,7 @@ class ConfigManager:
         if 'logging_level' in options:
             logging_level = options['logging_level']
 
-            VALID_LOGGING_LEVELS = {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}
+            VALID_LOGGING_LEVELS = {'DEBUG', 'INFO', 'WARNING', 'ERROR'}
 
             if not isinstance(logging_level, str):
                 raise ConfigurationError(
@@ -568,7 +572,7 @@ class ConfigManager:
 
         filelvl_options.update(global_options)
         for key, value_item in extra.items():
-            if key in ALLOWED_GLOBAL_OPTIONS:
+            if key in ALLOWED_FILE_OPTIONS:
                 # Only log override if the key existed in global_options
                 if key in filelvl_options:
                     logger.warning(
