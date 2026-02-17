@@ -56,10 +56,7 @@
 4.  Start the pipeline with a command:
 
    ```bash
-   nextflow run main.nf \
-     -process.containerOptions "-u $(id -u):$(id -g)" \
-     --max_cpu $(nproc) \
-     -resume
+   nextflow run main.nf --max_cpu $(nproc) -resume
    ```
 
 
@@ -341,10 +338,7 @@ Each workflow can also be executed individually if required.
 This executes **short-read processing**, **long-read processing**, and **reference vs modified genome comparison** pipelines:
 
 ```bash
-nextflow run main.nf \
-  -process.containerOptions "-u $(id -u):$(id -g)" \
-  --max_cpu $(nproc) \
-  -resume
+nextflow run main.nf --max_cpu $(nproc) -resume
 ```
 
 ### Available Nextflow Option
@@ -365,7 +359,6 @@ nextflow run main.nf \
 | `--out_dir`    | Output directory                             | `data/outputs`         |
 | `--registry`   | Docker/Singularity container registry        | `ghcr.io/ecomolegmo`   |
 | `--max_cpu`    | Maximum CPUs per process                     | `1`                    |
-| `--log`        | Enable logging                               | `true`                 |
 | `--clean_work` | Remove work directory after successful run   | `true`                 |
 | `--help`       | Display help message                         | –                      |
 
@@ -380,10 +373,7 @@ You can also run each of the three sub-pipelines independently.
 For Illumina short-read data:
 
 ```bash
-nextflow run workflows/short_read.nf \
-  -process.containerOptions "-u $(id -u):$(id -g)" \
-  --max_cpu $(nproc) \
-  -resume
+nextflow run workflows/short_read.nf --max_cpu $(nproc) -resume
 ```
 
 #### Long-read Processing
@@ -391,10 +381,7 @@ nextflow run workflows/short_read.nf \
 For Oxford Nanopore / PacBio long reads:
 
 ```bash
-nextflow run workflows/long_read.nf \
-  -process.containerOptions "-u $(id -u):$(id -g)" \
-  --max_cpu $(nproc) \
-  -resume
+nextflow run workflows/long_read.nf --max_cpu $(nproc) -resume
 ```
 
 #### Reference vs Modified Genome Comparison
@@ -402,10 +389,7 @@ nextflow run workflows/long_read.nf \
 For comparing reference and modified FASTA assemblies:
 
 ```bash
-nextflow run workflows/fasta_ref_x_mod.nf \
-  -process.containerOptions "-u $(id -u):$(id -g)" \
-  --max_cpu $(nproc) \
-  -resume
+nextflow run workflows/fasta_ref_x_mod.nf --max_cpu $(nproc) -resume
 ```
 
  
