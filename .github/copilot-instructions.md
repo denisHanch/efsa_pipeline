@@ -9,7 +9,7 @@
   - Start developer container (recommended): `./run_container.sh`
   - Validate inputs: `python3 ./modules/validation/main.py ./data/inputs/config.json` (creates `data/valid/`)
   - Run pipeline (resumable):
-    `nextflow run main.nf -process.containerOptions "-u $(id -u):$(id -g)" --max_cpu $(nproc) -resume`
+    `nextflow run main.nf --max_cpu $(nproc) -resume`
   - Run single workflow: `nextflow run workflows/long_read.nf -resume` (see `README.md` for examples)
 
 - Important file references (where to look/change behavior)

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/nextflow_schema.json",
+  "title": "Automated Prokaryotic Genome Assembly Analysis Pipeline",
+  "description": "Schema for pipeline parameters",
+  "type": "object",
+  "$defs": {
+    "input_output_options": {
+      "title": "Input/output options",
+      "type": "object",
+      "properties": {
+        "in_dir": {
+          "type": "string",
+          "format": "directory-path",
+          "default": "data/valid",
+          "description": "Input directory for Nextflow containing reference and modified genome FASTA files."
+        },
+        "out_dir": {
+          "type": "string",
+          "format": "directory-path",
+          "default": "data/outputs",
+          "description": "Output directory where pipeline results will be written."
+        },
+        "log_dir": {
+          "type": "string",
+          "format": "directory-path",
+          "default": "data/outputs/logs",
+          "description": "Directory where log files will be stored."
+        },
+        "ref_fasta_path": {
+          "type": "string",
+          "format": "file-path",
+          "default": "$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}",
+          "description": "Path pattern to the reference genome FASTA file."
+        },
+        "mod_fasta_path": {
+          "type": "string",
+          "format": "file-path",
+          "default": "$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}",
+          "description": "Path pattern to the modified/assembled genome FASTA file."
+        }
+      }
+    },
+    "general_options": {
+      "title": "General options",
+      "type": "object",
+      "properties": {
+        "help": {
+          "type": "boolean",
+          "default": false,
+          "description": "Display help message and exit."
+        },
+        "max_cpu": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Maximum number of CPUs available for pipeline processes."
+        },
+        "clean_work": {
+          "type": "boolean",
+          "default": false,
+          "description": "Clean the Nextflow work directory after successful completion."
+        }
+      }
+    }
+  }
+}

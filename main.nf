@@ -12,6 +12,8 @@ include { nanoplot as nanoplot_pacbio; nanoplot as nanoplot_ont } from "./module
 include { restructure_sv_tbl; create_empty_tbl as create_ont_tbl; create_empty_tbl as create_asm_tbl; create_empty_tbl as create_pacbio_tbl; create_empty_tbl as create_short_tbl } from "./modules/sv_calling.nf"
 include { describePipeline; logWorkflowCompletion; loadFastqFiles; loadShortFastqFiles; listFiles } from "./modules/logs.nf"
 
+include { validateParameters } from 'plugin/nf-schema'
+
 
 // Help message
 def helpMessage() {
@@ -25,7 +27,7 @@ def helpMessage() {
     --in_dir         Input directory              (default: ${params.in_dir})
     --registry       Docker/Singularity registry  (default: ${params.registry})
     --max_cpu        Maximum CPUs per process     (default: ${params.max_cpu})
-    --log            Enable logging               (default: ${params.log})
+    -log             Enable logging               (default: ${params.log})
     --clean_work     Remove workdir after success (default: ${params.clean_work})
     -with-report     Generate HTML execution report (Nextflow built-in)
     -with-timeline   Produce timeline visualization (Nextflow built-in)
@@ -42,6 +44,8 @@ if (params.help) {
 
 
 workflow {
+    validateParameters()
+
     // inputs
     ref_fasta = Channel.fromPath(params.ref_fasta_path, checkIfExists: true) 
     mod_fasta = Channel.fromPath(params.mod_fasta_path)

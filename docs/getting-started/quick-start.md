@@ -42,10 +42,7 @@ python3 ./modules/validation/main.py ./data/inputs/config.json
 Use the GitHub token provided in the Slack channel, then start the pipeline:
 
 ```bash
-nextflow run main.nf \
-  -process.containerOptions "-u $(id -u):$(id -g)" \
-  --max_cpu $(nproc) \
-  -resume
+nextflow run main.nf --max_cpu $(nproc) -resume
 ```
 
 ## Next Steps
