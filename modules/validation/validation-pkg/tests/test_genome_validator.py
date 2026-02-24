@@ -1579,5 +1579,168 @@ class TestGenomeValidatorOutputMetadata:
         assert metadata.n50 == 800
 
 
+class TestGenomeValidatorMainSequenceSelection:
+    """Test main sequence selection strategies (main_longest, main_first, both false)."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def output_dir(self, temp_dir):
+        out_dir = temp_dir / "output"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir
+
+    @pytest.fixture
+    def fasta_three_sequences(self, temp_dir):
+        """Create FASTA with 3 sequences of different lengths (first != longest)."""
+        fasta_file = temp_dir / "three_seqs.fasta"
+        sequences = [
+            SeqRecord(Seq("A" * 1000), id="seq_first", description=""),    # First, medium
+            SeqRecord(Seq("T" * 5000), id="seq_longest", description=""),  # Longest
+            SeqRecord(Seq("G" * 500), id="seq_short", description=""),     # Shortest
+        ]
+        with open(fasta_file, "w") as f:
+            SeqIO.write(sequences, f, 'fasta')
+        return fasta_file
+
+    def _make_config(self, fasta_file, output_dir):
+        return GenomeConfig(
+            filename=fasta_file.name,
+            basename=fasta_file.stem,
+            filepath=fasta_file,
+            coding_type=CT.NONE,
+            detected_format=GenomeFormat.FASTA,
+            output_dir=output_dir,
+            global_options={}
+        )
+
+    def test_main_longest_selects_longest_as_main(self, fasta_three_sequences, output_dir):
+        """Test that main_longest=True picks the longest sequence as main."""
+        config = self._make_config(fasta_three_sequences, output_dir)
+        settings = GenomeValidator.Settings(
+            plasmid_split=True,
+            main_longest=True,
+            main_first=False,
+            min_sequence_length=0,
+        )
+
+        validator = GenomeValidator(config, settings)
+        validator.run()
+
+        # Main output should contain only the longest sequence
+        assert len(validator.sequences) == 1
+        assert validator.sequences[0].id == "seq_longest"
+        assert len(validator.sequences[0].seq) == 5000
+
+        # Two plasmid files should be created
+        assert len(validator.plasmid_filenames) == 2
+
+        # Verify main output file
+        main_file = output_dir / "three_seqs.fasta"
+        assert main_file.exists()
+        main_seqs = list(SeqIO.parse(main_file, 'fasta'))
+        assert len(main_seqs) == 1
+        assert main_seqs[0].id == "seq_longest"
+
+    def test_main_first_selects_first_as_main(self, fasta_three_sequences, output_dir):
+        """Test that main_first=True picks the first sequence as main."""
+        config = self._make_config(fasta_three_sequences, output_dir)
+        settings = GenomeValidator.Settings(
+            plasmid_split=True,
+            main_longest=False,
+            main_first=True,
+            min_sequence_length=0,
+        )
+
+        validator = GenomeValidator(config, settings)
+        validator.run()
+
+        # Main output should contain only the first sequence
+        assert len(validator.sequences) == 1
+        assert validator.sequences[0].id == "seq_first"
+        assert len(validator.sequences[0].seq) == 1000
+
+        # Two plasmid files should be created
+        assert len(validator.plasmid_filenames) == 2
+
+        # Verify main output file
+        main_file = output_dir / "three_seqs.fasta"
+        assert main_file.exists()
+        main_seqs = list(SeqIO.parse(main_file, 'fasta'))
+        assert len(main_seqs) == 1
+        assert main_seqs[0].id == "seq_first"
+
+    def test_both_false_keeps_all_as_main(self, fasta_three_sequences, output_dir):
+        """Test that when both main_longest and main_first are False, all sequences stay as main."""
+        config = self._make_config(fasta_three_sequences, output_dir)
+        settings = GenomeValidator.Settings(
+            plasmid_split=True,
+            main_longest=False,
+            main_first=False,
+            min_sequence_length=0,
+        )
+
+        validator = GenomeValidator(config, settings)
+        validator.run()
+
+        # All 3 sequences should remain as main
+        assert len(validator.sequences) == 3
+        seq_ids = [s.id for s in validator.sequences]
+        assert seq_ids == ["seq_first", "seq_longest", "seq_short"]
+
+        # No plasmid files should be created
+        assert len(validator.plasmid_filenames) == 0
+
+        # Verify main output file contains all sequences
+        main_file = output_dir / "three_seqs.fasta"
+        assert main_file.exists()
+        main_seqs = list(SeqIO.parse(main_file, 'fasta'))
+        assert len(main_seqs) == 3
+
+    def test_both_false_with_plasmids_to_one(self, fasta_three_sequences, output_dir):
+        """Test that both-false also works with plasmids_to_one (no plasmids extracted)."""
+        config = self._make_config(fasta_three_sequences, output_dir)
+        settings = GenomeValidator.Settings(
+            plasmids_to_one=True,
+            main_longest=False,
+            main_first=False,
+            min_sequence_length=0,
+        )
+
+        validator = GenomeValidator(config, settings)
+        validator.run()
+
+        # All sequences kept as main, no plasmid extraction
+        assert len(validator.sequences) == 3
+        assert len(validator.plasmid_filenames) == 0
+
+    def test_main_longest_and_main_first_both_true_raises(self):
+        """Test that setting both main_longest and main_first raises ValueError."""
+        with pytest.raises(ValueError, match="main_longest and main_first cannot both be True"):
+            GenomeValidator.Settings(
+                main_longest=True,
+                main_first=True,
+            )
+
+    def test_main_longest_default_with_plasmid_split(self, fasta_three_sequences, output_dir):
+        """Test default behavior (main_longest=True) when only plasmid_split is set."""
+        config = self._make_config(fasta_three_sequences, output_dir)
+        settings = GenomeValidator.Settings(
+            plasmid_split=True,
+            min_sequence_length=0,
+        )
+
+        validator = GenomeValidator(config, settings)
+        validator.run()
+
+        # Default main_longest=True should select longest
+        assert len(validator.sequences) == 1
+        assert validator.sequences[0].id == "seq_longest"
+        assert len(validator.plasmid_filenames) == 2
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

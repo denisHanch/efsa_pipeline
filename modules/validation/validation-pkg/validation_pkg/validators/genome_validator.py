@@ -453,31 +453,36 @@ class GenomeValidator(BaseValidator):
             self.sequences = []
         elif self.settings.plasmid_split or self.settings.plasmids_to_one:
             # Only select main sequence if we're actually doing plasmid handling
-            self.main_sequence, plasmid_sequences = self._select_main_sequence(self.sequences)
+            main_sequences, plasmid_sequences = self._select_main_sequence(self.sequences)
             self._handle_plasmids(plasmid_sequences)
-            self.sequences = [self.main_sequence]
+            self.sequences = main_sequences
         # else: keep all sequences in main output file (default behavior)
 
         self.logger.debug(f"✓ Edits applied, {len(self.sequences)} sequence(s) remaining")
 
-    def _select_main_sequence(self, sequences: List[SeqRecord]) -> tuple[SeqRecord, List[SeqRecord]]:
-        """Select main chromosome from sequences based on settings."""
+    def _select_main_sequence(self, sequences: List[SeqRecord]) -> tuple[List[SeqRecord], List[SeqRecord]]:
+        """Select main chromosome(s) from sequences based on settings.
+
+        Returns (main_sequences, plasmid_sequences).
+        """
         if self.settings.main_longest:
             # Sort by length (longest first)
             sorted_sequences = sorted(sequences, key=lambda x: len(x.seq), reverse=True)
-            main_sequence = sorted_sequences[0]
+            main_sequences = [sorted_sequences[0]]
             plasmid_sequences = sorted_sequences[1:]
-            self.logger.debug(f"Selected longest sequence as main: {main_sequence.id} ({len(main_sequence.seq)} bp)")
+            self.logger.debug(f"Selected longest sequence as main: {main_sequences[0].id} ({len(main_sequences[0].seq)} bp)")
         elif self.settings.main_first:
             # Keep original order, first is main
-            main_sequence = sequences[0]
+            main_sequences = [sequences[0]]
             plasmid_sequences = sequences[1:]
-            self.logger.debug(f"Selected first sequence as main: {main_sequence.id} ({len(main_sequence.seq)} bp)")
+            self.logger.debug(f"Selected first sequence as main: {main_sequences[0].id} ({len(main_sequences[0].seq)} bp)")
         else:
-            # This should not happen due to __post_init__ validation
-            raise ValueError("Either main_longest or main_first must be True")
+            # Neither main_longest nor main_first - keep all sequences as main
+            main_sequences = sequences
+            plasmid_sequences = []
+            self.logger.debug(f"No main selection strategy - keeping all {len(sequences)} sequence(s) as main")
 
-        return main_sequence, plasmid_sequences
+        return main_sequences, plasmid_sequences
 
     def _handle_plasmids(self, plasmid_sequences: List[SeqRecord]) -> None:
         """Handle plasmid sequences according to settings."""
