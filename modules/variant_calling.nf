@@ -27,7 +27,6 @@ process freebayes {
 */
 
 process build_config {
-    container params.containers.snpeff
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
 

@@ -2,7 +2,7 @@
 
 /*
   workflow: fasta_ref_x_mod.nf
-  Purpose: Compare a reference FASTA to a modified/assembled FASTA, run nucmer -> delta_filter -> show-coords -> syri,
+  Purpose: Compare a reference FASTA to a modified/assembled FASTA, run nucmer -> deltaFilter -> show-coords -> syri,
            and convert resulting SV VCFs to TSV summary tables.
 
   Contract:
@@ -20,12 +20,14 @@ include { nucmer; delta_filter; show_coords; syri } from "../modules/assembly.nf
 include { logWorkflowCompletion } from "../modules/logs.nf"
 include { vcf_to_table } from "../modules/sv_calling.nf"
 
+def executed = false
 
 workflow ref_mod {
     take:
         ref_fasta
         mod_fasta
     main:
+        executed = true
         log.info "▶ Running pipeline comparing reference and modified fasta."
 
         def prefix_name = "assembly"
@@ -52,4 +54,13 @@ workflow {
     ref_mod(ref_fasta, mod_fasta)
 }
 
-logWorkflowCompletion("reference to modified fasta comparision")
+
+workflow.onComplete {
+    if (executed) {
+        if (workflow.success) {
+            log.info "✅ The ref_mod processing pipeline completed successfully.\n"
+        } else {
+            log.error "❌ The ref_mod processing pipeline failed: ${workflow.errorReport}"
+        }
+    }
+}

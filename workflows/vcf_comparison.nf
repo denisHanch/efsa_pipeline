@@ -16,7 +16,7 @@
       - Truvari outputs are produced in configured output locations per comparison.
       - (No direct channel emit here; Truvari run produces files/dirs consumed by downstream reporting.)
 */
-
+def executed = false
 include { sort_vcf; index_vcf; truvari } from '../modules/variant_calling.nf'
 
 workflow truvari_comparison {
@@ -27,6 +27,7 @@ workflow truvari_comparison {
         vcfs_ch
 
     main:
+        executed = true
         // Sorting and indexing VCFs
         sort_vcf(vcfs_ch) | index_vcf | set { indexed_vcfs }
 
@@ -44,9 +45,11 @@ workflow truvari_comparison {
 }
 
 workflow.onComplete {
-    if (workflow.success) {
+    if (executed) {
+ if (workflow.success) {
         log.info "✅ Truvari: the comparison of vcf files finished successfully.\n"
     } else {
         log.err "❌ Truvari: the comparison of vcf files failed.\n"
+    }
     }
 }

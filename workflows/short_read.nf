@@ -107,5 +107,12 @@ workflow {
     short_read(trimmed, fasta, out_folder_name, plasmid_files)
 }
 
-
-logWorkflowCompletion(out_folder_name)
+workflow.onComplete {
+    if (executed) {
+        if (workflow.success) {
+            log.info "✅ The short-read processing pipeline completed successfully.\n"
+        } else {
+            log.error "❌ The short-read processing pipeline failed: ${workflow.errorReport}"
+        }
+    }
+}
