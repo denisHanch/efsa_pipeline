@@ -1033,6 +1033,99 @@ class TestConfigValidatorSettings:
         assert loaded_config.reads[0].global_options == {}
 
 
+class TestAutodetectAndOrganismProfile:
+    """Tests for ngs_type autodetection and organism_type options."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    def _write_common_required_files(self, temp_dir: Path):
+        (temp_dir / "ref.fasta").write_text(">ref\nATCGATCG\n")
+        (temp_dir / "mod.fasta").write_text(">mod\nATCGATCG\n")
+
+    def _write_config(self, temp_dir: Path, reads_entry, options=None) -> Path:
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "mod_genome_filename": {"filename": "mod.fasta"},
+            "reads": [reads_entry],
+        }
+        if options is not None:
+            config["options"] = options
+
+        cfg = temp_dir / "config.json"
+        cfg.write_text(json.dumps(config, indent=2))
+        return cfg
+
+    def test_ngs_type_autodetect_illumina(self, temp_dir):
+        self._write_common_required_files(temp_dir)
+        (temp_dir / "illumina.fastq").write_text(
+            "@NS500123:45:H7VTLBGX2:1:11101:10000:1040 1:N:0:1\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+        )
+
+        cfg = self._write_config(
+            temp_dir,
+            {"filename": "illumina.fastq"},
+        )
+        loaded = ConfigManager.load(str(cfg))
+        assert loaded.reads[0].ngs_type == "illumina"
+
+    def test_ngs_type_autodetect_ont(self, temp_dir):
+        self._write_common_required_files(temp_dir)
+        (temp_dir / "ont.fastq").write_text(
+            "@read_0001 runid=abc123 ch=140 start_time=2025-02-20T09:01:00Z\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+        )
+
+        cfg = self._write_config(
+            temp_dir,
+            {"filename": "ont.fastq"},
+        )
+        loaded = ConfigManager.load(str(cfg))
+        assert loaded.reads[0].ngs_type == "ont"
+
+    def test_ngs_type_autodetect_pacbio(self, temp_dir):
+        self._write_common_required_files(temp_dir)
+        (temp_dir / "pacbio.fastq").write_text(
+            "@m64011_190830_192920/42153018/ccs\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+        )
+
+        cfg = self._write_config(
+            temp_dir,
+            {"filename": "pacbio.fastq"},
+        )
+        loaded = ConfigManager.load(str(cfg))
+        assert loaded.reads[0].ngs_type == "pacbio"
+
+    def test_ngs_type_filename_fallback_for_ont(self, temp_dir):
+        self._write_common_required_files(temp_dir)
+        (temp_dir / "sample_ont.fastq").write_text(
+            "@read_without_platform_signature\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+        )
+
+        cfg = self._write_config(
+            temp_dir,
+            {"filename": "sample_ont.fastq"},
+        )
+        loaded = ConfigManager.load(str(cfg))
+        assert loaded.reads[0].ngs_type == "ont"
+
+    def test_ngs_type_autodetect_bam_defaults_pacbio(self, temp_dir):
+        self._write_common_required_files(temp_dir)
+        (temp_dir / "reads.bam").write_text("not-a-real-bam\n")
+
+        cfg = self._write_config(
+            temp_dir,
+            {"filename": "reads.bam"},
+        )
+        loaded = ConfigManager.load(str(cfg))
+        assert loaded.reads[0].detected_format == ReadFormat.BAM
+        assert loaded.reads[0].ngs_type == "pacbio"
+
 class TestSecurityPathTraversal:
     """Security tests for path traversal protection."""
 

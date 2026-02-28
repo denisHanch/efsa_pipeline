@@ -397,16 +397,73 @@ class ConfigManager:
                 raise ValueError(f"Invalid reads[{idx}]: {e}")
 
     @staticmethod
+    def _autodetect_ngs_type(filepath: Path, detected_format: ReadFormat) -> str:
+        """
+        Best-effort NGS type autodetection from read headers.
+
+        Falls back to 'illumina' when no recognizable signature is found.
+        """
+        logger = get_logger()
+
+        # BAM has no simple universal platform marker in this config path.
+        # Keep a conservative default for long-read BAM inputs.
+        if detected_format == ReadFormat.BAM:
+            return 'pacbio'
+
+        try:
+            coding_type = file_handler.detect_compression_type(filepath)
+            with file_handler.open_file_with_coding_type(filepath, coding_type, 'rt') as handle:
+                first_line = handle.readline().strip()
+
+            if not first_line:
+                return 'illumina'
+
+            header = first_line.lower()
+
+            # Oxford Nanopore headers often contain run metadata key-value tags.
+            if any(token in header for token in ('runid=', 'ch=', 'start_time=', 'flow_cell_id=')):
+                return 'ont'
+
+            # PacBio CCS/subread headers commonly contain '/ccs', 'movie=', or 'zmw'.
+            if any(token in header for token in ('/ccs', 'movie=', 'zmw')):
+                return 'pacbio'
+
+            # Illumina headers typically contain read-part suffixes and lane metadata.
+            if first_line.startswith('@') and any(token in first_line for token in (' 1:', ' 2:', ':N:', ':Y:')):
+                return 'illumina'
+
+        except Exception as e:
+            logger.warning(f"Failed to auto-detect ngs_type for {filepath.name}: {e}")
+
+        name = filepath.name.lower()
+        if any(token in name for token in ('ont', 'nanopore', 'minion', 'promethion')):
+            return 'ont'
+        if any(token in name for token in ('pacbio', 'smrt', 'ccs')):
+            return 'pacbio'
+
+        return 'illumina'
+
+    @staticmethod
     def _parse_read_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> ReadConfig:
         """Parse a read configuration entry."""
-        # Extract ngs_type from the value before parsing
-        if isinstance(value, dict):
-            ngs_type = value.get('ngs_type', 'illumina')
-        else:
-            ngs_type = 'illumina'  # Default for string-only values
+        logger = get_logger()
 
+        ngs_type = None
+        if isinstance(value, dict):
+            ngs_type = value.get('ngs_type')
+
+        # Auto-detect when ngs_type is omitted or empty.
         if not ngs_type:
-            raise ValueError("Missing required 'ngs_type'")
+            filename, _ = file_handler.parse_config_file_value(value, field_name)
+            filepath = path_utils.resolve_filepath(config_dir, filename)
+
+            if not filepath.exists():
+                raise ValidationFileNotFoundError(
+                    f"The following file was not found: {filepath}\n")
+
+            detected_format = file_handler.detect_file_format(filepath, ReadFormat)
+            ngs_type = ConfigManager._autodetect_ngs_type(filepath, detected_format)
+            logger.info(f"{field_name}: Auto-detected ngs_type='{ngs_type}' for {filepath.name}")
 
         return ConfigManager._parse_file_config(
             value=value,
