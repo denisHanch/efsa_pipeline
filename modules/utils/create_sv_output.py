@@ -243,10 +243,8 @@ def annotate_event_relationships(clusters):
 
     for key, group in grouped.items():
 
-        # sort by start
         group = sorted(group, key=lambda c: (c.start, c.end))
 
-        # ---- Build adjacency list (interval graph) ----
         adj = {id(c): [] for c in group}
 
         for i in range(len(group)):
@@ -254,19 +252,16 @@ def annotate_event_relationships(clusters):
                 c1 = group[i]
                 c2 = group[j]
 
-                # check interval overlap (any overlap)
                 if not (c1.end < c2.start or c1.start > c2.end):
                     adj[id(c1)].append(c2)
                     adj[id(c2)].append(c1)
 
-        # ---- Find connected components ----
         visited = set()
 
         for c in group:
             if id(c) in visited:
                 continue
 
-            # BFS/DFS to collect component
             stack = [c]
             component = []
 
@@ -278,7 +273,6 @@ def annotate_event_relationships(clusters):
                 component.append(node)
                 stack.extend(adj[id(node)])
 
-            # ---- Classify component ----
             if len(component) == 1:
                 relationship[id(component[0])] = "isolated"
                 continue
@@ -310,14 +304,15 @@ def annotate_event_relationships(clusters):
 
 def annotate_event_relationships(clusters):
     """
-    Annotate each cluster relative to the longest overlapping interval
-    in its (chrom, std_type) group.
+    Robust overlap classification using connected components.
 
-    Possible outputs:
-      - isolated
-      - nested_in_<event_id>
-      - overlapping_with_<event_id>
-      - contains_<event_id>
+    For each (chrom, std_type):
+        - Build overlap graph
+        - Extract connected components
+        - Within each component:
+            - Longest interval = anchor
+            - Others classified relative to anchor
+            - If anchor has no other variants, label as 'isolated'
     """
 
     grouped = {}
@@ -327,57 +322,58 @@ def annotate_event_relationships(clusters):
     relationship = {}
 
     for key, group in grouped.items():
+
         group = sorted(group, key=lambda c: (c.start, c.end))
+
+        adj = {id(c): [] for c in group}
+
+        for i in range(len(group)):
+            for j in range(i + 1, len(group)):
+                c1 = group[i]
+                c2 = group[j]
+
+                if c1.start <= c2.end and c1.end >= c2.start:
+                    adj[id(c1)].append(c2)
+                    adj[id(c2)].append(c1)
 
         visited = set()
 
-        for i, c1 in enumerate(group):
-            if id(c1) in visited:
+        for c in group:
+            if id(c) in visited:
                 continue
 
-            overlapping_group = [c1]
+            stack = [c]
+            component = []
 
-            # collect all overlapping clusters
-            for j, c2 in enumerate(group):
-                if i == j:
+            while stack:
+                node = stack.pop()
+                if id(node) in visited:
                     continue
-                if not (c1.end < c2.start or c1.start > c2.end):
-                    overlapping_group.append(c2)
+                visited.add(id(node))
+                component.append(node)
+                stack.extend(adj[id(node)])
 
-            # if no real overlap
-            if len(overlapping_group) == 1:
-                relationship[id(c1)] = "isolated"
-                visited.add(id(c1))
+            if len(component) == 1:
+                relationship[id(component[0])] = "isolated"
                 continue
 
-            # find longest interval in this overlapping group
-            longest = max(
-                overlapping_group,
-                key=lambda c: (c.end - c.start)
-            )
+            # find longest interval as anchor
+            anchor = max(component, key=lambda x: (x.end - x.start))
 
-            longest_len = longest.end - longest.start
-
-            for c in overlapping_group:
-                visited.add(id(c))
-
-                if c is longest:
-                    relationship[id(c)] = "isolated"  # anchor variant
-                    continue
-
-                c_len = c.end - c.start
-
-                # nested
-                if c.start >= longest.start and c.end <= longest.end:
-                    relationship[id(c)] = f"nested_in_{longest.std_type}_{longest.start}_{longest.end}"
-
-                # contains (rare but possible)
-                elif c.start <= longest.start and c.end >= longest.end:
-                    relationship[id(c)] = f"contains_{longest.std_type}_{longest.start}_{longest.end}"
-
-                # partial overlap
+            for member in component:
+                if member is anchor:
+                    if len(component) == 1:
+                        relationship[id(member)] = "isolated"
+                    else:
+                        relationship[id(member)] = f"contains_{len(component)-1}_variants"
+                elif member.start >= anchor.start and member.end <= anchor.end:
+                    relationship[id(member)] = (
+                        f"nested_in_{anchor.std_type}_{anchor.start}_{anchor.end}"
+                    )
                 else:
-                    relationship[id(c)] = f"overlapping_with_{longest.std_type}_{longest.start}_{longest.end}"
+                    relationship[id(member)] = (
+                        f"overlapping_with_{anchor.std_type}_{anchor.start}_{anchor.end}"
+                    )
 
     return relationship
 
