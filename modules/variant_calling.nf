@@ -5,7 +5,6 @@
  * Calling short variants with FreeBayes
 */
 process freebayes {
-    container params.containers.freebayes
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -68,7 +67,6 @@ process build_config {
  * Annotating variants with SNPeff
 */
 process snpeff {
-    container params.containers.snpeff
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -96,7 +94,6 @@ process snpeff {
  * Getting variants statistics with bcftools stats
 */
 process bcftools_stats {
-    container params.containers.bcftools
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/bcftools_stats", mode: 'copy'
 
@@ -118,8 +115,7 @@ process bcftools_stats {
 /*
  * Truvari requires sorted vcfs for comparision
 */
-process sortVcf {
-    container params.containers.bcftools
+process sort_vcf {
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 
@@ -138,8 +134,7 @@ process sortVcf {
 /*
  * Truvari require indexed vcfs for comparision
 */
-process indexVcf {
-    container params.containers.bcftools
+process index_vcf {
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 
@@ -160,7 +155,6 @@ process indexVcf {
  * Running comparision btw files
 */
 process truvari {
-    container params.containers.truvari
     tag "$pair_id1 & $pair_id2"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 

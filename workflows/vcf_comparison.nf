@@ -17,7 +17,7 @@
       - (No direct channel emit here; Truvari run produces files/dirs consumed by downstream reporting.)
 */
 
-include { sortVcf; indexVcf; truvari } from '../modules/variant_calling.nf'
+include { sort_vcf; index_vcf; truvari } from '../modules/variant_calling.nf'
 
 workflow truvari_comparison {
 
@@ -28,7 +28,7 @@ workflow truvari_comparison {
 
     main:
         // Sorting and indexing VCFs
-        sortVcf(vcfs_ch) | indexVcf | set { indexed_vcfs }
+        sort_vcf(vcfs_ch) | index_vcf | set { indexed_vcfs }
 
         // Preprocessing channel for Truvari input
         split_ch = indexed_vcfs.branch {

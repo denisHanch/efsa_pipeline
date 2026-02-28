@@ -2,7 +2,7 @@
 
 /*
   workflow: fasta_ref_x_mod.nf
-  Purpose: Compare a reference FASTA to a modified/assembled FASTA, run nucmer -> deltaFilter -> show-coords -> syri,
+  Purpose: Compare a reference FASTA to a modified/assembled FASTA, run nucmer -> delta_filter -> show-coords -> syri,
            and convert resulting SV VCFs to TSV summary tables.
 
   Contract:
@@ -16,7 +16,7 @@
       - For each reference/modified pair, produce a VCF and a corresponding TSV summary.
 */
 
-include { nucmer; deltaFilter; showCoords; syri } from "../modules/assembly.nf"
+include { nucmer; delta_filter; show_coords; syri } from "../modules/assembly.nf"
 include { logWorkflowCompletion } from "../modules/logs.nf"
 include { vcf_to_table } from "../modules/sv_calling.nf"
 
@@ -35,8 +35,8 @@ workflow ref_mod {
             .map { ref, mod -> tuple(prefix_name, ref, mod) }
 
         ref_mod_fasta | nucmer | set { delta }
-        deltaFilter(prefix_name, delta) | set { filtered_delta }
-        showCoords(prefix_name, filtered_delta) | set { coords }
+        delta_filter(prefix_name, delta) | set { filtered_delta }
+        show_coords(prefix_name, filtered_delta) | set { coords }
         syri(ref_mod_fasta, coords, filtered_delta) | set { sv_vcf }
         vcf_to_table(sv_vcf)  | set { sv_tbl }
 
