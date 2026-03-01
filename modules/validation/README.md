@@ -4,19 +4,13 @@ Load your data and configuration file into `/EFSA_workspace/data/inputs/` (descr
 
 Run validation as 
 ```
-validate
+python3 /EFSA_workspace/modules/validation/main.py /EFSA_workspace/data/inputs/config.json > stdout.log
 ```
-
-or use specific config path with
-```
-validate --config=path/to/config.json
-```
-
 
 output of the validation is on `/EFSA_workspace/data/valid/` 
 
 #   What to export
-logs and reports are on `/EFSA_workspace/data/valid/`
+logs are on `.logs/` and `./stdout.log`
 Please share them with me.
 
 # Configuration File — Specification & Guide

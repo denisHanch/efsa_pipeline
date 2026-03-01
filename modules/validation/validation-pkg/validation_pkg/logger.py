@@ -183,21 +183,13 @@ class ValidationLogger:
             )
             stdlib_logger.addHandler(file_handler)
 
-            # Console-specific chain: same base processors plus context/color enrichment
-            # (inserted before wrap_for_formatter which must remain last)
-            console_pre_chain = processors[:-1] + [
-                format_process_info,
-                add_log_level_colors,
-                processors[-1],  # wrap_for_formatter
-            ]
-
             # Configure the ProcessorFormatter for console with colors
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setLevel(getattr(logging, console_level.upper()))
             console_handler.setFormatter(
                 structlog.stdlib.ProcessorFormatter(
                     processor=structlog.dev.ConsoleRenderer(colors=True),
-                    foreign_pre_chain=console_pre_chain,
+                    foreign_pre_chain=processors,
                 )
             )
             stdlib_logger.addHandler(console_handler)
