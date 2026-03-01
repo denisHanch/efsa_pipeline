@@ -227,86 +227,6 @@ def annotate_event_relationships(clusters):
     Robust overlap classification using connected components.
 
     For each (chrom, std_type):
-        1. Build overlap graph
-        2. Extract connected components
-        3. Within each component:
-            - Longest interval = anchor
-            - Others classified relative to anchor
-    """
-
-    # group by chromosome + type
-    grouped = {}
-    for c in clusters:
-        grouped.setdefault((c.chrom, c.std_type), []).append(c)
-
-    relationship = {}
-
-    for key, group in grouped.items():
-
-        group = sorted(group, key=lambda c: (c.start, c.end))
-
-        adj = {id(c): [] for c in group}
-
-        for i in range(len(group)):
-            for j in range(i + 1, len(group)):
-                c1 = group[i]
-                c2 = group[j]
-
-                if not (c1.end < c2.start or c1.start > c2.end):
-                    adj[id(c1)].append(c2)
-                    adj[id(c2)].append(c1)
-
-        visited = set()
-
-        for c in group:
-            if id(c) in visited:
-                continue
-
-            stack = [c]
-            component = []
-
-            while stack:
-                node = stack.pop()
-                if id(node) in visited:
-                    continue
-                visited.add(id(node))
-                component.append(node)
-                stack.extend(adj[id(node)])
-
-            if len(component) == 1:
-                relationship[id(component[0])] = "isolated"
-                continue
-
-            # find longest interval (anchor)
-            anchor = max(component, key=lambda x: (x.end - x.start))
-
-            anchor_len = anchor.end - anchor.start
-
-            for c2 in component:
-                if c2 is anchor:
-                    relationship[id(c2)] = f"contains_{len(component)-1}_variants"
-                    continue
-
-                # nested inside anchor
-                if c2.start >= anchor.start and c2.end <= anchor.end:
-                    relationship[id(c2)] = (
-                        f"nested_in_{anchor.std_type}_{anchor.start}_{anchor.end}"
-                    )
-
-                # partial overlap with anchor
-                else:
-                    relationship[id(c2)] = (
-                        f"overlapping_with_{anchor.std_type}_{anchor.start}_{anchor.end}"
-                    )
-
-    return relationship
-
-
-def annotate_event_relationships(clusters):
-    """
-    Robust overlap classification using connected components.
-
-    For each (chrom, std_type):
         - Build overlap graph
         - Extract connected components
         - Within each component:
@@ -357,7 +277,6 @@ def annotate_event_relationships(clusters):
                 relationship[id(component[0])] = "isolated"
                 continue
 
-            # find longest interval as anchor
             anchor = max(component, key=lambda x: (x.end - x.start))
 
             for member in component:
