@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import traceback
 from validation_pkg import (
     ConfigManager,
     GenomeValidator,
@@ -14,6 +15,7 @@ from validation_pkg import (
     validate_feature,
     validate_reads,
     setup_logging,
+    get_logger,
     readxread_validation,
     genomexgenome_validation
 )
@@ -28,13 +30,17 @@ def main():
         print("  python main.py config.json")
         return 1
 
+    # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
+    config_path = Path(sys.argv[1]).resolve()
+    output_dir = config_path.parent.parent / "valid"
+
     # Setup logging,
-    setup_logging(console_level='DEBUG',log_file=Path("/EFSA_workspace/data/outputs/validation.log"))
+    log_file = output_dir / "validation.log"
+    setup_logging(console_level='DEBUG', log_file=log_file)
 
     # ========================================================================
     # Step 1: Read and validate config
     # ========================================================================
-    config_path = sys.argv[1]
     config = ConfigManager.load(config_path)
 
     # ========================================================================
@@ -102,7 +108,7 @@ def main():
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
-    report = ValidationReport(Path("logs/report.txt"))
+    report = ValidationReport(output_dir / "report.txt")
 
     # Validate reference genome
     ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
@@ -143,6 +149,7 @@ def main():
         report.write(res,file_type = "feature")
 
     report.flush(format='text')
+    print(f"Log file: {log_file}")
     return 0
 
 
@@ -150,7 +157,10 @@ if __name__ == '__main__':
     try:
         sys.exit(main())
     except Exception as e:
-        print(f"\n✗ Error: {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
+        logger = get_logger()
+        logger.error(f"✗ Fatal error: {e}")
+        logger.debug(traceback.format_exc())
+        if len(sys.argv) >= 2:
+            log_file = Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log"
+            print(f"Log file: {log_file}")
         sys.exit(1)

@@ -203,35 +203,150 @@ class TestConfigManager:
         """Test error when referenced genome file doesn't exist."""
         (temp_dir / "mod.fasta").write_text(">seq1\nATCG\n")
         (temp_dir / "reads.fastq").write_text("@read1\nATCG\n+\nIIII\n")
-        
+
         config = {
             "ref_genome_filename": {"filename": "ref.fasta"},  # File doesn't exist
             "mod_genome_filename": {"filename": "mod.fasta"},
             "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}]
         }
-        
+
         config_file = temp_dir / "config.json"
         config_file.write_text(json.dumps(config))
-        
-        with pytest.raises((ValidationFileNotFoundError, FileNotFoundError), match="ref_genome|ref.fasta"):
+
+        with pytest.raises(ValidationFileNotFoundError, match="ref.fasta"):
             ConfigManager.load(str(config_file))
-    
+
     def test_missing_read_file(self, temp_dir):
         """Test error when referenced read file doesn't exist."""
         (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
         (temp_dir / "mod.fasta").write_text(">seq1\nATCG\n")
-        
+
         config = {
             "ref_genome_filename": {"filename": "ref.fasta"},
             "mod_genome_filename": {"filename": "mod.fasta"},
             "reads": [{"filename": "missing_reads.fastq", "ngs_type": "illumina"}]
         }
-        
+
         config_file = temp_dir / "config.json"
         config_file.write_text(json.dumps(config))
-        
-        with pytest.raises((ValidationFileNotFoundError, FileNotFoundError), match="reads\\[0\\]|missing_reads.fastq"):
+
+        with pytest.raises(ValidationFileNotFoundError, match="reads\\[0\\]"):
             ConfigManager.load(str(config_file))
+
+    def test_missing_read_file_second_entry_index(self, temp_dir):
+        """Test that reads[N] context reports the correct index."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "reads_ok.fastq").write_text("@read1\nATCG\n+\nIIII\n")
+
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "reads": [
+                {"filename": "reads_ok.fastq", "ngs_type": "illumina"},
+                {"filename": "missing.fastq", "ngs_type": "illumina"},  # index 1 is missing
+            ]
+        }
+
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config))
+
+        with pytest.raises(ValidationFileNotFoundError, match="reads\\[1\\]"):
+            ConfigManager.load(str(config_file))
+
+    def test_missing_mod_genome_file(self, temp_dir):
+        """Test error when optional mod_genome file is specified but missing."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "reads.fastq").write_text("@read1\nATCG\n+\nIIII\n")
+
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "mod_genome_filename": {"filename": "mod_missing.fasta"},  # File doesn't exist
+            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}]
+        }
+
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config))
+
+        with pytest.raises(ValidationFileNotFoundError, match="mod_missing.fasta"):
+            ConfigManager.load(str(config_file))
+
+    def test_missing_ref_plasmid_file(self, temp_dir):
+        """Test error when ref_plasmid file is specified but missing."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "reads.fastq").write_text("@read1\nATCG\n+\nIIII\n")
+
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "ref_plasmid_filename": {"filename": "plasmid_missing.fasta"},  # File doesn't exist
+            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}]
+        }
+
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config))
+
+        with pytest.raises(ValidationFileNotFoundError, match="plasmid_missing.fasta"):
+            ConfigManager.load(str(config_file))
+
+    def test_missing_ref_feature_file(self, temp_dir):
+        """Test error when ref_feature file is specified but missing."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "reads.fastq").write_text("@read1\nATCG\n+\nIIII\n")
+
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "ref_feature_filename": {"filename": "features_missing.gff"},  # File doesn't exist
+            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}]
+        }
+
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config))
+
+        with pytest.raises(ValidationFileNotFoundError, match="features_missing.gff"):
+            ConfigManager.load(str(config_file))
+
+    def test_missing_mod_feature_file(self, temp_dir):
+        """Test error when mod_feature file is specified but missing."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "reads.fastq").write_text("@read1\nATCG\n+\nIIII\n")
+
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "mod_feature_filename": {"filename": "mod_features_missing.gff"},  # File doesn't exist
+            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}]
+        }
+
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config))
+
+        with pytest.raises(ValidationFileNotFoundError, match="mod_features_missing.gff"):
+            ConfigManager.load(str(config_file))
+
+    def test_missing_file_is_logged(self, temp_dir):
+        """Test that a missing file error is logged via logger.error and add_validation_issue."""
+        from unittest.mock import patch, call
+        from validation_pkg.logger import get_logger
+
+        (temp_dir / "reads.fastq").write_text("@read1\nATCG\n+\nIIII\n")
+
+        config = {
+            "ref_genome_filename": {"filename": "ref_missing.fasta"},  # File doesn't exist
+            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}]
+        }
+
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config))
+
+        logger = get_logger()
+        with patch.object(logger, 'error') as mock_error, \
+             patch.object(logger, 'add_validation_issue') as mock_issue:
+            with pytest.raises(ValidationFileNotFoundError):
+                ConfigManager.load(str(config_file))
+
+            mock_error.assert_called_once()
+            assert "ref_missing.fasta" in mock_error.call_args[0][0]
+
+            mock_issue.assert_called_once()
+            call_kwargs = mock_issue.call_args[1] if mock_issue.call_args[1] else {}
+            assert call_kwargs.get('category') == 'configuration'
     
     def test_directory_reads(self, temp_dir):
         """Test reads specified as directory."""

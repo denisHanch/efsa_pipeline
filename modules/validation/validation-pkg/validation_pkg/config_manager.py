@@ -212,7 +212,18 @@ class ConfigManager:
 
             logger.info("✓ Configuration loaded and validated successfully")
             return config
-            
+
+        except ValidationFileNotFoundError as e:
+            error_msg = str(e)
+            logger.error(error_msg)
+            logger.add_validation_issue(
+                level='ERROR',
+                category='configuration',
+                message='File specified in config not found',
+                details={'file': str(config_path), 'error': error_msg}
+            )
+            raise ValidationFileNotFoundError(error_msg) from e
+
         except (ValueError, KeyError) as e:
             error_msg = f"Configuration validation failed: {e}"
             logger.error(error_msg)
@@ -393,6 +404,8 @@ class ConfigManager:
 
                         config.reads.append(ConfigManager._parse_read_config(file_entry, "", config.config_dir, config.output_dir, config.options))
 
+            except ValidationFileNotFoundError as e:
+                raise ValidationFileNotFoundError(f"reads[{idx}]: {e}") from e
             except ValueError as e:
                 raise ValueError(f"Invalid reads[{idx}]: {e}")
 
