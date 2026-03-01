@@ -102,7 +102,7 @@ def main():
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
-    report = ValidationReport(Path("/EFSA_workspace/data/outputs/report.txt"))
+    report = ValidationReport(Path("logs/report.txt"))
 
     # Validate reference genome
     ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
