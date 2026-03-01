@@ -29,7 +29,7 @@ def main():
         return 1
 
     # Setup logging,
-    setup_logging(console_level='DEBUG',log_file=Path("/EFSA_workspace/data/outputs/validation.log"))
+    setup_logging(console_level='DEBUG',log_file=Path("/EFSA_workspace/data/valid/validation.log"))
 
     # ========================================================================
     # Step 1: Read and validate config
@@ -102,7 +102,7 @@ def main():
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
-    report = ValidationReport(Path("/EFSA_workspace/data/outputs/report.txt"))
+    report = ValidationReport(Path("/EFSA_workspace/data/valid/report.txt"))
 
     # Validate reference genome
     ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
