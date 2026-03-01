@@ -67,7 +67,7 @@ workflow {
         
         ref_mod(ref_fasta, mod_fasta)
     
-        sv_tbl = ref_mod.out.sv_tbl
+        sv_tbl = sv_tbl.mix(ref_mod.out.sv_tbl) 
         activePipelines << ref_mod.out.sv_vcf
     
     } else {
@@ -151,6 +151,8 @@ workflow {
     if (activePipelines.size() == 0) {
         log.error "❌  No valid inputs found. Skipping workflows.\n"
         exit 0
+    } else if (activePipelines.size() == 1) {
+        log.warn "Only 1 pipeline is running.\n"
     } else {
         int comparisons = activePipelines.size() - 1
         String plural = comparisons == 1 ? "" : "s"

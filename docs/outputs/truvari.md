@@ -2,7 +2,7 @@
 
 ## Pipeline Workflow
 
-The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is output by the pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sortVcf), indexing them (indexVcf), and then performing the Truvari comparison to generate the final comparison results.
+The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is output by the pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sort_vcf), indexing them (index_vcf), and then performing the Truvari comparison to generate the final comparison results.
 
 ```mermaid
 %%{init: {
@@ -28,8 +28,8 @@ subgraph Truvari_Comparision_Pipeline["Truvari Comparison Pipeline"]
     IL_VCF["Illumina VCF"]:::input
 
     %% Processes
-    SORT_VCF["sortVcf"]:::process
-    INDEX_VCF["indexVcf"]:::process
+    SORT_VCF["sort_vcf"]:::process
+    INDEX_VCF["index_vcf"]:::process
     TRUVARI["truvari"]:::process
 
     %% Output
