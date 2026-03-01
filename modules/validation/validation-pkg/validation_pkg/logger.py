@@ -196,7 +196,7 @@ class ValidationLogger:
             console_handler.setFormatter(
                 structlog.stdlib.ProcessorFormatter(
                     processor=structlog.dev.ConsoleRenderer(colors=True),
-                    foreign_pre_chain=console_pre_chain,
+                    foreign_pre_chain=processors,
                 )
             )
             stdlib_logger.addHandler(console_handler)
