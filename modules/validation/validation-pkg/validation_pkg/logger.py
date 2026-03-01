@@ -184,7 +184,6 @@ class ValidationLogger:
             stdlib_logger.addHandler(file_handler)
 
             # Console-specific chain: same base processors plus context/color enrichment
-            # (inserted before wrap_for_formatter which must remain last)
             console_pre_chain = processors[:-1] + [
                 format_process_info,
                 add_log_level_colors,
