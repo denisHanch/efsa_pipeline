@@ -561,15 +561,15 @@ If the percentage of unmapped reads is unusually high, this may indicate:
 The Nextflow pipelines ran successfully and produced the expected outputs. Each step completed without errors:
 
 ```text
-✅ The reference to modified fasta comparision processing pipeline completed successfully.
+✅ The ref_mod processing pipeline completed successfully.
 
-✅ The long-ref processing pipeline completed successfully.
+✅ The long-read processing pipeline completed successfully.
 
-✅ The short-ref processing pipeline completed successfully.
+✅ The short-read processing pipeline completed successfully.
 
 ✅ Truvari: the comparison of vcf files finished successfully.
 
-✅ Execution of main.nf processing pipeline completed successfully.
+✅ The execution of main.nf processing pipeline completed successfully.
 ```
 
 

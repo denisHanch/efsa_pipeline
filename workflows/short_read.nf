@@ -25,6 +25,7 @@ include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from "../w
 include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadShortFastqFiles } from "../modules/logs.nf"
 include { vcf_to_table }  from "../modules/sv_calling.nf"
 
+def executed = false
 
 workflow short_read {
     take:
@@ -33,7 +34,8 @@ workflow short_read {
         out_folder_name
         plasmid_fasta
 
-    main:        
+    main:
+        executed = true
         // mapping to the reference
         bwa_index(fasta, out_folder_name) | set { fasta_index } 
         mapping(fasta, fasta_index, trimmed, out_folder_name) | set { indexed_bam }
