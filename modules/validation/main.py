@@ -59,7 +59,7 @@ def main():
 
     # Settings for modified genome
     mod_genome_settings = GenomeValidator.Settings(
-        plasmids_to_one=True,
+        error_n_sequences=5,
         main_longest=True,
         coding_type=None,
         output_filename_suffix='mod',

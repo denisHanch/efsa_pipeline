@@ -111,6 +111,7 @@ class GenomeValidator(BaseValidator):
         allow_empty_sequences: bool = False
         allow_empty_id: bool = False
         warn_n_sequences: int = 2
+        error_n_sequences: int = 5
 
         # Editing specifications
         is_plasmid: bool = False
@@ -334,6 +335,23 @@ class GenomeValidator(BaseValidator):
     def _validate_sequences(self) -> None:
         """Validate parsed sequences (trust/strict modes only)."""
         self.logger.debug("Validating sequences...")
+
+        # Check error threshold for number of sequences
+        if self.settings.error_n_sequences is not None and len(self.sequences) > self.settings.error_n_sequences:
+            error_msg = (
+                f"Number of sequences ({len(self.sequences)}) exceeds maximum allowed "
+                f"({self.settings.error_n_sequences})"
+            )
+            self.logger.add_validation_issue(
+                level='ERROR',
+                category='genome',
+                message=error_msg,
+                details={
+                    'num_sequences': len(self.sequences),
+                    'error_threshold': self.settings.error_n_sequences
+                }
+            )
+            raise GenomeValidationError(error_msg)
 
         # Trust mode - validate only first sequence
         if self.validation_level == 'trust':
