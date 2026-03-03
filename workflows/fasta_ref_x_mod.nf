@@ -18,7 +18,7 @@
 
 include { nucmer; deltaFilter; showCoords; syri } from "../modules/assembly.nf"
 include { logWorkflowCompletion } from "../modules/logs.nf"
-include { vcf_to_table } from "../modules/sv_calling.nf"
+include { vcf_to_table; create_empty_tbl } from "../modules/sv_calling.nf"
 
 
 workflow ref_mod {
@@ -41,10 +41,21 @@ workflow ref_mod {
 
         filtered_delta | showCoords | set { coords }
 
-        syri(ref_mod_fasta, coords, filtered_delta) | set { sv_vcf }
+        ref_mod_fasta.join(coords).join(filtered_delta) | set { syri_input_ch }
 
-        sv_vcf | vcf_to_table | set { sv_tbl }
+        syri(syri_input_ch) | set { sv_vcf }
 
+        sv_tbl = create_empty_tbl("assembly")
+        
+        contigs.count()
+            .map { n -> n == 1 }
+            .subscribe { is_single ->
+                if (is_single) {
+                    sv_vcf | vcf_to_table | set { sv_tbl }
+            }
+        }
+        
+    
 
     emit: 
         sv_vcf

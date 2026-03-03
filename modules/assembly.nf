@@ -62,9 +62,7 @@ process syri {
 
 
     input:
-    tuple val(prefix), path(ref), path(mod)
-    tuple val(prefix), path(coords)
-    tuple val(prefix), path(filtered_delta)
+    tuple val(prefix), path(ref), path(mod), path(coords), path(filtered_delta)
 
 
     output:
