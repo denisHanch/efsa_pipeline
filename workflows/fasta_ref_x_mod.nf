@@ -24,21 +24,27 @@ include { vcf_to_table } from "../modules/sv_calling.nf"
 workflow ref_mod {
     take:
         ref_fasta
-        mod_fasta
+        contigs
     main:
-        log.info "▶ Running pipeline comparing reference and modified fasta."
+        log.info "▶ Running pipeline comparing reference and modified fasta or reference and contigs."
 
-        def prefix_name = "assembly"
-
-        ref_mod_fasta = ref_fasta
-            .combine(mod_fasta)
-            .map { ref, mod -> tuple(prefix_name, ref, mod) }
+        ref_mod_fasta = contigs
+            .combine(ref_fasta)
+            .map { contig, ref -> 
+                def prefix = contig.baseName
+                tuple(prefix, ref, contig)
+            }
 
         ref_mod_fasta | nucmer | set { delta }
-        deltaFilter(prefix_name, delta) | set { filtered_delta }
-        showCoords(prefix_name, filtered_delta) | set { coords }
+
+        delta | deltaFilter | set { filtered_delta }
+
+        filtered_delta | showCoords | set { coords }
+
         syri(ref_mod_fasta, coords, filtered_delta) | set { sv_vcf }
-        vcf_to_table(sv_vcf)  | set { sv_tbl }
+
+        sv_vcf | vcf_to_table | set { sv_tbl }
+
 
     emit: 
         sv_vcf
@@ -47,9 +53,11 @@ workflow ref_mod {
 
 workflow {
     def ref_fasta = Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true)
-    def mod_fasta = Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true)
 
-    ref_mod(ref_fasta, mod_fasta)
+    def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
+
+    ref_mod(ref_fasta, contigs_ch)
 }
 
-logWorkflowCompletion("reference to modified fasta comparision")
+
+// logWorkflowCompletion("reference to modified fasta comparision")

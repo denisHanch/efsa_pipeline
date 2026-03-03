@@ -9,7 +9,7 @@ process nucmer {
 
 
     output:
-    path("${prefix}.delta")
+    tuple val(prefix), path("${prefix}.delta")
 
 
 
@@ -25,11 +25,10 @@ process deltaFilter {
     publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
 
     input:
-    val prefix 
-    path delta
+    tuple val(prefix), path(delta)
 
     output:
-    path("${prefix}_filtered.delta")
+    tuple val(prefix), path("${prefix}_filtered.delta")
 
     script:
     """
@@ -43,11 +42,10 @@ process showCoords {
     publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
 
     input:
-    val prefix
-    path filtered_delta
+    tuple val(prefix), path(filtered_delta)
 
     output:
-    path("${prefix}.filtered.coords")
+    tuple val(prefix), path("${prefix}.filtered.coords")
 
 
 
@@ -65,8 +63,8 @@ process syri {
 
     input:
     tuple val(prefix), path(ref), path(mod)
-    path coords
-    path filtered_delta
+    tuple val(prefix), path(coords)
+    tuple val(prefix), path(filtered_delta)
 
 
     output:
