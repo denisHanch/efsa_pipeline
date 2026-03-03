@@ -17,8 +17,8 @@
 */
 
 include { nucmer; deltaFilter; showCoords; syri } from "../modules/assembly.nf"
-include { logWorkflowCompletion } from "../modules/logs.nf"
-include { vcf_to_table; create_empty_tbl } from "../modules/sv_calling.nf"
+include { logWorkflowCompletion; listFiles } from "../modules/logs.nf"
+include { vcf_to_table_asm; create_empty_tbl } from "../modules/sv_calling.nf"
 
 
 workflow ref_mod {
@@ -27,6 +27,8 @@ workflow ref_mod {
         contigs
     main:
         log.info "▶ Running pipeline comparing reference and modified fasta or reference and contigs."
+
+        contig_files = listFiles("${params.in_dir}/", ".*contig.*\\.fasta")
 
         ref_mod_fasta = contigs
             .combine(ref_fasta)
@@ -44,18 +46,13 @@ workflow ref_mod {
         ref_mod_fasta.join(coords).join(filtered_delta) | set { syri_input_ch }
 
         syri(syri_input_ch) | set { sv_vcf }
-
-        sv_tbl = create_empty_tbl("assembly")
         
-        contigs.count()
-            .map { n -> n == 1 }
-            .subscribe { is_single ->
-                if (is_single) {
-                    sv_vcf | vcf_to_table | set { sv_tbl }
-            }
+        if (contig_files.size() == 1) {
+            sv_vcf | vcf_to_table_asm | set { sv_tbl }
+        } else {
+            create_empty_tbl("assembly") | set { sv_tbl }
         }
         
-    
 
     emit: 
         sv_vcf

@@ -148,16 +148,10 @@ workflow {
         sv_tbl = sv_tbl.mix(create_short_tbl("short"))
     }
 
-    if (activePipelines.size() == 0) {
-        log.error "❌  No valid inputs found. Skipping workflows.\n"
-        exit 0
-    } else {
+    if (params.run_truvari && activePipelines.size() >= 2 && mod_fasta_avail) {
         int comparisons = activePipelines.size() - 1
         String plural = comparisons == 1 ? "" : "s"
         log.info "ℹ️  Truvari: performing ${comparisons} comparison${plural}.\n"
-    }
-
-    if (activePipelines.size() >= 2 && mod_fasta_avail) {
         
         vcfs = activePipelines.inject(Channel.empty()) { acc, ch -> acc.mix(ch)}
         truvari_comparison(ref_fasta, vcfs)
@@ -166,7 +160,7 @@ workflow {
     script = file("${workflow.projectDir}/modules/utils/create_sv_output.py")
 
     def tbl_channel = sv_tbl.collect().map { list ->
-    def asm = list.find { it.name.toLowerCase().contains("assembly") }
+    def asm = list.find { it.name.toLowerCase().contains("mod") || it.name.toLowerCase().contains("assembly") }
     def long_pb = list.find { it.name.toLowerCase().contains("pb") }
     def long_ont = list.find { it.name.toLowerCase().contains("ont") }
     def sht = list.find { it.name.toLowerCase().contains("short") }

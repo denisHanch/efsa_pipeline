@@ -202,7 +202,7 @@ process survivor {
 /*
  * Convert vcf file to tsv table 
 */
-process vcf_to_table {
+process vcf_to_table_asm {
 
     container params.containers.bcftools
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
@@ -217,17 +217,29 @@ process vcf_to_table {
     """
     set -euxo pipefail
 
-    if [[ "${name}" == "assembly" ]]; then
-        {
-            echo -e "chrom\tstart\tend\tsvtype"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
-        } > "${name}_sv_summary.tsv"
-    else
-        {
-            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_reads\tscore\tRDCN"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\t[%RC]\t%QUAL\t[%RDCN]\n' "${vcf}"
-        } >> "${name}_short_sv_summary.tsv"
-    fi
+    echo -e "chrom\tstart\tend\tsvtype" > "${name}_sv_summary.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}" >> "${name}_sv_summary.tsv"
+
+    """
+}
+
+process vcf_to_table_short {
+
+    container params.containers.bcftools
+    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+
+    input:
+    tuple val(name), path(vcf)
+
+    output:
+    path "*_sv_summary.tsv"
+
+    script:
+    """
+    set -euxo pipefail
+
+    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_reads\tscore\tRDCN" > "${name}_short_sv_summary.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\t[%RC]\t%QUAL\t[%RDCN]\n' "${vcf}"  >> "${name}_short_sv_summary.tsv"
     """
 }
 

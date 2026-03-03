@@ -23,7 +23,7 @@ include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_read
 include { freebayes; bcftools_stats; bcftools_stats as bcftools_stats_plasmid } from "../modules/variant_calling.nf"
 include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from "../workflows/subworkflows.nf"
 include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadShortFastqFiles } from "../modules/logs.nf"
-include { vcf_to_table }  from "../modules/sv_calling.nf"
+include { vcf_to_table_short }  from "../modules/sv_calling.nf"
 
 
 workflow short_read {
@@ -77,7 +77,7 @@ workflow short_read {
         
             // SVs variant calling
             sv(fasta, indexed_bam, out_folder_name) | set { sv_vcf }
-            vcf_to_table(sv_vcf) | set { sv_tbl }
+            vcf_to_table_short(sv_vcf) | set { sv_tbl }
         } else {
             sv_vcf = Channel.empty()
             sv_tbl = Channel.empty()
