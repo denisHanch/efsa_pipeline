@@ -1,10 +1,16 @@
 """Inter-file validation for genome files."""
 
+import subprocess
 from dataclasses import dataclass
-from typing import Dict, Optional, Any
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from Bio import SeqIO
 from ..utils.base_settings import BaseSettings
-from ..exceptions import GenomeValidationError
+from ..exceptions import InterFileValidationError
 from ..logger import get_logger
+from ..utils.file_handler import check_tool_available, open_compressed_writer
+from ..utils.path_utils import strip_all_extensions
+from ..utils.formats import CodingType
 
 
 def _get_metadata_field(metadata_obj, field_name, default=None):
@@ -23,6 +29,7 @@ class GenomeXGenomeSettings(BaseSettings):
     same_number_of_sequences: bool = True
     same_sequence_ids: bool = False
     same_sequence_lengths: bool = False
+    characterize: bool = True
 
     def __post_init__(self):
         if self.same_sequence_lengths and not self.same_sequence_ids:
@@ -37,7 +44,13 @@ def genomexgenome_validation(
     mod_genome_result,  # OutputMetadata or Dict[str, Any]
     settings: Optional[GenomeXGenomeSettings] = None
 ) -> Dict[str, Any]:
-    """Validate consistency between two genome files (reference vs modified)."""
+    """Validate consistency between two genome files (reference vs modified).
+
+    When settings.characterize is True (default), also runs minimap2 to align
+    the modified genome against the reference and separates contigs (mapped)
+    from plasmids (unmapped), writing each to output FASTA files.
+    Characterization failures are non-fatal and recorded as warnings.
+    """
     settings = settings or GenomeXGenomeSettings()
     logger = get_logger()
 
@@ -102,46 +115,57 @@ def genomexgenome_validation(
         else:
             logger.debug(f"Sequence IDs match: {len(common_ids)} common ID(s)")
 
-        # Check 3: Same sequence lengths for common IDs
-        if settings.same_sequence_lengths and common_ids:
-            ref_lengths = _get_metadata_field(ref_meta, 'sequence_lengths', {})
-            mod_lengths = _get_metadata_field(mod_meta, 'sequence_lengths', {})
+    # Check 3: Same sequence lengths for common IDs
+    if settings.same_sequence_lengths and common_ids:
+        ref_lengths = _get_metadata_field(ref_meta, 'sequence_lengths', {})
+        mod_lengths = _get_metadata_field(mod_meta, 'sequence_lengths', {})
+        for seq_id in common_ids:
 
-            for seq_id in common_ids:
-                ref_len = ref_lengths.get(seq_id)
-                mod_len = mod_lengths.get(seq_id)
+            ref_len = ref_lengths.get(seq_id)
+            mod_len = mod_lengths.get(seq_id)
+            if ref_len is None or mod_len is None:
+                warning_msg = f"Missing length information for sequence '{seq_id}'"
+                warnings.append(warning_msg)
+                logger.warning(warning_msg)
+                continue
 
-                if ref_len is None or mod_len is None:
-                    warning_msg = f"Missing length information for sequence '{seq_id}'"
-                    warnings.append(warning_msg)
-                    logger.warning(warning_msg)
-                    continue
+            if ref_len != mod_len:
+                metadata['length_mismatches'][seq_id] = {
+                    'ref_length': ref_len,
+                    'mod_length': mod_len,
+                    'difference': mod_len - ref_len
+                }
 
-                if ref_len != mod_len:
-                    metadata['length_mismatches'][seq_id] = {
-                        'ref_length': ref_len,
-                        'mod_length': mod_len,
-                        'difference': mod_len - ref_len
-                    }
-                    error_msg = (
-                        f"Sequence length mismatch for '{seq_id}': "
-                        f"reference={ref_len} bp, modified={mod_len} bp "
-                        f"(diff={mod_len - ref_len:+d} bp)"
-                    )
-                    errors.append(error_msg)
-                    logger.error(error_msg)
+                error_msg = (
+                    f"Sequence length mismatch for '{seq_id}': "
+                    f"reference={ref_len} bp, modified={mod_len} bp "
+                    f"(diff={mod_len - ref_len:+d} bp)"
+                )
+                errors.append(error_msg)
+                logger.error(error_msg)
 
-            if not metadata['length_mismatches']:
-                logger.debug(f"Sequence lengths match for {len(common_ids)} sequence(s)")
+        if not metadata['length_mismatches']:
+            logger.debug(f"Sequence lengths match for {len(common_ids)} sequence(s)")
+
+    # Characterize contigs vs plasmids via minimap2 (non-fatal)
+    if settings.characterize:
+        logger.info("Running genome characterization: contigs vs plasmids via minimap2")
+        try:
+            _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, logger)
+        except Exception as e:
+            error_msg = f"Genome characterization skipped: {e}"
+            errors.append(error_msg)
+            logger.error(error_msg)
+            metadata.update({
+                'contigs_found': None,
+                'plasmids_found': None,
+                'contig_files': [],
+                'plasmid_file': None,
+            })
 
     # Determine if validation passed (no ERROR-level issues)
     passed = len(errors) == 0
-
-    if passed:
-        logger.info(f"✓ Genome inter-file validation passed")
-    else:
-        logger.error(f"✗ Genome inter-file validation failed: {len(errors)} error(s), {len(warnings)} warning(s)")
-
+    
     result = {
         'passed': passed,
         'warnings': warnings,
@@ -149,9 +173,90 @@ def genomexgenome_validation(
         'metadata': metadata
     }
 
-    # Raise exception if failed
-    if not passed:
+    if passed:
+        logger.info(f"✓ Genome inter-file validation passed")
+    else:
+        logger.error(f"✗ Genome inter-file validation failed: {len(errors)} error(s), {len(warnings)} warning(s)")
         error_summary = '\n  - '.join([''] + errors)
-        raise GenomeValidationError(f"Genome inter-file validation failed:{error_summary}")
-
+        raise InterFileValidationError(f"Genome inter-file validation failed:{error_summary}")
     return result
+
+
+def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, logger):
+    """Run minimap2 alignment and populate characterization keys into metadata.
+
+    Raises an exception on any failure so the caller can demote it to a warning.
+    """
+    if not check_tool_available('minimap2'):
+        raise InterFileValidationError(
+            "minimap2 is required for genome characterization but was not found. "
+            "Please install minimap2 and ensure it is on your PATH."
+        )
+
+    ref_path = _get_metadata_field(ref_genome_result, 'output_file')
+    mod_path = _get_metadata_field(mod_genome_result, 'output_file')
+    mod_filename = _get_metadata_field(mod_genome_result, 'output_filename')
+
+    logger.debug(f"Running minimap2: ref={ref_path} query={mod_path}")
+    try:
+        proc = subprocess.run(
+            ['minimap2', '-x', 'asm5', str(ref_path), str(mod_path)],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+    except subprocess.CalledProcessError as e:
+        raise InterFileValidationError(
+            f"minimap2 failed (exit code {e.returncode}): {e.stderr.strip()}"
+        )
+
+    # Parse PAF output: column 0 is the query sequence name
+    mapped_ids: set = set()
+    print(proc.stdout)
+    for line in proc.stdout.splitlines():
+        if line.strip():
+            mapped_ids.add(line.split('\t')[0])
+
+    logger.debug(f"minimap2 mapped {len(mapped_ids)} sequence(s) to reference")
+
+    # Split sequences into contigs (mapped) and plasmids (unmapped)
+    contig_seqs: List = []
+    plasmid_seqs: List = []
+    for record in SeqIO.parse(str(mod_path), 'fasta'):
+        if record.id in mapped_ids:
+            contig_seqs.append(record)
+        else:
+            plasmid_seqs.append(record)
+
+    output_dir = Path(mod_path).parent
+    base_name = strip_all_extensions(mod_filename)
+
+    # Write each contig to its own file
+    contig_files: List[str] = []
+    for i, seq in enumerate(contig_seqs):
+        contig_path = output_dir / f"{base_name}_contig_{i}.fasta"
+        with open_compressed_writer(contig_path, CodingType.NONE) as handle:
+            SeqIO.write([seq], handle, 'fasta')
+        contig_files.append(str(contig_path))
+        logger.debug(f"Contig {i}: {seq.id} ({len(seq.seq)} bp) → {contig_path.name}")
+
+    # Write all plasmids to a single file
+    plasmid_file: Optional[str] = None
+    if plasmid_seqs:
+        plasmid_path = output_dir / f"{base_name}_plasmids.fasta"
+        with open_compressed_writer(plasmid_path, CodingType.NONE) as handle:
+            SeqIO.write(plasmid_seqs, handle, 'fasta')
+        plasmid_file = str(plasmid_path)
+        logger.debug(f"Plasmids ({len(plasmid_seqs)}) → {plasmid_path.name}")
+
+    logger.info(
+        f"Genome characterization complete: "
+        f"{len(contig_seqs)} contig(s), {len(plasmid_seqs)} plasmid(s)"
+    )
+
+    metadata.update({
+        'contigs_found': len(contig_seqs),
+        'plasmids_found': len(plasmid_seqs),
+        'contig_files': contig_files,
+        'plasmid_file': plasmid_file,
+    })
