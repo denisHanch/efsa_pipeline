@@ -53,7 +53,7 @@ def main():
         main_longest=True,
         coding_type=None,
         output_filename_suffix='ref',
-        replace_id_with='chr',
+        replace_id_with_incremental='chr',
         min_sequence_length=100
     )
 
@@ -120,11 +120,26 @@ def main():
 
     # Validate modified genome
     mod_genome_res = validate_genome(config.mod_genome, mod_genome_settings)
-    report.write(mod_genome_res,file_type = "genome")
+    # report.write(mod_genome_res,file_type = "genome")
 
     # Add intergenome validation
     res = genomexgenome_validation(ref_genome_res,mod_genome_res,genomexgenome_settings)
     report.write(res,file_type = "genomexgenome")
+
+    # Revalidate modified genome
+    mod_genome_settings = GenomeValidator.Settings(
+        plasmids_to_one=True,
+        error_n_sequences=5,
+        coding_type=None,
+        output_filename_suffix='mod',
+        replace_id_with_incremental='chr',
+        min_sequence_length=100
+    )
+    # Validate modified genome
+    mod_genome_res = validate_genome(config.mod_genome, mod_genome_settings)
+    report.write(mod_genome_res,file_type = "genome")
+
+
 
     # Validate plasmid genomes (if present in config)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:

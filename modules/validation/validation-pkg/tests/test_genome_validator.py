@@ -428,12 +428,12 @@ class TestGenomeValidatorEditing:
         assert len(validator.sequences) == 1
         assert validator.sequences[0].id == "long_seq"
 
-    def test_replace_id_with_added(self, fasta_with_mixed_lengths, output_dir):
-        """Test replacing sequence IDs with auto-increment for multiple sequences."""
+    def test_replace_id_with_sets_fixed_id(self, fasta_with_mixed_lengths, output_dir):
+        """Test replace_id_with sets all sequence IDs to the exact given string."""
         settings = GenomeValidator.Settings(
             replace_id_with="chr",
             min_sequence_length=0,
-            warn_n_sequences=10,  # Set high to avoid forced plasmid split with 3 sequences
+            warn_n_sequences=10,
             plasmid_split=False
         )
 
@@ -450,14 +450,40 @@ class TestGenomeValidatorEditing:
         validator = GenomeValidator(genome_config, settings)
         validator.run()
 
-        # First sequence should have base name, subsequent should have increments
+        for seq in validator.sequences:
+            assert seq.id == "chr"
+        # Original IDs should be in description
+        assert any("short_seq" in seq.description for seq in validator.sequences)
+        assert any("medium_seq" in seq.description for seq in validator.sequences)
+        assert any("long_seq" in seq.description for seq in validator.sequences)
+
+    def test_replace_id_with_incremental(self, fasta_with_mixed_lengths, output_dir):
+        """Test replace_id_with_incremental: prefix, prefix1, prefix2, ..."""
+        settings = GenomeValidator.Settings(
+            replace_id_with_incremental="chr",
+            min_sequence_length=0,
+            warn_n_sequences=10,
+            plasmid_split=False
+        )
+
+        genome_config = GenomeConfig(
+            filename="mixed_lengths.fasta",
+            basename="mixed_lengths",
+            filepath=fasta_with_mixed_lengths,
+            coding_type=CT.NONE,
+            detected_format=GenomeFormat.FASTA,
+            output_dir=output_dir,
+            global_options={}
+        )
+
+        validator = GenomeValidator(genome_config, settings)
+        validator.run()
+
         assert validator.sequences[0].id == "chr"
         assert validator.sequences[1].id == "chr1"
         assert validator.sequences[2].id == "chr2"
-        # Verify IDs are unique
         sequence_ids = [seq.id for seq in validator.sequences]
         assert len(sequence_ids) == len(set(sequence_ids)), "Sequence IDs should be unique"
-        # Original IDs should be in description
         assert any("short_seq" in seq.description for seq in validator.sequences)
         assert any("medium_seq" in seq.description for seq in validator.sequences)
         assert any("long_seq" in seq.description for seq in validator.sequences)
@@ -997,7 +1023,7 @@ class TestGenomeValidatorValidationLevels:
 
     def test_strict_applies_edits(self, multi_seq_fasta, output_dir):
         """Test strict mode applies all edits."""
-        settings = GenomeValidator.Settings(replace_id_with='genome',
+        settings = GenomeValidator.Settings(replace_id_with_incremental='genome',
             min_sequence_length=0
         )
         genome_config = GenomeConfig(
@@ -1070,7 +1096,7 @@ class TestGenomeValidatorValidationLevels:
 
     def test_trust_applies_edits(self, multi_seq_fasta, output_dir):
         """Test trust mode applies all edits to all sequences."""
-        settings = GenomeValidator.Settings(replace_id_with='genome',
+        settings = GenomeValidator.Settings(replace_id_with_incremental='genome',
             min_sequence_length=0,
             plasmid_split=True  # Enable plasmid split to test edits on all sequences
         )
