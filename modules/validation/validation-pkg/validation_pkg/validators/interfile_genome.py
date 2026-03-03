@@ -182,6 +182,54 @@ def genomexgenome_validation(
     return result
 
 
+def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
+    """Parse PAF output and return the best-scoring hit per query sequence.
+
+    PAF columns (0-indexed):
+      0  query name      1  query length
+      2  q_start         3  q_end
+      4  strand (+/-)    5  ref name
+      6  ref length      7  r_start
+      8  r_end           9  residue matches
+      10 alignment block length   11 mapping quality
+
+    For each query name the hit with the largest alignment block length
+    (col 10) is selected.  This correctly handles multi-copy elements such
+    as ribosomal RNA that produce many hits: only the highest-scoring
+    reference assignment is kept.
+
+    Returns
+    -------
+    Dict mapping query_name -> {
+        'ref_name'     : str,   # name of best-matching reference sequence (expected to be only one reference = should be same all the time)
+        'strand'       : str,   # '+' or '-'
+        'alignment_len': int,   # alignment block length of the winning hit
+    }
+    """
+    best_hits: Dict[str, Dict] = {}
+    for line in paf_output.splitlines():
+        if not line.strip():
+            continue
+        cols = line.split('\t')
+        if len(cols) < 12:
+            continue
+        query_name = cols[0]
+        strand = cols[4]
+        ref_name = cols[5]
+        try:
+            alignment_block_len = int(cols[10])
+        except ValueError:
+            continue
+        current = best_hits.get(query_name)
+        if current is None or alignment_block_len > current['alignment_len']:
+            best_hits[query_name] = {
+                'ref_name': ref_name,
+                'strand': strand,
+                'alignment_len': alignment_block_len,
+            }
+    return best_hits
+
+
 def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, logger):
     """Run minimap2 alignment and populate characterization keys into metadata.
 
@@ -210,12 +258,12 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
             f"minimap2 failed (exit code {e.returncode}): {e.stderr.strip()}"
         )
 
-    # Parse PAF output: column 0 is the query sequence name
-    mapped_ids: set = set()
+    # Parse PAF output: for each query keep only the best-scoring hit so that
+    # multi-copy elements (e.g. ribosomal RNA) are resolved to a single
+    # reference assignment, and orientation is captured.
     print(proc.stdout)
-    for line in proc.stdout.splitlines():
-        if line.strip():
-            mapped_ids.add(line.split('\t')[0])
+    best_hits = _parse_paf_best_hits(proc.stdout)
+    mapped_ids = set(best_hits.keys())
 
     logger.debug(f"minimap2 mapped {len(mapped_ids)} sequence(s) to reference")
 
@@ -234,11 +282,17 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
     # Write each contig to its own file
     contig_files: List[str] = []
     for i, seq in enumerate(contig_seqs):
+        hit = best_hits[seq.id]
+        if hit['strand'] == '-':
+            seq = seq.reverse_complement(id=seq.id, description=seq.description)
         contig_path = output_dir / f"{base_name}_contig_{i}.fasta"
         with open_compressed_writer(contig_path, CodingType.NONE) as handle:
             SeqIO.write([seq], handle, 'fasta')
         contig_files.append(str(contig_path))
-        logger.debug(f"Contig {i}: {seq.id} ({len(seq.seq)} bp) → {contig_path.name}")
+        logger.debug(
+            f"Contig {i}: {seq.id} ({len(seq.seq)} bp) "
+            f"→ {hit['ref_name']} [{hit['strand']}] → {contig_path.name}"
+        )
 
     # Write all plasmids to a single file
     plasmid_file: Optional[str] = None
@@ -259,4 +313,6 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
         'plasmids_found': len(plasmid_seqs),
         'contig_files': contig_files,
         'plasmid_file': plasmid_file,
+        'contig_orientations': {seq.id: best_hits[seq.id]['strand'] for seq in contig_seqs},
+        'contig_ref_names': {seq.id: best_hits[seq.id]['ref_name'] for seq in contig_seqs},
     })

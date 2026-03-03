@@ -83,7 +83,7 @@ class TestSequenceCountValidation:
             sequence_lengths={}
         )
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result)
 
         error_msg = str(exc_info.value)
@@ -134,7 +134,7 @@ class TestSequenceIDValidation:
 
         settings = GenomeXGenomeSettings(same_sequence_ids=True)
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result, settings)
 
         error_msg = str(exc_info.value)
@@ -159,7 +159,7 @@ class TestSequenceIDValidation:
 
         settings = GenomeXGenomeSettings(same_sequence_ids=True)
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result, settings)
 
         error_msg = str(exc_info.value)
@@ -183,7 +183,7 @@ class TestSequenceIDValidation:
 
         settings = GenomeXGenomeSettings(same_sequence_ids=True)
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result, settings)
 
         error_msg = str(exc_info.value)
@@ -240,7 +240,7 @@ class TestSequenceLengthValidation:
             same_sequence_lengths=True
         )
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result, settings)
 
         error_msg = str(exc_info.value)
@@ -269,7 +269,7 @@ class TestSequenceLengthValidation:
             same_sequence_lengths=True
         )
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result, settings)
 
         error_msg = str(exc_info.value)
