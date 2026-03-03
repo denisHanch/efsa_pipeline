@@ -261,10 +261,9 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
     # Parse PAF output: for each query keep only the best-scoring hit so that
     # multi-copy elements (e.g. ribosomal RNA) are resolved to a single
     # reference assignment, and orientation is captured.
-    print(proc.stdout)
     best_hits = _parse_paf_best_hits(proc.stdout)
     mapped_ids = set(best_hits.keys())
-
+    
     logger.debug(f"minimap2 mapped {len(mapped_ids)} sequence(s) to reference")
 
     # Split sequences into contigs (mapped) and plasmids (unmapped)
@@ -283,14 +282,19 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
     contig_files: List[str] = []
     for i, seq in enumerate(contig_seqs):
         hit = best_hits[seq.id]
+        new_id = seq.id.rstrip('0123456789')
         if hit['strand'] == '-':
-            seq = seq.reverse_complement(id=seq.id, description=seq.description)
+            out_seq = seq.reverse_complement(id=new_id, description='')
+        else:
+            out_seq = seq[:]
+            out_seq.id = new_id
+            out_seq.description = ''
         contig_path = output_dir / f"{base_name}_contig_{i}.fasta"
         with open_compressed_writer(contig_path, CodingType.NONE) as handle:
-            SeqIO.write([seq], handle, 'fasta')
+            SeqIO.write([out_seq], handle, 'fasta')
         contig_files.append(str(contig_path))
         logger.debug(
-            f"Contig {i}: {seq.id} ({len(seq.seq)} bp) "
+            f"Contig {i}: {new_id} ({len(out_seq.seq)} bp) "
             f"→ {hit['ref_name']} [{hit['strand']}] → {contig_path.name}"
         )
 

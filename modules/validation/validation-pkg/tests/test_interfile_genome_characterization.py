@@ -227,7 +227,7 @@ class TestCharacterizationInGenomeXGenome:
         for contig_file in result["metadata"]["contig_files"]:
             ids = _read_ids(Path(contig_file))
             assert len(ids) == 1
-            assert ids[0] in {"chr1", "chr2"}
+            assert ids[0] == "chr"
 
         plasmid_ids = _read_ids(Path(result["metadata"]["plasmid_file"]))
         assert plasmid_ids == ["plasmid1"]
@@ -369,10 +369,10 @@ class TestOrientationHandling:
             mock_run.return_value = MagicMock(stdout=paf, returncode=0)
             result = genomexgenome_validation(ref_result, mod_result, settings)
 
-        # Find the contig file for chr2
+        # Find the contig file for chr2 (id is renamed to 'chr' after digit-stripping)
         chr2_file = next(
             f for f in result["metadata"]["contig_files"]
-            if SeqIO.read(f, "fasta").id == "chr2"
+            if "_contig_1" in f
         )
         written_seq = str(SeqIO.read(chr2_file, "fasta").seq)
         assert written_seq == expected_rc
@@ -400,7 +400,7 @@ class TestOrientationHandling:
 
         chr1_file = next(
             f for f in result["metadata"]["contig_files"]
-            if SeqIO.read(f, "fasta").id == "chr1"
+            if "_contig_0" in f
         )
         written_seq = str(SeqIO.read(chr1_file, "fasta").seq)
         assert written_seq == known_seq
