@@ -16,7 +16,7 @@
       - For each reference/modified pair, produce a VCF and a corresponding TSV summary.
 */
 
-include { nucmer; deltaFilter; showCoords; syri } from "../modules/assembly.nf"
+include { nucmer; delta_filter; show_coords; syri } from "../modules/assembly.nf"
 include { logWorkflowCompletion; listFiles } from "../modules/logs.nf"
 include { vcf_to_table_asm; create_empty_tbl } from "../modules/sv_calling.nf"
 
@@ -40,9 +40,9 @@ workflow ref_mod {
 
         ref_mod_fasta | nucmer | set { delta }
 
-        delta | deltaFilter | set { filtered_delta }
+        delta | delta_filter | set { filtered_delta }
 
-        filtered_delta | showCoords | set { coords }
+        filtered_delta | show_coords | set { coords }
 
         ref_mod_fasta.join(coords).join(filtered_delta) | set { syri_input_ch }
 

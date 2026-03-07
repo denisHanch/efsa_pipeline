@@ -52,6 +52,8 @@ workflow {
 
     def mod_fasta_avail = !file("${params.in_dir}").listFiles()?.findAll { it.name ==~ /.*(assembled_genome|mod)\.(fa|fna|fasta)$/ }.isEmpty()
 
+    def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
+
     def ref_plasmid = listFiles("${params.in_dir}", ".*ref_plasmid\\.(fa|fna|fasta)")
     def mod_plasmid = listFiles("${params.in_dir}", ".*mod_plasmid\\.(fa|fna|fasta)")
 
@@ -63,9 +65,9 @@ workflow {
     def sv_tbl = Channel.empty()
 
     // reference to modified fasta comparison - assembly pipeline
-    if (mod_fasta_avail) {
+    if (params.run_syri) {
         
-        ref_mod(ref_fasta, mod_fasta)
+        ref_mod(ref_fasta, contigs_ch)
     
         sv_tbl = sv_tbl.mix(ref_mod.out.sv_tbl) 
         activePipelines << ref_mod.out.sv_vcf
