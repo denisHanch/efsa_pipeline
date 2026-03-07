@@ -527,10 +527,6 @@ class ReadValidator(BaseValidator):
 
             self.logger.info(f"✓ Parsed {len(self.sequences):,} sequence(s)")
 
-        # Strict mode: detect (or confirm) ngs_type from actual sequence headers
-        if self.validation_level == 'strict':
-            self._update_ngs_type_from_content()
-
         except FileFormatError:
             raise
         except Exception as e:
@@ -554,7 +550,12 @@ class ReadValidator(BaseValidator):
                 }
             )
             raise exception_class(error_msg) from e
-    
+
+        # Strict mode: detect (or confirm) ngs_type from actual sequence headers.
+        # Runs after the parsing try/except so ReadValidationError propagates unmodified.
+        if self.validation_level == 'strict':
+            self._update_ngs_type_from_content()
+
     def _validate_sequences(self) -> None:
         """Validate parsed sequences with optional parallelization."""
         # Determine how many sequences to validate
