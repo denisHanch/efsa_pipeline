@@ -53,17 +53,17 @@ def main():
         main_longest=True,
         coding_type=None,
         output_filename_suffix='ref',
-        replace_id_with='chr',
+        replace_id_with_incremental='chr',
         min_sequence_length=100
     )
 
     # Settings for modified genome
     mod_genome_settings = GenomeValidator.Settings(
-        plasmids_to_one=True,
-        main_longest=True,
+        plasmids_to_one=False,
+        error_n_sequences=5,
         coding_type=None,
         output_filename_suffix='mod',
-        replace_id_with='chr',
+        replace_id_with_incremental='chr',
         min_sequence_length=100
     )
 
@@ -100,7 +100,11 @@ def main():
     )
     
     # Inter genome validation settings (using defaults)
-    genomexgenome_settings = GenomeXGenomeSettings()
+    genomexgenome_settings = GenomeXGenomeSettings(
+        characterize=True,
+        same_sequence_ids=False,
+        same_number_of_sequences=False
+    )
 
     # Inter read validation settings (using defaults)
     readxread_settings = ReadXReadSettings()
