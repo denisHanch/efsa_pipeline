@@ -27,18 +27,6 @@
           "default": "data/outputs/logs",
           "description": "Directory where log files will be stored."
         },
-        "ref_fasta_path": {
-          "type": "string",
-          "format": "file-path",
-          "default": "$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}",
-          "description": "Path pattern to the reference genome FASTA file."
-        },
-        "mod_fasta_path": {
-          "type": "string",
-          "format": "file-path",
-          "default": "$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}",
-          "description": "Path pattern to the modified/assembled genome FASTA file."
-        }
       }
     },
     "general_options": {
