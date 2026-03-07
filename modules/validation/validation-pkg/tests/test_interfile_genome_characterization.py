@@ -54,11 +54,13 @@ def _make_paf_line(
     strand: str = "+",
     ref_name: str = "ref_chr1",
     alignment_len: int = 100,
+    q_start: int = 0,
+    r_start: int = 0,
 ) -> str:
     """Build a minimal valid PAF line (12 tab-separated columns)."""
     return (
-        f"{query_id}\t{alignment_len}\t0\t{alignment_len}\t{strand}\t"
-        f"{ref_name}\t1000000\t0\t{alignment_len}\t{alignment_len}\t{alignment_len}\t255"
+        f"{query_id}\t{alignment_len}\t{q_start}\t{q_start + alignment_len}\t{strand}\t"
+        f"{ref_name}\t1000000\t{r_start}\t{r_start + alignment_len}\t{alignment_len}\t{alignment_len}\t255"
     )
 
 
@@ -286,6 +288,43 @@ class TestParsePafBestHits:
     def test_short_lines_skipped(self):
         """Lines with fewer than 12 columns are ignored."""
         assert _parse_paf_best_hits("chr1\t100\t0\t100\t+\tref1") == {}
+
+    def test_duplicate_pair_same_starts_ok(self):
+        """Same (query, ref) pair with identical q_start and r_start should not raise."""
+        lines = [
+            _make_paf_line("chr1", ref_name="ref1", alignment_len=100, q_start=0, r_start=0),
+            _make_paf_line("chr1", ref_name="ref1", alignment_len=200, q_start=0, r_start=0),
+        ]
+        hits = _parse_paf_best_hits("\n".join(lines))
+        assert hits["chr1"]["alignment_len"] == 200
+
+    def test_conflicting_q_start_raises(self):
+        """Same (query, ref) pair with different q_start values must raise."""
+        lines = [
+            _make_paf_line("chr1", ref_name="ref1", q_start=0, r_start=0),
+            _make_paf_line("chr1", ref_name="ref1", q_start=500, r_start=0),
+        ]
+        with pytest.raises(InterFileValidationError, match="q_start"):
+            _parse_paf_best_hits("\n".join(lines))
+
+    def test_conflicting_r_start_raises(self):
+        """Same (query, ref) pair with different r_start values must raise."""
+        lines = [
+            _make_paf_line("chr1", ref_name="ref1", q_start=0, r_start=0),
+            _make_paf_line("chr1", ref_name="ref1", q_start=0, r_start=1000),
+        ]
+        with pytest.raises(InterFileValidationError, match="r_start"):
+            _parse_paf_best_hits("\n".join(lines))
+
+    def test_different_ref_names_not_conflicting(self):
+        """Same query mapping to two different refs with different starts should not raise."""
+        lines = [
+            _make_paf_line("chr1", ref_name="ref1", q_start=0,   r_start=0),
+            _make_paf_line("chr1", ref_name="ref2", q_start=500, r_start=999),
+        ]
+        hits = _parse_paf_best_hits("\n".join(lines))
+        # Best hit is the one with larger alignment_len (both default to 100, so first wins)
+        assert hits["chr1"] is not None
 
 
 # ---------------------------------------------------------------------------
