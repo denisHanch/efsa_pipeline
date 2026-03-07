@@ -24,7 +24,7 @@ jobs:
             exit 0
           fi
 
-          # Enforce naming cinvention check
+          # Enforce naming convention check
           if ! [[ $BRANCH =~ ^(feature|bugfix|docs)/${ISSUE_PREFIX}-[0-9]+_.+ ]]; then
             echo "❗ Branch name is invalid. Must follow pattern:"
             echo "  (feature|bugfix|docs)/${ISSUE_PREFIX}-<number>_your_branch_name"
