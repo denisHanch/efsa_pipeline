@@ -35,8 +35,8 @@ def main():
     output_dir = config_path.parent.parent / "valid"
 
     # Setup logging,
-    log_file = output_dir / "validation.log"
-    setup_logging(console_level='DEBUG', log_file=log_file)
+    logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
+    log_file = logger.log_file
 
     # ========================================================================
     # Step 1: Read and validate config
@@ -161,6 +161,6 @@ if __name__ == '__main__':
         logger.error(f"✗ Fatal error: {e}")
         logger.debug(traceback.format_exc())
         if len(sys.argv) >= 2:
-            log_file = Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log"
-            print(f"Log file: {log_file}")
+            actual_log_file = get_logger().log_file or (Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log")
+            print(f"Log file: {actual_log_file}")
         sys.exit(1)
