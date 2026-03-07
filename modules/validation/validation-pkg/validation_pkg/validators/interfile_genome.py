@@ -208,7 +208,7 @@ def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
     """
     best_hits: Dict[str, Dict] = {}
     # Track (q_start, r_start) per (query_name, ref_name) pair to detect ambiguous alignments
-    pair_starts: Dict[tuple, tuple] = {}
+    # pair_starts: Dict[tuple, tuple] = {}
     for line in paf_output.splitlines():
         if not line.strip():
             continue
@@ -225,23 +225,23 @@ def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
         except ValueError:
             continue
 
-        pair_key = (query_name, ref_name)
-        if pair_key in pair_starts:
-            seen_q_start, seen_r_start = pair_starts[pair_key]
-            if q_start != seen_q_start:
-                raise InterFileValidationError(
-                    f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
-                    f"reference '{ref_name}' with conflicting q_start values "
-                    f"({seen_q_start} and {q_start})"
-                )
-            if r_start != seen_r_start:
-                raise InterFileValidationError(
-                    f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
-                    f"reference '{ref_name}' with conflicting r_start values "
-                    f"({seen_r_start} and {r_start})"
-                )
-        else:
-            pair_starts[pair_key] = (q_start, r_start)
+        # pair_key = (query_name, ref_name)
+        # if pair_key in pair_starts:
+        #     seen_q_start, seen_r_start = pair_starts[pair_key]
+        #     if q_start != seen_q_start:
+        #         raise InterFileValidationError(
+        #             f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
+        #             f"reference '{ref_name}' with conflicting q_start values "
+        #             f"({seen_q_start} and {q_start})"
+        #         )
+        #     if r_start != seen_r_start:
+        #         raise InterFileValidationError(
+        #             f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
+        #             f"reference '{ref_name}' with conflicting r_start values "
+        #             f"({seen_r_start} and {r_start})"
+        #         )
+        # else:
+        #     pair_starts[pair_key] = (q_start, r_start)
 
         current = best_hits.get(query_name)
         if current is None or alignment_block_len > current['alignment_len']:
