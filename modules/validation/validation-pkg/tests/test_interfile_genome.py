@@ -12,7 +12,7 @@ Tests cover:
 import pytest
 from validation_pkg.validators.interfile_genome import GenomeXGenomeSettings, genomexgenome_validation
 from validation_pkg.validators.genome_validator import GenomeOutputMetadata
-from validation_pkg.exceptions import GenomeValidationError
+from validation_pkg.exceptions import InterFileValidationError
 
 
 class TestGenomeXGenomeSettings:
@@ -24,6 +24,7 @@ class TestGenomeXGenomeSettings:
         assert settings.same_number_of_sequences is True
         assert settings.same_sequence_ids is False
         assert settings.same_sequence_lengths is False
+        assert settings.characterize is True
 
     def test_update_settings(self):
         """Test immutable update pattern."""
@@ -62,7 +63,7 @@ class TestSequenceCountValidation:
             sequence_lengths={'chr1': 5000000, 'chr2': 3000000, 'chr3': 2000000}
         )
 
-        result = genomexgenome_validation(ref_result, mod_result)
+        result = genomexgenome_validation(ref_result, mod_result, GenomeXGenomeSettings(characterize=False))
 
         assert result['passed'] is True
         assert len(result['errors']) == 0
@@ -82,7 +83,7 @@ class TestSequenceCountValidation:
             sequence_lengths={}
         )
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result)
 
         error_msg = str(exc_info.value)
@@ -109,7 +110,7 @@ class TestSequenceIDValidation:
             sequence_lengths={'chr1': 5000000, 'chr2': 3000000}
         )
 
-        settings = GenomeXGenomeSettings(same_sequence_ids=True)
+        settings = GenomeXGenomeSettings(same_sequence_ids=True, characterize=False)
         result = genomexgenome_validation(ref_result, mod_result, settings)
 
         assert result['passed'] is True
@@ -133,7 +134,7 @@ class TestSequenceIDValidation:
 
         settings = GenomeXGenomeSettings(same_sequence_ids=True)
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result, settings)
 
         error_msg = str(exc_info.value)
@@ -158,7 +159,7 @@ class TestSequenceIDValidation:
 
         settings = GenomeXGenomeSettings(same_sequence_ids=True)
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result, settings)
 
         error_msg = str(exc_info.value)
@@ -182,7 +183,7 @@ class TestSequenceIDValidation:
 
         settings = GenomeXGenomeSettings(same_sequence_ids=True)
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result, settings)
 
         error_msg = str(exc_info.value)
@@ -210,7 +211,8 @@ class TestSequenceLengthValidation:
 
         settings = GenomeXGenomeSettings(
             same_sequence_ids=True,
-            same_sequence_lengths=True
+            same_sequence_lengths=True,
+            characterize=False
         )
         result = genomexgenome_validation(ref_result, mod_result, settings)
 
@@ -238,7 +240,7 @@ class TestSequenceLengthValidation:
             same_sequence_lengths=True
         )
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result, settings)
 
         error_msg = str(exc_info.value)
@@ -267,7 +269,7 @@ class TestSequenceLengthValidation:
             same_sequence_lengths=True
         )
 
-        with pytest.raises(GenomeValidationError) as exc_info:
+        with pytest.raises(InterFileValidationError) as exc_info:
             genomexgenome_validation(ref_result, mod_result, settings)
 
         error_msg = str(exc_info.value)
@@ -290,7 +292,8 @@ class TestSequenceLengthValidation:
 
         settings = GenomeXGenomeSettings(
             same_sequence_ids=True,
-            same_sequence_lengths=True
+            same_sequence_lengths=True,
+            characterize=False
         )
 
         result = genomexgenome_validation(ref_result, mod_result, settings)
