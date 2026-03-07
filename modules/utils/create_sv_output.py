@@ -2,7 +2,7 @@
 """
 Merge SV summaries from:
   1) assembly/syri summary (required columns: chrom, start, end, svtype)
-  2) long-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score)
+  2) long-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score) both pacbio and ont
   3) short-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score)
 
 Outputs a folder with single CSV for each type of variations:
@@ -222,6 +222,81 @@ def read_tsv(path):
     return pd.read_csv(path, sep="\t", dtype=str, comment="#")
 
 
+def annotate_event_relationships(clusters):
+    """
+    Robust overlap classification using connected components.
+
+    For each (chrom, std_type):
+        - Build overlap graph
+        - Extract connected components
+        - Within each component:
+            - Longest interval = anchor
+            - Others classified relative to anchor
+            - If anchor has no other variants, label as 'isolated'
+    """
+
+    grouped = {}
+    for c in clusters:
+        grouped.setdefault((c.chrom, c.std_type), []).append(c)
+
+    relationship = {}
+
+    for key, group in grouped.items():
+
+        group = sorted(group, key=lambda c: (c.start, c.end))
+
+        adj = {id(c): [] for c in group}
+
+        for i in range(len(group)):
+            for j in range(i + 1, len(group)):
+                c1 = group[i]
+                c2 = group[j]
+
+                if c1.start <= c2.end and c1.end >= c2.start:
+                    adj[id(c1)].append(c2)
+                    adj[id(c2)].append(c1)
+
+        visited = set()
+
+        for c in group:
+            if id(c) in visited:
+                continue
+
+            stack = [c]
+            component = []
+
+            while stack:
+                node = stack.pop()
+                if id(node) in visited:
+                    continue
+                visited.add(id(node))
+                component.append(node)
+                stack.extend(adj[id(node)])
+
+            if len(component) == 1:
+                relationship[id(component[0])] = "isolated"
+                continue
+
+            anchor = max(component, key=lambda x: (x.end - x.start))
+
+            for member in component:
+                if member is anchor:
+                    if len(component) == 1:
+                        relationship[id(member)] = "isolated"
+                    else:
+                        relationship[id(member)] = f"contains_{len(component)-1}_variants"
+                elif member.start >= anchor.start and member.end <= anchor.end:
+                    relationship[id(member)] = (
+                        f"nested_in_{anchor.std_type}_{anchor.start}_{anchor.end}"
+                    )
+                else:
+                    relationship[id(member)] = (
+                        f"overlapping_with_{anchor.std_type}_{anchor.start}_{anchor.end}"
+                    )
+
+    return relationship
+
+
 def load_records(path, source):
     """Load records from a TSV file into Record objects.
 
@@ -280,10 +355,10 @@ def load_records(path, source):
     return out
 
 
-def build_output_table(clusters):
+def build_output_table(clusters, relationship_map):
     rows = []
     counters = {k: 0 for k in TAB_BY_TYPE}
-
+    
     for c in clusters:
         counters[c.std_type] += 1
         eid = f"{c.std_type}_{counters[c.std_type]}"
@@ -357,6 +432,7 @@ def build_output_table(clusters):
             "percentage_overlap": pct_str,
 
             "support_score": pipelines_confirmed,
+            "region_relationship": relationship_map.get(id(c), "isolated"),
         })
 
     return pd.DataFrame(rows)
@@ -407,7 +483,8 @@ def main():
     if not clusters:
         df = pd.DataFrame()
     else:
-        df = build_output_table(clusters)
+        relationship_map = annotate_event_relationships(clusters)
+        df = build_output_table(clusters, relationship_map)
 
     # fix scores for long_ont and long_pacbio when info_svtype present
     if "long_ont_info_svtype" in df.columns:
