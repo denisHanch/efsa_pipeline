@@ -111,6 +111,7 @@ class GenomeValidator(BaseValidator):
         allow_empty_sequences: bool = False
         allow_empty_id: bool = False
         warn_n_sequences: int = 2
+        error_n_sequences: int = 5
 
         # Editing specifications
         is_plasmid: bool = False
@@ -120,6 +121,7 @@ class GenomeValidator(BaseValidator):
         main_first: bool = False
 
         replace_id_with: Optional[str] = None
+        replace_id_with_incremental: Optional[str] = None
         min_sequence_length: int = 100
 
         def __post_init__(self):
@@ -335,6 +337,23 @@ class GenomeValidator(BaseValidator):
         """Validate parsed sequences (trust/strict modes only)."""
         self.logger.debug("Validating sequences...")
 
+        # Check error threshold for number of sequences
+        if self.settings.error_n_sequences is not None and len(self.sequences) > self.settings.error_n_sequences:
+            error_msg = (
+                f"Number of sequences ({len(self.sequences)}) exceeds maximum allowed "
+                f"({self.settings.error_n_sequences})"
+            )
+            self.logger.add_validation_issue(
+                level='ERROR',
+                category='genome',
+                message=error_msg,
+                details={
+                    'num_sequences': len(self.sequences),
+                    'error_threshold': self.settings.error_n_sequences
+                }
+            )
+            raise GenomeValidationError(error_msg)
+
         # Trust mode - validate only first sequence
         if self.validation_level == 'trust':
             self.logger.debug("Trust mode - validating first sequence only")
@@ -433,18 +452,20 @@ class GenomeValidator(BaseValidator):
                 self.logger.debug("All sequences filtered out")
                 return
 
-        # 2. Replace sequence IDs with auto-increment
+        # 2. Replace sequence IDs
         if self.settings.replace_id_with:
-            prefix = self.settings.replace_id_with
-            for idx, record in enumerate(self.sequences):
-                # Store original ID in description
+            new_id = self.settings.replace_id_with
+            for record in self.sequences:
                 record.description = f"{record.id}"
-                # First sequence: just prefix, subsequent: prefix + number (no separator)
-                if idx == 0:
-                    record.id = f"{prefix}"
-                else:
-                    record.id = f"{prefix}{idx}"
-            self.logger.debug(f"Replaced sequence IDs with '{prefix}' (auto-incremented for multiple sequences)")
+                record.id = new_id
+            self.logger.debug(f"Replaced sequence IDs with '{new_id}'")
+
+        if self.settings.replace_id_with_incremental:
+            prefix = self.settings.replace_id_with_incremental
+            for idx, record in enumerate(self.sequences):
+                record.description = f"{record.id}"
+                record.id = prefix if idx == 0 else f"{prefix}{idx}"
+            self.logger.debug(f"Replaced sequence IDs with '{prefix}' (incremental)")
 
         # 3. Handle plasmid sequences
         if self.settings.is_plasmid:
