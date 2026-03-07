@@ -26,8 +26,8 @@ subgraph REF_X_MOD["Reference vs Modified Fasta Comparison Pipeline"]
 
     %% Processes
     NUCMER["nucmer"]:::process
-    DELTA["deltaFilter"]:::process
-    SHOWCOORDS["showCoords"]:::process
+    DELTA["delta_filter"]:::process
+    SHOWCOORDS["show_coords"]:::process
     SYRI["syri"]:::process
 
     %% Output
@@ -79,8 +79,8 @@ The table below summarises all tools used within the pipeline:
 | **Tool**        | **Link for Further Information**                       |
 | --------------- | ------------------------------------------------------ |
 | **Nucmer**      | [MUMmer](https://mummer4.github.io/manual/manual.html) |
-| **deltaFilter** | [MUMmer](https://mummer4.github.io/manual/manual.html) |
-| **showCoords**  | [MUMmer](https://mummer4.github.io/manual/manual.html) |
+| **delta_filter** | [MUMmer](https://mummer4.github.io/manual/manual.html) |
+| **show_coords**  | [MUMmer](https://mummer4.github.io/manual/manual.html) |
 | **Syri**        | [SyRI GitHub](https://schneebergerlab.github.io/syri/) |
 
 
