@@ -2086,5 +2086,116 @@ class TestReadStatistics:
         assert stats['shortest_read_length'] == 0
 
 
+class TestStrictModeNgsTypeDetection:
+    """Test content-based ngs_type detection in strict mode.
+
+    When ngs_type is omitted from config and validation_level='strict', the ReadValidator
+    must detect the platform from FASTQ sequence headers after parsing the file.
+    Trust and minimal modes do not read file content, so they cannot detect.
+    """
+
+    @pytest.fixture
+    def temp_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def output_dir(self, temp_dir):
+        out_dir = temp_dir / "output"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir
+
+    def _make_config(self, fastq_path, output_dir, ngs_type, validation_level='strict'):
+        return ReadConfig(
+            filename=fastq_path.name,
+            filepath=fastq_path,
+            coding_type=CT.NONE,
+            detected_format=ReadFormat.FASTQ,
+            ngs_type=ngs_type,
+            output_dir=output_dir,
+            global_options={'validation_level': validation_level}
+        )
+
+    def test_strict_detects_ont_from_header(self, temp_dir, output_dir):
+        """Strict mode detects ONT from runid= signature in header."""
+        fastq = temp_dir / "sample.fastq"
+        fastq.write_text(
+            "@read_0001 runid=abc123 ch=140 start_time=2025-01-01T00:00:00Z\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+            "@read_0002 runid=abc123 ch=141 start_time=2025-01-01T00:00:01Z\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+        )
+        config = self._make_config(fastq, output_dir, ngs_type=None)
+        validator = ReadValidator(config)
+        result = validator.run()
+        assert result.ngs_type == 'ont'
+
+    def test_strict_detects_pacbio_from_header(self, temp_dir, output_dir):
+        """Strict mode detects PacBio from /ccs signature in header."""
+        fastq = temp_dir / "sample.fastq"
+        fastq.write_text(
+            "@m64011_190830_192920/42153018/ccs\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+            "@m64011_190830_192920/42153019/ccs\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+        )
+        config = self._make_config(fastq, output_dir, ngs_type=None)
+        validator = ReadValidator(config)
+        result = validator.run()
+        assert result.ngs_type == 'pacbio'
+
+    def test_strict_detects_illumina_from_header(self, temp_dir, output_dir):
+        """Strict mode detects Illumina from read-part suffix in header."""
+        fastq = temp_dir / "sample.fastq"
+        fastq.write_text(
+            "@NS500123:45:H7VTLBGX2:1:11101:10000:1040 1:N:0:1\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+            "@NS500123:45:H7VTLBGX2:1:11101:10000:1041 1:N:0:1\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+        )
+        config = self._make_config(fastq, output_dir, ngs_type=None)
+        validator = ReadValidator(config)
+        result = validator.run()
+        assert result.ngs_type == 'illumina'
+
+    def test_strict_overrides_wrong_configured_ngs_type(self, temp_dir, output_dir):
+        """Strict mode warns and overrides when content disagrees with configured ngs_type."""
+        fastq = temp_dir / "sample.fastq"
+        fastq.write_text(
+            "@read_0001 runid=abc123 ch=140 start_time=2025-01-01T00:00:00Z\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+        )
+        # Configured as illumina but content is ONT
+        config = self._make_config(fastq, output_dir, ngs_type='illumina')
+        validator = ReadValidator(config)
+        result = validator.run()
+        assert result.ngs_type == 'ont'
+
+    def test_strict_undetectable_headers_raises_error(self, temp_dir, output_dir):
+        """Strict mode raises ReadValidationError when ngs_type=None and headers are ambiguous."""
+        fastq = temp_dir / "sample.fastq"
+        fastq.write_text(
+            "@read1\nATCGATCG\n+\nIIIIIIII\n"
+            "@read2\nATCGATCG\n+\nIIIIIIII\n"
+        )
+        config = self._make_config(fastq, output_dir, ngs_type=None)
+        validator = ReadValidator(config)
+        with pytest.raises(ReadValidationError, match="auto-detect"):
+            validator.run()
+
+    def test_trust_mode_skips_content_detection(self, temp_dir, output_dir):
+        """Trust mode does not run content detection; ngs_type stays as configured."""
+        fastq = temp_dir / "sample.fastq"
+        fastq.write_text(
+            "@read_0001 runid=abc123 ch=140 start_time=2025-01-01T00:00:00Z\n"
+            "ATCGATCG\n+\nIIIIIIII\n"
+        )
+        # ngs_type is explicitly 'illumina', content has ONT headers — trust mode must not detect
+        config = self._make_config(fastq, output_dir, ngs_type='illumina', validation_level='trust')
+        validator = ReadValidator(config)
+        result = validator.run()
+        assert result.ngs_type == 'illumina'
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

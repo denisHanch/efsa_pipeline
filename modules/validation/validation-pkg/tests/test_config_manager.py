@@ -1033,8 +1033,12 @@ class TestConfigValidatorSettings:
         assert loaded_config.reads[0].global_options == {}
 
 
-class TestAutodetectAndOrganismProfile:
-    """Tests for ngs_type autodetection and organism_type options."""
+class TestNgsTypeRequirement:
+    """Tests for ngs_type validation at config load time.
+
+    ngs_type is required for trust/minimal modes (no file reading happens there).
+    For strict mode it may be omitted — the ReadValidator will detect it from content.
+    """
 
     @pytest.fixture
     def temp_dir(self):
@@ -1053,78 +1057,72 @@ class TestAutodetectAndOrganismProfile:
         }
         if options is not None:
             config["options"] = options
-
         cfg = temp_dir / "config.json"
         cfg.write_text(json.dumps(config, indent=2))
         return cfg
 
-    def test_ngs_type_autodetect_illumina(self, temp_dir):
+    def test_ngs_type_missing_trust_mode_raises_error(self, temp_dir):
+        """No ngs_type + trust mode → ConfigurationError at load time."""
         self._write_common_required_files(temp_dir)
-        (temp_dir / "illumina.fastq").write_text(
-            "@NS500123:45:H7VTLBGX2:1:11101:10000:1040 1:N:0:1\n"
-            "ATCGATCG\n+\nIIIIIIII\n"
-        )
+        (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
 
         cfg = self._write_config(
             temp_dir,
-            {"filename": "illumina.fastq"},
+            {"filename": "reads.fastq"},
+            options={"validation_level": "trust"},
         )
-        loaded = ConfigManager.load(str(cfg))
-        assert loaded.reads[0].ngs_type == "illumina"
+        with pytest.raises((ConfigurationError, ValueError), match="ngs_type"):
+            ConfigManager.load(str(cfg))
 
-    def test_ngs_type_autodetect_ont(self, temp_dir):
+    def test_ngs_type_missing_minimal_mode_raises_error(self, temp_dir):
+        """No ngs_type + minimal mode → ConfigurationError at load time."""
         self._write_common_required_files(temp_dir)
-        (temp_dir / "ont.fastq").write_text(
-            "@read_0001 runid=abc123 ch=140 start_time=2025-02-20T09:01:00Z\n"
-            "ATCGATCG\n+\nIIIIIIII\n"
-        )
+        (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
 
         cfg = self._write_config(
             temp_dir,
-            {"filename": "ont.fastq"},
+            {"filename": "reads.fastq"},
+            options={"validation_level": "minimal"},
         )
-        loaded = ConfigManager.load(str(cfg))
-        assert loaded.reads[0].ngs_type == "ont"
+        with pytest.raises((ConfigurationError, ValueError), match="ngs_type"):
+            ConfigManager.load(str(cfg))
 
-    def test_ngs_type_autodetect_pacbio(self, temp_dir):
+    def test_ngs_type_missing_strict_mode_allows_none(self, temp_dir):
+        """No ngs_type + strict mode → loads OK with ngs_type=None (deferred detection)."""
         self._write_common_required_files(temp_dir)
-        (temp_dir / "pacbio.fastq").write_text(
-            "@m64011_190830_192920/42153018/ccs\n"
-            "ATCGATCG\n+\nIIIIIIII\n"
-        )
+        (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
 
         cfg = self._write_config(
             temp_dir,
-            {"filename": "pacbio.fastq"},
+            {"filename": "reads.fastq"},
+            options={"validation_level": "strict"},
         )
         loaded = ConfigManager.load(str(cfg))
-        assert loaded.reads[0].ngs_type == "pacbio"
+        assert loaded.reads[0].ngs_type is None
 
-    def test_ngs_type_filename_fallback_for_ont(self, temp_dir):
+    def test_ngs_type_missing_default_level_is_strict_allows_none(self, temp_dir):
+        """No ngs_type, no validation_level option (default=strict) → loads OK."""
         self._write_common_required_files(temp_dir)
-        (temp_dir / "sample_ont.fastq").write_text(
-            "@read_without_platform_signature\n"
-            "ATCGATCG\n+\nIIIIIIII\n"
-        )
+        (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
 
         cfg = self._write_config(
             temp_dir,
-            {"filename": "sample_ont.fastq"},
+            {"filename": "reads.fastq"},
         )
         loaded = ConfigManager.load(str(cfg))
-        assert loaded.reads[0].ngs_type == "ont"
+        assert loaded.reads[0].ngs_type is None
 
-    def test_ngs_type_autodetect_bam_defaults_pacbio(self, temp_dir):
+    def test_ngs_type_invalid_value_still_errors(self, temp_dir):
+        """Explicitly invalid ngs_type value → ValueError regardless of mode."""
         self._write_common_required_files(temp_dir)
-        (temp_dir / "reads.bam").write_text("not-a-real-bam\n")
+        (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
 
         cfg = self._write_config(
             temp_dir,
-            {"filename": "reads.bam"},
+            {"filename": "reads.fastq", "ngs_type": "454"},
         )
-        loaded = ConfigManager.load(str(cfg))
-        assert loaded.reads[0].detected_format == ReadFormat.BAM
-        assert loaded.reads[0].ngs_type == "pacbio"
+        with pytest.raises((ConfigurationError, ValueError), match="Invalid ngs_type"):
+            ConfigManager.load(str(cfg))
 
 class TestSecurityPathTraversal:
     """Security tests for path traversal protection."""

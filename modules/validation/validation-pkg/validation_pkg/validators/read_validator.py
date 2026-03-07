@@ -225,9 +225,9 @@ class ReadValidator(BaseValidator):
         # Validator-specific data
         self.sequences = []  # List of SeqRecord objects
 
-        # Apply outdir_by_ngs_type if enabled
-        if self.settings.outdir_by_ngs_type:
-            # Override output_subdir_name with ngs_type
+        # Apply outdir_by_ngs_type if enabled and ngs_type is already known
+        # (when ngs_type is None it will be auto-detected in strict mode and applied later)
+        if self.settings.outdir_by_ngs_type and self.read_config.ngs_type:
             self.settings = self.settings.update(output_subdir_name=self.read_config.ngs_type)
             self.logger.debug(f"Applied outdir_by_ngs_type: output_subdir_name set to '{self.read_config.ngs_type}'")
 
@@ -338,7 +338,7 @@ class ReadValidator(BaseValidator):
         input_path: Optional[Path] = None
     ) -> str:
         """Build output filename with Illumina pattern detection for reads."""
-        # Detect Illumina pattern if ngs_type is illumina
+        # Detect Illumina pattern if ngs_type is illumina (skip when ngs_type not yet known)
         if self.read_config.ngs_type == 'illumina':
             self._detect_illumina_pattern(input_filename)
 
@@ -526,6 +526,10 @@ class ReadValidator(BaseValidator):
                 raise ReadValidationError(error_msg)
 
             self.logger.info(f"✓ Parsed {len(self.sequences):,} sequence(s)")
+
+        # Strict mode: detect (or confirm) ngs_type from actual sequence headers
+        if self.validation_level == 'strict':
+            self._update_ngs_type_from_content()
 
         except FileFormatError:
             raise
@@ -945,6 +949,62 @@ class ReadValidator(BaseValidator):
 
         return self.output_path
     
+    def _detect_ngs_type_from_content(self, n_sample: int = 20) -> Optional[str]:
+        """Detect NGS platform from FASTQ header signatures (strict mode only).
+
+        Samples the first n_sample parsed records and uses majority vote.
+        Returns the detected platform string, or None if no signatures found.
+        """
+        votes: dict = {'illumina': 0, 'ont': 0, 'pacbio': 0}
+        sample = self.sequences[:n_sample]
+
+        for record in sample:
+            # BioPython stores the description as everything after the first space in the header
+            header = (record.id + ' ' + record.description).lower()
+
+            if any(t in header for t in ('runid=', 'ch=', 'start_time=', 'flow_cell_id=')):
+                votes['ont'] += 1
+            elif any(t in header for t in ('/ccs', 'movie=', 'zmw')):
+                votes['pacbio'] += 1
+            elif any(t in header for t in (' 1:n:', ' 2:n:', ' 1:y:', ' 2:y:')):
+                votes['illumina'] += 1
+
+        total = sum(votes.values())
+        if total == 0:
+            return None
+
+        winner = max(votes, key=lambda k: votes[k])
+        return winner
+
+    def _update_ngs_type_from_content(self) -> None:
+        """Detect ngs_type from parsed sequences and update read_config (strict mode only)."""
+        detected = self._detect_ngs_type_from_content()
+        original = self.read_config.ngs_type
+
+        if detected is None and original is None:
+            raise ReadValidationError(
+                "Could not auto-detect ngs_type from sequence headers. "
+                "Please specify 'ngs_type' in your config."
+            )
+
+        if detected is not None:
+            if original is not None and detected != original:
+                self.logger.warning(
+                    f"Content-based detection found ngs_type='{detected}', "
+                    f"overriding configured value '{original}'"
+                )
+            elif original is None:
+                self.logger.info(f"Auto-detected ngs_type='{detected}' from sequence headers")
+            else:
+                self.logger.debug(f"Content detection confirmed ngs_type='{detected}'")
+
+            self.read_config.ngs_type = detected
+
+            # Rebuild output path now that ngs_type is known
+            if self.settings.outdir_by_ngs_type:
+                self.settings = self.settings.update(output_subdir_name=detected)
+                self.output_path = self._build_output_path()
+
     def _detect_illumina_pattern(self, filename: str) -> None:
         """Detect Illumina paired-end naming patterns in filename."""
 
