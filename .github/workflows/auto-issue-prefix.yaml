@@ -11,7 +11,7 @@ jobs:
       - name: Prefix issue title
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_token }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const prefix = "${{ vars.PROJECT_PREFIX }}";
             const issueNumber = context.issue.number;
