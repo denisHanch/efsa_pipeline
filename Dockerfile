@@ -35,6 +35,19 @@ RUN apk add --no-cache build-base bzip2-dev && \
     rm -rf /tmp/pbzip2* && \
     apk del build-base bzip2-dev
 
+# Build and install minimap2 from source (not available in Alpine repos, prebuilt binaries require glibc)
+RUN apk add --no-cache --virtual .minimap2-build-deps \
+        build-base \
+        zlib-dev \
+    && cd /tmp \
+    && curl -L https://github.com/lh3/minimap2/archive/refs/tags/v2.28.tar.gz | tar -xzf - \
+    && cd minimap2-2.28 \
+    && make \
+    && cp minimap2 /usr/local/bin/ \
+    && cd / \
+    && rm -rf /tmp/minimap2-2.28 \
+    && apk del .minimap2-build-deps
+
 # Build and install gffread from source (not available in Alpine repos)
 RUN apk add --no-cache --virtual .gffread-build-deps \
         build-base \

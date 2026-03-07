@@ -67,7 +67,7 @@ workflow {
         
         ref_mod(ref_fasta, mod_fasta)
     
-        sv_tbl = ref_mod.out.sv_tbl
+        sv_tbl = sv_tbl.mix(ref_mod.out.sv_tbl) 
         activePipelines << ref_mod.out.sv_vcf
     
     } else {

@@ -32,8 +32,8 @@ workflow mapping {
     main:
         bwa_mapping(fasta, fasta_index, trimmed, out_folder_name) | set { sam } 
         samtools_sort(sam, out_folder_name) | set { bam }
-        samtool_stats(bam, out_folder_name) | set { stats_out }
-        samtool_index_bam(bam, out_folder_name) | set { indexed_bam }
+        samtools_stats(bam, out_folder_name) | set { stats_out }
+        samtools_index_bam(bam, out_folder_name) | set { indexed_bam }
         picard(fasta, indexed_bam, out_folder_name) | set { picard_out }
         
         picard_out.collect() | set { qc_out }
@@ -96,7 +96,7 @@ workflow mapping_long {
     main:
         minimap2(fastqs, fasta, mapping_tag, out_folder_name) | set { sam }
         samtools_sort(sam, out_folder_name) | set { sorted_bam }
-        samtool_index_bam(sorted_bam, out_folder_name) | set { indexed_bam }
+        samtools_index_bam(sorted_bam, out_folder_name) | set { indexed_bam }
 
     emit:
         indexed_bam

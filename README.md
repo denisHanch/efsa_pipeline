@@ -561,15 +561,15 @@ If the percentage of unmapped reads is unusually high, this may indicate:
 The Nextflow pipelines ran successfully and produced the expected outputs. Each step completed without errors:
 
 ```text
-✅ The reference to modified fasta comparision processing pipeline completed successfully.
+✅ The ref_mod processing pipeline completed successfully.
 
-✅ The long-ref processing pipeline completed successfully.
+✅ The long-read processing pipeline completed successfully.
 
-✅ The short-ref processing pipeline completed successfully.
+✅ The short-read processing pipeline completed successfully.
 
 ✅ Truvari: the comparison of vcf files finished successfully.
 
-✅ Execution of main.nf processing pipeline completed successfully.
+✅ The execution of main.nf processing pipeline completed successfully.
 ```
 
 
@@ -675,8 +675,8 @@ subgraph REF_X_MOD["Reference vs Modified Fasta Comparison Pipeline"]
 
     %% Processes
     NUCMER["nucmer"]:::process
-    DELTA["deltaFilter"]:::process
-    SHOWCOORDS["showCoords"]:::process
+    DELTA["delta_filter"]:::process
+    SHOWCOORDS["show_coords"]:::process
     SYRI["syri"]:::process
 
     %% Output
@@ -725,8 +725,8 @@ The table below summarises all tools used within the pipeline:
 | **Tool**        | **Link for Further Information**                       |
 | --------------- | ------------------------------------------------------ |
 | **Nucmer**      | [MUMmer](https://mummer4.github.io/manual/manual.html) |
-| **deltaFilter** | [MUMmer](https://mummer4.github.io/manual/manual.html) |
-| **showCoords**  | [MUMmer](https://mummer4.github.io/manual/manual.html) |
+| **delta_filter** | [MUMmer](https://mummer4.github.io/manual/manual.html) |
+| **show_coords**  | [MUMmer](https://mummer4.github.io/manual/manual.html) |
 | **Syri**        | [SyRI GitHub](https://schneebergerlab.github.io/syri/) |
 
 
@@ -1161,7 +1161,7 @@ The table below summarises all tools used within the pipeline:
 
 ### `truvari/`
 
-The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is outputed by  pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sortVcf), indexing them (indexVcf), and then performing the Truvari comparison to generate the final comparison results.
+The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is outputed by  pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sort_vcf), indexing them (index_vcf), and then performing the Truvari comparison to generate the final comparison results.
 
 ```mermaid
 %%{init: {
@@ -1187,8 +1187,8 @@ subgraph Truvari_Comparision_Pipeline["Truvari Comparison Pipeline"]
     IL_VCF["Illumina VCF"]:::input
 
     %% Processes
-    SORT_VCF["sortVcf"]:::process
-    INDEX_VCF["indexVcf"]:::process
+    SORT_VCF["sort_vcf"]:::process
+    INDEX_VCF["index_vcf"]:::process
     TRUVARI["truvari"]:::process
 
     %% Output

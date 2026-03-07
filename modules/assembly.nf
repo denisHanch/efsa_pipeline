@@ -1,7 +1,6 @@
 params.workflow_id = "fasta_ref_mod"
 
 process nucmer {
-    container params.containers.mummer
     publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
 
     input:
@@ -20,8 +19,7 @@ process nucmer {
 
 }
 
-process deltaFilter {
-    container params.containers.mummer
+process delta_filter {
     publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
 
     input:
@@ -37,8 +35,7 @@ process deltaFilter {
 }
 
 
-process showCoords {
-    container params.containers.mummer
+process show_coords {
     publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
 
     input:
@@ -57,7 +54,6 @@ process showCoords {
 }
 
 process syri {
-    container params.containers.syri
     publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
 
 

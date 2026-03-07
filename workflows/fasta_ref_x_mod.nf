@@ -20,6 +20,7 @@ include { nucmer; deltaFilter; showCoords; syri } from "../modules/assembly.nf"
 include { logWorkflowCompletion; listFiles } from "../modules/logs.nf"
 include { vcf_to_table_asm; create_empty_tbl } from "../modules/sv_calling.nf"
 
+def executed = false
 
 workflow ref_mod {
     take:
@@ -68,4 +69,12 @@ workflow {
 }
 
 
-// logWorkflowCompletion("reference to modified fasta comparision")
+workflow.onComplete {
+    if (executed) {
+        if (workflow.success) {
+            log.info "✅ The ref_mod processing pipeline completed successfully.\n"
+        } else {
+            log.error "❌ The ref_mod processing pipeline failed: ${workflow.errorReport}"
+        }
+    }
+}
