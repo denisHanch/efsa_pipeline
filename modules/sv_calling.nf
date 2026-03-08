@@ -216,7 +216,6 @@ process vcf_to_table_asm {
 
 process vcf_to_table_short {
 
-    container params.containers.bcftools
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
 
     input:

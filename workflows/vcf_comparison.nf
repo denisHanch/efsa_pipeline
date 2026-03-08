@@ -37,6 +37,11 @@ workflow truvari_comparison {
             others:  it[0] != "assembly"
         }
 
+        split_ch.assembly.ifEmpty {
+            log.warn "No assembly VCF found (highly likely due to multiple contigs) — Truvari comparison will be skipped."
+        }
+
+
         assembly_vcfs = split_ch.assembly.collect()
         vcf_pairs_ch  = assembly_vcfs.combine(split_ch.others)
 
