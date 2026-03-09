@@ -50,8 +50,10 @@ workflow ref_mod {
         
         if (contig_files.size() == 1) {
             sv_vcf | vcf_to_table_asm | set { sv_tbl }
-        } else {
+        } else if (contig_files.size() > 1) {
             create_empty_tbl("assembly") | set { sv_tbl }
+        } else {
+            log.error "No contig FASTA files found in ${params.in_dir}. Please rerun the pipeline with --run_syri false"
         }
         
 

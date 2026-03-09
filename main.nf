@@ -156,12 +156,13 @@ workflow {
         sv_tbl = sv_tbl.mix(create_short_tbl("short"))
     }
 
-    if (params.run_truvari && activePipelines.size() >= 2 && params.run_syri) {
+    if (params.run_truvari && activePipelines.size() >= 2 && params.run_syri && contigs_files.size() == 1) {
         int comparisons = activePipelines.size() - 1
         String plural = comparisons == 1 ? "" : "s"
         log.info "ℹ️ Truvari: performing ${comparisons} comparison${plural}.\n"
         
         vcfs = activePipelines.inject(Channel.empty()) { acc, ch -> acc.mix(ch)}
+        
         truvari_comparison(ref_fasta, vcfs)
     }
     
