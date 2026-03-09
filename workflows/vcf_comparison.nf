@@ -27,7 +27,7 @@ workflow truvari_comparison {
         vcfs_ch
 
     main:
-        executed = true
+
         // Sorting and indexing VCFs
         sort_vcf(vcfs_ch) | index_vcf | set { indexed_vcfs }
 
@@ -38,15 +38,16 @@ workflow truvari_comparison {
         }
 
         split_ch.assembly.ifEmpty {
-            log.warn "No assembly VCF found (highly likely due to multiple contigs) — Truvari comparison will be skipped."
+            log.error "❌ No assembly VCF found (highly likely due to multiple contigs) — truvari vcf comparison will be skipped."
         }
 
-
+        
         assembly_vcfs = split_ch.assembly.collect()
         vcf_pairs_ch  = assembly_vcfs.combine(split_ch.others)
 
         // Run Truvari comparison
         truvari(ref_fasta, vcf_pairs_ch)
+        executed = true
 }
 
 workflow.onComplete {
@@ -54,7 +55,7 @@ workflow.onComplete {
  if (workflow.success) {
         log.info "✅ Truvari: the comparison of vcf files finished successfully.\n"
     } else {
-        log.err "❌ Truvari: the comparison of vcf files failed.\n"
-    }
+        log.error "❌ Truvari: the comparison of vcf files failed.\n"
+        }
     }
 }
