@@ -53,6 +53,7 @@ workflow {
     def mod_fasta_avail = !file("${params.in_dir}").listFiles()?.findAll { it.name ==~ /.*(assembled_genome|mod)\.(fa|fna|fasta)$/ }.isEmpty()
 
     def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
+    def contigs_files = listFiles("${params.in_dir}", ".*_contig_.*\\.(fa|fna|fasta)")
 
     def ref_plasmid = listFiles("${params.in_dir}", ".*ref_plasmid\\.(fa|fna|fasta)")
     def mod_plasmid = listFiles("${params.in_dir}", ".*mod_plasmid\\.(fa|fna|fasta)")
@@ -66,8 +67,13 @@ workflow {
 
     // reference to modified fasta comparison - assembly pipeline
     if (params.run_syri) {
-        
-        ref_mod(ref_fasta, contigs_ch)
+        if (contigs_files.size() > 1) {
+            ref_mod(ref_fasta, contigs_ch)
+        } else if (contigs_files.size() == 1) {
+            ref_mod(ref_fasta, mod_fasta)
+        } else {
+            log.error "No contig FASTA files found in ${params.in_dir}. Please rerun the pipeline with --run_syri false"}
+       
     
         sv_tbl = sv_tbl.mix(ref_mod.out.sv_tbl) 
         activePipelines << ref_mod.out.sv_vcf
@@ -153,10 +159,9 @@ workflow {
     if (params.run_truvari && activePipelines.size() >= 2 && params.run_syri) {
         int comparisons = activePipelines.size() - 1
         String plural = comparisons == 1 ? "" : "s"
-        log.info "ℹ️  Truvari: performing ${comparisons} comparison${plural}.\n"
+        log.info "ℹ️ Truvari: performing ${comparisons} comparison${plural}.\n"
         
         vcfs = activePipelines.inject(Channel.empty()) { acc, ch -> acc.mix(ch)}
-        vcfs.view()
         truvari_comparison(ref_fasta, vcfs)
     }
     

@@ -33,15 +33,15 @@ workflow truvari_comparison {
 
         // Preprocessing channel for Truvari input
         split_ch = indexed_vcfs.branch {
-            assembly: it[0] == "assembly"
-            others:  it[0] != "assembly"
+            assembly: it[0].endsWith('mod')
+            others:  !it[0].endsWith('mod')
         }
 
         split_ch.assembly.ifEmpty {
-            log.error "❌ No assembly VCF found (highly likely due to multiple contigs) — truvari vcf comparison will be skipped."
+            log.error "❌ No assembly VCF found (due to multiple contigs in the assembly) — truvari vcf comparison will be skipped."
         }
 
-        
+    
         assembly_vcfs = split_ch.assembly.collect()
         vcf_pairs_ch  = assembly_vcfs.combine(split_ch.others)
 
@@ -53,7 +53,7 @@ workflow truvari_comparison {
 workflow.onComplete {
     if (executed) {
  if (workflow.success) {
-        log.info "✅ Truvari: the comparison of vcf files finished successfully.\n"
+        log.info "✅ Truvari: the pipeline was executed successfully.\n"
     } else {
         log.error "❌ Truvari: the comparison of vcf files failed.\n"
         }
