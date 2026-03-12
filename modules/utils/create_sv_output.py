@@ -14,8 +14,12 @@ many unrelated smaller calls.
 
 Within each event, at most one record per source is chosen (best by supporting_reads then score).
 
+A second pass can optionally add cross-type links between final events that have the same genomic
+coordinates in different SV-type tables. By default this uses exact event_start/event_end matches.
+Set --cross_type_tol to a small positive integer to allow near-identical coordinates.
+
 Usage:
-    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10
+    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10 --cross_type_tol 0
 
 Any of the inputs may be omitted; the script will process whichever of the assembly, long_ont,
 long_pacbio or short tables are provided. Long-read inputs (ONT and PacBio) are treated
@@ -27,10 +31,10 @@ import argparse
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 # ----------------------------
@@ -132,7 +136,6 @@ class Record:
     supporting_methods: Optional[str] = None
 
 
-
 @dataclass
 class EventCluster:
     chrom: str
@@ -217,7 +220,6 @@ def choose_best_record(recs):
     return max(recs, key=key)
 
 
-
 def read_tsv(path):
     return pd.read_csv(path, sep="\t", dtype=str, comment="#")
 
@@ -241,7 +243,7 @@ def annotate_event_relationships(clusters):
 
     relationship = {}
 
-    for key, group in grouped.items():
+    for _, group in grouped.items():
 
         group = sorted(group, key=lambda c: (c.start, c.end))
 
@@ -281,10 +283,7 @@ def annotate_event_relationships(clusters):
 
             for member in component:
                 if member is anchor:
-                    if len(component) == 1:
-                        relationship[id(member)] = "isolated"
-                    else:
-                        relationship[id(member)] = f"contains_{len(component)-1}_variants"
+                    relationship[id(member)] = f"contains_{len(component)-1}_variants"
                 elif member.start >= anchor.start and member.end <= anchor.end:
                     relationship[id(member)] = (
                         f"nested_in_{anchor.std_type}_{anchor.start}_{anchor.end}"
@@ -358,18 +357,14 @@ def load_records(path, source):
 def build_output_table(clusters, relationship_map):
     rows = []
     counters = {k: 0 for k in TAB_BY_TYPE}
-    
+
     for c in clusters:
         counters[c.std_type] += 1
         eid = f"{c.std_type}_{counters[c.std_type]}"
 
         by_src = {"asm": [], "long_ont": [], "long_pacbio": [], "short": []}
         for m in c.members:
-            src = m.source
-            if src not in by_src:
-                by_src.setdefault(src, []).append(m)
-            else:
-                by_src[src].append(m)
+            by_src.setdefault(m.source, []).append(m)
 
         asm = choose_best_record(by_src.get("asm", []))
         long_ont = choose_best_record(by_src.get("long_ont", []))
@@ -377,7 +372,6 @@ def build_output_table(clusters, relationship_map):
         sht = choose_best_record(by_src.get("short", []))
         pipelines_confirmed = sum(x is not None for x in (asm, long_ont, long_pacbio, sht))
 
-        # format percentage overlaps collected during clustering into a human-friendly string
         percs = getattr(c, "percentage_overlaps", []) or []
         if percs:
             def fmt(p):
@@ -404,7 +398,7 @@ def build_output_table(clusters, relationship_map):
             "asm_start": asm.start if asm else np.nan,
             "asm_end": asm.end if asm else np.nan,
             "asm_svtype_raw": asm.raw_svtype if asm else "",
-            "asm_score" : 1,
+            "asm_score": 1,
 
             "long_ont_start": long_ont.start if long_ont else np.nan,
             "long_ont_end": long_ont.end if long_ont else np.nan,
@@ -429,13 +423,117 @@ def build_output_table(clusters, relationship_map):
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
             "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
-            "percentage_overlap": pct_str,
 
+            "percentage_overlap": pct_str,
             "support_score": pipelines_confirmed,
             "region_relationship": relationship_map.get(id(c), "isolated"),
         })
 
     return pd.DataFrame(rows)
+
+
+def _format_cross_type_link(event_id, std_svtype, chrom, start, end, relation):
+    return f"{event_id} ({std_svtype}, {chrom}:{start}-{end}, {relation})"
+
+
+def annotate_cross_type_connections(df, coord_tol=0):
+    """
+    Add links between final per-type rows that represent the same coordinates in different SV-type tables.
+
+    Matching rule:
+      - same chrom
+      - different std_svtype
+      - abs(event_start difference) <= coord_tol
+      - abs(event_end difference) <= coord_tol
+
+    With coord_tol == 0 this is an exact coordinate match.
+    """
+    df = df.copy()
+
+    if df.empty:
+        df["linked_event"] = pd.Series(dtype=str)
+        return df
+
+    coord_tol = max(int(coord_tol or 0), 0)
+    link_map = {idx: [] for idx in df.index}
+
+    if coord_tol == 0:
+        grouped = df.groupby(["chrom", "event_start", "event_end"], dropna=False, sort=False)
+        for _, group in grouped:
+            if len(group) < 2:
+                continue
+
+            rows = group[["event_id", "std_svtype", "chrom", "event_start", "event_end"]].to_dict("records")
+            if len({row["std_svtype"] for row in rows}) < 2:
+                continue
+
+            group_index = list(group.index)
+            for i, row_i in enumerate(rows):
+                for j, row_j in enumerate(rows):
+                    if i == j or row_i["std_svtype"] == row_j["std_svtype"]:
+                        continue
+                    link_map[group_index[i]].append(
+                        _format_cross_type_link(
+                            row_j["event_id"],
+                            row_j["std_svtype"],
+                            row_j["chrom"],
+                            int(row_j["event_start"]),
+                            int(row_j["event_end"]),
+                            "exact_coordinates",
+                        )
+                    )
+    else:
+        for chrom, group in df.groupby("chrom", sort=False):
+            group = group.sort_values(["event_start", "event_end", "std_svtype", "event_id"]).copy()
+            rows = list(group[["event_id", "std_svtype", "chrom", "event_start", "event_end"]].itertuples())
+
+            for i in range(len(rows)):
+                left = rows[i]
+                for j in range(i + 1, len(rows)):
+                    right = rows[j]
+                    if right.event_start - left.event_start > coord_tol:
+                        break
+                    if left.std_svtype == right.std_svtype:
+                        continue
+                    if abs(int(left.event_end) - int(right.event_end)) > coord_tol:
+                        continue
+
+                    relation = f"same_coordinates_within_{coord_tol}bp"
+                    link_map[group.index[i]].append(
+                        _format_cross_type_link(
+                            right.event_id,
+                            right.std_svtype,
+                            chrom,
+                            int(right.event_start),
+                            int(right.event_end),
+                            relation,
+                        )
+                    )
+                    link_map[group.index[j]].append(
+                        _format_cross_type_link(
+                            left.event_id,
+                            left.std_svtype,
+                            chrom,
+                            int(left.event_start),
+                            int(left.event_end),
+                            relation,
+                        )
+                    )
+
+    def _dedupe_keep_order(items):
+        seen = set()
+        out = []
+        for item in items:
+            if item not in seen:
+                seen.add(item)
+                out.append(item)
+        return out
+
+    df["linked_event"] = [
+        "; ".join(_dedupe_keep_order(link_map[idx]))
+        for idx in df.index
+    ]
+    return df
 
 
 def write_csv_tables(df, outdir):
@@ -461,8 +559,15 @@ def main():
     p.add_argument("--long_pacbio", dest="long_pacbio")
     p.add_argument("--short", dest="short_reads")
     p.add_argument("--out", required=True, help="Output directory")
-    p.add_argument("--tol", type=int, default=10)
+    p.add_argument("--tol", type=int, default=10, help="Within-type clustering tolerance in bp")
+    p.add_argument(
+        "--cross_type_tol",
+        type=int,
+        default=0,
+        help="Tolerance in bp for linking final events across different SV-type tables. 0 = exact coordinates only.",
+    )
     args = p.parse_args()
+
     records = []
     records += load_records(args.asm, "asm")
 
@@ -486,13 +591,14 @@ def main():
         relationship_map = annotate_event_relationships(clusters)
         df = build_output_table(clusters, relationship_map)
 
-    # fix scores for long_ont and long_pacbio when info_svtype present
     if "long_ont_info_svtype" in df.columns:
         mask = df["long_ont_info_svtype"].notna() & (df["long_ont_info_svtype"] != "")
         df.loc[mask, "long_ont_score"] = df.loc[mask, "long_ont_score"].fillna(0)
     if "long_pacbio_info_svtype" in df.columns:
         mask = df["long_pacbio_info_svtype"].notna() & (df["long_pacbio_info_svtype"] != "")
         df.loc[mask, "long_pacbio_score"] = df.loc[mask, "long_pacbio_score"].fillna(0)
+
+    df = annotate_cross_type_connections(df, args.cross_type_tol)
 
     write_csv_tables(df, args.out)
 
