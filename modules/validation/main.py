@@ -22,6 +22,9 @@ from validation_pkg import (
 
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+import nextflow_schema as nf_schema
+
 def main():
     # Check command line arguments
     if len(sys.argv) < 2:
@@ -154,6 +157,18 @@ def main():
 
     report.flush(format='text')
     print(f"Log file: {log_file}")
+
+    # ========================================================================
+    # Step 4: Generate nextflow_schema.json with validation results
+    # ========================================================================
+    validation_results = {
+        "ref_genome": ref_genome_res,
+        "mod_genome": mod_genome_res,
+    }
+    schema = nf_schema.build_schema(validation_results)
+    project_root = Path(__file__).resolve().parent.parent.parent
+    nf_schema.write_schema(schema, project_root / "nextflow_schema.json")
+
     return 0
 
 
