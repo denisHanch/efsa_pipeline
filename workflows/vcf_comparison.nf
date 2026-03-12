@@ -21,17 +21,15 @@ include { sort_vcf; index_vcf; truvari } from '../modules/variant_calling.nf'
 
 workflow truvari_comparison {
 
-    // Inputs
     take:
         ref_fasta
         vcfs_ch
 
     main:
         executed = true
-        // Sorting and indexing VCFs
+
         sort_vcf(vcfs_ch) | index_vcf | set { indexed_vcfs }
 
-        // Preprocessing channel for Truvari input
         split_ch = indexed_vcfs.branch {
             assembly: it[0].endsWith('mod')
             others:  !it[0].endsWith('mod')
@@ -40,7 +38,6 @@ workflow truvari_comparison {
         assembly_vcfs = split_ch.assembly.collect()
         vcf_pairs_ch  = assembly_vcfs.combine(split_ch.others)
 
-        // Run Truvari comparison
         truvari(ref_fasta, vcf_pairs_ch)
 }
 

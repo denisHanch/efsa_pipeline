@@ -1,7 +1,7 @@
 params.workflow_id = "fasta_ref_mod"
 
 process nucmer {
-    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
+    publishDir "${params.out_dir}/${params.workflow_id}/${prefix}", mode: "copy"
 
     input:
     tuple val(prefix), path(ref), path(mod)
@@ -20,7 +20,7 @@ process nucmer {
 }
 
 process delta_filter {
-    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
+    publishDir "${params.out_dir}/${params.workflow_id}/${prefix}", mode: "copy"
 
     input:
     tuple val(prefix), path(delta)
@@ -36,7 +36,7 @@ process delta_filter {
 
 
 process show_coords {
-    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
+    publishDir "${params.out_dir}/${params.workflow_id}/${prefix}", mode: "copy"
 
     input:
     tuple val(prefix), path(filtered_delta)
@@ -68,5 +68,38 @@ process syri {
     script:
     """
     syri -c $coords -d $filtered_delta  -r $ref -q $mod --prefix ${prefix} --nosnp
+    """
+}
+
+process bgzip_tabix {
+    publishDir "${params.out_dir}/${params.workflow_id}/${prefix}", mode: "copy"
+
+    input:
+    tuple val(prefix), path(vcf)
+
+    output:
+    tuple val(prefix), path("${prefix}.vcf.gz"), path("${prefix}.vcf.gz.tbi")
+
+    script:
+    """
+    bgzip -c $vcf > ${prefix}.vcf.gz
+    tabix -p vcf ${prefix}.vcf.gz
+    """
+}
+
+
+process bcftools_concat {
+    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
+
+    input:
+    path(sv_vcf)
+    path(tbis)
+
+    output:
+    tuple val('assembly'), path("assembly_concat.vcf")
+
+    script:
+    """
+    bcftools concat -a -O v -o assembly_concat.vcf *.gz
     """
 }

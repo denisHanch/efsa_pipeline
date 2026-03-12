@@ -7,7 +7,6 @@
            reference, call structural variants (SVs) for long-read runs, and convert SV VCFs
            to tabular summaries.
 
-  Contract:
   - Inputs:
       - Channel of long-read FASTQ files (e.g., from params.in_dir/ont or /pacbio)
       - Channel of reference FASTA to map against

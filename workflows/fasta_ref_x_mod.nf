@@ -5,7 +5,7 @@
   Purpose: Compare a reference FASTA to a modified/assembled FASTA, run nucmer -> deltaFilter -> show-coords -> syri,
            and convert resulting SV VCFs to TSV summary tables.
 
-  Contract:
+
   - Inputs:
       - Channel of reference fasta (globbed from params.in_dir)
       - Channel of modified/assembled fasta (globbed from params.in_dir)
@@ -16,7 +16,7 @@
       - For each reference/modified pair, produce a VCF and a corresponding TSV summary.
 */
 
-include { nucmer; delta_filter; show_coords; syri } from "../modules/assembly.nf"
+include { nucmer; delta_filter; show_coords; syri; bcftools_concat; bgzip_tabix } from "../modules/assembly.nf"
 include { logWorkflowCompletion; listFiles } from "../modules/logs.nf"
 include { vcf_to_table_asm; create_empty_tbl } from "../modules/sv_calling.nf"
 
@@ -48,26 +48,17 @@ workflow ref_mod {
 
         syri(syri_input_ch) | set { sv_vcf }
         
-        if (contig_files.size() == 1) {
-            sv_vcf | vcf_to_table_asm | set { sv_tbl }
-        } else if (contig_files.size() > 1) {
-            create_empty_tbl("assembly") | set { sv_tbl }
-        } else {
-            log.error "No contig FASTA files found in ${params.in_dir}. Please rerun the pipeline with --run_syri false"
-        }
-        
+        bgzip_tabix(sv_vcf) | set { sv_vcf_bgz }
+
+        vcfs = sv_vcf_bgz.map { prefix, vcf, tbi -> vcf }.collect()
+
+        tbis = sv_vcf_bgz.map { prefix, vcf, tbi -> tbi }.collect()
+
+        bcftools_concat(vcfs, tbis) | vcf_to_table_asm | set { sv_tbl }
 
     emit: 
         sv_vcf
         sv_tbl
-}
-
-workflow {
-    def ref_fasta = Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true)
-
-    def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
-
-    ref_mod(ref_fasta, contigs_ch)
 }
 
 
