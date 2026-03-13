@@ -2,9 +2,6 @@
 
 // Processes for short-read pipeline
 
-/*
- * Index the genome
-*/
 process bwa_index {
     tag "$fasta_file"
     publishDir "${params.out_dir}/${out_folder_name}/bwa_index", mode: "copy"
@@ -23,10 +20,6 @@ process bwa_index {
 }
 
 
-
-/*
- * Mapping reads to the genome
-*/
 process bwa_mapping {
     tag "$pair_id"
 
@@ -47,9 +40,6 @@ process bwa_mapping {
 
 
 
-/*
- * Indexing BAM file
-*/
 process samtools_index_bam {
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/bam", mode: "copy"
@@ -68,9 +58,6 @@ process samtools_index_bam {
 }
 
 
-/*
- * Running picard to get mapping statistics
-*/
 process picard {
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/picard", mode: "copy"
@@ -93,10 +80,6 @@ process picard {
 }
 
 
-
-/*
- * Running samtools stats to get mapping statistics
-*/
 process samtools_stats {
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/samtools_stats", mode: "copy"
@@ -117,9 +100,6 @@ process samtools_stats {
 
 // Processes for long-read pipeline
 
-/*
- * Map long reads
-*/
 process minimap2 {
     tag "$pair_id"
 
@@ -139,9 +119,7 @@ process minimap2 {
     """
 }
 
-/*
- * Sort reads with samtools
-*/
+
 process samtools_sort {
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/bam", mode: "copy"

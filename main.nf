@@ -52,6 +52,9 @@ workflow {
 
     def mod_fasta_avail = !file("${params.in_dir}").listFiles()?.findAll { it.name ==~ /.*(assembled_genome|mod)\.(fa|fna|fasta)$/ }.isEmpty()
 
+    def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
+    def contigs_files = listFiles("${params.in_dir}", ".*_contig_.*\\.fasta")
+
     def ref_plasmid = listFiles("${params.in_dir}", ".*ref_plasmid\\.(fa|fna|fasta)")
     def mod_plasmid = listFiles("${params.in_dir}", ".*mod_plasmid\\.(fa|fna|fasta)")
 
@@ -63,12 +66,17 @@ workflow {
     def sv_tbl = Channel.empty()
 
     // reference to modified fasta comparison - assembly pipeline
-    if (mod_fasta_avail) {
-        
-        ref_mod(ref_fasta, mod_fasta)
-    
-        sv_tbl = sv_tbl.mix(ref_mod.out.sv_tbl) 
-        activePipelines << ref_mod.out.sv_vcf
+    if (params.run_syri && mod_fasta_avail) {
+        if (contigs_files.size() >= 1) {
+
+            ref_mod(ref_fasta, contigs_ch)
+
+            sv_tbl = sv_tbl.mix(ref_mod.out.sv_tbl) 
+            
+            activePipelines << ref_mod.out.sv_vcf
+
+        } else {
+            log.error "No contig FASTA files found in ${params.in_dir}. Please rerun the pipeline with --run_syri false"}
     
     } else {
         sv_tbl = sv_tbl.mix(create_asm_tbl("assembly"))
@@ -84,6 +92,9 @@ workflow {
         
         long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag, ref_plasmid, "pacbio/long-ref")
 
+        sv_tbl = sv_tbl.mix(long_ref_pacbio.out.sv_tbl)
+        activePipelines << long_ref_pacbio.out.sv_vcf
+
         if (mod_fasta_avail) {
             describePipeline("long-pacbio", "reference & modified")
             long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "pacbio/long-mod")       
@@ -92,9 +103,6 @@ workflow {
         } else {
             describePipeline("long-pacbio", "reference only")
         }
-
-        sv_tbl = sv_tbl.mix(long_ref_pacbio.out.sv_tbl)
-        activePipelines << long_ref_pacbio.out.sv_vcf
     
     } else {
         sv_tbl = sv_tbl.mix(create_pacbio_tbl("pb"))
@@ -110,16 +118,18 @@ workflow {
         
         long_ref_ont(ont_fastqs, ref_fasta, mapping_tag, ref_plasmid, "ont/long-ref")
 
+        sv_tbl = sv_tbl.mix(long_ref_ont.out.sv_tbl)
+        
+        activePipelines << long_ref_ont.out.sv_vcf
+
         if (mod_fasta_avail) {
             describePipeline("long-ont", "reference & modified")
             long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "ont/long-mod")
-            compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")      
+            compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
+
         } else {
             describePipeline("long-ont", "reference only")
         }
-
-        sv_tbl = sv_tbl.mix(long_ref_ont.out.sv_tbl)
-        activePipelines << long_ref_ont.out.sv_vcf
 
     } else {
         sv_tbl = sv_tbl.mix(create_ont_tbl("ont"))
@@ -134,6 +144,9 @@ workflow {
 
         short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid) 
         
+        sv_tbl = sv_tbl.mix(short_ref.out.sv_tbl)
+        activePipelines << short_ref.out.sv_vcf
+
         if (mod_fasta_avail) {
             describePipeline("short", "reference & modified")
             short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
@@ -141,37 +154,29 @@ workflow {
         } else {
             describePipeline("short", "reference only")
         }
-        sv_tbl = sv_tbl.mix(short_ref.out.sv_tbl)
-        activePipelines << short_ref.out.sv_vcf
     
     } else {
         sv_tbl = sv_tbl.mix(create_short_tbl("short"))
     }
 
-    if (activePipelines.size() == 0) {
-        log.error "❌  No valid inputs found. Skipping workflows.\n"
-        exit 0
-    } else if (activePipelines.size() == 1) {
-        log.warn "Only 1 pipeline is running.\n"
-    } else {
+    if (params.run_truvari && activePipelines.size() >= 2 && params.run_syri) {
+        
         int comparisons = activePipelines.size() - 1
-        String plural = comparisons == 1 ? "" : "s"
-        log.info "ℹ️  Truvari: performing ${comparisons} comparison${plural}.\n"
-    }
 
-    if (activePipelines.size() >= 2 && mod_fasta_avail) {
+        log.info "ℹ️ Truvari: performing ${comparisons} comparison${comparisons == 1 ? "" : "s"}.\n"
         
         vcfs = activePipelines.inject(Channel.empty()) { acc, ch -> acc.mix(ch)}
+        
         truvari_comparison(ref_fasta, vcfs)
     }
     
     script = file("${workflow.projectDir}/modules/utils/create_sv_output.py")
 
     def tbl_channel = sv_tbl.collect().map { list ->
-    def asm = list.find { it.name.toLowerCase().contains("assembly") }
-    def long_pb = list.find { it.name.toLowerCase().contains("pb") }
-    def long_ont = list.find { it.name.toLowerCase().contains("ont") }
-    def sht = list.find { it.name.toLowerCase().contains("short") }
+    def asm = list.find { it.name.contains("mod") || it.name.contains("assembly") }
+    def long_pb = list.find { it.name.contains("pb") }
+    def long_ont = list.find { it.name.contains("ont") }
+    def sht = list.find { it.name.contains("short") }
         tuple(asm, long_ont, long_pb, sht)
     }
 

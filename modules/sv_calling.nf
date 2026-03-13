@@ -1,10 +1,9 @@
 
 // Processes for short-read pipeline
 
-/*
- * Index fasta file with samtools
-*/
+
 process samtools_index {
+    
     publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
 
     input:
@@ -20,10 +19,9 @@ process samtools_index {
     """   
 }
 
-/*
- * Create picard dictionary to run delly
-*/
+
 process picard_dict {
+    
     publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
     
     input:
@@ -40,11 +38,9 @@ process picard_dict {
     """  
 }
 
-/*
- * Running delly SV caller
-*/
+
 process delly {
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
     input:
@@ -64,11 +60,9 @@ process delly {
     """
 }
 
-/*
- * Convert bcf (default delly output) to vcf
-*/
+
 process convert_bcf_to_vcf {
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
     input:
@@ -88,11 +82,8 @@ process convert_bcf_to_vcf {
 
 // Processes for long-read pipeline
 
-/*
- * variant calling with cuteSV
-*/
 process cute_sv {
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
 
     input:
@@ -112,12 +103,10 @@ process cute_sv {
 }
 
 
-/*
- * variant calling with debreak
-*/
+
 process debreak {
-    tag "$pair_id"
-        publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
+
+    publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
 
     input:
     each path(fasta_file)
@@ -135,11 +124,8 @@ process debreak {
 }
 
 
-/*
- * variant calling with sniffles
-*/
 process sniffles {
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: "copy"
 
     input:
@@ -157,11 +143,8 @@ process sniffles {
 }
 
 
-/*
- * merging SV
-*/
 process survivor {
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: "copy"
 
     input:
@@ -191,10 +174,8 @@ process survivor {
 }
 
 
-/*
- * Convert vcf file to tsv table 
-*/
-process vcf_to_table {
+
+process vcf_to_table_asm {
 
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
 
@@ -208,17 +189,28 @@ process vcf_to_table {
     """
     set -euxo pipefail
 
-    if [[ "${name}" == "assembly" ]]; then
-        {
-            echo -e "chrom\tstart\tend\tsvtype"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
-        } > "${name}_sv_summary.tsv"
-    else
-        {
-            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_reads\tscore\tRDCN"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\t[%RC]\t%QUAL\t[%RDCN]\n' "${vcf}"
-        } >> "${name}_short_sv_summary.tsv"
-    fi
+    echo -e "chrom\tstart\tend\tsvtype" > "${name}_sv_summary.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}" >> "${name}_sv_summary.tsv"
+
+    """
+}
+
+process vcf_to_table_short {
+
+    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+
+    input:
+    tuple val(name), path(vcf)
+
+    output:
+    path "*_sv_summary.tsv"
+
+    script:
+    """
+    set -euxo pipefail
+
+    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_reads\tscore\tRDCN" > "${name}_short_sv_summary.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\t[%RC]\t%QUAL\t[%RDCN]\n' "${vcf}"  >> "${name}_short_sv_summary.tsv"
     """
 }
 
