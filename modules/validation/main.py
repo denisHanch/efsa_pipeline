@@ -127,7 +127,6 @@ def main():
             report.write(mod_genome_res, file_type="genome")
         except ValidationError as e:
             logger.warning(f"Optional mod_genome validation failed: {e}")
-            logger.debug(traceback.format_exc())
 
     # Inter-genome validation — only if both genomes validated successfully
     if mod_genome_res is not None:
@@ -136,7 +135,6 @@ def main():
             report.write(res, file_type="genomexgenome")
         except ValidationError as e:
             logger.warning(f"Inter-genome validation failed: {e}")
-            logger.debug(traceback.format_exc())
 
     # Validate plasmid genomes (optional — non-fatal)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
@@ -145,7 +143,6 @@ def main():
             report.write(res, file_type="genome")
         except ValidationError as e:
             logger.warning(f"Optional ref_plasmid validation failed: {e}")
-            logger.debug(traceback.format_exc())
 
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
         try:
@@ -153,7 +150,6 @@ def main():
             report.write(res, file_type="genome")
         except ValidationError as e:
             logger.warning(f"Optional mod_plasmid validation failed: {e}")
-            logger.debug(traceback.format_exc())
 
     # Validate reads (required — fatal on failure)
     reads_res = validate_reads(config.reads, reads_settings)
@@ -170,7 +166,6 @@ def main():
             report.write(res, file_type="feature")
         except ValidationError as e:
             logger.warning(f"Optional ref_feature validation failed: {e}")
-            logger.debug(traceback.format_exc())
 
     if config.mod_feature:
         try:
@@ -178,7 +173,6 @@ def main():
             report.write(res, file_type="feature")
         except ValidationError as e:
             logger.warning(f"Optional mod_feature validation failed: {e}")
-            logger.debug(traceback.format_exc())
 
     report.flush(format='text')
     print(f"Log file: {log_file}")
