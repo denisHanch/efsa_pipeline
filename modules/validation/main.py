@@ -13,12 +13,12 @@ from validation_pkg import (
     validate_genome,
     validate_reads,
     validate_feature,
-    validate_reads,
     setup_logging,
     get_logger,
     readxread_validation,
     genomexgenome_validation
 )
+from validation_pkg.exceptions import ValidationError
 
 from pathlib import Path
 
@@ -114,43 +114,67 @@ def main():
     # ========================================================================
     report = ValidationReport(output_dir / "report.txt")
 
-    # Validate reference genome
+    # Validate reference genome (required — fatal on failure)
     ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
-    report.write(ref_genome_res,file_type = "genome")
+    report.write(ref_genome_res, file_type="genome")
 
-    # Validate modified genome
-    mod_genome_res = validate_genome(config.mod_genome, mod_genome_settings)
-    report.write(mod_genome_res,file_type = "genome")
+    # Validate modified genome (optional — non-fatal)
+    mod_genome_res = None
+    if hasattr(config, 'mod_genome') and config.mod_genome:
+        try:
+            mod_genome_res = validate_genome(config.mod_genome, mod_genome_settings)
+            report.write(mod_genome_res, file_type="genome")
+        except ValidationError as e:
+            logger.warning(f"Optional mod_genome validation failed: {e}")
 
-    # Add intergenome validation
-    res = genomexgenome_validation(ref_genome_res,mod_genome_res,genomexgenome_settings)
-    report.write(res,file_type = "genomexgenome")
+    # Inter-genome validation — only if both genomes validated successfully
+    if mod_genome_res is not None:
+        try:
+            res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings)
+            report.write(res, file_type="genomexgenome")
+        except ValidationError as e:
+            logger.warning(f"Inter-genome validation failed: {e}")
 
-    # Validate plasmid genomes (if present in config)
+    # Validate plasmid genomes (optional — non-fatal)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
-        res = validate_genome(config.ref_plasmid, plasmid_settings)
-        report.write(res,file_type = "genome")
+        try:
+            res = validate_genome(config.ref_plasmid, plasmid_settings)
+            report.write(res, file_type="genome")
+        except ValidationError as e:
+            logger.warning(f"Optional ref_plasmid validation failed: {e}")
 
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
-        res = validate_genome(config.mod_plasmid, plasmid_settings)
-        report.write(res,file_type = "genome")
+        try:
+            res = validate_genome(config.mod_plasmid, plasmid_settings)
+            report.write(res, file_type="genome")
+        except ValidationError as e:
+            logger.warning(f"Optional mod_plasmid validation failed: {e}")
 
-    # Validate reads
+    # Validate reads (required — fatal on failure)
     reads_res = validate_reads(config.reads, reads_settings)
-    report.write(reads_res,file_type = "read")
+    report.write(reads_res, file_type="read")
 
     # Add interread validation
-    readxread_res = readxread_validation(reads_res,readxread_settings)
-    report.write(readxread_res,file_type = "readxread")
+    try:
+        readxread_res = readxread_validation(reads_res, readxread_settings)
+        report.write(readxread_res, file_type="readxread")
+    except ValidationError as e:
+        logger.warning(f"Inter-read validation failed: {e}")
 
-    # Validate features
-    if config.ref_feature:
-        res = validate_feature(config.ref_feature, ref_feature_settings)
-        report.write(res,file_type = "feature")
+    # Validate features (optional — non-fatal)
+    if hasattr(config, 'ref_feature') and config.ref_feature:
+        try:
+            res = validate_feature(config.ref_feature, ref_feature_settings)
+            report.write(res, file_type="feature")
+        except ValidationError as e:
+            logger.warning(f"Optional ref_feature validation failed: {e}")
 
-    if config.mod_feature:
-        res = validate_feature(config.mod_feature, mod_feature_settings)
-        report.write(res,file_type = "feature")
+    if hasattr(config, 'mod_feature') and config.mod_feature:
+        try:
+            res = validate_feature(config.mod_feature, mod_feature_settings)
+            report.write(res, file_type="feature")
+        except ValidationError as e:
+            logger.warning(f"Optional mod_feature validation failed: {e}")
 
     report.flush(format='text')
     print(f"Log file: {log_file}")
