@@ -131,14 +131,14 @@ class GenomeValidator(BaseValidator):
 
             # Genome-specific validation
             if self.plasmid_split and self.plasmids_to_one:
-                raise ValueError(
+                raise GenomeValidationError(
                     "plasmid_split and plasmids_to_one cannot both be True. "
                     "Choose one: plasmid_split creates separate files for each plasmid, "
                     "plasmids_to_one merges all plasmids into a single file."
                 )
 
             if self.main_longest and self.main_first:
-                raise ValueError(
+                raise GenomeValidationError(
                     "main_longest and main_first cannot both be True. "
                     "Choose one: main_longest selects the longest sequence as main, "
                     "main_first selects the first sequence as main."
@@ -496,7 +496,7 @@ class GenomeValidator(BaseValidator):
             self.logger.debug(f"Selected first sequence as main: {main_sequence.id} ({len(main_sequence.seq)} bp)")
         else:
             # This should not happen due to __post_init__ validation
-            raise ValueError("Either main_longest or main_first must be True")
+            raise GenomeValidationError("Either main_longest or main_first must be True")
 
         return main_sequence, plasmid_sequences
 

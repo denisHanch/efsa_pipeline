@@ -13,7 +13,6 @@ from validation_pkg import (
     validate_genome,
     validate_reads,
     validate_feature,
-    validate_reads,
     setup_logging,
     get_logger,
     readxread_validation,
@@ -156,18 +155,21 @@ def main():
     report.write(reads_res, file_type="read")
 
     # Add interread validation
-    readxread_res = readxread_validation(reads_res, readxread_settings)
-    report.write(readxread_res, file_type="readxread")
+    try:
+        readxread_res = readxread_validation(reads_res, readxread_settings)
+        report.write(readxread_res, file_type="readxread")
+    except ValidationError as e:
+        logger.warning(f"Inter-read validation failed: {e}")
 
     # Validate features (optional — non-fatal)
-    if config.ref_feature:
+    if hasattr(config, 'ref_feature') and config.ref_feature:
         try:
             res = validate_feature(config.ref_feature, ref_feature_settings)
             report.write(res, file_type="feature")
         except ValidationError as e:
             logger.warning(f"Optional ref_feature validation failed: {e}")
 
-    if config.mod_feature:
+    if hasattr(config, 'mod_feature') and config.mod_feature:
         try:
             res = validate_feature(config.mod_feature, mod_feature_settings)
             report.write(res, file_type="feature")
