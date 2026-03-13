@@ -1,9 +1,7 @@
 
 // Processes for short-read pipeline
 
-/*
- * Calling short variants with FreeBayes
-*/
+
 process freebayes {
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
@@ -22,13 +20,10 @@ process freebayes {
     """
 }
 
-/*
-* SNPEff build
-*/
 
 process build_config {
+    
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
-
 
     input:
     each path(fasta_file)
@@ -62,9 +57,6 @@ process build_config {
 }
 
 
-/*
- * Annotating variants with SNPeff
-*/
 process snpeff {
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
@@ -89,11 +81,8 @@ process snpeff {
 }
 
 
-/*
- * Getting variants statistics with bcftools stats
-*/
 process bcftools_stats {
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/bcftools_stats", mode: 'copy'
 
     input:
@@ -109,11 +98,8 @@ process bcftools_stats {
     """
 }
 
-// Processes for comparision of VCF files (in main.nf pipeline)
+// Processes related to truvari pipeline
 
-/*
- * Truvari requires sorted vcfs for comparision
-*/
 process sort_vcf {
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
@@ -130,9 +116,7 @@ process sort_vcf {
     """
 }
 
-/*
- * Truvari require indexed vcfs for comparision
-*/
+
 process index_vcf {
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
@@ -150,9 +134,7 @@ process index_vcf {
     """
 }
 
-/*
- * Running comparision btw files
-*/
+
 process truvari {
     tag "$pair_id1 & $pair_id2"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
