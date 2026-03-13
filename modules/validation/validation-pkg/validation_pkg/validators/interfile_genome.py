@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from Bio import SeqIO
 from ..utils.base_settings import BaseSettings
-from ..exceptions import InterFileValidationError
+from ..exceptions import InterFileValidationError, ValidationError
 from ..logger import get_logger
 from ..utils.file_handler import check_tool_available, open_compressed_writer
 from ..utils.path_utils import strip_all_extensions
@@ -33,7 +33,7 @@ class GenomeXGenomeSettings(BaseSettings):
 
     def __post_init__(self):
         if self.same_sequence_lengths and not self.same_sequence_ids:
-            raise ValueError(
+            raise ValidationError(
                 "same_sequence_lengths requires same_sequence_ids=True "
                 "(cannot compare lengths without matching IDs)"
             )
