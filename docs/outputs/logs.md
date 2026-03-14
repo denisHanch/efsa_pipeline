@@ -4,6 +4,8 @@
 
 ```
 logs/
+├── report.html               # A visual HTML report of the workflow execution, including task durations, resource usage, and statuses
+├── timeline.html             # A timeline visualization showing when each pipeline process started and finished
 └── 00/
     └── a80c5c6b6654950042a976836ff441
         ├── .command.begin    # Timestamp file marking the start of a process
@@ -41,6 +43,14 @@ Metadata about process execution including:
 
 ### `.command.sh`
 The shell script that Nextflow runs; contains the exact commands for the process.
+
+### report.html
+
+A visual HTML report of the workflow execution, including task durations, resource usage, and statuses (see [nextflow documentation](https://docs.seqera.io/nextflow/reports#execution-report))
+
+### timeline.html
+
+A timeline visualization showing when each pipeline process started and finished (see [nextflow documentation](https://docs.seqera.io/nextflow/reports#execution-timeline))
 
 ## Usage
 

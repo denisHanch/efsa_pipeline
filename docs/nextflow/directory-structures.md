@@ -8,19 +8,21 @@ This directory contains all input data used by the Nextflow pipeline.
 data/valid/
 ├── assembled_genome.fasta
 ├── reference_genome.fasta
+├── mod_config_[0..4].fasta    # Presence of multiple contings incase of a fragmented assembly
 ├── ref_plasmid.fa             # Reference plasmid sequences (if used)
 ├── mod_plasmid.fa             # Modified/assembled plasmid sequences (if used)
 ├── ref_feature.gff            # Genome annotation file GTF/GFF (if used)
 │
-├── illumina/
-│   ├── SampleName_1.fastq.gz
-│   ├── SampleName_2.fastq.gz
+├── illumina/                  
+│   ├── SampleName_1.fastq.gz  
+│   ├── SampleName_2.fastq.gz  
 │
-├── ont/
+├── ont/                       
 │   └── SampleName.fastq.gz
 │
-└── pacbio/
+└── pacbio/                   
     └── SampleName.fastq.gz
+
 ```
 
 ### File Descriptions

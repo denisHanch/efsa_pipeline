@@ -34,7 +34,6 @@ nextflow run main.nf --max_cpu $(nproc) -resume
 |----------------|-------------------------------------------------------------------|-------------------------|
 | `--in_dir`     | Input directory                                                   | `data/valid`            |
 | `--out_dir`    | Output directory                                                  | `data/outputs`          |
-| `--registry`   | Docker/Singularity container registry                             | `ghcr.io/kate-simonova` |
 | `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
 | `--run_truvari`| Enables filtering of VCFs based on truth set                      | `false`                 |
 | `--run_syri`   | Enables comparison between the assembly FASTA and reference FASTA | `true`                  |

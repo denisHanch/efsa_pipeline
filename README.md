@@ -286,6 +286,8 @@ flowchart TD
         bwa_map --> samtools_sort["Samtools Sort & Stats"]
         samtools_sort --> picard["Picard / MultiQC"]
         samtools_sort --> sr_vcf["VCF Output (Short-Read)"]
+        sr_vcf --> short_mod["Optional: Compare to Modified"]
+        short_mod --> agg_tbl
     end
     style ShortReadPipeline fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
@@ -295,6 +297,8 @@ flowchart TD
         minimap2_pb --> samtools_sort_pb["Samtools Sort & Stats"]
         samtools_sort_pb --> pb_sv["SV Calling (CuteSV / Sniffles / Debreak)"]
         pb_sv --> pb_vcf["VCF Output (PacBio)"]
+        pb_vcf --> long_mod_pb["Optional: Compare to Modified"]
+        long_mod_pb --> agg_tbl
     end
     style LongReadPacBio fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
@@ -304,34 +308,51 @@ flowchart TD
         minimap2_ont --> samtools_sort_ont["Samtools Sort & Stats"]
         samtools_sort_ont --> ont_sv["SV Calling (CuteSV / Sniffles / Debreak)"]
         ont_sv --> ont_vcf["VCF Output (ONT)"]
+        ont_vcf --> long_mod_ont["Optional: Compare to Modified"]
+        long_mod_ont --> agg_tbl
     end
     style LongReadONT fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
     %% Reference vs Modified pipeline
     subgraph RefVsMod["Reference vs Modified Pipeline"]
-        ref_fasta --> nucmer["NUCmer Alignment"]
-        mod_fasta --> nucmer
+        ref_fasta --> run_syri_decision{"--run_syri?"}
+        mod_fasta --> run_syri_decision
+        run_syri_decision -->|Yes| nucmer["NUCmer Alignment"]
+        run_syri_decision -->|No| skip_syri["Skip SYRI"]
         nucmer --> delta_filter["Delta Filter"]
         delta_filter --> show_coords["Show Coords"]
         show_coords --> syri_vcf["VCF Output (assemblysyri)"]
+        syri_vcf --> agg_tbl
     end
     style RefVsMod fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
-    %% Truvari comparison
-    subgraph Truvari["Truvari Comparison"]
-        sr_vcf --> truvari["Compare SVs (Truvari)"]
-        pb_vcf --> truvari
-        ont_vcf --> truvari
-        syri_vcf --> truvari
+    %% SV table aggregation (central)
+    subgraph SVTable["SV Table Aggregation"]
+        agg_tbl["Mix SV Tables"] --> restructure["Restructure SV Table (create_sv_output.py)"]
+    end
+    style SVTable fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
+
+    %% Truvari comparison (central)
+    subgraph Truvari["Truvari Comparison (Conditional)"]
+        sr_vcf --> truvari_in["VCFs for Truvari"]
+        pb_vcf --> truvari_in
+        ont_vcf --> truvari_in
+        syri_vcf --> truvari_in
+        truvari_in --> check_truvari{"--run_truvari?"}
+        check_truvari -->|Yes| truvari["Compare SVs (Truvari)"]
+        check_truvari -->|No| skip_truvari["Skip Truvari"]
         truvari --> final_report["Truvari Reports / Summary"]
     end
     style Truvari fill:#D0F0C0,stroke:#2E7D32,stroke-width:2px
+
+    %% Central alignment
+    restructure --> truvari_in
 ```
+
 
 ## Running the Pipeline
 
 The main pipeline (`main.nf`) executes **all three workflows** in sequence.
-Each workflow can also be executed individually if required.
 
 ### Running Main Workflow
 
@@ -347,7 +368,7 @@ nextflow run main.nf --max_cpu $(nproc) -resume
 | Option           | Description                                                                                                                                                                         |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `-resume`        | Resume a pipeline run from the point where it previously stopped or failed.                                                                                                         |
-| `-with-report`   | Generate a visual HTML report of the workflow execution, including task durations, resource usage, and statuses. The report is saved by default to `data/outputs/logs/report.html`. |
+| `-with-report`   | Generate a visual HTML report of the workflow execution, including task durations, resource usage, and statuses. The report is saved by default to `data/outputs/logs/`. |
 | `-with-timeline` | Generate a timeline visualization showing when each pipeline process started and finished. The timeline is saved by default to `data/outputs/logs/timeline.html`.                   |
 | `-with-dag`      | Generate a directed acyclic graph (DAG) illustrating task dependencies in the workflow.                                                                                             |
 
@@ -358,7 +379,6 @@ nextflow run main.nf --max_cpu $(nproc) -resume
 |----------------|-------------------------------------------------------------------|-------------------------|
 | `--in_dir`     | Input directory                                                   | `data/valid`            |
 | `--out_dir`    | Output directory                                                  | `data/outputs`          |
-| `--registry`   | Docker/Singularity container registry                             | `ghcr.io/kate-simonova` |
 | `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
 | `--run_truvari`| Enables filtering of VCFs based on truth set                      | `false`                 |
 | `--run_syri`   | Enables comparison between the assembly FASTA and reference FASTA | `true`                  |
@@ -368,35 +388,6 @@ nextflow run main.nf --max_cpu $(nproc) -resume
 
 ---
 
-### Running Individual Pipelines
-
-You can also run each of the three sub-pipelines independently.
-
-#### Short-read Processing
-
-For Illumina short-read data:
-
-```bash
-nextflow run workflows/short_read.nf --max_cpu $(nproc) -resume
-```
-
-#### Long-read Processing
-
-For Oxford Nanopore / PacBio long reads:
-
-```bash
-nextflow run workflows/long_read.nf --max_cpu $(nproc) -resume
-```
-
-#### Reference vs Modified Genome Comparison
-
-For comparing reference and modified FASTA assemblies:
-
-```bash
-nextflow run workflows/fasta_ref_x_mod.nf --max_cpu $(nproc) -resume
-```
-
- 
 ## Generation of per structural variation (SV) type CSV tables
 
 These utilities convert SV VCFs into compact TSV summaries and then merge available summaries into per-SV-type CSV tables.
@@ -415,6 +406,7 @@ flowchart LR
 
 ### Key points
 
+- By default a nextflow pipeline is collecting the tables from pipelines and runs restructure_sv_tbl to create all summary
 - Variants are extracted into a table format with processes `vcf_to_table` and `vcf_to_table_long`
 - if one of the pipelines was not running (shourt/long/assembly) an empty tsv file is generated with a process create_empty_tbl
 - `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
@@ -605,6 +597,7 @@ This directory contains all input data used by the Nextflow pipeline.
 data/valid/
 ├── assembled_genome.fasta
 ├── reference_genome.fasta
+├── mod_config_[0..4].fasta    # Presence of multiple contings incase of a fragmented assembly
 ├── ref_plasmid.fa             # Reference plasmid sequences (if used)
 ├── mod_plasmid.fa             # Modified/assembled plasmid sequences (if used)
 ├── ref_feature.gff            # Genome annotation file GTF/GFF (if used)
@@ -675,21 +668,29 @@ subgraph REF_X_MOD["Reference vs Modified Fasta Comparison Pipeline"]
 
     %% Inputs
     REF_FASTA["Reference FASTA"]:::input
-    MOD_FASTA["Modified FASTA"]:::input
+    CONTIGS["Contigs FASTA"]:::input
+
+    %% Combine ref + contigs
+    REF_MOD_COMB["ref_mod_fasta"]:::process
 
     %% Processes
     NUCMER["nucmer"]:::process
     DELTA["delta_filter"]:::process
     SHOWCOORDS["show_coords"]:::process
     SYRI["syri"]:::process
+    BGZIP["bgzip + tabix"]:::process
+    CONCAT_TABLE["bcftools_concat + vcf_to_table_asm"]:::process
 
-    %% Output
+    %% Outputs
     VCF_OUT["Structural Variant VCF"]:::output
+    SV_TABLE["Structural Variant Table"]:::output
 
     %% Connections
-    REF_FASTA --> NUCMER
-    MOD_FASTA --> NUCMER
-    NUCMER --> DELTA --> SHOWCOORDS --> SYRI --> VCF_OUT
+    REF_FASTA --> REF_MOD_COMB
+    CONTIGS --> REF_MOD_COMB
+    REF_MOD_COMB --> NUCMER
+    NUCMER --> DELTA --> SHOWCOORDS --> SYRI --> BGZIP --> VCF_OUT
+    BGZIP --> CONCAT_TABLE --> SV_TABLE
 
 end
 
@@ -697,8 +698,10 @@ end
 classDef input fill:#E3F2FD,stroke:#1565C0
 classDef process fill:#B6ECE2,stroke:#065647
 classDef output fill:#E8F5E9,stroke:#2E7D32
-
 ```
+
+
+## Directory Structure
 
 This folder contains results from the **reference vs modified FASTA comparison pipeline**:
 
@@ -706,32 +709,60 @@ This folder contains results from the **reference vs modified FASTA comparison p
 fasta_ref_mod/
 ├── assembly.delta
 ├── assembly.filtered.coords
+├── assembly_concat.vcf
 ├── assembly_filtered.delta
-└── assemblysyri.vcf
+├── assemblysyri.vcf
+├── mod_contig_0
+│   ├── mod_contig_0.delta
+│   ├── mod_contig_0.filtered.coords
+│   ├── mod_contig_0.vcf.gz
+│   ├── mod_contig_0.vcf.gz.tbi
+│   └── mod_contig_0_filtered.delta
+└── mod_contig_0syri.vcf
 ```
 
-**Description of files:**
+## Output Files
 
-* `assembly.delta`
-  Raw alignment difference file between reference and modified FASTA (generated by `nucmer`/MUMmer).
+> **Important!**
+> To allow the pipeline to run, set `--run_syri` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
+>
+> ```groovy
+> params {
+>     run_syri = true
+> }
+> ```
+>
+> By default, this parameter is set to `true`.
 
-* `assembly.filtered.coords`
-  Filtered alignment coordinates showing high-confidence matches and structural differences.
+### `assembly.delta`
+Raw alignment difference file between reference and modified FASTA (generated by `nucmer`/MUMmer).
 
-* `assembly_filtered.delta`
-  Cleaned and filtered delta file used for downstream structural comparison.
+### `assembly.filtered.coords`
+Filtered alignment coordinates showing high-confidence matches and structural differences.
 
-* `assemblysyri.vcf`
-  Structural variants and genome rearrangements detected by **SyRI**, stored in VCF format.
+### `assembly_filtered.delta`
+Cleaned and filtered delta file used for downstream structural comparison.
+
+### `assemblysyri.vcf`
+Structural variants and genome rearrangements detected by **SyRI**, stored in VCF format.
+
+### mod_contig_[0..4]`
+The folder contains syri comparison from each contig when assembly is fragmented into more than one contig. mod_contig_0.
+
+### mod_contig_[0..4].vcf.gz`
+A bgzipped VCF files of structural variants per contig.
+
+### mod_contig_[0..4].vcf.gz.tbi`
+Tabix index of a bgzipped VCF file used for efficient concatenation with bcftools.
 
 The table below summarises all tools used within the pipeline:
 
-| **Tool**        | **Link for Further Information**                       |
-| --------------- | ------------------------------------------------------ |
-| **Nucmer**      | [MUMmer](https://mummer4.github.io/manual/manual.html) |
-| **delta_filter** | [MUMmer](https://mummer4.github.io/manual/manual.html) |
-| **show_coords**  | [MUMmer](https://mummer4.github.io/manual/manual.html) |
-| **Syri**        | [SyRI GitHub](https://schneebergerlab.github.io/syri/) |
+| **Tool**         | **Link for Further Information**                        |
+| ---------------- | ------------------------------------------------------  |
+| **Nucmer**       | [MUMmer](https://mummer4.github.io/manual/manual.html)  |
+| **delta_filter** | [MUMmer](https://mummer4.github.io/manual/manual.html)  |
+| **show_coords**  | [MUMmer](https://mummer4.github.io/manual/manual.html)  |
+| **Syri**         | [SyRI GitHub](https://schneebergerlab.github.io/syri/)  |
 
 
 ---
@@ -1599,21 +1630,50 @@ end
 
 ```
 logs/
-├── .command.begin    # Timestamp file marking the start of a process
-├── .command.err      # Captures standard error output from the process
-├── .command.log      # Logs process execution messages from Nextflow
-├── .command.out      # Captures standard output from the process
-├── .command.run      # Execution metadata (exit status, runtime, resources)
-└── .command.sh       # The shell script containing the exact commands executed
+├── report.html               # A visual HTML report of the workflow execution, including task durations, resource usage, and statuses
+├── timeline.html             # A timeline visualization showing when each pipeline process started and finished
+└── 00/
+    └── a80c5c6b6654950042a976836ff441
+        ├── .command.begin    # Timestamp file marking the start of a process
+        ├── .command.err      # Captures standard error output from the process
+        ├── .command.log      # Logs process execution messages from Nextflow
+        ├── .command.out      # Captures standard output from the process
+        ├── .command.run      # Execution metadata (exit status, runtime, resources)
+        └── .command.sh       # The shell script containing the exact commands executed
 ```
 
 #### Description
 
 The `logs/` folder contains **detailed logs and command scripts** for each Nextflow process.
 
-* **`.command.begin`** — Marks the start time of a process.
-* **`.command.err`** — Captures standard error messages generated by the process.
-* **`.command.log`** — General execution logs from Nextflow for the process.
-* **`.command.out`** — Captures standard output of the process.
-* **`.command.run`** — Metadata about process execution (e.g., exit code, runtime, resource usage).
-* **`.command.sh`** — The shell script that Nextflow runs; contains the exact commands for the process.
+## File Descriptions
+
+### `.command.begin`
+Marks the start time of a process.
+
+### `.command.err`
+Captures standard error messages generated by the process.
+
+### `.command.log`
+General execution logs from Nextflow for the process.
+
+### `.command.out`
+Captures standard output of the process.
+
+### `.command.run`
+Metadata about process execution including:
+
+- Exit code
+- Runtime duration
+- Resource usage
+
+### `.command.sh`
+The shell script that Nextflow runs; contains the exact commands for the process.
+
+### report.html
+
+A visual HTML report of the workflow execution, including task durations, resource usage, and statuses (see [nextflow documentation](https://docs.seqera.io/nextflow/reports#execution-report))
+
+### timeline.html
+
+A timeline visualization showing when each pipeline process started and finished (see [nextflow documentation](https://docs.seqera.io/nextflow/reports#execution-timeline))
