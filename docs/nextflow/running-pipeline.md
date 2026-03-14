@@ -18,53 +18,28 @@ This executes all workflows based on the files located within a subfolder of `da
 nextflow run main.nf --max_cpu $(nproc) -resume
 ```
 
-## Available Nextflow Options
+## Nextflow Options
 
-| Option        | Description |
-|---------------|-------------|
-| `-resume`     | Resumes a pipeline run from the point where it was interrupted or previously failed. |
-| `-with-report` | Generates a visual HTML report of the workflow execution, including task durations, resource usage, and statuses. |
-| `-with-timeline` | Produces a timeline visualization showing when each process in the pipeline started and finished. |
-| `-with-dag`     | Generates a directed acyclic graph (DAG) showing task dependencies within the workflow. |
+| Option           | Description                                                                                                                                                                         |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-resume`        | Resume a pipeline run from the point where it previously stopped or failed.                                                                                                         |
+| `-with-report`   | Generate a visual HTML report of the workflow execution, including task durations, resource usage, and statuses. The report is saved by default to `data/outputs/logs/report.html`. |
+| `-with-timeline` | Generate a timeline visualization showing when each pipeline process started and finished. The timeline is saved by default to `data/outputs/logs/timeline.html`.                   |
+| `-with-dag`      | Generate a directed acyclic graph (DAG) illustrating task dependencies in the workflow.                                                                                             |
 
-## Available Pipeline Options
 
-| Option         | Description                                  | Default                |
-| -------------- | -------------------------------------------- | ---------------------- |
-| `--in_dir`     | Input directory                              | `data/valid`           |
-| `--out_dir`    | Output directory                             | `data/outputs`         |
-| `--registry`   | Docker/Singularity container registry        | `ghcr.io/kate-simonova`|
-| `--max_cpu`    | Maximum CPUs per process                     | `1`                    |
-| `--clean_work` | Remove work directory after successful run   | `true`                 |
-| `--help`       | Display help message                         | –                      |
+## Pipeline Options
 
-## Running Individual Pipelines
-
-You can run each of the three sub-pipelines independently.
-
-### Short-read Processing
-
-For Illumina short-read data:
-
-```bash
-nextflow run workflows/short_read.nf --max_cpu $(nproc) -resume
-```
-
-### Long-read Processing
-
-For Oxford Nanopore / PacBio long-read data:
-
-```bash
-nextflow run workflows/long_read.nf --max_cpu $(nproc) -resume
-```
-
-### Reference vs Modified Genome Comparison
-
-For comparing reference and modified FASTA assemblies:
-
-```bash
-nextflow run workflows/fasta_ref_x_mod.nf --max_cpu $(nproc) -resume
-```
+| Option         | Description                                                       | Default                 |
+|----------------|-------------------------------------------------------------------|-------------------------|
+| `--in_dir`     | Input directory                                                   | `data/valid`            |
+| `--out_dir`    | Output directory                                                  | `data/outputs`          |
+| `--registry`   | Docker/Singularity container registry                             | `ghcr.io/kate-simonova` |
+| `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
+| `--run_truvari`| Enables filtering of VCFs based on truth set                      | `false`                 |
+| `--run_syri`   | Enables comparison between the assembly FASTA and reference FASTA | `true`                  |
+| `--clean_work` | Remove work directory after successful run                        | `true`                  |
+| `--help`       | Display help message                                              | –                       |
 
 
 ## Next Steps

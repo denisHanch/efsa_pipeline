@@ -49,7 +49,7 @@ data/outputs
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
 ├── tables              → Per-SV csv tables
-├── truvari             → Variant comparison results from Truvari
+├── truvari             → Variant comparison results from Truvari (if --run_truvari set to true)
 └── unmapped_stats      → Summary statistics of unmapped reads for each workflow
 ```
 
