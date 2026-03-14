@@ -1,12 +1,12 @@
 site_name: EFSA Pipeline Documentation
 site_description: Comprehensive genomic analysis pipeline with validation, QC, and variant detection
 site_author: EFSA Pipeline Team
-site_url: https://denisHanch.github.io/efsagmopipeline
+site_url: https://denishanch.github.io/efsa_pipeline/
 
 # Repository
 repo_name: efsa_pipeline
 repo_url: https://github.com/denisHanch/efsa_pipeline
-edit_uri: edit/main/docs/md/
+edit_uri: edit/main/docs/
 
 # Copyright
 copyright: Copyright &copy; 2025 EFSA Pipeline Team
