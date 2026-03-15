@@ -1,4 +1,4 @@
-# Long-Read Peocessing Pipeline Output (PacBio & ONT)
+# Long-Read Peocessing Pipeline (PacBio & ONT)
 
 ## Pipeline Workflow
 
@@ -215,6 +215,6 @@ Nature communications, Vol. 8, 14061, 24.01.2017, p. 1-11. DOI:10.1038/NCOMMS140
 
 ## See Also
 
-- [Short-Read Processing Pipeline Output](illumina.md) - Short-read results
+- [Short-Read Processing Pipeline Results (Illumina)](illumina.md) - Short-read results
 - [Unmapped Statistics](unmapped-stats.md) - Detailed unmapped read analysis
 - [Truvari Comparison](truvari.md) - Variant comparison results
