@@ -26,7 +26,7 @@
           "format": "directory-path",
           "default": "data/outputs/logs",
           "description": "Directory where log files will be stored."
-        },
+        }
       }
     },
     "general_options": {
@@ -46,8 +46,18 @@
         },
         "clean_work": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Clean the Nextflow work directory after successful completion."
+        },
+        "run_truvari": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run Truvari benchmarking to evaluate structural variant calls."
+        },
+        "run_syri": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run SyRI to identify genomic rearrangements between reference and assembly."
         }
       }
     }

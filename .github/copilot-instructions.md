@@ -28,7 +28,6 @@
   - Error handling: `process.errorStrategy = 'ignore'` is set globally in `nextflow.config` — be careful when changing this as it affects pipeline robustness and retries.
 
 - Integration points & external dependencies
-  - Many processes run in Docker containers listed in `nextflow.config`. Ensure images exist and are accessible (registry or local build). Some images are `ecomolegmo/*` and `staphb/*`.
 - Do not edit anything in the validation package (`modules/validation/`) — it is managed by a separate CI process.
 
 - Debugging & development tips
