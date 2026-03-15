@@ -1,4 +1,4 @@
-# Short-Read Processing Pipeline Output
+# Short-Read Processing Pipeline (Illumina)
 
 ## Pipeline Workflow
 
@@ -242,6 +242,6 @@ https://doi.org/10.1093/bioinformatics/bts378
 
 ## See Also
 
-- [Long-Read Processing Pipeline Output](long-reads.md) - PacBio and ONT results
+- [Long-Read Processing Pipeline (PacBio & Oxford Nanopore)](long-reads.md) - PacBio and ONT results
 - [Unmapped Statistics](unmapped-stats.md) - Detailed unmapped read analysis
 - [Truvari Comparison](truvari.md) - Variant comparison results

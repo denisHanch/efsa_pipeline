@@ -299,6 +299,6 @@ end
 
 ## See Also
 
-- [Short-Read Processing Pipeline Output](illumina.md) - Short-read mapping details
-- [Long-Read Processing Pipeline Output](long-reads.md) - Long-read mapping details
+- [Short-Read Processing Pipeline Results (Illumina)](illumina.md) - Short-read mapping details
+- [Long-Read Processing Pipeline (PacBio & Oxford Nanopore)](long-reads.md) - Long-read mapping details
 - [Runtime Messages](../nextflow/runtime-messages.md) - Pipeline execution messages
