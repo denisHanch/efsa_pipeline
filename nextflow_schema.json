@@ -31,15 +31,20 @@
           "type": "string",
           "format": "file-path",
           "default": "data/valid/pacbio/Bacillus_toyonensis_LE1_pacbio.fastq.gz",
-          "description": "Directory where log files will be stored."
+          "description": "Path to PacBio FASTQ file for assembly evaluation (set to 'null' if not available)."
         },
          "nanopore_fastq": {
           "type": "string",
           "format": "file-path",
-          "default": "data/valid/nanopore_fastq/Bacillus_toyonensis_LE1_nanopore.fastq.gz",
-          "description": "Directory where log files will be stored."
+          "default": "null",
+          "description": "Path to Nanopore FASTQ file for assembly evaluation (set to 'null' if not available)."
+         },
+        "gff": {
+          "type": "string",
+          "format": "file-path",
+          "default": "null",
+          "description": "Path to GFF annotation file for the reference genome (set to 'null' if not available)."
         }
-
       }
     },
     "general_options": {
@@ -75,12 +80,12 @@
         },
         "run_syri": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Run SyRI to identify genomic rearrangements between reference and assembly."
         },
          "run_illumina": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Run Illumina read processing pipeline."
         },
         "run_nanopore": {
@@ -92,6 +97,11 @@
           "type": "boolean",
           "default": false,
           "description": "Run PacBio read processing pipeline."
+        },
+        "run_vcf_annotation": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run VCF annotation using provided GFF file."
         }
       }
     },
