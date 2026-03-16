@@ -8,7 +8,6 @@ The main pipeline (`main.nf`) executes **all three workflows** in sequence:
 - Long-read processing for Pacbio/Oxford Nanopore data
 - Reference vs modified genome comparison using SyRI
 
-Each workflow can also be executed individually if required.
 
 ## Running Main Workflow
 
