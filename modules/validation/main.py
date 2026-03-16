@@ -22,8 +22,7 @@ from validation_pkg.exceptions import ValidationError
 
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-import nextflow_schema as nf_schema
+import nextflow_params as nf_params
 
 def main():
     # Check command line arguments
@@ -214,9 +213,8 @@ def main():
         "ref_genome": ref_genome_res,
         "mod_genome": mod_genome_res,
     }
-    params = nf_schema.build_params(validation_results)
-    project_root = Path(__file__).resolve().parent.parent.parent
-    nf_schema.write_params(params, project_root / "validated_params.json")
+    params = nf_params.build_params(validation_results)
+    nf_params.write_params(params, output_dir / "validated_params.json")
 
     return 0
 

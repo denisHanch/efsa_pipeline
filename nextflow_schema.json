@@ -61,7 +61,6 @@
         }
       }
     },
-    // new section to not influent previous version
     "validated_inputs": {
       "title": "Validated inputs",
       "type": "object",

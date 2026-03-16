@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-nextflow_schema.py
+nextflow_params.py
 ==================
 Utilities to build and write a validated_params.json file after the validation
 step runs. Nextflow picks up this file via `-params-file validated_params.json`.
