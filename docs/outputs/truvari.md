@@ -137,6 +137,6 @@ Petr Danecek, James K Bonfield, Jennifer Liddle, John Marshall, Valeriu Ohan, Ma
 
 ## See Also
 
-- [Reference vs Modified Processing Pipeline Output](fasta-ref-mod.md) - SyRI baseline variants
-- [Short-Read Processing Pipeline Output](illumina.md) - Short-read SV calls
-- [Long-Read Processing Pipeline Output](long-reads.md) - Long-read SV calls
+- [Reference vs Modified Processing Pipeline](fasta-ref-mod.md) - SyRI baseline variants
+- [Short-Read Processing Pipeline Results (Illumina)](illumina.md) - Short-read SV calls
+- [Long-Read Processing Pipeline (PacBio & Oxford Nanopore)](long-reads.md) - Long-read SV calls

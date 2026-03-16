@@ -41,6 +41,7 @@ docker run --privileged -d --rm \
     --name "$CONTAINER_NAME" \
     -w "$WORKSPACE_PATH" \
     -v "$WORKSPACE_PATH:$WORKSPACE_PATH" \
+    -e "NXF_LOG_FILE=${WORKSPACE_PATH}/data/outputs/logs/nextflow.log" \
     $INPUT_MOUNT \
     efsa-pipeline \
     sh -c "dockerd-entrypoint.sh & tail -f /dev/null"

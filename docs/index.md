@@ -26,10 +26,10 @@ Welcome to the EFSA Pipeline documentation. This pipeline provides comprehensive
 
 ### Output Documentation
 
-- [Reference vs Modified FASTA Pipeline Output](outputs/fasta-ref-mod.md)
-- [Short-Read Pipeline Output (Illumina)](outputs/illumina.md)
-- [Long-Read Pipeline Output (PacBio & Oxford Nanopore)](outputs/long-reads.md)
-- [VCF Comparison Pipeline Output](outputs/truvari.md)
+- [Reference vs Modified FASTA Pipeline](outputs/fasta-ref-mod.md)
+- [Short-Read Pipeline (Illumina)](outputs/illumina.md)
+- [Long-Read Pipeline (PacBio & Oxford Nanopore)](outputs/long-reads.md)
+- [VCF Comparison Pipeline](outputs/truvari.md)
 - [Unmapped Reads Statistics](outputs/unmapped-stats.md)
 - [Logs](outputs/logs.md)
 - [Generation of per structural variation type CSV tables](outputs/sv-tables.md)

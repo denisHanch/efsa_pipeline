@@ -48,5 +48,6 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
 ## What's Next?
 
 After setting up the Docker container, proceed to:
+
 - [Input Validation](../validation/OVERVIEW.md)
 - [Pipeline Execution](../nextflow/running-pipeline.md)

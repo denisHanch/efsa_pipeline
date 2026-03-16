@@ -9,7 +9,7 @@
 
 ### 1. Clone the Repository
 
-Generate a GitHub token (see instructions in the repository link) and download the repository:
+Download the repository:
 
 ```bash
 git clone https://github.com/denisHanch/efsa_pipeline.git
@@ -27,19 +27,20 @@ git clone https://github.com/denisHanch/efsa_pipeline.git
 
 > **Important!**
 >
-> Create configuration file `config.json` on `data/inputs`.
+> Create configuration file `config.json` based on data in `data/inputs`.
 
 ### 3. Run Input Validation
 
 Running QC on the input data and processing data for the Nextflow pipeline to `data/valid` folder:
 
 ```bash
-python3 ./modules/validation/main.py ./data/inputs/config.json
+validate                 - Run validation with default config
+validate --config <path> - Run validation with custom config
 ```
 
 ### 4. Execute the Pipeline
 
-Use the GitHub token provided in the Slack channel, then start the pipeline:
+Start the pipeline:
 
 ```bash
 nextflow run main.nf --max_cpu $(nproc) -resume
