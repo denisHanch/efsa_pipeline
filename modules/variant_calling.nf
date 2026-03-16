@@ -41,7 +41,7 @@ process build_config {
     feature_path='${feature_file}'
 
     # Extract genome ID from first header line
-    genome_id=\$(grep '^>' \$fasta_path | head -n 1 | cut -d ' ' -f1 | sed 's/^>//' | tr -cd '[:alnum:]_')
+    genome_id=\$(grep '^>' \$fasta_path | head -n 1 | cut -d ' ' -f2 | sed 's/^>//' | tr -cd '[:alnum:]_')
     echo "Using genome ID: \$genome_id"
 
     mkdir -p data/\$genome_id
