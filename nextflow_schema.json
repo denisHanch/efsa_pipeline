@@ -26,7 +26,7 @@
           "format": "directory-path",
           "default": "data/outputs/logs",
           "description": "Directory where log files will be stored."
-        },
+        }
       }
     },
     "general_options": {
@@ -50,6 +50,37 @@
           "description": "Clean the Nextflow work directory after successful completion."
         }
       }
+    },
+    // new section to not influent previous version
+    "validated_inputs": {
+      "title": "Validated inputs",
+      "type": "object",
+      "description": "File paths and flags produced by the validation step (loaded via -params-file validated_params.json).",
+      "properties": {
+        "ref_fasta_validated": {
+          "type": "string",
+          "format": "file-path",
+          "hidden": true,
+          "description": "Validated reference genome FASTA path."
+        },
+        "mod_fasta_validated": {
+          "type": "string",
+          "format": "file-path",
+          "hidden": true,
+          "description": "Validated modified genome FASTA path."
+        },
+        "fasta_ref_x_mod": {
+          "type": "boolean",
+          "default": false,
+          "hidden": true,
+          "description": "True when both ref and mod genomes validated successfully."
+        }
+      }
     }
-  }
+  },
+  "allOf": [
+    {"$ref": "#/$defs/input_output_options"},
+    {"$ref": "#/$defs/general_options"},
+    {"$ref": "#/$defs/validated_inputs"}
+  ]
 }

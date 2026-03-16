@@ -159,15 +159,15 @@ def main():
     print(f"Log file: {log_file}")
 
     # ========================================================================
-    # Step 4: Generate nextflow_schema.json with validation results
+    # Step 4: Write validated_params.json for Nextflow (-params-file)
     # ========================================================================
     validation_results = {
         "ref_genome": ref_genome_res,
         "mod_genome": mod_genome_res,
     }
-    schema = nf_schema.build_schema(validation_results)
+    params = nf_schema.build_params(validation_results)
     project_root = Path(__file__).resolve().parent.parent.parent
-    nf_schema.write_schema(schema, project_root / "nextflow_schema.json")
+    nf_schema.write_params(params, project_root / "validated_params.json")
 
     return 0
 
