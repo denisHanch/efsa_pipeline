@@ -22,6 +22,8 @@ flowchart TD
         bwa_map --> samtools_sort["Samtools Sort & Stats"]
         samtools_sort --> picard["Picard / MultiQC"]
         samtools_sort --> sr_vcf["VCF Output (Short-Read)"]
+        sr_vcf --> short_mod["Optional: Compare to Modified"]
+        short_mod --> agg_tbl
     end
     style ShortReadPipeline fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
@@ -31,6 +33,8 @@ flowchart TD
         minimap2_pb --> samtools_sort_pb["Samtools Sort & Stats"]
         samtools_sort_pb --> pb_sv["SV Calling (CuteSV / Sniffles / Debreak)"]
         pb_sv --> pb_vcf["VCF Output (PacBio)"]
+        pb_vcf --> long_mod_pb["Optional: Compare to Modified"]
+        long_mod_pb --> agg_tbl
     end
     style LongReadPacBio fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
@@ -40,28 +44,45 @@ flowchart TD
         minimap2_ont --> samtools_sort_ont["Samtools Sort & Stats"]
         samtools_sort_ont --> ont_sv["SV Calling (CuteSV / Sniffles / Debreak)"]
         ont_sv --> ont_vcf["VCF Output (ONT)"]
+        ont_vcf --> long_mod_ont["Optional: Compare to Modified"]
+        long_mod_ont --> agg_tbl
     end
     style LongReadONT fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
     %% Reference vs Modified pipeline
     subgraph RefVsMod["Reference vs Modified Pipeline"]
-        ref_fasta --> nucmer["NUCmer Alignment"]
-        mod_fasta --> nucmer
+        ref_fasta --> run_syri_decision{"--run_syri?"}
+        mod_fasta --> run_syri_decision
+        run_syri_decision -->|Yes| nucmer["NUCmer Alignment"]
+        run_syri_decision -->|No| skip_syri["Skip SYRI"]
         nucmer --> delta_filter["Delta Filter"]
         delta_filter --> show_coords["Show Coords"]
-        show_coords --> syri_vcf["VCF Output (ref_x_modsyri)"]
+        show_coords --> syri_vcf["VCF Output (assemblysyri)"]
+        syri_vcf --> agg_tbl
     end
     style RefVsMod fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
-    %% Truvari comparison
-    subgraph Truvari["Truvari Comparison"]
-        sr_vcf --> truvari["Compare SVs (Truvari)"]
-        pb_vcf --> truvari
-        ont_vcf --> truvari
-        syri_vcf --> truvari
+    %% SV table aggregation (central)
+    subgraph SVTable["SV Table Aggregation"]
+        agg_tbl["Mix SV Tables"] --> restructure["Restructure SV Table (create_sv_output.py)"]
+    end
+    style SVTable fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
+
+    %% Truvari comparison (central)
+    subgraph Truvari["Truvari Comparison (Conditional)"]
+        sr_vcf --> truvari_in["VCFs for Truvari"]
+        pb_vcf --> truvari_in
+        ont_vcf --> truvari_in
+        syri_vcf --> truvari_in
+        truvari_in --> check_truvari{"--run_truvari?"}
+        check_truvari -->|Yes| truvari["Compare SVs (Truvari)"]
+        check_truvari -->|No| skip_truvari["Skip Truvari"]
         truvari --> final_report["Truvari Reports / Summary"]
     end
     style Truvari fill:#D0F0C0,stroke:#2E7D32,stroke-width:2px
+
+    %% Central alignment
+    restructure --> truvari_in
 ```
 
 ## Detailed Workflow Diagrams

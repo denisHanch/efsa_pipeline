@@ -12,7 +12,6 @@ def logUnmapped(reads, total_reads, out_folder_name, reference) {
         def percentage = (unmapped * 100.0) / totalInput
         def pctStr = String.format("%.2f", percentage)
 
-        // Build a plain String
         String msg = "📊 ${out_folder_name} mapping${reference}:\n" +
                      "    Unmapped reads: ${String.format("%,d", unmapped)} (${pctStr}%)\n" +
                      "    Total input reads: ${String.format("%,d", totalInput)}\n"
@@ -53,7 +52,7 @@ def logWorkflowCompletion(out_folder_name) {
             }
 
             if (params.clean_work && out_folder_name == "execution of main.nf") {
-                if( workDir.exists() ) {
+                if ( workDir.exists() ) {
                     workDir.deleteDir()
                     log.info "ℹ️  Nextflow work/ directory was removed.\n"
                 }

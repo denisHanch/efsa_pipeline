@@ -15,6 +15,8 @@ flowchart LR
 ```
 
 ### Key points
+
+- By default a nextflow pipeline is collecting the tables from pipelines and runs restructure_sv_tbl to create all summary  
 - Variants are extracted into a table format with processes `vcf_to_table` and `vcf_to_table_long`
 - if one of the pipelines was not running (shourt/long/assembly) an empty tsv file is generated with a process create_empty_tbl
 - `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
@@ -41,7 +43,13 @@ python3 modules/utils/create_sv_output.py --asm assembly_sv_summary.tsv \
   --long_ont sample1_ont_sv_summary.tsv --long_pacbio sample1_pacbio_sv_summary.tsv \
   --short sample1_short_sv_summary.tsv --out csv_per_sv_sumary
 ```
-
+| Option           | Description                                                                  |
+|------------------|------------------------------------------------------------------------------|
+| `--asm`          | TSV file containing structural variant summary from assembly-based calling   |
+| `--long_ont`     | TSV file with structural variant summary from Oxford Nanopore long-read data |
+| `--long_pacbio`  | TSV file with structural variant summary from PacBio long-read data          |
+| `--short`        | TSV file with structural variant summary from short-read sequencing data     |
+| `--out`          | Output prefix for a folder containing SV results                             |
 
 ### Explanation of csv_per_sv_summary CSV columns
 

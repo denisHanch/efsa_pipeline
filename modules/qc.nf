@@ -7,9 +7,7 @@
  */
 process trimgalore {
 
-    tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/trimmed_reads", mode: 'copy'
-    cpus = 4
 
     input:
     tuple val(pair_id), path(reads)
@@ -30,13 +28,9 @@ process trimgalore {
 
 
 
-/*
- * Check quality of reads
- */
 process fastqc {
-    tag "FASTQC on $pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/fastqc_out", mode: "copy"
 
+    publishDir "${params.out_dir}/${out_folder_name}/fastqc_out", mode: "copy"
 
     input:
     tuple val(pair_id), path(reads)
@@ -52,10 +46,9 @@ process fastqc {
     """
 }
 
-/*
- * Generate multiqc report
- */
+
 process multiqc {
+    
     publishDir "${params.out_dir}/${out_folder_name}/multiqc", mode: "copy"
 
     input:
@@ -75,11 +68,8 @@ process multiqc {
 
 // Processes for long-read pipeline
 
-/*
- * Check QC of input samples
-*/
 process nanoplot {
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/nanoplot", mode: "copy"
 
     input:
