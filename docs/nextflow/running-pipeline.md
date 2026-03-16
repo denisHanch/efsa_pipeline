@@ -14,10 +14,16 @@ The main pipeline (`main.nf`) executes **all three workflows** in sequence:
 This executes all workflows based on the files located within a subfolder of `data/valid` folder:
 
 ```bash
-nextflow run main.nf --max_cpu $(nproc) -resume
+nextflow run main.nf --max_cpu $(nproc) -params-file data/valid/validated_params.json -resume
 ```
 
+<<<<<<< Updated upstream
 ## Nextflow Options
+=======
+The `-params-file` flag passes the `validated_params.json` produced by the validation step, which supplies validated FASTA paths and the `fasta_ref_x_mod` flag to the pipeline automatically.
+
+## Available Nextflow Options
+>>>>>>> Stashed changes
 
 | Option           | Description                                                                                                                                                                         |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
