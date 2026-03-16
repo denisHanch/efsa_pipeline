@@ -26,7 +26,20 @@
           "format": "directory-path",
           "default": "data/outputs/logs",
           "description": "Directory where log files will be stored."
+        }, 
+        "pacbio_fastq": {
+          "type": "string",
+          "format": "file-path",
+          "default": "data/valid/pacbio/Bacillus_toyonensis_LE1_pacbio.fastq.gz",
+          "description": "Directory where log files will be stored."
+        },
+         "nanopore_fastq": {
+          "type": "string",
+          "format": "file-path",
+          "default": "data/valid/nanopore_fastq/Bacillus_toyonensis_LE1_nanopore.fastq.gz",
+          "description": "Directory where log files will be stored."
         }
+
       }
     },
     "general_options": {
@@ -44,6 +57,12 @@
           "default": 1,
           "description": "Maximum number of CPUs available for pipeline processes."
         },
+          "contig_file_size": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Number of contig files found in the input directory."
+        },
         "clean_work": {
           "type": "boolean",
           "default": true,
@@ -58,6 +77,21 @@
           "type": "boolean",
           "default": true,
           "description": "Run SyRI to identify genomic rearrangements between reference and assembly."
+        },
+         "run_illumina": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run Illumina read processing pipeline."
+        },
+        "run_nanopore": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run Nanopore read processing pipeline."
+        },
+        "run_pacbio": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run PacBio read processing pipeline."
         }
       }
     },
@@ -78,7 +112,7 @@
           "hidden": true,
           "description": "Validated modified genome FASTA path."
         },
-        "fasta_ref_x_mod": {
+        "mod_fasta_avail": {
           "type": "boolean",
           "default": false,
           "hidden": true,

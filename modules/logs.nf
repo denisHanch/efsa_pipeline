@@ -74,7 +74,8 @@ def loadFastqFiles(pathPattern) {
 }
 
 def loadShortFastqFiles(short_read_files) {
-    return Channel.from(short_read_files).map { file ->
+    return Channel.from(short_read_files).map { f ->
+            def file = file(f)
             def matcher = file.name =~ /^(.+?)(?:[_\.](S[0-9]+_L[0-9]+_)?(R[12]|[12]))?\.f(ast)?q\.gz$/
             if (matcher.matches()) {
                 [matcher[0][1], file]
