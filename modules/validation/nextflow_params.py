@@ -45,16 +45,18 @@ def build_params(validation_results: dict) -> dict:
         if ngs and ngs not in by_type:
             by_type[ngs] = _path(r)
 
+    contig_file_size = len(gxg.get("contig_files", []))
+
     params = {
         # validated_inputs
         "mod_fasta_avail":    mod_path is not None,
         # general_options — pipeline switches
-        "run_syri":           bool(ref_path and mod_path),
+        "run_syri":           1 <= contig_file_size <= 5,
         "run_truvari":        False,
         "run_illumina":       "illumina" in by_type,
         "run_nanopore":       "ont"      in by_type,
         "run_pacbio":         "pacbio"   in by_type,
-        "contig_file_size":   len(gxg.get("contig_files", [])),
+        "contig_file_size":   contig_file_size,
         "run_vcf_annotation": gff_path is not None,
         # input_output_options — nullable paths
         "nanopore_fastq":     by_type.get("ont"),
