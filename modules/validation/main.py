@@ -152,10 +152,11 @@ def main():
             logger.warning(f"Optional mod_genome validation failed: {e}")
 
     # Inter-genome validation — only if both genomes validated successfully
+    genomexgenome_res = None
     if mod_genome_res is not None:
         try:
-            res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings)
-            report.write(res, file_type="genomexgenome")
+            genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings)
+            report.write(genomexgenome_res, file_type="genomexgenome")
         except ValidationError as e:
             logger.warning(f"Inter-genome validation failed: {e}")
 
@@ -188,11 +189,12 @@ def main():
     except ValidationError as e:
         logger.warning(f"Inter-read validation failed: {e}")
 
-    # Validate features (optional)
+    # Validate features (optional — non-fatal)
+    ref_feature_res = None
     if hasattr(config, 'ref_feature') and config.ref_feature:
         try:
-            res = validate_feature(config.ref_feature, ref_feature_settings)
-            report.write(res, file_type="feature")
+            ref_feature_res = validate_feature(config.ref_feature, ref_feature_settings)
+            report.write(ref_feature_res, file_type="feature")
         except ValidationError as e:
             logger.warning(f"Optional ref_feature validation failed: {e}")
 
@@ -210,8 +212,11 @@ def main():
     # Step 4: Write validated_params.json for Nextflow (-params-file)
     # ========================================================================
     validation_results = {
-        "ref_genome": ref_genome_res,
-        "mod_genome": mod_genome_res,
+        "ref_genome":    ref_genome_res,
+        "mod_genome":    mod_genome_res,
+        "genomexgenome": genomexgenome_res,
+        "reads":         reads_res,
+        "ref_feature":   ref_feature_res,
     }
     params = nf_params.build_params(validation_results)
     nf_params.write_params(params, output_dir / "validated_params.json")

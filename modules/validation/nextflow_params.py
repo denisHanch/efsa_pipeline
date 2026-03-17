@@ -18,8 +18,11 @@ def build_params(validation_results: dict) -> dict:
     ----------
     validation_results : dict
         Expected keys:
-          ref_genome  – GenomeOutputMetadata or None
-          mod_genome  – GenomeOutputMetadata or None
+          ref_genome    – GenomeOutputMetadata or None
+          mod_genome    – GenomeOutputMetadata or None
+          genomexgenome – dict with 'contig_files' key, or None
+          reads         – List[ReadOutputMetadata]
+          ref_feature   – FeatureOutputMetadata or None
 
     Returns
     -------
@@ -31,14 +34,39 @@ def build_params(validation_results: dict) -> dict:
 
     ref_path = _path(validation_results.get("ref_genome"))
     mod_path = _path(validation_results.get("mod_genome"))
+    gxg      = validation_results.get("genomexgenome") or {}
+    reads    = validation_results.get("reads") or []
+    gff_path = _path(validation_results.get("ref_feature"))
+
+    # reads grouped by ngs_type — keep first validated path per type
+    by_type = {}
+    for r in reads:
+        ngs = getattr(r, "ngs_type", None)
+        if ngs and ngs not in by_type:
+            by_type[ngs] = _path(r)
 
     params = {
-        "fasta_ref_x_mod": bool(ref_path and mod_path),
+        # validated_inputs
+        "mod_fasta_avail":    mod_path is not None,
+        # general_options — pipeline switches
+        "run_syri":           bool(ref_path and mod_path),
+        "run_truvari":        False,
+        "run_illumina":       "illumina" in by_type,
+        "run_nanopore":       "ont"      in by_type,
+        "run_pacbio":         "pacbio"   in by_type,
+        "contig_file_size":   len(gxg.get("contig_files", [])),
+        "run_vcf_annotation": gff_path is not None,
+        # input_output_options — nullable paths
+        "nanopore_fastq":     by_type.get("ont"),
     }
     if ref_path:
         params["ref_fasta_validated"] = ref_path
     if mod_path:
         params["mod_fasta_validated"] = mod_path
+    if by_type.get("pacbio"):
+        params["pacbio_fastq"] = by_type["pacbio"]
+    if gff_path:
+        params["gff"] = gff_path
 
     return params
 
