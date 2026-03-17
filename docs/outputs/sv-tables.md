@@ -51,7 +51,7 @@ python3 modules/utils/create_sv_output.py --asm assembly_sv_summary.tsv \
   --out csv_per_sv_sumary
 ```
 
-### Processing script options
+### All supported processing script options
 
 | Option | Description |
 |---|---|
@@ -104,6 +104,6 @@ The examples below use simplified coordinates for clarity.
 
 | Column name | Description |
 |---|---|
-| **long_(ont|pacbio)_supporting_reads** | Number of Oxford Nanopore or PacBio reads supporting the structural variant (VCF `FORMAT` field `DR`, when present). |
-| **long_(ont|pacbio)_supporting_methods** | Number or label of long-read variant calling methods supporting the structural variant, derived from the TSV summary when available. |
+| **long_(ont\|pacbio)_supporting_reads** | Number of Oxford Nanopore or PacBio reads supporting the structural variant (VCF `FORMAT` field `DR`, when present). |
+| **long_(ont\|pacbio)_supporting_methods** | Number or label of long-read variant calling methods supporting the structural variant, derived from the TSV summary when available. |
 | **short_reads_copy_number_estimate** | Estimated copy number derived from short-read depth information (VCF `FORMAT` field `RDCN`). |
