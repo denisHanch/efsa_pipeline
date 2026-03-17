@@ -3,7 +3,32 @@
 nextflow_params.py
 ==================
 Utilities to build and write a validated_params.json file after the validation
-step runs. Nextflow picks up this file via `-params-file validated_params.json`.
+step completes. The file is consumed by the main Nextflow pipeline via
+``-params-file validated_params.json``, overriding the defaults defined in
+``nextflow.config`` and ``nextflow_schema.json``.
+
+Produced parameters
+-------------------
+validated_inputs (hidden, set by validation):
+  ref_fasta_validated  – absolute path to the validated reference FASTA
+  mod_fasta_validated  – absolute path to the validated modified FASTA
+  mod_fasta_avail      – True when a validated modified genome is present
+
+general_options (pipeline execution switches):
+  run_syri             – True when 1–5 contigs found (prokaryotic assembly);
+                         False for >5 contigs (fragmented/eukaryotic) or when
+                         no modified genome is available
+  run_truvari          – always False (reserved for future use / manual override)
+  run_illumina         – True when validated Illumina reads are present
+  run_nanopore         – True when validated Nanopore (ONT) reads are present
+  run_pacbio           – True when validated PacBio reads are present
+  contig_file_size     – number of contig files from inter-genome characterisation
+  run_vcf_annotation   – True when a validated GFF feature file is present
+
+input_output_options (file paths, null when absent):
+  pacbio_fastq         – path to the first validated PacBio FASTQ
+  nanopore_fastq       – path to the first validated Nanopore FASTQ (or None)
+  gff                  – path to the validated reference GFF/GFF3 file
 """
 
 import json
@@ -12,7 +37,7 @@ from pathlib import Path
 
 def build_params(validation_results: dict) -> dict:
     """
-    Build a params dict from validation results.
+    Build a Nextflow params dict from validation results.
 
     Parameters
     ----------
@@ -20,14 +45,15 @@ def build_params(validation_results: dict) -> dict:
         Expected keys:
           ref_genome    – GenomeOutputMetadata or None
           mod_genome    – GenomeOutputMetadata or None
-          genomexgenome – dict with 'contig_files' key, or None
-          reads         – List[ReadOutputMetadata]
+          genomexgenome – dict with 'contig_files' key (from genomexgenome_validation), or None
+          reads         – List[ReadOutputMetadata], each with a .ngs_type attribute
           ref_feature   – FeatureOutputMetadata or None
 
     Returns
     -------
     dict
-        Params ready to serialise as JSON for `-params-file`.
+        Params dict ready to serialise as JSON for ``-params-file``.
+        See module docstring for the full list of produced keys.
     """
     def _path(meta):
         return str(getattr(meta, "output_file", None)) if meta is not None else None

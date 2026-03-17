@@ -17,13 +17,9 @@ This executes all workflows based on the files located within a subfolder of `da
 nextflow run main.nf --max_cpu $(nproc) -params-file data/valid/validated_params.json -resume
 ```
 
-<<<<<<< Updated upstream
-## Nextflow Options
-=======
-The `-params-file` flag passes the `validated_params.json` produced by the validation step, which supplies validated FASTA paths and the `fasta_ref_x_mod` flag to the pipeline automatically.
+The `-params-file` flag passes the `validated_params.json` produced by the validation step, which supplies validated file paths and pipeline flags automatically.
 
-## Available Nextflow Options
->>>>>>> Stashed changes
+## Nextflow Options
 
 | Option           | Description                                                                                                                                                                         |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
