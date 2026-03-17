@@ -14,12 +14,17 @@ many unrelated smaller calls.
 
 Within each event, at most one record per source is chosen (best by supporting_reads then score).
 
+A final pass scans all final SV rows and adds `linked_event` entries for any overlapping events
+on the same chromosome. This captures exact coordinate matches, partial overlaps, and nested
+events for both same-type and cross-type SV rows. Set --cross_type_tol to a small positive
+integer to also link near-identical final coordinates.
+
 Usage:
-    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10
+    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10 --cross_type_tol 0
 
 Any of the inputs may be omitted; the script will process whichever of the assembly, long_ont,
 long_pacbio or short tables are provided. Long-read inputs (ONT and PacBio) are treated
-the same for clustering and merged into the "long" source.
+the same for clustering, but preserved as separate `long_ont_*` and `long_pacbio_*` columns in the final output tables.
 """
 from __future__ import annotations
 
@@ -27,11 +32,10 @@ import argparse
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
-import pandas as pd
 import numpy as np
-
+import pandas as pd
 
 # ----------------------------
 # SV type standardization
@@ -75,7 +79,6 @@ ASM_PREFIX_MAP = [
     (r"^SYN", "RPL"),
 ]
 
-
 def _to_int(x):
     try:
         if pd.isna(x):
@@ -84,7 +87,6 @@ def _to_int(x):
     except Exception:
         return None
 
-
 def _to_float(x):
     try:
         if pd.isna(x):
@@ -92,7 +94,6 @@ def _to_float(x):
         return float(x)
     except Exception:
         return None
-
 
 def standardize_type(raw_svtype, info_svtype, source):
     if info_svtype is not None:
@@ -113,9 +114,7 @@ def standardize_type(raw_svtype, info_svtype, source):
 
     return "RPL"
 
-
 # Data models
-
 
 @dataclass
 class Record:
@@ -131,8 +130,6 @@ class Record:
     copy_number: Optional[int] = None
     supporting_methods: Optional[str] = None
 
-
-
 @dataclass
 class EventCluster:
     chrom: str
@@ -143,7 +140,6 @@ class EventCluster:
     # sequence of overlap percentages (floats, 0-100) collected during daisy-chain merges
     percentage_overlaps: List[float] = field(default_factory=list)
 
-
 # Clustering
 
 def intervals_overlap(a_start, a_end, b_start, b_end, tol):
@@ -151,7 +147,6 @@ def intervals_overlap(a_start, a_end, b_start, b_end, tol):
     if not overlap:
         return False
     return abs(a_start - b_start) <= tol or abs(a_end - b_end) <= tol
-
 
 def cluster_records(records, tol):
     clusters = []
@@ -202,7 +197,6 @@ def cluster_records(records, tol):
 
     return sorted(clusters, key=lambda c: (c.std_type, c.chrom, c.start))
 
-
 def choose_best_record(recs):
     if not recs:
         return None
@@ -216,86 +210,8 @@ def choose_best_record(recs):
 
     return max(recs, key=key)
 
-
-
 def read_tsv(path):
     return pd.read_csv(path, sep="\t", dtype=str, comment="#")
-
-
-def annotate_event_relationships(clusters):
-    """
-    Robust overlap classification using connected components.
-
-    For each (chrom, std_type):
-        - Build overlap graph
-        - Extract connected components
-        - Within each component:
-            - Longest interval = anchor
-            - Others classified relative to anchor
-            - If anchor has no other variants, label as 'isolated'
-    """
-
-    grouped = {}
-    for c in clusters:
-        grouped.setdefault((c.chrom, c.std_type), []).append(c)
-
-    relationship = {}
-
-    for key, group in grouped.items():
-
-        group = sorted(group, key=lambda c: (c.start, c.end))
-
-        adj = {id(c): [] for c in group}
-
-        for i in range(len(group)):
-            for j in range(i + 1, len(group)):
-                c1 = group[i]
-                c2 = group[j]
-
-                if c1.start <= c2.end and c1.end >= c2.start:
-                    adj[id(c1)].append(c2)
-                    adj[id(c2)].append(c1)
-
-        visited = set()
-
-        for c in group:
-            if id(c) in visited:
-                continue
-
-            stack = [c]
-            component = []
-
-            while stack:
-                node = stack.pop()
-                if id(node) in visited:
-                    continue
-                visited.add(id(node))
-                component.append(node)
-                stack.extend(adj[id(node)])
-
-            if len(component) == 1:
-                relationship[id(component[0])] = "isolated"
-                continue
-
-            anchor = max(component, key=lambda x: (x.end - x.start))
-
-            for member in component:
-                if member is anchor:
-                    if len(component) == 1:
-                        relationship[id(member)] = "isolated"
-                    else:
-                        relationship[id(member)] = f"contains_{len(component)-1}_variants"
-                elif member.start >= anchor.start and member.end <= anchor.end:
-                    relationship[id(member)] = (
-                        f"nested_in_{anchor.std_type}_{anchor.start}_{anchor.end}"
-                    )
-                else:
-                    relationship[id(member)] = (
-                        f"overlapping_with_{anchor.std_type}_{anchor.start}_{anchor.end}"
-                    )
-
-    return relationship
-
 
 def load_records(path, source):
     """Load records from a TSV file into Record objects.
@@ -354,22 +270,17 @@ def load_records(path, source):
 
     return out
 
-
-def build_output_table(clusters, relationship_map):
+def build_output_table(clusters):
     rows = []
     counters = {k: 0 for k in TAB_BY_TYPE}
-    
+
     for c in clusters:
         counters[c.std_type] += 1
         eid = f"{c.std_type}_{counters[c.std_type]}"
 
         by_src = {"asm": [], "long_ont": [], "long_pacbio": [], "short": []}
         for m in c.members:
-            src = m.source
-            if src not in by_src:
-                by_src.setdefault(src, []).append(m)
-            else:
-                by_src[src].append(m)
+            by_src.setdefault(m.source, []).append(m)
 
         asm = choose_best_record(by_src.get("asm", []))
         long_ont = choose_best_record(by_src.get("long_ont", []))
@@ -377,7 +288,6 @@ def build_output_table(clusters, relationship_map):
         sht = choose_best_record(by_src.get("short", []))
         pipelines_confirmed = sum(x is not None for x in (asm, long_ont, long_pacbio, sht))
 
-        # format percentage overlaps collected during clustering into a human-friendly string
         percs = getattr(c, "percentage_overlaps", []) or []
         if percs:
             def fmt(p):
@@ -404,7 +314,7 @@ def build_output_table(clusters, relationship_map):
             "asm_start": asm.start if asm else np.nan,
             "asm_end": asm.end if asm else np.nan,
             "asm_svtype_raw": asm.raw_svtype if asm else "",
-            "asm_score" : 1,
+            "asm_score": 1,
 
             "long_ont_start": long_ont.start if long_ont else np.nan,
             "long_ont_end": long_ont.end if long_ont else np.nan,
@@ -429,14 +339,137 @@ def build_output_table(clusters, relationship_map):
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
             "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
-            "percentage_overlap": pct_str,
 
+            "percentage_overlap": pct_str,
             "support_score": pipelines_confirmed,
-            "region_relationship": relationship_map.get(id(c), "isolated"),
         })
 
     return pd.DataFrame(rows)
 
+def _format_linked_event(event_id, std_svtype, chrom, start, end, relation):
+    return f"{event_id} ({std_svtype}, {chrom}:{start}-{end}, {relation})"
+
+def _interval_relation(left_start, left_end, right_start, right_end):
+    if left_start == right_start and left_end == right_end:
+        return "exact_coordinates"
+    if left_start >= right_start and left_end <= right_end:
+        return "nested_in"
+    if left_start <= right_start and left_end >= right_end:
+        return "contains"
+    return "overlap"
+
+def _linked_event_relation(left_start, left_end, right_start, right_end, coord_tol=0):
+    if left_start == right_start and left_end == right_end:
+        return "exact_coordinates"
+
+    overlaps = (right_start <= left_end) and (right_end >= left_start)
+    if overlaps:
+        return _interval_relation(left_start, left_end, right_start, right_end)
+
+    coord_tol = max(int(coord_tol or 0), 0)
+    if coord_tol > 0 and abs(left_start - right_start) <= coord_tol and abs(left_end - right_end) <= coord_tol:
+        return f"same_coordinates_within_{coord_tol}bp"
+
+    return None
+
+def annotate_linked_events(df, coord_tol=0):
+    """
+    Final post-processing step that links overlapping final SV rows using only
+    the event coordinates written to the per-type tables.
+
+    Rules:
+      - same chromosome
+      - intervals overlap in any way, including exact matches and nesting
+      - links are added for both same-type and cross-type event pairs
+      - when coord_tol > 0, near-identical coordinates can also be linked
+
+    The resulting linked_event column contains a semicolon-separated list of
+    linked event IDs with their type, coordinates, and interval relation from
+    the current row's point of view.
+    """
+    df = df.copy()
+
+    if df.empty:
+        df["linked_event"] = pd.Series(dtype=str)
+        return df
+
+    coord_tol = max(int(coord_tol or 0), 0)
+    sort_cols = ["chrom", "event_start", "event_end", "std_svtype", "event_id"]
+    work = df.sort_values(sort_cols).copy()
+    link_map = {idx: [] for idx in work.index}
+
+    for chrom, group in work.groupby("chrom", sort=False):
+        rows = list(group.itertuples())
+        active = []
+
+        for row in rows:
+            row_start = int(row.event_start)
+            row_end = int(row.event_end)
+
+            active = [other for other in active if int(other.event_end) >= row_start - coord_tol]
+
+            for other in active:
+                other_start = int(other.event_start)
+                other_end = int(other.event_end)
+
+                if other_start > row_end + coord_tol or row_start > other_end + coord_tol:
+                    continue
+
+                row_relation = _linked_event_relation(
+                    row_start,
+                    row_end,
+                    other_start,
+                    other_end,
+                    coord_tol,
+                )
+                if row_relation is None:
+                    continue
+
+                other_relation = _linked_event_relation(
+                    other_start,
+                    other_end,
+                    row_start,
+                    row_end,
+                    coord_tol,
+                )
+
+                link_map[row.Index].append(
+                    _format_linked_event(
+                        other.event_id,
+                        other.std_svtype,
+                        chrom,
+                        other_start,
+                        other_end,
+                        row_relation,
+                    )
+                )
+                link_map[other.Index].append(
+                    _format_linked_event(
+                        row.event_id,
+                        row.std_svtype,
+                        chrom,
+                        row_start,
+                        row_end,
+                        other_relation,
+                    )
+                )
+
+            active.append(row)
+
+    def _dedupe_keep_order(items):
+        seen = set()
+        out = []
+        for item in items:
+            if item not in seen:
+                seen.add(item)
+                out.append(item)
+        return out
+
+    df["linked_event"] = [
+        "; ".join(_dedupe_keep_order(link_map[idx]))
+        for idx in df.index
+    ]
+    return df
 
 def write_csv_tables(df, outdir):
     os.makedirs(outdir, exist_ok=True)
@@ -451,7 +484,6 @@ def write_csv_tables(df, outdir):
     if not other.empty:
         other.to_csv(os.path.join(outdir, "Other.csv"), index=False)
 
-
 # Main
 
 def main():
@@ -461,8 +493,15 @@ def main():
     p.add_argument("--long_pacbio", dest="long_pacbio")
     p.add_argument("--short", dest="short_reads")
     p.add_argument("--out", required=True, help="Output directory")
-    p.add_argument("--tol", type=int, default=10)
+    p.add_argument("--tol", type=int, default=10, help="Within-type clustering tolerance in bp")
+    p.add_argument(
+        "--cross_type_tol",
+        type=int,
+        default=0,
+        help="Tolerance in bp for linking near-identical final event coordinates in linked_event. Default 0 keeps overlap-only linking.",
+    )
     args = p.parse_args()
+
     records = []
     records += load_records(args.asm, "asm")
 
@@ -483,10 +522,8 @@ def main():
     if not clusters:
         df = pd.DataFrame()
     else:
-        relationship_map = annotate_event_relationships(clusters)
-        df = build_output_table(clusters, relationship_map)
+        df = build_output_table(clusters)
 
-    # fix scores for long_ont and long_pacbio when info_svtype present
     if "long_ont_info_svtype" in df.columns:
         mask = df["long_ont_info_svtype"].notna() & (df["long_ont_info_svtype"] != "")
         df.loc[mask, "long_ont_score"] = df.loc[mask, "long_ont_score"].fillna(0)
@@ -496,8 +533,10 @@ def main():
 
     write_csv_tables(df, args.out)
 
-    print(f"Wrote CSV tables to: {args.out}")
+    df = annotate_linked_events(df, args.cross_type_tol)
+    write_csv_tables(df, args.out)
 
+    print(f"Wrote CSV tables to: {args.out}")
 
 if __name__ == "__main__":
     main()
