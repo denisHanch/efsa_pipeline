@@ -45,6 +45,7 @@ def main():
         config = ConfigManager.load(config_path)
     except Exception as e:
         logger.error(f"Loading a coonfig file failed: {e}")
+        return
 
 
     # ========================================================================
