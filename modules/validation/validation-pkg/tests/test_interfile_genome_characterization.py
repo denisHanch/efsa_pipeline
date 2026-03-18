@@ -10,6 +10,7 @@ Tests cover:
 - Correct sequence content in output files
 - PAF best-hit selection (multi-hit queries, ribosomal RNA scenario)
 - Orientation tracking ('+' and '-' strand)
+- Ref plasmid files included in minimap2 command
 """
 
 import pytest
@@ -443,3 +444,81 @@ class TestOrientationHandling:
         )
         written_seq = str(SeqIO.read(chr1_file, "fasta").seq)
         assert written_seq == known_seq
+
+
+# ---------------------------------------------------------------------------
+# Ref plasmid files included in minimap2 command
+# ---------------------------------------------------------------------------
+
+class TestRefPlasmidFilesInMinimap2:
+    """Ref plasmid files (from plasmids_to_one=True processing) must be
+    passed to minimap2 so mod sequences homologous to non-main ref
+    chromosomes are not mis-classified as plasmids."""
+
+    @pytest.fixture
+    def setup(self, tmp_path):
+        ref_path = tmp_path / "ref.fasta"
+        plasmid_path = tmp_path / "ref_plasmid.fasta"
+        mod_path = tmp_path / "mod.fasta"
+
+        _write_fasta(ref_path, _make_records(["ref_chr"]))
+        _write_fasta(plasmid_path, _make_records(["ref_plasmid"]))
+        _write_fasta(mod_path, _make_records(["chr", "chr1", "chr2"]))
+
+        ref_result = GenomeOutputMetadata(
+            output_file=str(ref_path),
+            output_filename="ref.fasta",
+            num_sequences=1,
+            plasmid_filenames=["ref_plasmid.fasta"],
+        )
+        mod_result = GenomeOutputMetadata(
+            output_file=str(mod_path),
+            output_filename="mod.fasta",
+            num_sequences=3,
+        )
+        settings = GenomeXGenomeSettings(same_number_of_sequences=False, characterize=True)
+        return tmp_path, ref_result, mod_result, settings
+
+    def test_plasmid_file_appended_to_minimap2_command(self, setup):
+        """minimap2 receives both the main ref file and the plasmid file."""
+        tmp_path, ref_result, mod_result, settings = setup
+        paf = "\n".join([_make_paf_line("chr"), _make_paf_line("chr1"), _make_paf_line("chr2")])
+
+        with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
+             patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout=paf, returncode=0)
+            genomexgenome_validation(ref_result, mod_result, settings)
+
+        cmd = mock_run.call_args[0][0]
+        assert str(tmp_path / "ref.fasta") in cmd
+        assert str(tmp_path / "ref_plasmid.fasta") in cmd
+
+    def test_missing_plasmid_file_skipped_gracefully(self, setup):
+        """A plasmid filename that doesn't exist on disk is silently skipped."""
+        tmp_path, ref_result, mod_result, settings = setup
+        ref_result.plasmid_filenames = ["nonexistent_plasmid.fasta"]
+        paf = _make_paf_line("chr")
+
+        with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
+             patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout=paf, returncode=0)
+            result = genomexgenome_validation(ref_result, mod_result, settings)
+
+        cmd = mock_run.call_args[0][0]
+        assert "nonexistent_plasmid.fasta" not in " ".join(cmd)
+        assert result["passed"] is True
+
+    def test_no_plasmid_filenames_uses_only_main_ref(self, setup):
+        """When ref has no plasmid files, only the main ref is passed to minimap2."""
+        tmp_path, ref_result, mod_result, settings = setup
+        ref_result.plasmid_filenames = []
+        paf = _make_paf_line("chr")
+
+        with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
+             patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout=paf, returncode=0)
+            genomexgenome_validation(ref_result, mod_result, settings)
+
+        cmd = mock_run.call_args[0][0]
+        ref_files_in_cmd = [c for c in cmd if c.endswith(".fasta") and "mod" not in c]
+        assert ref_files_in_cmd == [str(tmp_path / "ref.fasta")]

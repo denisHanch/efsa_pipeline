@@ -201,7 +201,7 @@ def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
     Returns
     -------
     Dict mapping query_name -> {
-        'ref_name'     : str,   # name of best-matching reference sequence (expected to be only one reference = should be same all the time)
+        'ref_name'     : str,   # name of best-matching reference sequence (may come from main ref or a plasmid file)
         'strand'       : str,   # '+' or '-'
         'alignment_len': int,   # alignment block length of the winning hit
     }
@@ -268,10 +268,21 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
     mod_path = _get_metadata_field(mod_genome_result, 'output_file')
     mod_filename = _get_metadata_field(mod_genome_result, 'output_filename')
 
-    logger.debug(f"Running minimap2: ref={ref_path} query={mod_path}")
+    # Include ref plasmid files so mod sequences corresponding to non-main
+    # reference chromosomes are not mis-classified as plasmids.
+    ref_plasmid_filenames = _get_metadata_field(ref_genome_result, 'plasmid_filenames') or []
+    ref_dir = Path(ref_path).parent
+    ref_files = [str(ref_path)]
+    for pf in ref_plasmid_filenames:
+        full_path = ref_dir / pf
+        if full_path.exists():
+            ref_files.append(str(full_path))
+            logger.debug(f"Including ref plasmid file in minimap2: {full_path.name}")
+
+    logger.debug(f"Running minimap2: ref={ref_files} query={mod_path}")
     try:
         proc = subprocess.run(
-            ['minimap2', '-x', 'asm5', str(ref_path), str(mod_path)],
+            ['minimap2', '-x', 'asm5'] + ref_files + [str(mod_path)],
             capture_output=True,
             text=True,
             check=True
