@@ -182,8 +182,8 @@ def genomexgenome_validation(
     return result
 
 
-def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
-    """Parse PAF output and return the best-scoring hit per query sequence.
+def _parse_paf_best_hits(paf_path: str) -> Dict[str, Dict]:
+    """Parse a PAF file and return the best-scoring hit per query sequence.
 
     PAF columns (0-indexed):
       0  query name      1  query length
@@ -209,47 +209,48 @@ def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
     best_hits: Dict[str, Dict] = {}
     # Track (q_start, r_start) per (query_name, ref_name) pair to detect ambiguous alignments
     # pair_starts: Dict[tuple, tuple] = {}
-    for line in paf_output.splitlines():
-        if not line.strip():
-            continue
-        cols = line.split('\t')
-        if len(cols) < 12:
-            continue
-        query_name = cols[0]
-        strand = cols[4]
-        ref_name = cols[5]
-        try:
-            q_start = int(cols[2])
-            r_start = int(cols[7])
-            alignment_block_len = int(cols[10])
-        except ValueError:
-            continue
+    with open(paf_path, 'r') as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            cols = line.split('\t')
+            if len(cols) < 12:
+                continue
+            query_name = cols[0]
+            strand = cols[4]
+            ref_name = cols[5]
+            try:
+                q_start = int(cols[2])
+                r_start = int(cols[7])
+                alignment_block_len = int(cols[10])
+            except ValueError:
+                continue
 
-        # pair_key = (query_name, ref_name)
-        # if pair_key in pair_starts:
-        #     seen_q_start, seen_r_start = pair_starts[pair_key]
-        #     if q_start != seen_q_start:
-        #         raise InterFileValidationError(
-        #             f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
-        #             f"reference '{ref_name}' with conflicting q_start values "
-        #             f"({seen_q_start} and {q_start})"
-        #         )
-        #     if r_start != seen_r_start:
-        #         raise InterFileValidationError(
-        #             f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
-        #             f"reference '{ref_name}' with conflicting r_start values "
-        #             f"({seen_r_start} and {r_start})"
-        #         )
-        # else:
-        #     pair_starts[pair_key] = (q_start, r_start)
+            # pair_key = (query_name, ref_name)
+            # if pair_key in pair_starts:
+            #     seen_q_start, seen_r_start = pair_starts[pair_key]
+            #     if q_start != seen_q_start:
+            #         raise InterFileValidationError(
+            #             f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
+            #             f"reference '{ref_name}' with conflicting q_start values "
+            #             f"({seen_q_start} and {q_start})"
+            #         )
+            #     if r_start != seen_r_start:
+            #         raise InterFileValidationError(
+            #             f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
+            #             f"reference '{ref_name}' with conflicting r_start values "
+            #             f"({seen_r_start} and {r_start})"
+            #         )
+            # else:
+            #     pair_starts[pair_key] = (q_start, r_start)
 
-        current = best_hits.get(query_name)
-        if current is None or alignment_block_len > current['alignment_len']:
-            best_hits[query_name] = {
-                'ref_name': ref_name,
-                'strand': strand,
-                'alignment_len': alignment_block_len,
-            }
+            current = best_hits.get(query_name)
+            if current is None or alignment_block_len > current['alignment_len']:
+                best_hits[query_name] = {
+                    'ref_name': ref_name,
+                    'strand': strand,
+                    'alignment_len': alignment_block_len,
+                }
     return best_hits
 
 
@@ -281,12 +282,12 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
             f"minimap2 failed (exit code {e.returncode}): {e.stderr.strip()}"
         )
 
-    # Parse PAF output: for each query keep only the best-scoring hit so that
+    # Parse PAF file: for each query keep only the best-scoring hit so that
     # multi-copy elements (e.g. ribosomal RNA) are resolved to a single
     # reference assignment, and orientation is captured.
-    best_hits = _parse_paf_best_hits(proc.stdout)
+    best_hits = _parse_paf_best_hits(str(paf_path))
     mapped_ids = set(best_hits.keys())
-    
+
     logger.debug(f"minimap2 mapped {len(mapped_ids)} sequence(s) to reference")
 
     # Split sequences into contigs (mapped) and plasmids (unmapped)
@@ -297,9 +298,6 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
             contig_seqs.append(record)
         else:
             plasmid_seqs.append(record)
-
-    output_dir = Path(mod_path).parent
-    base_name = strip_all_extensions(mod_filename)
 
     # Write each contig to its own file
     contig_files: List[str] = []
