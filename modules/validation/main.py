@@ -30,22 +30,28 @@ def main():
         print("  python main.py config.json")
         return 1
 
-    # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
-    config_path = Path(sys.argv[1]).resolve()
-    output_dir = config_path.parent.parent / "valid"
+
 
     # Setup logging,
-    logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
-    log_file = logger.log_file
+    try:
+        log_file = logger.log_file
+        logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
+    except Exception as e:
+        print(f"Failed to setup logging: {e}")
+        return 1
+
 
     # ========================================================================
     # Step 1: Read and validate config
     # ========================================================================
     try:
+        # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
+        config_path = Path(sys.argv[1]).resolve()
+        output_dir = config_path.parent.parent / "valid"
         config = ConfigManager.load(config_path)
     except Exception as e:
-        logger.error(f"Loading a coonfig file failed: {e}")
-        return
+        logger.error(f"Loading a config file failed: {e}")
+        return 1
 
 
     # ========================================================================
