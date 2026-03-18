@@ -231,6 +231,11 @@ class FeatureValidator(BaseValidator):
                 with open(temp_gff3, 'r') as f:
                     self.features = self._parse_gff(f)
 
+                if not self.features:
+                    self.logger.warning("gffread returned 0 features, falling back to direct GFF parsing")
+                    with open(temp_input, 'r') as f:
+                        self.features = self._parse_gff(f)
+
                 self.logger.info(f"Parsed {len(self.features)} features")
 
             except FeatureValidationError as e:
