@@ -38,14 +38,13 @@ def main():
     logger = None
     log_file = None
 
-    # Setup logging,
+    # Setup logging (fall back to console-only if log file is not writable)
     try:
         logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
-        log_file = logger.log_file
-    except Exception as e:
-        print(f"Failed to setup logging: {e}")
-        return 1
-
+    except (PermissionError, OSError) as e:
+        logger = setup_logging(console_level='DEBUG')
+        logger.warning(f"Could not write log file ({e}); logging to console only")
+    log_file = getattr(logger, 'log_file', None)
 
     # ========================================================================
     # Step 1: Read and validate config
@@ -232,6 +231,6 @@ if __name__ == '__main__':
         logger.error(f"✗ Fatal error: {e}")
         logger.debug(traceback.format_exc())
         if len(sys.argv) >= 2:
-            actual_log_file = get_logger().log_file or (Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log")
+            actual_log_file = getattr(get_logger(), 'log_file', None) or (Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log")
             print(f"Log file: {actual_log_file}")
         sys.exit(1)

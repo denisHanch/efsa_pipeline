@@ -71,7 +71,8 @@ def build_params(validation_results: dict) -> dict:
         if ngs and ngs not in by_type:
             by_type[ngs] = _path(r)
 
-    contig_file_size = len(gxg.get("contig_files", []))
+    gxg_metadata = gxg.get("metadata") or {}
+    contig_file_size = len(gxg_metadata.get("contig_files", []))
 
     params = {
         # validated_inputs
