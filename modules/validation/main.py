@@ -49,8 +49,8 @@ def main():
 
     # Settings for reference genome
     ref_genome_settings = GenomeValidator.Settings(
-        plasmids_to_one=True,
-        main_longest=True,
+        plasmids_to_one=False,
+        error_n_sequences=5,
         coding_type=None,
         output_filename_suffix='ref',
         replace_id_with_incremental='chr',
@@ -103,7 +103,12 @@ def main():
     genomexgenome_settings = GenomeXGenomeSettings(
         characterize=True,
         same_sequence_ids=False,
-        same_number_of_sequences=False
+        same_number_of_sequences=False,
+        concatenate=True,
+        min_mapping_quality=0,
+        min_identity=0,
+        min_query_coverage=0,
+        max_ref_overlap=1000000,
     )
 
     # Inter read validation settings (using defaults)

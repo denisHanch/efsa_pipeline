@@ -30,6 +30,12 @@ class GenomeXGenomeSettings(BaseSettings):
     same_sequence_ids: bool = False
     same_sequence_lengths: bool = False
     characterize: bool = True
+    # Concatenation settings (used when characterize=True)
+    concatenate: bool = False
+    min_mapping_quality: int = 0      # PAF col 11; 0 = accept all
+    min_query_coverage: float = 0.0   # alignment_len / q_len; 0.0 = accept all
+    min_identity: float = 0.0         # residue_matches / alignment_len; 0.0 = accept all
+    max_ref_overlap: int = 0          # max allowed overlap (bp) between adjacent queries on ref
 
     def __post_init__(self):
         if self.same_sequence_lengths and not self.same_sequence_ids:
@@ -37,6 +43,14 @@ class GenomeXGenomeSettings(BaseSettings):
                 "same_sequence_lengths requires same_sequence_ids=True "
                 "(cannot compare lengths without matching IDs)"
             )
+        if not (0.0 <= self.min_query_coverage <= 1.0):
+            raise ValidationError("min_query_coverage must be between 0.0 and 1.0")
+        if not (0.0 <= self.min_identity <= 1.0):
+            raise ValidationError("min_identity must be between 0.0 and 1.0")
+        if self.min_mapping_quality < 0:
+            raise ValidationError("min_mapping_quality must be >= 0")
+        if self.max_ref_overlap < 0:
+            raise ValidationError("max_ref_overlap must be >= 0")
 
 
 def genomexgenome_validation(
@@ -151,7 +165,7 @@ def genomexgenome_validation(
     if settings.characterize:
         logger.info("Running genome characterization: contigs vs plasmids via minimap2")
         try:
-            _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, logger)
+            _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, logger, settings)
         except Exception as e:
             error_msg = f"Genome characterization skipped: {e}"
             errors.append(error_msg)
@@ -182,8 +196,8 @@ def genomexgenome_validation(
     return result
 
 
-def _parse_paf_best_hits(paf_path: str) -> Dict[str, Dict]:
-    """Parse a PAF file and return the best-scoring hit per query sequence.
+def _parse_paf_best_hits(paf_source: str) -> Dict[str, Dict[str, Dict]]:
+    """Parse a PAF file (or raw PAF string) and return the best-scoring hit per (query, ref) pair.
 
     PAF columns (0-indexed):
       0  query name      1  query length
@@ -193,68 +207,160 @@ def _parse_paf_best_hits(paf_path: str) -> Dict[str, Dict]:
       8  r_end           9  residue matches
       10 alignment block length   11 mapping quality
 
-    For each query name the hit with the largest alignment block length
-    (col 10) is selected.  This correctly handles multi-copy elements such
-    as ribosomal RNA that produce many hits: only the highest-scoring
-    reference assignment is kept.
+    For each (query_name, ref_name) pair the hit with the largest alignment
+    block length (col 10) is selected.  A query that maps to multiple distinct
+    reference sequences produces one entry per ref_name, enabling a unique
+    contig file to be written for every such mapping.
+
+    Parameters
+    ----------
+    paf_source : str
+        Either a file path to a PAF file, or a raw PAF string (containing newlines).
 
     Returns
     -------
-    Dict mapping query_name -> {
-        'ref_name'     : str,   # name of best-matching reference sequence (expected to be only one reference = should be same all the time)
-        'strand'       : str,   # '+' or '-'
-        'alignment_len': int,   # alignment block length of the winning hit
+    Dict mapping query_name -> ref_name -> {
+        'strand'        : str,   # '+' or '-'
+        'alignment_len' : int,   # alignment block length (col 10)
+        'q_len'         : int,   # query length (col 1)
+        'q_end'         : int,   # query alignment end (col 3)
+        'r_start'       : int,   # reference alignment start (col 7)
+        'r_end'         : int,   # reference alignment end (col 8)
+        'residue_matches': int,  # matching residues (col 9)
+        'mapq'          : int,   # mapping quality (col 11)
     }
     """
-    best_hits: Dict[str, Dict] = {}
-    # Track (q_start, r_start) per (query_name, ref_name) pair to detect ambiguous alignments
-    # pair_starts: Dict[tuple, tuple] = {}
-    with open(paf_path, 'r') as fh:
-        for line in fh:
-            if not line.strip():
-                continue
-            cols = line.split('\t')
-            if len(cols) < 12:
-                continue
-            query_name = cols[0]
-            strand = cols[4]
-            ref_name = cols[5]
-            try:
-                q_start = int(cols[2])
-                r_start = int(cols[7])
-                alignment_block_len = int(cols[10])
-            except ValueError:
-                continue
+    if '\t' in paf_source or paf_source == '':
+        lines = paf_source.splitlines()
+    else:
+        with open(paf_source, 'r') as fh:
+            lines = fh.readlines()
 
-            # pair_key = (query_name, ref_name)
-            # if pair_key in pair_starts:
-            #     seen_q_start, seen_r_start = pair_starts[pair_key]
-            #     if q_start != seen_q_start:
-            #         raise InterFileValidationError(
-            #             f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
-            #             f"reference '{ref_name}' with conflicting q_start values "
-            #             f"({seen_q_start} and {q_start})"
-            #         )
-            #     if r_start != seen_r_start:
-            #         raise InterFileValidationError(
-            #             f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
-            #             f"reference '{ref_name}' with conflicting r_start values "
-            #             f"({seen_r_start} and {r_start})"
-            #         )
-            # else:
-            #     pair_starts[pair_key] = (q_start, r_start)
+    best_hits: Dict[str, Dict[str, Dict]] = {}
+    for line in lines:
+        if not line.strip():
+            continue
+        cols = line.split('\t')
+        if len(cols) < 12:
+            continue
+        query_name = cols[0]
+        strand = cols[4]
+        ref_name = cols[5]
+        try:
+            alignment_block_len = int(cols[10])
+            q_len   = int(cols[1])
+            q_end   = int(cols[3])
+            r_start = int(cols[7])
+            r_end   = int(cols[8])
+            residue_matches = int(cols[9])
+            mapq    = int(cols[11])
+        except ValueError:
+            continue
 
-            current = best_hits.get(query_name)
-            if current is None or alignment_block_len > current['alignment_len']:
-                best_hits[query_name] = {
-                    'ref_name': ref_name,
-                    'strand': strand,
-                    'alignment_len': alignment_block_len,
-                }
+        ref_hits = best_hits.setdefault(query_name, {})
+        current = ref_hits.get(ref_name)
+        if current is None or alignment_block_len > current['alignment_len']:
+            ref_hits[ref_name] = {
+                'strand':          strand,
+                'alignment_len':   alignment_block_len,
+                'q_len':           q_len,
+                'q_end':           q_end,
+                'r_start':         r_start,
+                'r_end':           r_end,
+                'residue_matches': residue_matches,
+                'mapq':            mapq,
+            }
     return best_hits
 
 
-def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, logger):
+def _filter_and_group_hits(
+    best_hits: Dict[str, Dict[str, Dict]],
+    settings: GenomeXGenomeSettings,
+    logger,
+) -> tuple:
+    """Filter PAF hits by quality thresholds and group passing queries by reference.
+
+    (query_name, ref_name) pairs failing per-hit thresholds, or belonging to a
+    group whose adjacent reference mappings overlap more than max_ref_overlap,
+    are returned in individual_ids and written as standalone contig files by
+    the caller.
+
+    Returns
+    -------
+    groups : Dict[ref_name, List[query_name]]
+        Queries that passed all checks, sorted by r_start within each group.
+    individual_ids : set[Tuple[str, str]]
+        (query_name, ref_name) pairs that failed a threshold or overlap check.
+    """
+    passed: Dict[tuple, Dict] = {}
+    individual_ids: set = set()
+
+    for query_name, ref_hits in best_hits.items():
+        for ref_name, hit in ref_hits.items():
+            if hit['mapq'] < settings.min_mapping_quality:
+                logger.debug(
+                    f"  {query_name} → {ref_name}: MAPQ {hit['mapq']} < "
+                    f"{settings.min_mapping_quality}, writing individually"
+                )
+                individual_ids.add((query_name, ref_name))
+                continue
+
+            query_coverage = hit['alignment_len'] / hit['q_len'] if hit['q_len'] > 0 else 0.0
+            if query_coverage < settings.min_query_coverage:
+                logger.debug(
+                    f"  {query_name} → {ref_name}: query_coverage {query_coverage:.3f} < "
+                    f"{settings.min_query_coverage}, writing individually"
+                )
+                individual_ids.add((query_name, ref_name))
+                continue
+
+            identity = (
+                hit['residue_matches'] / hit['alignment_len']
+                if hit['alignment_len'] > 0 else 0.0
+            )
+            if identity < settings.min_identity:
+                logger.debug(
+                    f"  {query_name} → {ref_name}: identity {identity:.3f} < "
+                    f"{settings.min_identity}, writing individually"
+                )
+                individual_ids.add((query_name, ref_name))
+                continue
+
+            passed[(query_name, ref_name)] = hit
+
+    # Group by ref_name, sort each group by r_start
+    groups: Dict[str, List] = {}
+    for (query_name, ref_name), hit in passed.items():
+        groups.setdefault(ref_name, []).append(query_name)
+    for ref_name in groups:
+        groups[ref_name].sort(key=lambda qn: passed[(qn, ref_name)]['r_start'])
+
+    # Per-group overlap check: demote entire group if any adjacent pair overlaps too much
+    clean_groups: Dict[str, List] = {}
+    for ref_name, query_names in groups.items():
+        has_overlap = False
+        for i in range(len(query_names) - 1):
+            q_a, q_b = query_names[i], query_names[i + 1]
+            overlap = max(0, passed[(q_a, ref_name)]['r_end'] - passed[(q_b, ref_name)]['r_start'])
+            if overlap > settings.max_ref_overlap:
+                logger.warning(
+                    f"Concat group for ref '{ref_name}' has reference overlap "
+                    f"{overlap} bp between '{q_a}' and '{q_b}' "
+                    f"(max_ref_overlap={settings.max_ref_overlap}). "
+                    "Writing sequences individually."
+                )
+                has_overlap = True
+                break
+        if has_overlap:
+            for qn in query_names:
+                individual_ids.add((qn, ref_name))
+        else:
+            clean_groups[ref_name] = query_names
+
+    return clean_groups, individual_ids
+
+
+def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, logger, settings: GenomeXGenomeSettings = None):
     """Run minimap2 alignment and populate characterization keys into metadata.
 
     Raises an exception on any failure so the caller can demote it to a warning.
@@ -282,15 +388,31 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
             f"minimap2 failed (exit code {e.returncode}): {e.stderr.strip()}"
         )
 
-    # Parse PAF file: for each query keep only the best-scoring hit so that
-    # multi-copy elements (e.g. ribosomal RNA) are resolved to a single
-    # reference assignment, and orientation is captured.
+    # Parse PAF file: for each (query, ref) pair keep the best-scoring hit so
+    # that a query mapping to multiple reference sequences produces one contig
+    # file per reference mapping.
     best_hits = _parse_paf_best_hits(str(paf_path))
     mapped_ids = set(best_hits.keys())
 
     logger.debug(f"minimap2 mapped {len(mapped_ids)} sequence(s) to reference")
 
-    # Split sequences into contigs (mapped) and plasmids (unmapped)
+    # Determine grouping for concatenation mode
+    if settings is not None and settings.concatenate:
+        groups, individual_ids = _filter_and_group_hits(best_hits, settings, logger)
+        concat_pairs = {(qn, ref) for ref, qns in groups.items() for qn in qns}
+        logger.debug(
+            f"Concatenation: {len(groups)} group(s), "
+            f"{len(individual_ids)} (query,ref) pair(s) written individually"
+        )
+    else:
+        groups = {}
+        concat_pairs: set = set()
+
+    # All (query_name, ref_name) pairs from best_hits
+    all_pairs = {(qn, ref) for qn, ref_hits in best_hits.items() for ref in ref_hits}
+    individual_pairs = all_pairs - concat_pairs
+
+    # Split sequences: mapped → contigs, unmapped → plasmids
     contig_seqs: List = []
     plasmid_seqs: List = []
     for record in SeqIO.parse(str(mod_path), 'fasta'):
@@ -299,10 +421,50 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
         else:
             plasmid_seqs.append(record)
 
-    # Write each contig to its own file
+    seq_by_id = {seq.id: seq for seq in contig_seqs}
     contig_files: List[str] = []
-    for i, seq in enumerate(contig_seqs):
-        hit = best_hits[seq.id]
+    contig_index = 0
+    concat_groups_metadata: Dict[str, Any] = {}
+
+    # --- Concatenated groups ---
+    for ref_name, query_names in groups.items():
+        oriented_parts = []
+        for qn in query_names:
+            hit = best_hits[qn][ref_name]
+            seq = seq_by_id[qn]
+            new_id = seq.id.rstrip('0123456789')
+            if hit['strand'] == '-':
+                part = seq.reverse_complement(id=new_id, description='')
+            else:
+                part = seq[:]
+                part.id = new_id
+                part.description = ''
+            oriented_parts.append(part)
+
+        concat_seq = oriented_parts[0]
+        for part in oriented_parts[1:]:
+            concat_seq = concat_seq + part
+        concat_seq.id = ref_name.rstrip('0123456789')
+        concat_seq.description = f"concatenated_{len(query_names)}_queries"
+
+        contig_path = output_dir / f"{base_name}_contig_{contig_index}.fasta"
+        with open_compressed_writer(contig_path, CodingType.NONE) as handle:
+            SeqIO.write([concat_seq], handle, 'fasta')
+        contig_files.append(str(contig_path))
+        concat_groups_metadata[ref_name] = {
+            'query_names': query_names,
+            'contig_file': str(contig_path),
+        }
+        logger.debug(
+            f"Concat contig {contig_index}: {len(query_names)} queries → "
+            f"{ref_name} ({len(concat_seq.seq)} bp) → {contig_path.name}"
+        )
+        contig_index += 1
+
+    # --- Individual contigs: one file per (query_name, ref_name) pair ---
+    for query_name, ref_name in sorted(individual_pairs):
+        hit = best_hits[query_name][ref_name]
+        seq = seq_by_id[query_name]
         new_id = seq.id.rstrip('0123456789')
         if hit['strand'] == '-':
             out_seq = seq.reverse_complement(id=new_id, description='')
@@ -310,14 +472,15 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
             out_seq = seq[:]
             out_seq.id = new_id
             out_seq.description = ''
-        contig_path = output_dir / f"{base_name}_contig_{i}.fasta"
+        contig_path = output_dir / f"{base_name}_contig_{contig_index}.fasta"
         with open_compressed_writer(contig_path, CodingType.NONE) as handle:
             SeqIO.write([out_seq], handle, 'fasta')
         contig_files.append(str(contig_path))
         logger.debug(
-            f"Contig {i}: {new_id} ({len(out_seq.seq)} bp) "
-            f"→ {hit['ref_name']} [{hit['strand']}] → {contig_path.name}"
+            f"Contig {contig_index}: {new_id} ({len(out_seq.seq)} bp) "
+            f"→ {ref_name} [{hit['strand']}] → {contig_path.name}"
         )
+        contig_index += 1
 
     # Write all plasmids to a single file
     plasmid_file: Optional[str] = None
@@ -330,14 +493,30 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
 
     logger.info(
         f"Genome characterization complete: "
-        f"{len(contig_seqs)} contig(s), {len(plasmid_seqs)} plasmid(s)"
+        f"{len(contig_files)} contig file(s) "
+        f"({len(groups)} concatenated group(s), {len(individual_pairs)} individual (query,ref) pair(s)), "
+        f"{len(plasmid_seqs)} plasmid(s)"
+    )
+
+    # Build orientation/ref-name metadata: nested for groups, tuple-keyed for individual pairs
+    contig_orientations: Dict[str, Any] = {
+        ref_name: {qn: best_hits[qn][ref_name]['strand'] for qn in qns}
+        for ref_name, qns in groups.items()
+    }
+    contig_orientations.update(
+        {(qn, ref): best_hits[qn][ref]['strand'] for qn, ref in individual_pairs}
+    )
+    contig_ref_names: Dict[str, Any] = {ref_name: ref_name for ref_name in groups}
+    contig_ref_names.update(
+        {(qn, ref): ref for qn, ref in individual_pairs}
     )
 
     metadata.update({
-        'contigs_found': len(contig_seqs),
+        'contigs_found': len(contig_files),
         'plasmids_found': len(plasmid_seqs),
         'contig_files': contig_files,
         'plasmid_file': plasmid_file,
-        'contig_orientations': {seq.id: best_hits[seq.id]['strand'] for seq in contig_seqs},
-        'contig_ref_names': {seq.id: best_hits[seq.id]['ref_name'] for seq in contig_seqs},
+        'contig_orientations': contig_orientations,
+        'contig_ref_names': contig_ref_names,
+        'concat_groups': concat_groups_metadata or None,
     })
