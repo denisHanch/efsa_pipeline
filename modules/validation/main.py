@@ -41,73 +41,82 @@ def main():
     # ========================================================================
     # Step 1: Read and validate config
     # ========================================================================
-    config = ConfigManager.load(config_path)
+    try:
+        config = ConfigManager.load(config_path)
+    except Exception as e:
+        logger.error(f"Loading a coonfig file failed: {e}")
+
 
     # ========================================================================
     # Step 2: Edit settings for each validator
     # ========================================================================
 
     # Settings for reference genome
-    ref_genome_settings = GenomeValidator.Settings(
-        plasmids_to_one=True,
-        main_longest=True,
-        coding_type=None,
-        output_filename_suffix='ref',
-        replace_id_with_incremental='chr',
-        min_sequence_length=100
-    )
+    try:
+        ref_genome_settings = GenomeValidator.Settings(
+            plasmids_to_one=True,
+            main_longest=True,
+            coding_type=None,
+            output_filename_suffix='ref',
+            replace_id_with_incremental='chr',
+            min_sequence_length=100
+        )
 
-    # Settings for modified genome
-    mod_genome_settings = GenomeValidator.Settings(
-        plasmids_to_one=False,
-        error_n_sequences=5,
-        coding_type=None,
-        output_filename_suffix='mod',
-        replace_id_with_incremental='chr',
-        min_sequence_length=100
-    )
+        # Settings for modified genome
+        mod_genome_settings = GenomeValidator.Settings(
+            plasmids_to_one=False,
+            error_n_sequences=5,
+            coding_type=None,
+            output_filename_suffix='mod',
+            replace_id_with_incremental='chr',
+            min_sequence_length=100
+        )
 
-    # Settings for plasmid genomes (if you have them)
-    plasmid_settings = GenomeValidator.Settings(
-        is_plasmid=True,
-        plasmids_to_one=True,
-        coding_type=None,
-        output_filename_suffix='plasmid'
-    )
-    
-    # Settings for reads
-    reads_settings = ReadValidator.Settings(
-        coding_type='gz',
-        outdir_by_ngs_type=True
-    )
+        # Settings for plasmid genomes (if you have them)
+        plasmid_settings = GenomeValidator.Settings(
+            is_plasmid=True,
+            plasmids_to_one=True,
+            coding_type=None,
+            output_filename_suffix='plasmid'
+        )
 
-    # Settings for reference features
-    ref_feature_settings = FeatureValidator.Settings(
-        sort_by_position=False,
-        check_coordinates=False,
-        replace_id_with='chr',
-        coding_type=None,
-        output_filename_suffix='ref'
-    )
+        # Settings for reads
+        reads_settings = ReadValidator.Settings(
+            coding_type='gz',
+            outdir_by_ngs_type=True
+        )
 
-    # Settings for modified features
-    mod_feature_settings = FeatureValidator.Settings(
-        sort_by_position=False,
-        check_coordinates=False,
-        replace_id_with='chr',
-        coding_type=None,
-        output_filename_suffix='mod'
-    )
-    
-    # Inter genome validation settings (using defaults)
-    genomexgenome_settings = GenomeXGenomeSettings(
-        characterize=True,
-        same_sequence_ids=False,
-        same_number_of_sequences=False
-    )
+        # Settings for reference features
+        ref_feature_settings = FeatureValidator.Settings(
+            sort_by_position=False,
+            check_coordinates=False,
+            replace_id_with='chr',
+            coding_type=None,
+            output_filename_suffix='ref'
+        )
 
-    # Inter read validation settings (using defaults)
-    readxread_settings = ReadXReadSettings()
+        # Settings for modified features
+        mod_feature_settings = FeatureValidator.Settings(
+            sort_by_position=False,
+            check_coordinates=False,
+            replace_id_with='chr',
+            coding_type=None,
+            output_filename_suffix='mod'
+        )
+
+        # Inter genome validation settings (using defaults)
+        genomexgenome_settings = GenomeXGenomeSettings(
+            characterize=True,
+            same_sequence_ids=False,
+            same_number_of_sequences=False
+        )
+
+        # Inter read validation settings (using defaults)
+        readxread_settings = ReadXReadSettings()
+
+    except Exception as e:
+        logger.error(f"Setting up validators failed: {e}")
+
 
     # ========================================================================
     # Step 3: Run validation using functional API
