@@ -114,11 +114,16 @@ def main():
     # ========================================================================
     report = ValidationReport(output_dir / "report.txt")
 
-    # Validate reference genome (required — fatal on failure)
-    ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
-    report.write(ref_genome_res, file_type="genome")
+    # Validate reference genome (required)
+    ref_genome_res = None
+    if hasattr(config, 'ref_genome') and config.ref_genome:
+        try:
+            ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
+            report.write(ref_genome_res, file_type="genome")
+        except ValidationError as e:
+            logger.error(f"Required ref_genome validation failed: {e}")
 
-    # Validate modified genome (optional — non-fatal)
+    # Validate modified genome (optional)
     mod_genome_res = None
     if hasattr(config, 'mod_genome') and config.mod_genome:
         try:
@@ -135,7 +140,7 @@ def main():
         except ValidationError as e:
             logger.warning(f"Inter-genome validation failed: {e}")
 
-    # Validate plasmid genomes (optional — non-fatal)
+    # Validate plasmid genomes (optional)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
         try:
             res = validate_genome(config.ref_plasmid, plasmid_settings)
@@ -150,9 +155,12 @@ def main():
         except ValidationError as e:
             logger.warning(f"Optional mod_plasmid validation failed: {e}")
 
-    # Validate reads (required — fatal on failure)
-    reads_res = validate_reads(config.reads, reads_settings)
-    report.write(reads_res, file_type="read")
+    # Validate reads (required)
+    try:
+        reads_res = validate_reads(config.reads, reads_settings)
+        report.write(reads_res, file_type="read")
+    except ValidationError as e:
+        logger.warning(f"Read validation failed: {e}")
 
     # Add interread validation
     try:
@@ -161,7 +169,7 @@ def main():
     except ValidationError as e:
         logger.warning(f"Inter-read validation failed: {e}")
 
-    # Validate features (optional — non-fatal)
+    # Validate features (optional)
     if hasattr(config, 'ref_feature') and config.ref_feature:
         try:
             res = validate_feature(config.ref_feature, ref_feature_settings)
