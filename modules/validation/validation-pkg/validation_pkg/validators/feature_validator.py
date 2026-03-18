@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Optional, List, Type, Any
 from dataclasses import dataclass
+from multiprocessing import Pool
 import tempfile
 import subprocess
 
@@ -11,6 +12,22 @@ from validation_pkg.exceptions import FeatureValidationError
 from validation_pkg.utils.formats import CodingType as CT, FeatureFormat
 from validation_pkg.utils.file_handler import open_compressed_writer, check_tool_available
 from validation_pkg.utils.base_validator import BaseValidator
+
+TRUST_MODE_SAMPLE_SIZE = 10
+PARALLEL_CHUNK_MULTIPLIER = 4
+MIN_PARALLEL_FEATURES = 1000
+MIN_CHUNK_SIZE = 1000
+
+
+def _validate_feature_coordinates(feature) -> dict:
+    """Validate coordinates of a single feature (module-level for pickling)."""
+    if feature.start < 1:
+        return {'valid': False, 'seqname': feature.seqname,
+                'error': f"Invalid start coordinate ({feature.start} < 1)"}
+    if feature.start > feature.end:
+        return {'valid': False, 'seqname': feature.seqname,
+                'error': f"start > end ({feature.start} > {feature.end})"}
+    return {'valid': True}
 
 @dataclass
 class FeatureOutputMetadata(BaseOutputMetadata):
@@ -167,9 +184,42 @@ class FeatureValidator(BaseValidator):
         """Execute validation and processing workflow for trust/strict modes."""
         # Trust/Strict modes - full validation and processing
         self._parse_input()
+        self._validate_coordinates()
         self._edit_features()
         output_path = self._write_output()
         return output_path
+
+    def _validate_coordinates(self) -> None:
+        """Validate feature coordinates, using parallel processing for large files."""
+        if not self.settings.check_coordinates or not self.features:
+            return
+
+        validate_count = TRUST_MODE_SAMPLE_SIZE if self.validation_level == 'trust' else len(self.features)
+        features_to_validate = self.features[:validate_count]
+
+        use_parallel = (
+            self.validation_level != 'trust'
+            and self.threads and self.threads > 1
+            and len(self.features) >= MIN_PARALLEL_FEATURES
+        )
+
+        if use_parallel:
+            chunk_size = max(MIN_CHUNK_SIZE, len(features_to_validate) // (self.threads * PARALLEL_CHUNK_MULTIPLIER))
+            self.logger.debug(f"Validating coordinates in parallel ({self.threads} threads, chunk_size={chunk_size})...")
+            with Pool(processes=self.threads) as pool:
+                results = pool.map(_validate_feature_coordinates, features_to_validate, chunksize=chunk_size)
+        else:
+            self.logger.debug("Validating coordinates sequentially...")
+            results = [_validate_feature_coordinates(f) for f in features_to_validate]
+
+        for res in results:
+            if not res['valid']:
+                self.logger.add_validation_issue(
+                    level='WARNING',
+                    category='coordinate',
+                    message=res['error'],
+                    details={'seqname': res['seqname']}
+                )
 
     def _parse_gff(self, handle) -> List[Feature]:
         """Parse GFF3 format file."""
