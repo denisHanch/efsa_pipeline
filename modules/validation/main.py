@@ -30,95 +30,116 @@ def main():
         print("  python main.py config.json")
         return 1
 
-    # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
-    config_path = Path(sys.argv[1]).resolve()
-    output_dir = config_path.parent.parent / "valid"
+
 
     # Setup logging,
-    logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
-    log_file = logger.log_file
+    try:
+        log_file = logger.log_file
+        logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
+    except Exception as e:
+        print(f"Failed to setup logging: {e}")
+        return 1
+
 
     # ========================================================================
     # Step 1: Read and validate config
     # ========================================================================
-    config = ConfigManager.load(config_path)
+    try:
+        # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
+        config_path = Path(sys.argv[1]).resolve()
+        output_dir = config_path.parent.parent / "valid"
+        config = ConfigManager.load(config_path)
+    except Exception as e:
+        logger.error(f"Loading a config file failed: {e}")
+        return 1
+
 
     # ========================================================================
     # Step 2: Edit settings for each validator
     # ========================================================================
 
     # Settings for reference genome
-    ref_genome_settings = GenomeValidator.Settings(
-        plasmids_to_one=True,
-        main_longest=True,
-        coding_type=None,
-        output_filename_suffix='ref',
-        replace_id_with_incremental='chr',
-        min_sequence_length=100
-    )
+    try:
+        ref_genome_settings = GenomeValidator.Settings(
+            plasmids_to_one=True,
+            main_longest=True,
+            coding_type=None,
+            output_filename_suffix='ref',
+            replace_id_with_incremental='chr',
+            min_sequence_length=100
+        )
 
-    # Settings for modified genome
-    mod_genome_settings = GenomeValidator.Settings(
-        plasmids_to_one=False,
-        error_n_sequences=5,
-        coding_type=None,
-        output_filename_suffix='mod',
-        replace_id_with_incremental='chr',
-        min_sequence_length=100
-    )
+        # Settings for modified genome
+        mod_genome_settings = GenomeValidator.Settings(
+            plasmids_to_one=False,
+            error_n_sequences=5,
+            coding_type=None,
+            output_filename_suffix='mod',
+            replace_id_with_incremental='chr',
+            min_sequence_length=100
+        )
 
-    # Settings for plasmid genomes (if you have them)
-    plasmid_settings = GenomeValidator.Settings(
-        is_plasmid=True,
-        plasmids_to_one=True,
-        coding_type=None,
-        output_filename_suffix='plasmid'
-    )
-    
-    # Settings for reads
-    reads_settings = ReadValidator.Settings(
-        coding_type='gz',
-        outdir_by_ngs_type=True
-    )
+        # Settings for plasmid genomes (if you have them)
+        plasmid_settings = GenomeValidator.Settings(
+            is_plasmid=True,
+            plasmids_to_one=True,
+            coding_type=None,
+            output_filename_suffix='plasmid'
+        )
 
-    # Settings for reference features
-    ref_feature_settings = FeatureValidator.Settings(
-        sort_by_position=False,
-        check_coordinates=False,
-        replace_id_with='chr',
-        coding_type=None,
-        output_filename_suffix='ref'
-    )
+        # Settings for reads
+        reads_settings = ReadValidator.Settings(
+            coding_type='gz',
+            outdir_by_ngs_type=True
+        )
 
-    # Settings for modified features
-    mod_feature_settings = FeatureValidator.Settings(
-        sort_by_position=False,
-        check_coordinates=False,
-        replace_id_with='chr',
-        coding_type=None,
-        output_filename_suffix='mod'
-    )
-    
-    # Inter genome validation settings (using defaults)
-    genomexgenome_settings = GenomeXGenomeSettings(
-        characterize=True,
-        same_sequence_ids=False,
-        same_number_of_sequences=False
-    )
+        # Settings for reference features
+        ref_feature_settings = FeatureValidator.Settings(
+            sort_by_position=False,
+            check_coordinates=False,
+            replace_id_with='chr',
+            coding_type=None,
+            output_filename_suffix='ref'
+        )
 
-    # Inter read validation settings (using defaults)
-    readxread_settings = ReadXReadSettings()
+        # Settings for modified features
+        mod_feature_settings = FeatureValidator.Settings(
+            sort_by_position=False,
+            check_coordinates=False,
+            replace_id_with='chr',
+            coding_type=None,
+            output_filename_suffix='mod'
+        )
+
+        # Inter genome validation settings (using defaults)
+        genomexgenome_settings = GenomeXGenomeSettings(
+            characterize=True,
+            same_sequence_ids=False,
+            same_number_of_sequences=False
+        )
+
+        # Inter read validation settings (using defaults)
+        readxread_settings = ReadXReadSettings()
+
+    except Exception as e:
+        logger.error(f"Setting up validators failed: {e}")
+
 
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
     report = ValidationReport(output_dir / "report.txt")
 
-    # Validate reference genome (required — fatal on failure)
-    ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
-    report.write(ref_genome_res, file_type="genome")
+    # Validate reference genome (required)
+    ref_genome_res = None
+    if hasattr(config, 'ref_genome') and config.ref_genome:
+        try:
+            ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
+            report.write(ref_genome_res, file_type="genome")
+        except ValidationError as e:
+            logger.error(f"Required ref_genome validation failed: {e}")
 
-    # Validate modified genome (optional — non-fatal)
+    # Validate modified genome (optional)
     mod_genome_res = None
     if hasattr(config, 'mod_genome') and config.mod_genome:
         try:
@@ -135,7 +156,7 @@ def main():
         except ValidationError as e:
             logger.warning(f"Inter-genome validation failed: {e}")
 
-    # Validate plasmid genomes (optional — non-fatal)
+    # Validate plasmid genomes (optional)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
         try:
             res = validate_genome(config.ref_plasmid, plasmid_settings)
@@ -150,9 +171,12 @@ def main():
         except ValidationError as e:
             logger.warning(f"Optional mod_plasmid validation failed: {e}")
 
-    # Validate reads (required — fatal on failure)
-    reads_res = validate_reads(config.reads, reads_settings)
-    report.write(reads_res, file_type="read")
+    # Validate reads (required)
+    try:
+        reads_res = validate_reads(config.reads, reads_settings)
+        report.write(reads_res, file_type="read")
+    except ValidationError as e:
+        logger.warning(f"Read validation failed: {e}")
 
     # Add interread validation
     try:
@@ -161,7 +185,7 @@ def main():
     except ValidationError as e:
         logger.warning(f"Inter-read validation failed: {e}")
 
-    # Validate features (optional — non-fatal)
+    # Validate features (optional)
     if hasattr(config, 'ref_feature') and config.ref_feature:
         try:
             res = validate_feature(config.ref_feature, ref_feature_settings)
