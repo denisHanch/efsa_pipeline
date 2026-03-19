@@ -37,9 +37,11 @@ The EFSA Pipeline validation module supports various file formats for genomic da
 | Compression: `.gz`, `.bz2`, `.gzip`, `.bzip2` | Uncompressed |
 
 ### Details
-- All feature formats are converted to GFF3
+- All feature formats are converted to GFF3 via `gffread`
 - BED files are automatically converted to GFF3 format
 - Output is always uncompressed
+- If `gffread` fails to parse the file, the validator falls back to direct parallel GFF3 parsing (strict mode only)
+- Coordinate validation (`start >= 1`, `start <= end`) runs in strict mode; issues are reported as warnings
 
 ## File Organization
 

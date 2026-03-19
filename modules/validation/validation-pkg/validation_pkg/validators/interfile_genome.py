@@ -15,12 +15,15 @@ from ..utils.formats import CodingType
 
 def _get_metadata_field(metadata_obj, field_name, default=None):
     """Get field from either OutputMetadata object or dict."""
+    if metadata_obj is None:
+        return default
     if hasattr(metadata_obj, field_name):
         # OutputMetadata object - use attribute access
         return getattr(metadata_obj, field_name, default)
-    else:
+    elif isinstance(metadata_obj, dict):
         # Dictionary - use dict access
         return metadata_obj.get(field_name, default)
+    return default
 
 
 @dataclass
@@ -90,6 +93,7 @@ def genomexgenome_validation(
             logger.debug(f"Sequence count match: {ref_count} sequence(s)")
 
     # Check 2: Same sequence IDs
+    common_ids = set()
     if settings.same_sequence_ids:
         ref_ids = set(_get_metadata_field(ref_meta, 'sequence_ids', []))
         mod_ids = set(_get_metadata_field(mod_meta, 'sequence_ids', []))
@@ -219,8 +223,8 @@ def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
         strand = cols[4]
         ref_name = cols[5]
         try:
-            q_start = int(cols[2])
-            r_start = int(cols[7])
+            # q_start = int(cols[2])
+            # r_start = int(cols[7])
             alignment_block_len = int(cols[10])
         except ValueError:
             continue

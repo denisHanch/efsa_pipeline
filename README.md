@@ -456,13 +456,13 @@ These columns describe the SV event independently of any specific pipeline:
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | **event_id**        | Unique identifier of the structural variant (SV) event.                                                                                    |
 | **chrom**           | Chromosome where the SV is located (VCF `CHROM`).                                                                                          |
-| **std_svtype**      | Standardized SV type harmonized across pipelines (e.g. DEL, DUP, INS, INV).                                                                |
-| **event_start**     | Representative start coordinate of the SV (VCF `POS`), selected from available pipeline calls.                                             |
-| **event_end**       | Representative end coordinate of the SV (VCF `END`).                                                                                       |
-| **event_length_bp** | Length of the SV in base pairs, calculated as `event_end − event_start`.                                                                   |
-| **support_score**   | Integrated support score summarizing evidence across all pipelines, taking into account SV agreement, confidence scores, and read support. |
-
-| **percentage_overlap**   | Percentage of genomic overlap between two structural variants, calculated as the length of the intersection of their genomic intervals divided by the length of the smaller variant, multiplied by 100. |
+| **std_svtype**      | Standardized SV type harmonized across pipelines. Current values are `DEL`, `INS`, `RPL`, `INV`, and `TRA`. |
+| **event_start**     | Representative start coordinate of the final merged SV event. |
+| **event_end**       | Representative end coordinate of the final merged SV event. |
+| **event_length_bp** | Length of the SV in base pairs, calculated as `event_end - event_start + 1`. |
+| **support_score**   | Number of input sources contributing to the final event row. In the current implementation this is the count of non-empty calls among `asm`, `long_ont`, `long_pacbio`, and `short`. |
+| **percentage_overlap** | Comma-separated overlap percentages collected while building a same-type event cluster. Each value is calculated during one merge step as `(intersection length / longer interval length) × 100`. Empty if the final event was created from a single record only. |
+| **linked_event** | Semicolon-separated list of overlapping final SV events on the same chromosome. This single column includes both same-type and cross-type links, so there is no separate same-type relationship column in the final CSVs. Each linked entry has the format `<event_id> (<std_svtype>, <chrom>:<start>-<end>, <relation>)`. The standard relation values are `exact_coordinates`, `overlap`, `nested_in`, and `contains`, always from the point of view of the current row. If `--cross_type_tol` is set above `0`, near-identical boundaries can also be reported as `same_coordinates_within_<N>bp`. Example for a current event `DEL_2` at `chr1:23-67`: `DEL_1 (DEL, chr1:20-80, nested_in); DEL_3 (DEL, chr1:60-90, overlap); RPL_1 (RPL, chr1:23-67, exact_coordinates); INV_1 (INV, chr1:10-100, nested_in)`. Leave empty when no linked events are found. |
 
 **Additional pipeline-specific columns**
 
