@@ -214,12 +214,18 @@ def main():
     # ========================================================================
     # Step 4: Write validated_params.json for Nextflow (-params-file)
     # ========================================================================
+    mod_n_sequence_limit = (
+        config.mod_genome.n_sequence_limit
+        if hasattr(config, 'mod_genome') and config.mod_genome
+        else None
+    )
     validation_results = {
-        "ref_genome":    ref_genome_res,
-        "mod_genome":    mod_genome_res,
-        "genomexgenome": genomexgenome_res,
-        "reads":         reads_res,
-        "ref_feature":   ref_feature_res,
+        "ref_genome":          ref_genome_res,
+        "mod_genome":          mod_genome_res,
+        "genomexgenome":       genomexgenome_res,
+        "reads":               reads_res,
+        "ref_feature":         ref_feature_res,
+        "mod_n_sequence_limit": mod_n_sequence_limit,
     }
     params = nf_params.build_params(validation_results)
     nf_params.write_params(params, output_dir / "validated_params.json")
