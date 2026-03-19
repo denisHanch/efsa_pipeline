@@ -64,6 +64,7 @@ This file is produced by the validation step and consumed by Nextflow via `-para
 
 | Parameter            | Type    | Description                                                                                           |
 | -------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
+| `run_ref_x_mod`      | boolean | `true` when both reference and modified genome validation succeeded; gates all ref-vs-mod steps.      |
 | `run_syri`           | boolean | `true` when 1–5 contigs found (prokaryotic assembly); `false` for >5 contigs or no modified genome.  |
 | `run_truvari`        | boolean | Always `false` by default; can be overridden manually.                                                |
 | `run_illumina`       | boolean | `true` when validated Illumina reads are present.                                                     |
