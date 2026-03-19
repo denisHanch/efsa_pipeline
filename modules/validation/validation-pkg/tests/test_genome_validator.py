@@ -433,7 +433,6 @@ class TestGenomeValidatorEditing:
         settings = GenomeValidator.Settings(
             replace_id_with="chr",
             min_sequence_length=0,
-            warn_n_sequences=10,
             plasmid_split=False
         )
 
@@ -462,7 +461,6 @@ class TestGenomeValidatorEditing:
         settings = GenomeValidator.Settings(
             replace_id_with_incremental="chr",
             min_sequence_length=0,
-            warn_n_sequences=10,
             plasmid_split=False
         )
 
@@ -784,7 +782,6 @@ class TestGenomeValidatorPlasmidSplit:
         settings = GenomeValidator.Settings(
             plasmid_split=False,  # Disabled
             min_sequence_length=0,
-            warn_n_sequences=2  # Default threshold
         )
 
         validator = GenomeValidator(genome_config, settings)
@@ -804,7 +801,7 @@ class TestGenomeValidatorPlasmidSplit:
         assert not plasmid_file1.exists()
 
     def test_plasmid_split_not_triggered_with_two_sequences(self, fasta_with_two_sequences, output_dir):
-        """Test that plasmid split IS triggered when 2 sequences >= warn_n_sequences threshold."""
+        """Test that plasmid split is triggered with 2 sequences."""
         genome_config = GenomeConfig(
             filename="genome_two_seqs.fasta",
             basename="genome_two_seqs",
@@ -818,13 +815,11 @@ class TestGenomeValidatorPlasmidSplit:
         settings = GenomeValidator.Settings(
             plasmid_split=True,
             min_sequence_length=0,
-            warn_n_sequences=2  # Default threshold
         )
 
         validator = GenomeValidator(genome_config, settings)
         validator.run()
 
-        # With 2 sequences and warn_n_sequences=2, split IS triggered (>= comparison at line 238)
         # Only 1 sequence (longest) should remain
         assert len(validator.sequences) == 1
         assert validator.sequences[0].id == "chromosome"

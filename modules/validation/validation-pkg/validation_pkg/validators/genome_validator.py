@@ -110,7 +110,6 @@ class GenomeValidator(BaseValidator):
         # Validation thresholds
         allow_empty_sequences: bool = False
         allow_empty_id: bool = False
-        warn_n_sequences: int = 2
 
         # Editing specifications
         is_plasmid: bool = False
@@ -385,18 +384,6 @@ class GenomeValidator(BaseValidator):
             return
 
         # Strict mode - full validation
-        # Warn about number of sequences
-        if len(self.sequences) >= self.settings.warn_n_sequences:
-            self.logger.add_validation_issue(
-                level='WARNING',
-                category='genome',
-                message=f"High number of sequences: {len(self.sequences)}",
-                details={
-                    'num_sequences': len(self.sequences),
-                    'threshold': self.settings.warn_n_sequences
-                }
-            )
-
         for idx, record in enumerate(self.sequences):
             # Check sequence ID
             if not record.id and not self.settings.allow_empty_id:
