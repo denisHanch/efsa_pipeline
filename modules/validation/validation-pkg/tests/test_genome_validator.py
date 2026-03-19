@@ -433,7 +433,6 @@ class TestGenomeValidatorEditing:
         settings = GenomeValidator.Settings(
             replace_id_with="chr",
             min_sequence_length=0,
-            warn_n_sequences=10,
             plasmid_split=False
         )
 
@@ -462,7 +461,6 @@ class TestGenomeValidatorEditing:
         settings = GenomeValidator.Settings(
             replace_id_with_incremental="chr",
             min_sequence_length=0,
-            warn_n_sequences=10,
             plasmid_split=False
         )
 
@@ -784,7 +782,6 @@ class TestGenomeValidatorPlasmidSplit:
         settings = GenomeValidator.Settings(
             plasmid_split=False,  # Disabled
             min_sequence_length=0,
-            warn_n_sequences=2  # Default threshold
         )
 
         validator = GenomeValidator(genome_config, settings)
@@ -804,7 +801,7 @@ class TestGenomeValidatorPlasmidSplit:
         assert not plasmid_file1.exists()
 
     def test_plasmid_split_not_triggered_with_two_sequences(self, fasta_with_two_sequences, output_dir):
-        """Test that plasmid split IS triggered when 2 sequences >= warn_n_sequences threshold."""
+        """Test that plasmid split is triggered with 2 sequences."""
         genome_config = GenomeConfig(
             filename="genome_two_seqs.fasta",
             basename="genome_two_seqs",
@@ -818,13 +815,11 @@ class TestGenomeValidatorPlasmidSplit:
         settings = GenomeValidator.Settings(
             plasmid_split=True,
             min_sequence_length=0,
-            warn_n_sequences=2  # Default threshold
         )
 
         validator = GenomeValidator(genome_config, settings)
         validator.run()
 
-        # With 2 sequences and warn_n_sequences=2, split IS triggered (>= comparison at line 238)
         # Only 1 sequence (longest) should remain
         assert len(validator.sequences) == 1
         assert validator.sequences[0].id == "chromosome"
@@ -1606,7 +1601,7 @@ class TestGenomeValidatorOutputMetadata:
 
 
 class TestGenomeValidatorErrorNSequences:
-    """Test error_n_sequences setting — hard stop when sequence count exceeds threshold."""
+    """Test n_sequence_limit config field — hard stop when sequence count exceeds threshold."""
 
     @pytest.fixture
     def temp_dir(self):
@@ -1626,7 +1621,7 @@ class TestGenomeValidatorErrorNSequences:
             SeqIO.write(records, f, "fasta")
         return path
 
-    def _make_config(self, filepath: Path, output_dir: Path, validation_level: str = "strict"):
+    def _make_config(self, filepath: Path, output_dir: Path, validation_level: str = "strict", n_sequence_limit: int = 5):
         return GenomeConfig(
             filename=filepath.name,
             basename=filepath.stem,
@@ -1635,24 +1630,25 @@ class TestGenomeValidatorErrorNSequences:
             detected_format=GenomeFormat.FASTA,
             output_dir=output_dir,
             global_options={"validation_level": validation_level},
+            n_sequence_limit=n_sequence_limit,
         )
 
     # ── error raised ──────────────────────────────────────────────────────────
 
     def test_raises_when_count_exceeds_threshold_strict(self, temp_dir, output_dir):
-        """Strict mode: error raised when number of sequences exceeds error_n_sequences."""
+        """Strict mode: error raised when number of sequences exceeds n_sequence_limit."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=6)
-        config = self._make_config(fasta, output_dir, "strict")
-        settings = GenomeValidator.Settings(error_n_sequences=5, min_sequence_length=0)
+        config = self._make_config(fasta, output_dir, "strict", n_sequence_limit=5)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
 
         with pytest.raises(GenomeValidationError, match="exceeds maximum allowed"):
             GenomeValidator(config, settings).run()
 
     def test_raises_when_count_exceeds_threshold_trust(self, temp_dir, output_dir):
-        """Trust mode: error_n_sequences check applies before trust-mode shortcut."""
+        """Trust mode: n_sequence_limit check applies before trust-mode shortcut."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=6)
-        config = self._make_config(fasta, output_dir, "trust")
-        settings = GenomeValidator.Settings(error_n_sequences=5, min_sequence_length=0)
+        config = self._make_config(fasta, output_dir, "trust", n_sequence_limit=5)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
 
         with pytest.raises(GenomeValidationError, match="exceeds maximum allowed"):
             GenomeValidator(config, settings).run()
@@ -1660,8 +1656,8 @@ class TestGenomeValidatorErrorNSequences:
     def test_error_message_contains_count_and_threshold(self, temp_dir, output_dir):
         """Error message includes actual count and configured threshold."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=8)
-        config = self._make_config(fasta, output_dir)
-        settings = GenomeValidator.Settings(error_n_sequences=5, min_sequence_length=0)
+        config = self._make_config(fasta, output_dir, n_sequence_limit=5)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
 
         with pytest.raises(GenomeValidationError, match=r"8.*5|5.*8"):
             GenomeValidator(config, settings).run()
@@ -1669,10 +1665,10 @@ class TestGenomeValidatorErrorNSequences:
     # ── boundary conditions ───────────────────────────────────────────────────
 
     def test_no_error_when_count_equals_threshold(self, temp_dir, output_dir):
-        """Exactly at threshold (count == error_n_sequences) should pass — 'higher than'."""
+        """Exactly at threshold (count == n_sequence_limit) should pass — 'higher than'."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=5)
-        config = self._make_config(fasta, output_dir)
-        settings = GenomeValidator.Settings(error_n_sequences=5, min_sequence_length=0)
+        config = self._make_config(fasta, output_dir, n_sequence_limit=5)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
 
         # Should not raise
         GenomeValidator(config, settings).run()
@@ -1680,18 +1676,18 @@ class TestGenomeValidatorErrorNSequences:
     def test_no_error_when_count_below_threshold(self, temp_dir, output_dir):
         """Count below threshold should always pass."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
-        config = self._make_config(fasta, output_dir)
-        settings = GenomeValidator.Settings(error_n_sequences=5, min_sequence_length=0)
+        config = self._make_config(fasta, output_dir, n_sequence_limit=5)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
 
         GenomeValidator(config, settings).run()
 
     # ── disabled / None ───────────────────────────────────────────────────────
 
     def test_none_disables_check(self, temp_dir, output_dir):
-        """error_n_sequences=None disables the check entirely."""
+        """n_sequence_limit=None disables the check entirely."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=100)
-        config = self._make_config(fasta, output_dir)
-        settings = GenomeValidator.Settings(error_n_sequences=None, min_sequence_length=0)
+        config = self._make_config(fasta, output_dir, n_sequence_limit=None)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
 
         # Should not raise regardless of sequence count
         GenomeValidator(config, settings).run()
@@ -1699,10 +1695,10 @@ class TestGenomeValidatorErrorNSequences:
     # ── no output written on error ────────────────────────────────────────────
 
     def test_no_output_file_written_on_error(self, temp_dir, output_dir):
-        """When error_n_sequences is exceeded no output file should be written."""
+        """When n_sequence_limit is exceeded no output file should be written."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=6)
-        config = self._make_config(fasta, output_dir)
-        settings = GenomeValidator.Settings(error_n_sequences=5, min_sequence_length=0)
+        config = self._make_config(fasta, output_dir, n_sequence_limit=5)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
 
         with pytest.raises(GenomeValidationError):
             GenomeValidator(config, settings).run()
