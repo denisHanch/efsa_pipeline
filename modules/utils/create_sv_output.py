@@ -313,22 +313,33 @@ def build_output_table(clusters):
             pct_str = ""
 
         # Calculate lengths for each source
-        asm_length = asm.svlen if asm else np.nan if c.std_type == "INS" else (asm.end - asm.start + 1) if asm else np.nan
-        long_ont_length = long_ont.svlen if long_ont else np.nan if c.std_type == "INS" else (long_ont.end - long_ont.start + 1) if long_ont else np.nan
-        long_pacbio_length = long_pacbio.svlen if long_pacbio else np.nan if c.std_type == "INS" else (long_pacbio.end - long_pacbio.start + 1) if long_pacbio else np.nan
-        sht_length = sht.svlen if sht else np.nan if c.std_type == "INS" else (sht.end - sht.start + 1) if sht else np.nan
+        # For INS types, use svlen; for other types, use calculated end - start + 1
+        asm_length = (asm.svlen if pd.notna(asm.svlen) else np.nan) if (asm and c.std_type == "INS") else ((asm.end - asm.start + 1) if asm else np.nan)
+        long_ont_length = (long_ont.svlen if pd.notna(long_ont.svlen) else np.nan) if (long_ont and c.std_type == "INS") else ((long_ont.end - long_ont.start + 1) if long_ont else np.nan)
+        long_pacbio_length = (long_pacbio.svlen if pd.notna(long_pacbio.svlen) else np.nan) if (long_pacbio and c.std_type == "INS") else ((long_pacbio.end - long_pacbio.start + 1) if long_pacbio else np.nan)
+        sht_length = (sht.svlen if pd.notna(sht.svlen) else np.nan) if (sht and c.std_type == "INS") else ((sht.end - sht.start + 1) if sht else np.nan)
 
-        # Compute minimum of the three lengths
-        lengths = [asm_length, long_ont_length, long_pacbio_length, sht_length]
-        valid_lengths = [l for l in lengths if pd.notna(l)]
-        event_length_bp = min(valid_lengths) if valid_lengths else np.nan
+        # Calculate overlapping interval (most confident coordinates)
+        # overlap_start = max of all member starts, overlap_end = min of all member ends
+        member_starts = [m.start for m in c.members]
+        member_ends = [m.end for m in c.members]
+        overlap_start = max(member_starts) if member_starts else c.start
+        overlap_end = min(member_ends) if member_ends else c.end
+        
+        # For INS, use minimum of source svlen values; for other types, use overlapping interval length
+        if c.std_type == "INS":
+            lengths = [asm_length, long_ont_length, long_pacbio_length, sht_length]
+            valid_lengths = [l for l in lengths if pd.notna(l)]
+            event_length_bp = min(valid_lengths) if valid_lengths else np.nan
+        else:
+            event_length_bp = (overlap_end - overlap_start + 1) if overlap_end >= overlap_start else np.nan
 
         row = {
             "event_id": eid,
             "chrom": c.chrom,
             "std_svtype": c.std_type,
-            "event_start": c.start,
-            "event_end": c.end,
+            "event_start": overlap_start,
+            "event_end": overlap_end,
             "event_length_bp": event_length_bp,
 
             "asm_start": asm.start if asm else np.nan,
