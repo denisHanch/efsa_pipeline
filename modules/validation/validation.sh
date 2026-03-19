@@ -1,5 +1,5 @@
 #!/bin/bash
-# validate-efsa - Wrapper script for EFSA validation
+# validate - Wrapper script for EFSA validation
 
 # Default config path
 DEFAULT_CONFIG="./data/inputs/config.json"
@@ -13,7 +13,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -h|--help)
-            echo "Usage: validate-efsa [--config <path>]"
+            echo "Usage: validate [--config <path>]"
             echo ""
             echo "Options:"
             echo "  --config <path>    Path to config file (default: ./data/inputs/config.json)"
