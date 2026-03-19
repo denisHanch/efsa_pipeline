@@ -189,9 +189,8 @@ process vcf_to_table_asm {
     """
     set -euxo pipefail
 
-    echo -e "chrom\tstart\tend\tsvtype" > "${name}_sv_summary.tsv"
-    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}" >> "${name}_sv_summary.tsv"
-
+    echo -e "chrom\tstart\tend\tsvtype\tstart_mod\tend_mod" > "${name}_sv_summary.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/StartB\t%INFO/EndB\n' "${vcf}" >> "${name}_sv_summary.tsv"
     """
 }
 
