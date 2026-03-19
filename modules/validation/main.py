@@ -74,7 +74,6 @@ def main():
         # Settings for modified genome
         mod_genome_settings = GenomeValidator.Settings(
             plasmids_to_one=False,
-            error_n_sequences=5,
             coding_type=None,
             output_filename_suffix='mod',
             replace_id_with_incremental='chr',

@@ -111,7 +111,6 @@ class GenomeValidator(BaseValidator):
         allow_empty_sequences: bool = False
         allow_empty_id: bool = False
         warn_n_sequences: int = 2
-        error_n_sequences: int = 5
 
         # Editing specifications
         is_plasmid: bool = False
@@ -338,10 +337,11 @@ class GenomeValidator(BaseValidator):
         self.logger.debug("Validating sequences...")
 
         # Check error threshold for number of sequences
-        if self.settings.error_n_sequences is not None and len(self.sequences) > self.settings.error_n_sequences:
+        n_sequence_limit = self.genome_config.n_sequence_limit
+        if n_sequence_limit is not None and len(self.sequences) > n_sequence_limit:
             error_msg = (
                 f"Number of sequences ({len(self.sequences)}) exceeds maximum allowed "
-                f"({self.settings.error_n_sequences} -> the assembly is too fragmented for further analysis)"
+                f"({n_sequence_limit} -> the assembly is too fragmented for further analysis)"
             )
             self.logger.add_validation_issue(
                 level='ERROR',
@@ -349,7 +349,7 @@ class GenomeValidator(BaseValidator):
                 message=error_msg,
                 details={
                     'num_sequences': len(self.sequences),
-                    'error_threshold': self.settings.error_n_sequences
+                    'error_threshold': n_sequence_limit
                 }
             )
             raise GenomeValidationError(error_msg)
