@@ -15,6 +15,7 @@ validated_inputs (hidden, set by validation):
   mod_fasta_avail      – True when a validated modified genome is present
 
 general_options (pipeline execution switches):
+  run_ref_x_mod        – True when both ref_genome and mod_genome validation succeeded
   run_syri             – True when 1–5 contigs found (prokaryotic assembly);
                          False for >5 contigs (fragmented/eukaryotic) or when
                          no modified genome is available
@@ -78,6 +79,7 @@ def build_params(validation_results: dict) -> dict:
         # validated_inputs
         "mod_fasta_avail":    mod_path is not None,
         # general_options — pipeline switches
+        "run_ref_x_mod":      ref_path is not None and mod_path is not None,
         "run_syri":           1 <= contig_file_size <= 5,
         "run_truvari":        False,
         "run_illumina":       "illumina" in by_type,

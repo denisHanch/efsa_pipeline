@@ -125,6 +125,7 @@ def main():
 
     except Exception as e:
         logger.error(f"Setting up validators failed: {e}")
+        return 1
 
 
     # ========================================================================
@@ -152,7 +153,7 @@ def main():
 
     # Inter-genome validation — only if both genomes validated successfully
     genomexgenome_res = None
-    if mod_genome_res is not None:
+    if mod_genome_res is not None and ref_genome_res is not None:
         try:
             genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings)
             report.write(genomexgenome_res, file_type="genomexgenome")
@@ -175,6 +176,7 @@ def main():
             logger.warning(f"Optional mod_plasmid validation failed: {e}")
 
     # Validate reads (required)
+    reads_res = None
     try:
         reads_res = validate_reads(config.reads, reads_settings)
         report.write(reads_res, file_type="read")
@@ -182,11 +184,13 @@ def main():
         logger.warning(f"Read validation failed: {e}")
 
     # Add interread validation
-    try:
-        readxread_res = readxread_validation(reads_res, readxread_settings)
-        report.write(readxread_res, file_type="readxread")
-    except ValidationError as e:
-        logger.warning(f"Inter-read validation failed: {e}")
+    readxread_res = None
+    if reads_res is not None:
+        try:
+            readxread_res = readxread_validation(reads_res, readxread_settings)
+            report.write(readxread_res, file_type="readxread")
+        except ValidationError as e:
+            logger.warning(f"Inter-read validation failed: {e}")
 
     # Validate features (optional — non-fatal)
     ref_feature_res = None

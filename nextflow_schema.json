@@ -53,6 +53,10 @@
       "default": true
     },
 
+    "run_ref_x_mod": {
+      "type": "boolean",
+      "default": false
+    },
     "run_truvari": {
       "type": "boolean",
       "default": false
