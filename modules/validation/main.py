@@ -34,8 +34,8 @@ def main():
 
     # Setup logging,
     try:
-        log_file = logger.log_file
         logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
+        log_file = logger.log_file
     except Exception as e:
         print(f"Failed to setup logging: {e}")
         return 1
