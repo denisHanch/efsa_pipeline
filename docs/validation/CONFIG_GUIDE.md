@@ -117,17 +117,28 @@ Specifies a genome or plasmid file.
 }
 ```
 
-**Optional fields (validator settings):**
+**Optional fields:**
 ```json
 {
   "filename": "path/to/genome.fasta.gz",
   "validation_level": "trust",
+  "n_sequence_limit": 10
 }
 ```
 
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `filename` | string | — | Path to genome file (relative to config) |
+| `validation_level` | string | global / `"strict"` | Per-file validation level override |
+| `threads` | integer | global / auto | Per-file thread count override |
+| `n_sequence_limit` | integer | `10` | Maximum allowed number of sequences. Validation fails if the genome contains more sequences than this limit (assembly too fragmented). Set higher for highly fragmented assemblies. |
+
 **Example:**
 ```json
-"ref_genome_filename": {"filename": "data/reference.gbk"}
+"ref_genome_filename": {
+  "filename": "data/reference.gbk",
+  "n_sequence_limit": 5
+}
 ```
 
 ### ReadConfig Object
@@ -243,9 +254,10 @@ These settings customize validation behavior without modifying code.
 
 ### File-Level Settings
 
-Override global options for specific files by adding settings to individual file entries. Same options as for global ones:
+Override global options for specific files by adding settings to individual file entries:
 - `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (overrides global)
 - `threads`: Number of threads for compression (int, overrides global)
+- `n_sequence_limit`: Maximum number of sequences allowed in a genome/plasmid file (int, genome entries only, default: `10`)
 
 **Warnings:** When a file-level setting overrides a global option, a WARNING is logged:
 ```
@@ -278,22 +290,26 @@ Complete example with all optional fields and global options:
   "ref_genome_filename": {
     "filename": "ref.gbk",
     "validation_level": "strict",
-    "threads": 8
+    "threads": 8,
+    "n_sequence_limit": 10
   },
   "mod_genome_filename": {
     "filename": "mod.fasta.gz",
     "validation_level": "strict",
-    "threads": 8
+    "threads": 8,
+    "n_sequence_limit": 50
   },
   "ref_plasmid_filename": {
     "filename": "plasmid_ref.gbk",
     "validation_level": "strict",
-    "threads": 8
+    "threads": 8,
+    "n_sequence_limit": 5
     },
   "mod_plasmid_filename": {
     "filename": "plasmid_mod.fasta",
     "validation_level": "strict",
-    "threads": 8
+    "threads": 8,
+    "n_sequence_limit": 5
     },
   "reads": [
     {

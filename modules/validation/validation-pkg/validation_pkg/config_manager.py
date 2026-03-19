@@ -60,6 +60,7 @@ class BaseValidatorConfig:
 class GenomeConfig(BaseValidatorConfig):
     """Configuration for genome or plasmid files."""
     detected_format: GenomeFormat = None
+    n_sequence_limit: Optional[int] = 10
 
     def __post_init__(self):
         self._initialize_defaults()
@@ -334,14 +335,26 @@ class ConfigManager:
     @staticmethod
     def _parse_genome_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> GenomeConfig:
         """Parse a genome configuration entry."""
+        n_sequence_limit = None
+        filtered_value = value
+
+        if isinstance(value, dict) and 'n_sequence_limit' in value:
+            n_sequence_limit = value['n_sequence_limit']
+            if not isinstance(n_sequence_limit, int) or n_sequence_limit <= 0:
+                raise ConfigurationError(
+                    f"'{field_name}.n_sequence_limit' must be a positive integer, got {n_sequence_limit!r}"
+                )
+            filtered_value = {k: v for k, v in value.items() if k != 'n_sequence_limit'}
+
         return ConfigManager._parse_file_config(
-            value=value,
+            value=filtered_value,
             field_name=field_name,
             config_dir=config_dir,
             output_dir=output_dir,
             config_class=GenomeConfig,
             format_class=GenomeFormat,
-            global_options=global_options
+            global_options=global_options,
+            extra_fields={'n_sequence_limit': n_sequence_limit} if n_sequence_limit is not None else None
         )
 
     @staticmethod
