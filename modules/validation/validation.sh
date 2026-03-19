@@ -34,6 +34,13 @@ if [ ! -f "$CONFIG_PATH" ]; then
     exit 1
 fi
 
+
+
+# Clear valid directory before running validation
+VALID_DIR="./data/valid"
+echo "Clearing valid directory: $VALID_DIR"
+rm -rf "${VALID_DIR:?}"/*
+
 # Run the validation script with error handling
 echo "Running EFSA validation with config: $CONFIG_PATH"
 echo "---"
