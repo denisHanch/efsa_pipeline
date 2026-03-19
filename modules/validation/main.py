@@ -30,7 +30,11 @@ def main():
         print("  python main.py config.json")
         return 1
 
+    # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
+    config_path = Path(sys.argv[1]).resolve()
     output_dir = config_path.parent.parent / "valid"
+    logger = None
+    log_file = None
 
     # Setup logging,
     try:
@@ -44,9 +48,8 @@ def main():
     # ========================================================================
     # Step 1: Read and validate config
     # ========================================================================
+    config = None
     try:
-        # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
-        config_path = Path(sys.argv[1]).resolve()
         config = ConfigManager.load(config_path)
     except Exception as e:
         logger.error(f"Loading a config file failed: {e}")
