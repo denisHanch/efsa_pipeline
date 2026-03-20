@@ -129,6 +129,9 @@ class Record:
     score: Optional[float] = None
     copy_number: Optional[int] = None
     supporting_methods: Optional[str] = None
+    svlen: Optional[int] = None
+    start_mod: Optional[int] = None
+    end_mod: Optional[int] = None
 
 @dataclass
 class EventCluster:
@@ -251,6 +254,9 @@ def load_records(path, source):
         # treat any long* sources as long for supporting_methods
         supporting_methods = row.get("supporting_methods") if str(source).startswith("long") else None
         copy_number = _to_int(row.get("RDCN")) if source == "short" else None
+        svlen = _to_int(row.get("svlen"))
+        start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
+        end_mod = _to_int(row.get("end_mod")) if source == "asm" else None
 
         out.append(
             Record(
@@ -265,6 +271,9 @@ def load_records(path, source):
                 _to_float(row.get("score")),
                 copy_number,
                 supporting_methods,
+                svlen,
+                start_mod,
+                end_mod,
             )
         )
 
@@ -303,22 +312,47 @@ def build_output_table(clusters):
         else:
             pct_str = ""
 
-        rows.append({
+        # Calculate lengths for each source
+        # For INS types, use svlen; for other types, use calculated end - start + 1
+        asm_length = (asm.svlen if pd.notna(asm.svlen) else np.nan) if (asm and c.std_type == "INS") else ((asm.end - asm.start + 1) if asm else np.nan)
+        long_ont_length = (long_ont.svlen if pd.notna(long_ont.svlen) else np.nan) if (long_ont and c.std_type == "INS") else ((long_ont.end - long_ont.start + 1) if long_ont else np.nan)
+        long_pacbio_length = (long_pacbio.svlen if pd.notna(long_pacbio.svlen) else np.nan) if (long_pacbio and c.std_type == "INS") else ((long_pacbio.end - long_pacbio.start + 1) if long_pacbio else np.nan)
+        sht_length = (sht.svlen if pd.notna(sht.svlen) else np.nan) if (sht and c.std_type == "INS") else ((sht.end - sht.start + 1) if sht else np.nan)
+
+        # Calculate overlapping interval (most confident coordinates)
+        # overlap_start = max of all member starts, overlap_end = min of all member ends
+        member_starts = [m.start for m in c.members]
+        member_ends = [m.end for m in c.members]
+        overlap_start = max(member_starts) if member_starts else c.start
+        overlap_end = min(member_ends) if member_ends else c.end
+        
+        # For INS, use minimum of source svlen values; for other types, use overlapping interval length
+        if c.std_type == "INS":
+            lengths = [asm_length, long_ont_length, long_pacbio_length, sht_length]
+            valid_lengths = [l for l in lengths if pd.notna(l)]
+            event_length_bp = min(valid_lengths) if valid_lengths else np.nan
+        else:
+            event_length_bp = (overlap_end - overlap_start + 1) if overlap_end >= overlap_start else np.nan
+
+        row = {
             "event_id": eid,
             "chrom": c.chrom,
             "std_svtype": c.std_type,
-            "event_start": c.start,
-            "event_end": c.end,
-            "event_length_bp": c.end - c.start + 1,
+            "event_start": overlap_start,
+            "event_end": overlap_end,
+            "event_length_bp": event_length_bp,
 
             "asm_start": asm.start if asm else np.nan,
             "asm_end": asm.end if asm else np.nan,
+            "asm_start_mod": asm.start_mod if asm else np.nan,
+            "asm_end_mod": asm.end_mod if asm else np.nan,
+            "asm_length": asm_length,
             "asm_svtype_raw": asm.raw_svtype if asm else "",
             "asm_score": 1,
 
             "long_ont_start": long_ont.start if long_ont else np.nan,
             "long_ont_end": long_ont.end if long_ont else np.nan,
-            "long_ont_svtype_raw": long_ont.raw_svtype if long_ont else "",
+            "long_ont_length": long_ont_length,
             "long_ont_info_svtype": long_ont.info_svtype if long_ont else "",
             "long_ont_score": long_ont.score if long_ont else np.nan,
             "long_ont_supporting_reads": long_ont.supporting_reads if long_ont else np.nan,
@@ -326,7 +360,7 @@ def build_output_table(clusters):
 
             "long_pacbio_start": long_pacbio.start if long_pacbio else np.nan,
             "long_pacbio_end": long_pacbio.end if long_pacbio else np.nan,
-            "long_pacbio_svtype_raw": long_pacbio.raw_svtype if long_pacbio else "",
+            "long_pacbio_length": long_pacbio_length,
             "long_pacbio_info_svtype": long_pacbio.info_svtype if long_pacbio else "",
             "long_pacbio_score": long_pacbio.score if long_pacbio else np.nan,
             "long_pacbio_supporting_reads": long_pacbio.supporting_reads if long_pacbio else np.nan,
@@ -334,6 +368,7 @@ def build_output_table(clusters):
 
             "short_start": sht.start if sht else np.nan,
             "short_end": sht.end if sht else np.nan,
+            "short_length": sht_length,
             "short_svtype_raw": sht.raw_svtype if sht else "",
             "short_info_svtype": sht.info_svtype if sht else "",
             "short_score": sht.score if sht else np.nan,
@@ -342,7 +377,9 @@ def build_output_table(clusters):
 
             "percentage_overlap": pct_str,
             "support_score": pipelines_confirmed,
-        })
+        }
+
+        rows.append(row)
 
     return pd.DataFrame(rows)
 
@@ -475,13 +512,19 @@ def write_csv_tables(df, outdir):
     os.makedirs(outdir, exist_ok=True)
 
     for std_type, name in TAB_BY_TYPE.items():
-        sub = df[df["std_svtype"] == std_type]
+        sub = df[df["std_svtype"] == std_type].copy()
         if not sub.empty:
+            # Drop type-specific columns
+            cols_to_drop = ["std_svtype"]
+            if std_type != "TRA":
+                cols_to_drop.extend(["asm_start_mod", "asm_end_mod"])
+            sub = sub.drop(columns=cols_to_drop, errors="ignore")
             path = os.path.join(outdir, f"{name}.csv")
             sub.sort_values(["chrom", "event_start", "event_end"]).to_csv(path, index=False)
 
-    other = df[~df["std_svtype"].isin(TAB_BY_TYPE)]
+    other = df[~df["std_svtype"].isin(TAB_BY_TYPE)].copy()
     if not other.empty:
+        other = other.drop(columns=["std_svtype", "asm_start_mod", "asm_end_mod"], errors="ignore")
         other.to_csv(os.path.join(outdir, "Other.csv"), index=False)
 
 # Main

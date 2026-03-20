@@ -159,6 +159,8 @@ def main():
             report.write(genomexgenome_res, file_type="genomexgenome")
         except ValidationError as e:
             logger.warning(f"Inter-genome validation failed: {e}")
+    else:
+        logger.warning("Inter-genome validation skiped")
 
     # Validate plasmid genomes (optional)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
@@ -191,6 +193,8 @@ def main():
             report.write(readxread_res, file_type="readxread")
         except ValidationError as e:
             logger.warning(f"Inter-read validation failed: {e}")
+    else:
+        logger.warning("Inter-read validation skiped")
 
     # Validate features (optional — non-fatal)
     ref_feature_res = None
