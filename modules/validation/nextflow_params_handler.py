@@ -79,6 +79,8 @@ def build_params(validation_results: dict) -> dict:
         # validated_inputs
         "ref_fasta_avail":    ref_path is not None,
         "mod_fasta_avail":    mod_path is not None,
+        "ref_fasta_validated": ref_path,
+        "mod_fasta_validated": mod_path,
         # general_options — pipeline switches
         "run_ref_x_mod":      ref_path is not None and mod_path is not None and gxg.get("passed", False),
         "run_syri":           1 <= contig_file_size <= mod_n_sequence_limit,
@@ -91,10 +93,6 @@ def build_params(validation_results: dict) -> dict:
         # input_output_options — nullable paths
         "nanopore_fastq":     by_type.get("ont"),
     }
-    if ref_path:
-        params["ref_fasta_validated"] = ref_path
-    if mod_path:
-        params["mod_fasta_validated"] = mod_path
     if by_type.get("pacbio"):
         params["pacbio_fastq"] = by_type["pacbio"]
     if gff_path:

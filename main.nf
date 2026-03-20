@@ -49,8 +49,8 @@ workflow {
     validateParameters()
 
     // inputs
-    def ref_fasta = Channel.fromPath(params.ref_fasta_validated, checkIfExists: true) 
-    def mod_fasta = Channel.fromPath(params.mod_fasta_validated)
+    def ref_fasta = Channel.fromPath(params.ref_fasta_validated, checkIfExists: true)
+    def mod_fasta = params.mod_fasta_avail ? Channel.fromPath(params.mod_fasta_validated) : Channel.empty()
 
     def ref_plasmid = listFiles("${params.in_dir}", ".*ref_plasmid\\.(fa|fna|fasta)")
     def mod_plasmid = listFiles("${params.in_dir}", ".*mod_plasmid\\.(fa|fna|fasta)")

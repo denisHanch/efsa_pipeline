@@ -45,7 +45,7 @@
     },
     "contig_file_size": {
       "type": "integer",
-      "minimum": 1
+      "minimum": 0
     },
 
     "clean_work": {
