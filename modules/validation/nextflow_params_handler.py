@@ -93,6 +93,12 @@ def build_params(validation_results: dict) -> dict:
         # input_output_options — nullable paths
         "nanopore_fastq":     by_type.get("ont"),
     }
+
+    if ref_path:
+        params["ref_fasta_validated"] = ref_path
+    if mod_path:
+        params["mod_fasta_validated"] = mod_path
+
     if by_type.get("pacbio"):
         params["pacbio_fastq"] = by_type["pacbio"]
     if gff_path:
