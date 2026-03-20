@@ -43,7 +43,7 @@ validate --config <path> - Run validation with custom config
 Start the pipeline:
 
 ```bash
-nextflow run main.nf --max_cpu $(nproc) -resume
+nextflow run main.nf --max_cpu $(nproc) -params-file data/valid/validated_params.json -resume
 ```
 
 ## Next Steps

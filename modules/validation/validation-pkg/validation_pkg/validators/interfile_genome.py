@@ -272,7 +272,8 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
     mod_path = _get_metadata_field(mod_genome_result, 'output_file')
     mod_filename = _get_metadata_field(mod_genome_result, 'output_filename')
 
-    logger.debug(f"Running minimap2: ref={ref_path} query={mod_path}")
+    paf_path = Path(mod_path).parent / "minimap_out.paf"
+    logger.debug(f"Running minimap2: ref={ref_path} query={mod_path} out={paf_path}")
     try:
         proc = subprocess.run(
             ['minimap2', '-x', 'asm5', str(ref_path), str(mod_path)],
@@ -284,6 +285,9 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
         raise InterFileValidationError(
             f"minimap2 failed (exit code {e.returncode}): {e.stderr.strip()}"
         )
+
+    paf_path.write_text(proc.stdout)
+    logger.debug(f"minimap2 PAF output written to {paf_path}")
 
     # Parse PAF output: for each query keep only the best-scoring hit so that
     # multi-copy elements (e.g. ribosomal RNA) are resolved to a single

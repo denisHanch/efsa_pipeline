@@ -22,6 +22,8 @@ from validation_pkg.exceptions import ValidationError
 
 from pathlib import Path
 
+import nextflow_params_handler as nf_params
+
 def main():
     # Check command line arguments
     if len(sys.argv) < 2:
@@ -36,14 +38,13 @@ def main():
     logger = None
     log_file = None
 
-    # Setup logging,
+    # Setup logging
     try:
         logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
-        log_file = logger.log_file
-    except Exception as e:
-        print(f"Failed to setup logging: {e}")
-        return 1
-
+    except (PermissionError, OSError) as e:
+        logger = setup_logging(console_level='DEBUG')
+        logger.warning(f"Could not write log file ({e}); logging to console only")
+    log_file = getattr(logger, 'log_file', None)
 
     # ========================================================================
     # Step 1: Read and validate config
@@ -124,6 +125,7 @@ def main():
 
     except Exception as e:
         logger.error(f"Setting up validators failed: {e}")
+        return 1
 
 
     # ========================================================================
@@ -150,12 +152,15 @@ def main():
             logger.warning(f"Optional mod_genome validation failed: {e}")
 
     # Inter-genome validation — only if both genomes validated successfully
-    if mod_genome_res is not None:
+    genomexgenome_res = None
+    if mod_genome_res is not None and ref_genome_res is not None:
         try:
-            res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings)
-            report.write(res, file_type="genomexgenome")
+            genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings)
+            report.write(genomexgenome_res, file_type="genomexgenome")
         except ValidationError as e:
-            logger.warning(f"Inter-genome validation failed: {e}")
+            logger.error(f"Inter-genome validation failed: {e}")
+    else:
+        logger.warning("Inter-genome validation skiped")
 
     # Validate plasmid genomes (optional)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
@@ -173,6 +178,7 @@ def main():
             logger.warning(f"Optional mod_plasmid validation failed: {e}")
 
     # Validate reads (required)
+    reads_res = None
     try:
         reads_res = validate_reads(config.reads, reads_settings)
         report.write(reads_res, file_type="read")
@@ -180,17 +186,22 @@ def main():
         logger.warning(f"Read validation failed: {e}")
 
     # Add interread validation
-    try:
-        readxread_res = readxread_validation(reads_res, readxread_settings)
-        report.write(readxread_res, file_type="readxread")
-    except ValidationError as e:
-        logger.warning(f"Inter-read validation failed: {e}")
+    readxread_res = None
+    if reads_res is not None:
+        try:
+            readxread_res = readxread_validation(reads_res, readxread_settings)
+            report.write(readxread_res, file_type="readxread")
+        except ValidationError as e:
+            logger.error(f"Inter-read validation failed: {e}")
+    else:
+        logger.warning("Inter-read validation skiped")
 
-    # Validate features (optional)
+    # Validate features (optional — non-fatal)
+    ref_feature_res = None
     if hasattr(config, 'ref_feature') and config.ref_feature:
         try:
-            res = validate_feature(config.ref_feature, ref_feature_settings)
-            report.write(res, file_type="feature")
+            ref_feature_res = validate_feature(config.ref_feature, ref_feature_settings)
+            report.write(ref_feature_res, file_type="feature")
         except ValidationError as e:
             logger.warning(f"Optional ref_feature validation failed: {e}")
 
@@ -203,6 +214,26 @@ def main():
 
     report.flush(format='text')
     print(f"Log file: {log_file}")
+
+    # ========================================================================
+    # Step 4: Write validated_params.json for Nextflow (-params-file)
+    # ========================================================================
+    mod_n_sequence_limit = (
+        config.mod_genome.n_sequence_limit
+        if hasattr(config, 'mod_genome') and config.mod_genome
+        else None
+    )
+    validation_results = {
+        "ref_genome":          ref_genome_res,
+        "mod_genome":          mod_genome_res,
+        "genomexgenome":       genomexgenome_res,
+        "reads":               reads_res,
+        "ref_feature":         ref_feature_res,
+        "mod_n_sequence_limit": mod_n_sequence_limit,
+    }
+    params = nf_params.build_params(validation_results)
+    nf_params.write_params(params, output_dir / "validated_params.json")
+
     return 0
 
 
@@ -214,6 +245,6 @@ if __name__ == '__main__':
         logger.error(f"✗ Fatal error: {e}")
         logger.debug(traceback.format_exc())
         if len(sys.argv) >= 2:
-            actual_log_file = get_logger().log_file or (Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log")
+            actual_log_file = getattr(get_logger(), 'log_file', None) or (Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log")
             print(f"Log file: {actual_log_file}")
         sys.exit(1)

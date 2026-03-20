@@ -64,17 +64,17 @@ def logWorkflowCompletion(out_folder_name) {
     }
 }
 
-
-def loadFastqFiles(pathPattern) { 
-    return Channel.fromPath(pathPattern)
-                  .map { file ->
-                      def name = file.baseName.replaceFirst(/\.fastq/, '')
-                      [name, file]
-                  }
+def loadFastqFiles(input) {
+    return Channel.fromPath(input)
+        .map { f ->
+            def name = f.name.replaceFirst(/\.fastq\.gz$/, '')
+            tuple(name, f)
+        }
 }
 
 def loadShortFastqFiles(short_read_files) {
-    return Channel.from(short_read_files).map { file ->
+    return Channel.from(short_read_files).map { f ->
+            def file = file(f)
             def matcher = file.name =~ /^(.+?)(?:[_\.](S[0-9]+_L[0-9]+_)?(R[12]|[12]))?\.f(ast)?q\.gz$/
             if (matcher.matches()) {
                 [matcher[0][1], file]

@@ -49,28 +49,21 @@ workflow {
     validateParameters()
 
     // inputs
-    ref_fasta = Channel.fromPath(params.ref_fasta_path, checkIfExists: true) 
-    mod_fasta = Channel.fromPath(params.mod_fasta_path)
-
-    def mod_fasta_avail = !file("${params.in_dir}").listFiles()?.findAll { it.name ==~ /.*(assembled_genome|mod)\.(fa|fna|fasta)$/ }.isEmpty()
-
-    def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
-    def contigs_files = listFiles("${params.in_dir}", ".*_contig_.*\\.fasta")
+    def ref_fasta = Channel.fromPath(params.ref_fasta_validated, checkIfExists: true) 
+    def mod_fasta = Channel.fromPath(params.mod_fasta_validated)
 
     def ref_plasmid = listFiles("${params.in_dir}", ".*ref_plasmid\\.(fa|fna|fasta)")
     def mod_plasmid = listFiles("${params.in_dir}", ".*mod_plasmid\\.(fa|fna|fasta)")
-
-    def ont_files = listFiles("${params.in_dir}/ont/")
-    def pacbio_files = listFiles("${params.in_dir}/pacbio/")
-    def illumina_files = listFiles("${params.in_dir}/illumina/")
 
     def activePipelines = []
     def sv_tbl = Channel.empty()
 
     // reference to modified fasta comparison - assembly pipeline
-    if (params.run_syri && mod_fasta_avail) {
-        if (contigs_files.size() >= 1) {
-
+    if (params.run_syri && params.mod_fasta_avail) {
+        if (params.contig_file_size >= 1) {
+                
+            def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
+            
             ref_mod(ref_fasta, contigs_ch)
 
             sv_tbl = sv_tbl.mix(ref_mod.out.sv_tbl) 
@@ -85,10 +78,10 @@ workflow {
     }
 
     // pacbio reads pipeline
-    if (pacbio_files) {
+    if (params.run_pacbio) {
         mapping_tag = "map-pb"
-
-        pacbio_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
+            
+        pacbio_fastqs = loadFastqFiles("${params.pacbio_fastq}")
         
         nanoplot_pacbio(pacbio_fastqs, "pacbio")
         
@@ -97,7 +90,7 @@ workflow {
         sv_tbl = sv_tbl.mix(long_ref_pacbio.out.sv_tbl)
         activePipelines << long_ref_pacbio.out.sv_vcf
 
-        if (mod_fasta_avail) {
+        if (params.mod_fasta_avail) {
             describePipeline("long-pacbio", "reference & modified")
             long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "pacbio/long-mod")       
             compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
@@ -111,10 +104,10 @@ workflow {
     }
 
     // nanopore reads pipeline
-    if (ont_files) {
+    if (params.run_nanopore) {
         mapping_tag = "map-ont"
         
-        ont_fastqs = loadFastqFiles("${params.in_dir}/ont/*.fastq.gz")
+        ont_fastqs = loadFastqFiles("${params.nanopore_fastq}")
 
         nanoplot_ont(ont_fastqs, "ont")
         
@@ -124,7 +117,7 @@ workflow {
         
         activePipelines << long_ref_ont.out.sv_vcf
 
-        if (mod_fasta_avail) {
+        if (params.mod_fasta_avail) {
             describePipeline("long-ont", "reference & modified")
             long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "ont/long-mod")
             compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
@@ -138,9 +131,11 @@ workflow {
     }
 
     // illimina reads pipeline
-    if (illumina_files) {    
+    if (params.run_illumina) {    
         
-        fastqs = loadShortFastqFiles(illumina_files)
+        def illumina_files = listFiles("${params.in_dir}/illumina/")
+
+       fastqs = loadShortFastqFiles(illumina_files)
 
         qc(fastqs, "illumina/qc_trimming") | set { trimmed }
 
@@ -149,7 +144,7 @@ workflow {
         sv_tbl = sv_tbl.mix(short_ref.out.sv_tbl)
         activePipelines << short_ref.out.sv_vcf
 
-        if (mod_fasta_avail) {
+        if (params.mod_fasta_avail) {
             describePipeline("short", "reference & modified")
             short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
             compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")

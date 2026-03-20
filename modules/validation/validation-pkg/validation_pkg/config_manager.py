@@ -60,7 +60,7 @@ class BaseValidatorConfig:
 class GenomeConfig(BaseValidatorConfig):
     """Configuration for genome or plasmid files."""
     detected_format: GenomeFormat = None
-    n_sequence_limit: Optional[int] = 10
+    n_sequence_limit: Optional[int] = None
 
     def __post_init__(self):
         self._initialize_defaults()
@@ -248,7 +248,8 @@ class ConfigManager:
         """Parse genome and plasmid configurations (internal method)."""
         # Required genomes
         config.ref_genome = ConfigManager._parse_genome_config(
-            data['ref_genome_filename'], 'ref_genome_filename', config.config_dir, config.output_dir, config.options
+            data['ref_genome_filename'], 'ref_genome_filename', config.config_dir, config.output_dir, config.options,
+            allow_n_sequence_limit=False
         )
         # Optional modified genome
         if 'mod_genome_filename' in data and data['mod_genome_filename']:
@@ -333,18 +334,27 @@ class ConfigManager:
         return config_class(**config_args)
 
     @staticmethod
-    def _parse_genome_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> GenomeConfig:
+    def _parse_genome_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None, allow_n_sequence_limit: bool = True) -> GenomeConfig:
         """Parse a genome configuration entry."""
+        logger = get_logger()
         n_sequence_limit = None
         filtered_value = value
 
         if isinstance(value, dict) and 'n_sequence_limit' in value:
-            n_sequence_limit = value['n_sequence_limit']
-            if not isinstance(n_sequence_limit, int) or n_sequence_limit <= 0:
-                raise ConfigurationError(
-                    f"'{field_name}.n_sequence_limit' must be a positive integer, got {n_sequence_limit!r}"
+            if not allow_n_sequence_limit:
+                logger.warning(
+                    f"'n_sequence_limit' is not allowed for '{field_name}' and will be ignored"
                 )
-            filtered_value = {k: v for k, v in value.items() if k != 'n_sequence_limit'}
+                filtered_value = {k: v for k, v in value.items() if k != 'n_sequence_limit'}
+            else:
+                n_sequence_limit = value['n_sequence_limit']
+                if not isinstance(n_sequence_limit, int) or n_sequence_limit <= 0:
+                    raise ConfigurationError(
+                        f"'{field_name}.n_sequence_limit' must be a positive integer, got {n_sequence_limit!r}"
+                    )
+                filtered_value = {k: v for k, v in value.items() if k != 'n_sequence_limit'}
+        elif allow_n_sequence_limit:
+            n_sequence_limit = 5
 
         return ConfigManager._parse_file_config(
             value=filtered_value,
