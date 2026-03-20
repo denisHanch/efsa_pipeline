@@ -45,6 +45,7 @@ After successful validation:
 
 - Validated files are placed in `data/valid/`
 - `data/valid/validated_params.json` is written with paths and flags for Nextflow (loaded automatically via `-params-file`)
+- If the modified genome exceeds `n_sequence_limit`, the file is still copied to `data/valid/` but `run_syri` will be set to `false`
 - Log file created in `./logs/validation_ID.log`
 - Report file created in `./logs/report_ID.txt`
 
@@ -65,7 +66,7 @@ This file is produced by the validation step and consumed by Nextflow via `-para
 | Parameter            | Type    | Description                                                                                           |
 | -------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
 | `run_ref_x_mod`      | boolean | `true` when both reference and modified genome validation succeeded; gates all ref-vs-mod steps.      |
-| `run_syri`           | boolean | `true` when 1–5 contigs found (prokaryotic assembly); `false` for >5 contigs or no modified genome.  |
+| `run_syri`           | boolean | `true` when the number of contig files is between 1 and `n_sequence_limit` (default `5`) of the modified genome; `false` otherwise. The threshold is controlled by `n_sequence_limit` in `config.json` under `mod_genome_filename`. |
 | `run_truvari`        | boolean | Always `false` by default; can be overridden manually.                                                |
 | `run_illumina`       | boolean | `true` when validated Illumina reads are present.                                                     |
 | `run_nanopore`       | boolean | `true` when validated Nanopore (ONT) reads are present.                                               |
