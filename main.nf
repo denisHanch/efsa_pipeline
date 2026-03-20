@@ -49,12 +49,8 @@ workflow {
     validateParameters()
 
     // inputs
-    def ref_fasta = params.ref_fasta_avail
-        ? Channel.fromPath(params.ref_fasta_validated, checkIfExists: true)
-        : Channel.empty()
-    def mod_fasta = params.mod_fasta_avail
-        ? Channel.fromPath(params.mod_fasta_validated)
-        : Channel.empty()
+    def ref_fasta = Channel.fromPath(params.ref_fasta_validated, checkIfExists: true) 
+    def mod_fasta = Channel.fromPath(params.mod_fasta_validated)
 
     def ref_plasmid = listFiles("${params.in_dir}", ".*ref_plasmid\\.(fa|fna|fasta)")
     def mod_plasmid = listFiles("${params.in_dir}", ".*mod_plasmid\\.(fa|fna|fasta)")
@@ -63,7 +59,7 @@ workflow {
     def sv_tbl = Channel.empty()
 
     // reference to modified fasta comparison - assembly pipeline
-    if (params.run_syri && params.run_ref_x_mod) {
+    if (params.run_syri && params.mod_fasta_avail) {
         if (params.contig_file_size >= 1) {
                 
             def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
