@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-nextflow_params.py
+nextflow_params_handler.py
 ==================
 Utilities to build and write a validated_params.json file after the validation
 step completes. The file is consumed by the main Nextflow pipeline via

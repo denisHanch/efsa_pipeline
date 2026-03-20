@@ -19,7 +19,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nextflow_params import build_params, write_params
+from nextflow_params_handler import build_params, write_params
 
 
 # ---------------------------------------------------------------------------

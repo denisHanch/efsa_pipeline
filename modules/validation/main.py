@@ -38,7 +38,7 @@ def main():
     logger = None
     log_file = None
 
-    # Setup logging (fall back to console-only if log file is not writable)
+    # Setup logging
     try:
         logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
     except (PermissionError, OSError) as e:
@@ -158,7 +158,7 @@ def main():
             genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings)
             report.write(genomexgenome_res, file_type="genomexgenome")
         except ValidationError as e:
-            logger.warning(f"Inter-genome validation failed: {e}")
+            logger.error(f"Inter-genome validation failed: {e}")
     else:
         logger.warning("Inter-genome validation skiped")
 
@@ -192,7 +192,7 @@ def main():
             readxread_res = readxread_validation(reads_res, readxread_settings)
             report.write(readxread_res, file_type="readxread")
         except ValidationError as e:
-            logger.warning(f"Inter-read validation failed: {e}")
+            logger.error(f"Inter-read validation failed: {e}")
     else:
         logger.warning("Inter-read validation skiped")
 
