@@ -150,12 +150,14 @@ def main():
             logger.warning(f"Optional mod_genome validation failed: {e}")
 
     # Inter-genome validation — only if both genomes validated successfully
-    if mod_genome_res is not None:
+    if mod_genome_res is not None and ref_genome_res is not None:
         try:
             res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings)
             report.write(res, file_type="genomexgenome")
         except ValidationError as e:
             logger.warning(f"Inter-genome validation failed: {e}")
+    else:
+        logger.warning("Inter-genome validation skiped")
 
     # Validate plasmid genomes (optional)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
@@ -173,6 +175,7 @@ def main():
             logger.warning(f"Optional mod_plasmid validation failed: {e}")
 
     # Validate reads (required)
+    reads_res = None
     try:
         reads_res = validate_reads(config.reads, reads_settings)
         report.write(reads_res, file_type="read")
@@ -180,11 +183,14 @@ def main():
         logger.warning(f"Read validation failed: {e}")
 
     # Add interread validation
-    try:
-        readxread_res = readxread_validation(reads_res, readxread_settings)
-        report.write(readxread_res, file_type="readxread")
-    except ValidationError as e:
-        logger.warning(f"Inter-read validation failed: {e}")
+    if reads_res is not None:
+        try:
+            readxread_res = readxread_validation(reads_res, readxread_settings)
+            report.write(readxread_res, file_type="readxread")
+        except ValidationError as e:
+            logger.warning(f"Inter-read validation failed: {e}")
+    else:
+        logger.warning("Inter-read validation skiped")
 
     # Validate features (optional)
     if hasattr(config, 'ref_feature') and config.ref_feature:
