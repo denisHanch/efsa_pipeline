@@ -17,8 +17,7 @@ validated_inputs (hidden, set by validation):
 general_options (pipeline execution switches):
   run_ref_x_mod        – True when both ref_genome and mod_genome and inter-genome validation succeeded
   run_syri             – True when 1–n_sequence_limit contigs found (prokaryotic assembly);
-                         False for >n_sequence_limit contigs (fragmented/eukaryotic) or when
-                         no modified genome is available
+                         False for >n_sequence_limit contigs (fragmented/eukaryotic) 
   run_truvari          – always False (reserved for future use / manual override)
   run_illumina         – True when validated Illumina reads are present
   run_nanopore         – True when validated Nanopore (ONT) reads are present
@@ -78,6 +77,7 @@ def build_params(validation_results: dict) -> dict:
 
     params = {
         # validated_inputs
+        "ref_fasta_avail":    ref_path is not None,
         "mod_fasta_avail":    mod_path is not None,
         # general_options — pipeline switches
         "run_ref_x_mod":      ref_path is not None and mod_path is not None and gxg.get("passed", False),

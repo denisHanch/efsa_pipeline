@@ -92,6 +92,11 @@
       "format": "file",
       "hidden": true
     },
+    "ref_fasta_avail": {
+      "type": "boolean",
+      "default": false,
+      "hidden": true
+    },
     "mod_fasta_avail": {
       "type": "boolean",
       "default": false,
