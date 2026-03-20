@@ -22,7 +22,7 @@ from validation_pkg.exceptions import ValidationError
 
 from pathlib import Path
 
-import nextflow_params as nf_params
+import nextflow_params_handler as nf_params
 
 def main():
     # Check command line arguments
