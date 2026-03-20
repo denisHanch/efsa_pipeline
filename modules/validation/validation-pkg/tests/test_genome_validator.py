@@ -1692,10 +1692,10 @@ class TestGenomeValidatorErrorNSequences:
         # Should not raise regardless of sequence count
         GenomeValidator(config, settings).run()
 
-    # ── no output written on error ────────────────────────────────────────────
+    # ── original file copied to output on error ───────────────────────────────
 
-    def test_no_output_file_written_on_error(self, temp_dir, output_dir):
-        """When n_sequence_limit is exceeded no output file should be written."""
+    def test_original_file_copied_to_output_on_error(self, temp_dir, output_dir):
+        """When n_sequence_limit is exceeded, the original file is copied to output dir."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=6)
         config = self._make_config(fasta, output_dir, n_sequence_limit=5)
         settings = GenomeValidator.Settings(min_sequence_length=0)
@@ -1703,7 +1703,18 @@ class TestGenomeValidatorErrorNSequences:
         with pytest.raises(GenomeValidationError):
             GenomeValidator(config, settings).run()
 
-        assert list(output_dir.glob("*.fasta")) == []
+        assert (output_dir / "genome.fasta").exists()
+
+    def test_copied_file_has_correct_content(self, temp_dir, output_dir):
+        """Copied file content matches the original input file."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=6)
+        config = self._make_config(fasta, output_dir, n_sequence_limit=5)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
+
+        with pytest.raises(GenomeValidationError):
+            GenomeValidator(config, settings).run()
+
+        assert (output_dir / "genome.fasta").read_bytes() == fasta.read_bytes()
 
 
 if __name__ == "__main__":

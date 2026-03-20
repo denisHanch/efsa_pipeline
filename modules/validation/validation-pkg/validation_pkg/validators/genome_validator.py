@@ -15,7 +15,7 @@ from validation_pkg.exceptions import (
     FastaFormatError,
     GenBankFormatError
 )
-from validation_pkg.utils.file_handler import open_compressed_writer
+from validation_pkg.utils.file_handler import open_compressed_writer, copy_file
 from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
 from validation_pkg.utils.base_validator import BaseValidator
 from validation_pkg.utils.sequence_stats import calculate_n50
@@ -351,6 +351,7 @@ class GenomeValidator(BaseValidator):
                     'error_threshold': n_sequence_limit
                 }
             )
+            copy_file(self.input_path, self.output_path, self.logger)
             raise GenomeValidationError(error_msg)
 
         # Trust mode - validate only first sequence
