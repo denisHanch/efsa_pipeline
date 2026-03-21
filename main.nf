@@ -24,16 +24,17 @@ def helpMessage() {
     
     Options:
 
-    -resume          Run pipeline from the point where it was interrupted or previously failed (Nextflow built-in)
-    --out_dir        Output directory                           (default: ${params.out_dir})
-    --in_dir         Input directory                            (default: ${params.in_dir})
-    --max_cpu        Maximum CPUs per process                   (default: ${params.max_cpu})
-    --run_syri       Run reference vs modified FASTA comparison (default: ${params.run_syri})
-    --run_truvari    Run pairwise VCF comparisons               (default: ${params.run_truvari})
-    --clean_work     Remove workdir after success               (default: ${params.clean_work})
-    -with-report     Generate HTML execution report             (Nextflow built-in)
-    -with-timeline   Produce timeline visualization             (Nextflow built-in)
-    -with-dag        Produce DAG of workflow                    (Nextflow built-in)
+    -params-file     Path to JSON file containing parameter values                  (Nextflow built-in)
+    -resume          Run pipeline from the point where it was interrupted or failed (Nextflow built-in)
+    --out_dir        Output directory                                               (default: ${params.out_dir})
+    --in_dir         Input directory                                                (default: ${params.in_dir})
+    --max_cpu        Maximum CPUs per process                                       (default: ${params.max_cpu})
+    --run_syri       Run reference vs modified FASTA comparison                     (default: ${params.run_syri})
+    --run_truvari    Run pairwise VCF comparisons                                   (default: ${params.run_truvari})
+    --clean_work     Remove workdir after success                                   (default: ${params.clean_work})
+    -with-report     Generate HTML execution report                                 (Nextflow built-in)
+    -with-timeline   Produce timeline visualization                                 (Nextflow built-in)
+    -with-dag        Produce DAG of workflow                                        (Nextflow built-in)
     --help           Show this help message
     """.stripIndent()
 }
