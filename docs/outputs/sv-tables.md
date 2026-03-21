@@ -34,12 +34,37 @@ data/outputs/tables/
 │   ├── Inversions.csv
 │   ├── Replacements.csv
 │   └── Translocations.csv
+├── supporting_reads/
+│   ├── sample1_method_supporting_reads.tsv
+│   └── ...
 └── tsv
     ├── assembly_sv_summary.tsv
     ├── short_sv_summary.tsv
     ├── mab-pb_sv_summary.tsv
     └── map-ont_sv_summary.tsv
 ```
+
+### Supporting Reads Extraction
+
+The `extract_supp_reads` process extracts supporting reads information from structural variant (SV) VCF files. This provides detailed evidence for each SV call, showing how many reads support the variant.
+
+#### Process details
+- **Input**: SV VCF file, parameter name (e.g., `PE` for paired-end reads), method name (e.g., `delly`)
+- **Output**: TSV file in `data/outputs/tables/supporting_reads/` with columns:
+  - `chrom`: Chromosome
+  - `start`: Start position
+  - `end`: End position
+  - `svtype`: SV type
+  - `supporting_reads`: Number of supporting reads (extracted via the specified parameter)
+
+#### Example output
+```
+chrom	start	end	svtype	supporting_reads
+chr1	1000	2000	DEL	15
+chr2	5000	6000	INS	8
+```
+
+This output complements the summary tables by providing granular read-level evidence for SV calls.
 
 ### Example command
 

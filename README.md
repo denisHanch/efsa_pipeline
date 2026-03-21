@@ -423,12 +423,17 @@ data/outputs/tables/
 │   ├── Inversions.csv
 │   ├── Replacements.csv
 │   └── Translocations.csv
+├── supporting_reads/
+│   ├── sample1_method_supporting_reads.tsv
+│   └── ...
 └── tsv
     ├── assembly_sv_summary.tsv
     ├── short_sv_summary.tsv
     ├── mab-pb_sv_summary.tsv
     └── map-ont_sv_summary.tsv
 ```
+
+**Note**: The `supporting_reads/` directory contains TSV files with detailed read support evidence for each SV call, extracted from VCF files.
 
 ### Example command
 
