@@ -38,6 +38,9 @@ class GenomeOutputMetadata(BaseOutputMetadata):
     sequence_ids: List[str] = None
     sequence_lengths: dict = None
 
+    # Fragmented assembly flag (sequence limit exceeded — inter-genome validation skipped)
+    fragmented: bool = False
+
     def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
         """Format genome-specific statistics for report output."""
         lines = []
@@ -185,6 +188,8 @@ class GenomeValidator(BaseValidator):
         # Trust/Strict modes - full validation and processing
         self._parse_file()
         self._validate_sequences()
+        if getattr(self, '_sequence_limit_exceeded', False):
+            return self.output_path
         self._apply_edits()  # include plasmid handle
         output_path = self._write_output()
         return output_path
@@ -239,6 +244,7 @@ class GenomeValidator(BaseValidator):
             pass
 
         self.output_metadata.num_sequences_filtered = self.num_sequences_filtered
+        self.output_metadata.fragmented = getattr(self, '_sequence_limit_exceeded', False)
 
         # Strict mode only - compute expensive statistics
         if self.validation_level == 'strict' and self.sequences:
@@ -343,7 +349,7 @@ class GenomeValidator(BaseValidator):
                 f"({n_sequence_limit} -> the assembly is too fragmented for further analysis)"
             )
             self.logger.add_validation_issue(
-                level='ERROR',
+                level='WARNING',
                 category='genome',
                 message=error_msg,
                 details={
@@ -352,7 +358,8 @@ class GenomeValidator(BaseValidator):
                 }
             )
             copy_file(self.input_path, self.output_path, self.logger)
-            raise GenomeValidationError(error_msg)
+            self._sequence_limit_exceeded = True
+            return
 
         # Trust mode - validate only first sequence
         if self.validation_level == 'trust':
