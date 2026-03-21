@@ -149,18 +149,18 @@ def main():
             mod_genome_res = validate_genome(config.mod_genome, mod_genome_settings)
             report.write(mod_genome_res, file_type="genome")
         except ValidationError as e:
-            logger.warning(f"Optional mod_genome validation failed: {e}")
+            logger.error(f"Optional mod_genome validation failed: {e}")
 
-    # Inter-genome validation — only if both genomes validated successfully
+    # Inter-genome validation — only if both genomes validated successfully and mod is not fragmented
     genomexgenome_res = None
-    if mod_genome_res is not None and ref_genome_res is not None:
+    if mod_genome_res is not None and ref_genome_res is not None and not getattr(mod_genome_res, 'fragmented', False):
         try:
             genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings)
             report.write(genomexgenome_res, file_type="genomexgenome")
         except ValidationError as e:
             logger.error(f"Inter-genome validation failed: {e}")
     else:
-        logger.warning("Inter-genome validation skiped")
+        logger.error("Inter-genome validation skiped")
 
     # Validate plasmid genomes (optional)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
@@ -168,14 +168,14 @@ def main():
             res = validate_genome(config.ref_plasmid, plasmid_settings)
             report.write(res, file_type="genome")
         except ValidationError as e:
-            logger.warning(f"Optional ref_plasmid validation failed: {e}")
+            logger.error(f"Optional ref_plasmid validation failed: {e}")
 
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
         try:
             res = validate_genome(config.mod_plasmid, plasmid_settings)
             report.write(res, file_type="genome")
         except ValidationError as e:
-            logger.warning(f"Optional mod_plasmid validation failed: {e}")
+            logger.error(f"Optional mod_plasmid validation failed: {e}")
 
     # Validate reads (required)
     reads_res = None
@@ -183,7 +183,7 @@ def main():
         reads_res = validate_reads(config.reads, reads_settings)
         report.write(reads_res, file_type="read")
     except ValidationError as e:
-        logger.warning(f"Read validation failed: {e}")
+        logger.error(f"Read validation failed: {e}")
 
     # Add interread validation
     readxread_res = None
@@ -194,7 +194,7 @@ def main():
         except ValidationError as e:
             logger.error(f"Inter-read validation failed: {e}")
     else:
-        logger.warning("Inter-read validation skiped")
+        logger.error("Inter-read validation skiped")
 
     # Validate features (optional — non-fatal)
     ref_feature_res = None
@@ -203,14 +203,14 @@ def main():
             ref_feature_res = validate_feature(config.ref_feature, ref_feature_settings)
             report.write(ref_feature_res, file_type="feature")
         except ValidationError as e:
-            logger.warning(f"Optional ref_feature validation failed: {e}")
+            logger.error(f"Optional ref_feature validation failed: {e}")
 
     if hasattr(config, 'mod_feature') and config.mod_feature:
         try:
             res = validate_feature(config.mod_feature, mod_feature_settings)
             report.write(res, file_type="feature")
         except ValidationError as e:
-            logger.warning(f"Optional mod_feature validation failed: {e}")
+            logger.error(f"Optional mod_feature validation failed: {e}")
 
     report.flush(format='text')
     print(f"Log file: {log_file}")
