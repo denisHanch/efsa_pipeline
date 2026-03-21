@@ -274,3 +274,25 @@ process create_empty_tbl {
     echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_methods\tscore\tsupporting_reads" > empty_${prefix}_sv_summary.tsv
     """
 }
+
+
+process extract_supp_reads {
+    
+    publishDir "${params.out_dir}/tables/supporting_reads", mode: 'copy'
+
+    input:
+    tuple val(name), path(vcf)
+    val(parameter)
+    val(method)
+
+    output:
+    path "${name}_${method}_supporting_reads.tsv"
+
+    script:
+    """
+    set -euxo pipefail
+
+    echo -e "chrom\tstart\tend\tsvtype\tsupporting_reads" > "${name}_${method}_supporting_reads.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/${parameter}\n' "${vcf}" >> "${name}_${method}_supporting_reads.tsv"
+    """
+}
