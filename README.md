@@ -113,6 +113,27 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
 
 # Input Validation
 
+## Input Scenarios and Preprocessing Logic
+
+The validation module not only verifies input formats, but also determines how genome assemblies are interpreted and preprocessed before entering the pipeline.
+
+Depending on the structure of `ref.fa` and `mod.fa`, different strategies are applied for:
+- chromosome and plasmid separation
+- contig handling
+- usage of minimap2 for sequence mapping
+- preparation of files in `data/valid/`
+
+The following table summarizes all supported scenarios:
+
+| #     | Scenario                                                  | Mode (`config.json`)       | Input Structure                                                                                | Plasmids Handling                                                                                                                                               | `run_ref_x_mod` | **minimap2 Mapping**                                              | mod.fa Processing                                                                                          | Modules Run          | Output in `data/valid/`                                                      |
+| ----- | --------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------- |
+| **1** | Single contig + plasmids (prokaryote)                     | `prokaryote`               | **ref.fa:** 1 sequence (+ optional plasmids) <br> **mod.fa:** 1 sequence (+ optional plasmids) | From both genomes: <br> - Longest sequence → chromosome <br> - Remaining → plasmids <br><br> In **mod.fa**: plasmids = sequences **not mapped** to reference    | True            | **Used** to identify unmapped regions (plasmids in mod.fa)        | Reduced to **1 contig** (chromosome only)                                                                  | All modules          | `ref.fa`, `mod.fa` (1 contig) <br> `*_contig_0.fasta` <br> `*_plasmid.fasta` |
+| **2** | Fragmented assembly (below limit) (prokaryote)            | `prokaryote`               | **ref.fa:** 1 sequence <br> **mod.fa:** multiple sequences (≤ limit)                           | In reference: <br> - Longest = chromosome <br> - Rest = plasmids <br><br> In **mod.fa**: <br> - Unmapped sequences → plasmids <br> - Mapped sequences → contigs | True            | **Used** to split mod.fa into mapped contigs vs unmapped plasmids | - Split into individual contigs (`*_contig.fasta`) <br> - `mod.fa` becomes multifasta **without plasmids** | All modules          | `ref.fa`, `mod.fa` + contig set <br> `*_contig.fasta` <br> `*_plasmid.fasta` |
+| **3** | Fragmented assembly (above limit) (prokaryote)            | `prokaryote`               | **ref.fa:** 1 sequence <br> **mod.fa:** multiple sequences (> limit)                           | In reference: <br> - Longest = chromosome <br> - Rest → `*ref_plasmid.fasta` <br><br> In **mod.fa**: no plasmid detection                                       | False           | **Not used**                                                      | No processing (mod.fa copied as-is)                                                                        | Mapping-only modules | `ref.fa`, `mod.fa` (copied) <br> `*_plasmid.fasta`                           |
+| **4** | Multiple sequences in reference (prokaryote or eukaryote) | `prokaryote` / `eukaryote` | **ref.fa:** multiple sequences (non-plasmid) <br> **mod.fa:** one or more sequences            | No plasmids considered                                                                                                                                          | False           | **Not used**                                                      | No processing (files copied as-is)                                                                         | Mapping-only modules | `ref.fa`, `mod.fa` (copied)                                                  |
+
+
+
 > **Important!**
 > 
 > When container is build please follow the steps to preprocess the data with a validation package.
