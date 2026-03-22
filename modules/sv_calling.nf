@@ -86,7 +86,7 @@ process cute_sv {
 
     memory { 16.GB * task.attempt }
     errorStrategy 'retry'
-    maxForks 4
+    maxForks 1
     maxRetries 3
 
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
@@ -103,7 +103,7 @@ process cute_sv {
     script:
     """
     mkdir ${pair_id}_out
-    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t ${params.max_cpu}
+    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t 1
     """
 }
 
