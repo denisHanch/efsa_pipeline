@@ -20,7 +20,7 @@ T = TypeVar('T', bound='BaseValidatorConfig')
 
 # ===== Global Configuration Constants =====
 # Only these fields can be specified in config.json "options" section
-ALLOWED_GLOBAL_OPTIONS = {'threads', 'validation_level', 'logging_level'}
+ALLOWED_GLOBAL_OPTIONS = {'threads', 'validation_level', 'logging_level', 'type'}
 # Only these fields can be overridden at the file level
 ALLOWED_FILE_OPTIONS = {'threads', 'validation_level'}
 MAX_RECOMMENDED_THREADS = 16
@@ -124,6 +124,11 @@ class Config:
     def validation_level(self) -> str:
         """Get validation level from options, or default to 'strict'."""
         return self.options.get('validation_level', 'strict')
+
+    @property
+    def type(self) -> Optional[str]:
+        """Get organism type from options ('prokaryote' or 'eukaryote')."""
+        return self.options.get('type')
 
     def __repr__(self):
         """Return a detailed string representation of the configuration."""
@@ -248,8 +253,7 @@ class ConfigManager:
         """Parse genome and plasmid configurations (internal method)."""
         # Required genomes
         config.ref_genome = ConfigManager._parse_genome_config(
-            data['ref_genome_filename'], 'ref_genome_filename', config.config_dir, config.output_dir, config.options,
-            allow_n_sequence_limit=False
+            data['ref_genome_filename'], 'ref_genome_filename', config.config_dir, config.output_dir, config.options
         )
         # Optional modified genome
         if 'mod_genome_filename' in data and data['mod_genome_filename']:
@@ -257,15 +261,17 @@ class ConfigManager:
                 data['mod_genome_filename'], 'mod_genome_filename', config.config_dir, config.output_dir, config.options
             )
 
-        # Optional plasmids
+        # Optional plasmids — n_sequence_limit is not applicable to plasmids
         if 'ref_plasmid_filename' in data and data['ref_plasmid_filename']:
             config.ref_plasmid = ConfigManager._parse_genome_config(
-                data['ref_plasmid_filename'], 'ref_plasmid_filename', config.config_dir, config.output_dir, config.options
+                data['ref_plasmid_filename'], 'ref_plasmid_filename', config.config_dir, config.output_dir, config.options,
+                allow_n_sequence_limit=False
             )
 
         if 'mod_plasmid_filename' in data and data['mod_plasmid_filename']:
             config.mod_plasmid = ConfigManager._parse_genome_config(
-                data['mod_plasmid_filename'], 'mod_plasmid_filename', config.config_dir, config.output_dir, config.options
+                data['mod_plasmid_filename'], 'mod_plasmid_filename', config.config_dir, config.output_dir, config.options,
+                allow_n_sequence_limit=False
             )
 
     @staticmethod
@@ -597,6 +603,28 @@ class ConfigManager:
             config.options['logging_level'] = logging_level
         else:
             logger.debug("logging_level not specified in global options (default: INFO)")
+
+        # Parse type option
+        if 'type' in options:
+            organism_type = options['type']
+
+            VALID_TYPES = {'prokaryote', 'eukaryote'}
+
+            if not isinstance(organism_type, str):
+                raise ConfigurationError(
+                    f"'type' must be a string, got {type(organism_type).__name__}: {organism_type}"
+                )
+
+            if organism_type not in VALID_TYPES:
+                raise ConfigurationError(
+                    f"Invalid type '{organism_type}'. "
+                    f"Must be one of: {', '.join(sorted(VALID_TYPES))}"
+                )
+
+            logger.info(f"Global option: type={organism_type}")
+            config.options['type'] = organism_type
+        else:
+            logger.debug("type not specified in global options")
 
     @staticmethod
     def _merge_options(field_name: str, global_options: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:        

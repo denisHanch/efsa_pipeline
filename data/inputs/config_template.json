@@ -2,6 +2,7 @@
   "ref_genome_filename": {
     "filename": "TBA",
     "validation_level": "strict/trust/minimal",
+    "n_sequence_limit": 5,
     "threads": 8
   },
   "mod_genome_filename": {
@@ -47,6 +48,7 @@
   "options": {
     "threads": 8,
     "validation_level": "strict/trust/minimal",
-    "logging_level":"DEBUG/INFO/WARNING/ERROR"
+    "logging_level":"DEBUG/INFO/WARNING/ERROR",
+    "type":"prokaryote/eukaryote"
   }
 }
