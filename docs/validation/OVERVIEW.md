@@ -45,7 +45,7 @@ After successful validation:
 
 - Validated files are placed in `data/valid/`
 - `data/valid/validated_params.json` is written with paths and flags for Nextflow (loaded automatically via `-params-file`)
-- If any genome exceeds `n_sequence_limit` or `type` is `"eukaryote"`, the file is still copied to `data/valid/` but `run_syri` and `run_ref_x_mod` will be set to `false`
+- If any genome exceeds `n_sequence_limit` or `type` is `"eukaryote"`, the file is still copied to `data/valid/` but `run_ref_x_mod` will be set to `false`
 - Log file created in `./logs/validation_ID.log`
 - Report file created in `./logs/report_ID.txt`
 
@@ -53,21 +53,11 @@ After successful validation:
 
 This file is produced by the validation step and consumed by Nextflow via `-params-file`. It overrides the defaults in `nextflow.config` and `nextflow_schema.json`.
 
-#### Validated inputs (hidden params)
-
-| Parameter             | Type    | Description                                                        |
-| --------------------- | ------- | ------------------------------------------------------------------ |
-| `ref_fasta_validated` | string  | Path to the validated reference genome FASTA.                      |
-| `mod_fasta_validated` | string  | Path to the validated modified genome FASTA.                       |
-| `ref_fasta_avail`     | boolean | `true` when a validated reference genome is available.             |
-| `mod_fasta_avail`     | boolean | `true` when a validated modified genome is available.              |
-
 #### Pipeline switches
 
 | Parameter            | Type    | Description                                                                                           |
 | -------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
 | `run_ref_x_mod`      | boolean | `true` when both reference and modified genome validation succeeded and neither is fragmented; `false` when any genome exceeds `n_sequence_limit` or `type` is `"eukaryote"`. Gates all ref-vs-mod steps. |
-| `run_syri`           | boolean | `true` when the number of contig files is between 1 and `n_sequence_limit` (default `5`) of the modified genome; `false` when the assembly is too fragmented or the organism is eukaryotic. The threshold is controlled by `n_sequence_limit` in `config.json`. |
 | `run_truvari`        | boolean | Always `false` by default; can be overridden manually.                                                |
 | `run_illumina`       | boolean | `true` when validated Illumina reads are present.                                                     |
 | `run_nanopore`       | boolean | `true` when validated Nanopore (ONT) reads are present.                                               |
@@ -77,8 +67,10 @@ This file is produced by the validation step and consumed by Nextflow via `-para
 
 #### File paths (null when absent)
 
-| Parameter       | Type   | Description                                          |
-| --------------- | ------ | ---------------------------------------------------- |
-| `pacbio_fastq`  | string | Path to the first validated PacBio FASTQ file.       |
-| `nanopore_fastq`| string | Path to the first validated Nanopore FASTQ file.     |
-| `gff`           | string | Path to the validated reference GFF/GFF3 file.       |
+| Parameter             | Type   | Description                                          |
+| --------------------- | ------ | ---------------------------------------------------- |
+| `ref_fasta_validated` | string | Path to the validated reference genome FASTA.        |
+| `mod_fasta_validated` | string | Path to the validated modified genome FASTA.         |
+| `pacbio_fastq`        | string | Path to the first validated PacBio FASTQ file.       |
+| `nanopore_fastq`      | string | Path to the first validated Nanopore FASTQ file.     |
+| `gff`                 | string | Path to the validated reference GFF/GFF3 file.       |
