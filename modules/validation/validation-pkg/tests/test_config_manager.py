@@ -1315,7 +1315,9 @@ class TestNSequenceLimit:
     Rules:
     - ref_genome_filename: n_sequence_limit is optional; when absent the
       default is 5. Explicit values are accepted and stored.
-    - mod_genome_filename (and plasmids): same behaviour.
+    - mod_genome_filename: same behaviour.
+    - ref_plasmid_filename / mod_plasmid_filename: n_sequence_limit is NOT
+      applicable; it is ignored with a warning and the field is set to None.
     """
 
     @pytest.fixture
@@ -1471,10 +1473,10 @@ class TestNSequenceLimit:
         with pytest.raises(ConfigurationError, match="n_sequence_limit"):
             ConfigManager.load(str(config_file))
 
-    # ── plasmid entries inherit the same parsing ──────────────────────────────
+    # ── plasmid entries ignore n_sequence_limit ───────────────────────────────
 
-    def test_n_sequence_limit_on_plasmid(self, temp_dir):
-        """n_sequence_limit is parsed for plasmid genome entries."""
+    def test_n_sequence_limit_on_ref_plasmid_is_ignored(self, temp_dir):
+        """n_sequence_limit specified on ref_plasmid is ignored with a warning."""
         (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
         (temp_dir / "plasmid.fasta").write_text(">plasmid1\nATCG\n")
         (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
@@ -1487,7 +1489,39 @@ class TestNSequenceLimit:
         config_file.write_text(json.dumps(config))
 
         loaded = ConfigManager.load(str(config_file))
-        assert loaded.ref_plasmid.n_sequence_limit == 3
+        assert loaded.ref_plasmid.n_sequence_limit is None
+
+    def test_n_sequence_limit_on_mod_plasmid_is_ignored(self, temp_dir):
+        """n_sequence_limit specified on mod_plasmid is ignored with a warning."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "plasmid.fasta").write_text(">plasmid1\nATCG\n")
+        (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "mod_plasmid_filename": {"filename": "plasmid.fasta", "n_sequence_limit": 10},
+            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}],
+        }
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config))
+
+        loaded = ConfigManager.load(str(config_file))
+        assert loaded.mod_plasmid.n_sequence_limit is None
+
+    def test_plasmid_n_sequence_limit_is_none_by_default(self, temp_dir):
+        """Plasmid n_sequence_limit is None when not specified (no default applied)."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "plasmid.fasta").write_text(">plasmid1\nATCG\n")
+        (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "ref_plasmid_filename": {"filename": "plasmid.fasta"},
+            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}],
+        }
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config))
+
+        loaded = ConfigManager.load(str(config_file))
+        assert loaded.ref_plasmid.n_sequence_limit is None
 
 
 class TestConfigOptionsType:

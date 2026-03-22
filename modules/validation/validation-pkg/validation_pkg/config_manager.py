@@ -261,15 +261,17 @@ class ConfigManager:
                 data['mod_genome_filename'], 'mod_genome_filename', config.config_dir, config.output_dir, config.options
             )
 
-        # Optional plasmids
+        # Optional plasmids — n_sequence_limit is not applicable to plasmids
         if 'ref_plasmid_filename' in data and data['ref_plasmid_filename']:
             config.ref_plasmid = ConfigManager._parse_genome_config(
-                data['ref_plasmid_filename'], 'ref_plasmid_filename', config.config_dir, config.output_dir, config.options
+                data['ref_plasmid_filename'], 'ref_plasmid_filename', config.config_dir, config.output_dir, config.options,
+                allow_n_sequence_limit=False
             )
 
         if 'mod_plasmid_filename' in data and data['mod_plasmid_filename']:
             config.mod_plasmid = ConfigManager._parse_genome_config(
-                data['mod_plasmid_filename'], 'mod_plasmid_filename', config.config_dir, config.output_dir, config.options
+                data['mod_plasmid_filename'], 'mod_plasmid_filename', config.config_dir, config.output_dir, config.options,
+                allow_n_sequence_limit=False
             )
 
     @staticmethod
