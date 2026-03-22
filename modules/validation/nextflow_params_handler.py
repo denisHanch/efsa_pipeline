@@ -12,13 +12,9 @@ Produced parameters
 validated_inputs (hidden, set by validation):
   ref_fasta_validated  – absolute path to the validated reference FASTA
   mod_fasta_validated  – absolute path to the validated modified FASTA
-  mod_fasta_avail      – True when a validated modified genome is present
-
 general_options (pipeline execution switches):
   run_ref_x_mod        – True when both ref_genome and mod_genome and inter-genome validation succeeded;
                          False when any genome is too fragmented (eukaryote type or n_sequences > limit)
-  run_syri             – True when 1–n_sequence_limit contigs found (prokaryotic assembly);
-                         False for >n_sequence_limit contigs (fragmented/eukaryotic) 
   run_truvari          – always False (reserved for future use / manual override)
   run_illumina         – True when validated Illumina reads are present
   run_nanopore         – True when validated Nanopore (ONT) reads are present
@@ -40,12 +36,8 @@ from typing import Optional
 
 @dataclass
 class NextflowParams:
-    # validated_inputs
-    ref_fasta_avail: bool = False
-    mod_fasta_avail: bool = False
     # general_options
     run_ref_x_mod: bool = False
-    run_syri: bool = False
     run_truvari: bool = False
     run_illumina: bool = False
     run_nanopore: bool = False
@@ -65,10 +57,7 @@ class NextflowParams:
         Optional path fields are excluded when None; nanopore_fastq is always included."""
         _OPTIONAL_PATHS = {"ref_fasta_validated", "mod_fasta_validated", "pacbio_fastq", "gff"}
         result = {
-            "ref_fasta_avail": self.ref_fasta_avail,
-            "mod_fasta_avail": self.mod_fasta_avail,
             "run_ref_x_mod": self.run_ref_x_mod,
-            "run_syri": self.run_syri,
             "run_truvari": self.run_truvari,
             "run_illumina": self.run_illumina,
             "run_nanopore": self.run_nanopore,
@@ -122,20 +111,15 @@ def build_params(validation_results: dict) -> NextflowParams:
 
     gxg_metadata = gxg.get("metadata") or {}
     contig_file_size = len(gxg_metadata.get("contig_files", []))
-    mod_n_sequence_limit = validation_results.get("mod_n_sequence_limit") or 5
 
     ref_fragmented = getattr(validation_results.get("ref_genome"), 'fragmented', False)
     mod_fragmented = getattr(validation_results.get("mod_genome"), 'fragmented', False)
 
     return NextflowParams(
-        # validated_inputs
-        ref_fasta_avail=ref_path is not None,
-        mod_fasta_avail=mod_path is not None,
         # general_options — pipeline switches
         run_ref_x_mod=(ref_path is not None and mod_path is not None
                        and not ref_fragmented and not mod_fragmented
                        and gxg.get("passed", False)),
-        run_syri=1 <= contig_file_size <= mod_n_sequence_limit,
         run_truvari=False,
         run_illumina="illumina" in by_type,
         run_nanopore="ont" in by_type,

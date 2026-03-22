@@ -2,13 +2,10 @@
 Tests for nextflow_params.py
 
 Tests cover:
-- run_syri logic (contig_file_size vs n_sequence_limit)
 - run_ref_x_mod conditions
-- ref/mod FASTA availability flags
 - Read type detection (illumina, ont, pacbio)
 - GFF / run_vcf_annotation
 - Conditional keys (ref_fasta_validated, mod_fasta_validated, pacbio_fastq, gff)
-- mod_n_sequence_limit default fallback
 - write_params serialises valid JSON
 """
 
@@ -38,52 +35,15 @@ def _gxg(contig_files: list, passed: bool = True) -> dict:
     return {"metadata": {"contig_files": contig_files}, "passed": passed}
 
 
-def _base(contig_files=None, passed=True, mod_n_sequence_limit=None):
+def _base(contig_files=None, passed=True):
     """Minimal validation_results with ref + mod genome and given contigs."""
     return {
-        "ref_genome":           _meta("/ref/genome.fasta"),
-        "mod_genome":           _meta("/mod/genome.fasta"),
-        "genomexgenome":        _gxg(contig_files or [], passed=passed),
-        "reads":                [],
-        "ref_feature":          None,
-        "mod_n_sequence_limit": mod_n_sequence_limit,
+        "ref_genome":    _meta("/ref/genome.fasta"),
+        "mod_genome":    _meta("/mod/genome.fasta"),
+        "genomexgenome": _gxg(contig_files or [], passed=passed),
+        "reads":         [],
+        "ref_feature":   None,
     }
-
-
-# ---------------------------------------------------------------------------
-# run_syri
-# ---------------------------------------------------------------------------
-
-class TestRunSyri:
-
-    def test_no_contigs_is_false(self):
-        p = build_params(_base(contig_files=[]))
-        assert p.run_syri is False
-
-    def test_single_contig_is_true(self):
-        p = build_params(_base(contig_files=["c1.fasta"]))
-        assert p.run_syri is True
-
-    def test_contigs_at_default_limit_is_true(self):
-        # default mod_n_sequence_limit = 5
-        p = build_params(_base(contig_files=["c1", "c2", "c3", "c4", "c5"]))
-        assert p.run_syri is True
-
-    def test_contigs_exceed_default_limit_is_false(self):
-        p = build_params(_base(contig_files=["c1", "c2", "c3", "c4", "c5", "c6"]))
-        assert p.run_syri is False
-
-    def test_custom_limit_respected(self):
-        p = build_params(_base(contig_files=["c1", "c2", "c3"], mod_n_sequence_limit=3))
-        assert p.run_syri is True
-
-    def test_contigs_exceed_custom_limit_is_false(self):
-        p = build_params(_base(contig_files=["c1", "c2", "c3", "c4"], mod_n_sequence_limit=3))
-        assert p.run_syri is False
-
-    def test_contig_file_size_is_reported(self):
-        p = build_params(_base(contig_files=["c1", "c2"]))
-        assert p.contig_file_size == 2
 
 
 # ---------------------------------------------------------------------------
@@ -120,15 +80,13 @@ class TestRunRefXMod:
 
 
 # ---------------------------------------------------------------------------
-# FASTA availability flags and conditional keys
+# FASTA conditional keys
 # ---------------------------------------------------------------------------
 
 class TestFastaAvailability:
 
     def test_ref_and_mod_available(self):
         p = build_params(_base())
-        assert p.ref_fasta_avail is True
-        assert p.mod_fasta_avail is True
         assert p.ref_fasta_validated == "/ref/genome.fasta"
         assert p.mod_fasta_validated == "/mod/genome.fasta"
 
@@ -136,8 +94,6 @@ class TestFastaAvailability:
         r = _base()
         r["mod_genome"] = None
         p = build_params(r)
-        assert p.ref_fasta_avail is True
-        assert p.mod_fasta_avail is False
         assert p.ref_fasta_validated is not None
         assert p.mod_fasta_validated is None
 
@@ -146,8 +102,6 @@ class TestFastaAvailability:
         r["ref_genome"] = None
         r["mod_genome"] = None
         p = build_params(r)
-        assert p.ref_fasta_avail is False
-        assert p.mod_fasta_avail is False
         assert p.ref_fasta_validated is None
         assert p.mod_fasta_validated is None
 
@@ -236,24 +190,6 @@ class TestFeatureAnnotation:
 
 
 # ---------------------------------------------------------------------------
-# mod_n_sequence_limit default
-# ---------------------------------------------------------------------------
-
-class TestModNSequenceLimitDefault:
-
-    def test_none_defaults_to_5(self):
-        # 6 contigs should exceed the default of 5
-        p = build_params(_base(contig_files=["c1", "c2", "c3", "c4", "c5", "c6"],
-                               mod_n_sequence_limit=None))
-        assert p.run_syri is False
-
-    def test_zero_defaults_to_5(self):
-        # mod_n_sequence_limit=0 is falsy → defaults to 5
-        p = build_params(_base(contig_files=["c1"], mod_n_sequence_limit=0))
-        assert p.run_syri is True  # 1 contig, default limit 5
-
-
-# ---------------------------------------------------------------------------
 # run_truvari always False
 # ---------------------------------------------------------------------------
 
@@ -276,7 +212,7 @@ class TestWriteParams:
             out = Path(tmpdir) / "params.json"
             write_params(params, out)
             data = json.loads(out.read_text())
-        assert data["run_syri"] == params.run_syri
+        assert data["run_ref_x_mod"] == params.run_ref_x_mod
 
     def test_output_is_readable_dict(self):
         params = build_params(_base(contig_files=["c1"]))
@@ -285,5 +221,5 @@ class TestWriteParams:
             write_params(params, out)
             loaded = json.loads(out.read_text())
         assert isinstance(loaded, dict)
-        assert "run_syri" in loaded
         assert "run_ref_x_mod" in loaded
+        assert "run_truvari" in loaded
