@@ -1633,34 +1633,43 @@ class TestGenomeValidatorErrorNSequences:
             n_sequence_limit=n_sequence_limit,
         )
 
-    # ── error raised ──────────────────────────────────────────────────────────
+    # ── validation completes, file copied, metadata populated ─────────────────
 
-    def test_raises_when_count_exceeds_threshold_strict(self, temp_dir, output_dir):
-        """Strict mode: error raised when number of sequences exceeds n_sequence_limit."""
+    def test_returns_metadata_when_count_exceeds_threshold_strict(self, temp_dir, output_dir):
+        """Strict mode: validation completes (no exception) when n_sequence_limit exceeded."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=6)
         config = self._make_config(fasta, output_dir, "strict", n_sequence_limit=5)
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        with pytest.raises(GenomeValidationError, match="exceeds maximum allowed"):
-            GenomeValidator(config, settings).run()
+        result = GenomeValidator(config, settings).run()
+        assert result is not None
 
-    def test_raises_when_count_exceeds_threshold_trust(self, temp_dir, output_dir):
-        """Trust mode: n_sequence_limit check applies before trust-mode shortcut."""
+    def test_returns_metadata_when_count_exceeds_threshold_trust(self, temp_dir, output_dir):
+        """Trust mode: validation completes (no exception) when n_sequence_limit exceeded."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=6)
         config = self._make_config(fasta, output_dir, "trust", n_sequence_limit=5)
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        with pytest.raises(GenomeValidationError, match="exceeds maximum allowed"):
-            GenomeValidator(config, settings).run()
+        result = GenomeValidator(config, settings).run()
+        assert result is not None
 
-    def test_error_message_contains_count_and_threshold(self, temp_dir, output_dir):
-        """Error message includes actual count and configured threshold."""
-        fasta = self._make_fasta(temp_dir / "genome.fasta", n=8)
+    def test_output_file_set_in_metadata_when_limit_exceeded(self, temp_dir, output_dir):
+        """output_file in metadata points to the copied file when limit exceeded."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=6)
         config = self._make_config(fasta, output_dir, n_sequence_limit=5)
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        with pytest.raises(GenomeValidationError, match=r"8.*5|5.*8"):
-            GenomeValidator(config, settings).run()
+        result = GenomeValidator(config, settings).run()
+        assert result.output_file is not None
+
+    def test_fragmented_true_when_limit_exceeded(self, temp_dir, output_dir):
+        """fragmented flag is True in metadata when n_sequence_limit exceeded."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=6)
+        config = self._make_config(fasta, output_dir, n_sequence_limit=5)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
+
+        result = GenomeValidator(config, settings).run()
+        assert result.fragmented is True
 
     # ── boundary conditions ───────────────────────────────────────────────────
 
@@ -1692,7 +1701,7 @@ class TestGenomeValidatorErrorNSequences:
         # Should not raise regardless of sequence count
         GenomeValidator(config, settings).run()
 
-    # ── original file copied to output on error ───────────────────────────────
+    # ── original file copied to output ────────────────────────────────────────
 
     def test_original_file_copied_to_output_on_error(self, temp_dir, output_dir):
         """When n_sequence_limit is exceeded, the original file is copied to output dir."""
@@ -1700,8 +1709,7 @@ class TestGenomeValidatorErrorNSequences:
         config = self._make_config(fasta, output_dir, n_sequence_limit=5)
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        with pytest.raises(GenomeValidationError):
-            GenomeValidator(config, settings).run()
+        GenomeValidator(config, settings).run()
 
         assert (output_dir / "genome.fasta").exists()
 
@@ -1711,8 +1719,7 @@ class TestGenomeValidatorErrorNSequences:
         config = self._make_config(fasta, output_dir, n_sequence_limit=5)
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        with pytest.raises(GenomeValidationError):
-            GenomeValidator(config, settings).run()
+        GenomeValidator(config, settings).run()
 
         assert (output_dir / "genome.fasta").read_bytes() == fasta.read_bytes()
 
@@ -1750,47 +1757,57 @@ class TestGenomeValidatorEukaryoteType:
             n_sequence_limit=None,
         )
 
-    # ── error raised ──────────────────────────────────────────────────────────
+    # ── validation completes, file copied, metadata populated ─────────────────
 
-    def test_raises_for_eukaryote_strict(self, temp_dir, output_dir):
-        """Strict mode: GenomeValidationError raised when type='eukaryote'."""
+    def test_returns_metadata_for_eukaryote_strict(self, temp_dir, output_dir):
+        """Strict mode: validation completes (no exception) when type='eukaryote'."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
         config = self._make_config(fasta, output_dir, "strict")
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        with pytest.raises(GenomeValidationError, match="eukaryote"):
-            GenomeValidator(config, settings).run()
+        result = GenomeValidator(config, settings).run()
+        assert result is not None
 
-    def test_raises_for_eukaryote_trust(self, temp_dir, output_dir):
-        """Trust mode: eukaryote check fires before trust-mode shortcut."""
+    def test_returns_metadata_for_eukaryote_trust(self, temp_dir, output_dir):
+        """Trust mode: validation completes (no exception) when type='eukaryote'."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
         config = self._make_config(fasta, output_dir, "trust")
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        with pytest.raises(GenomeValidationError, match="eukaryote"):
-            GenomeValidator(config, settings).run()
+        result = GenomeValidator(config, settings).run()
+        assert result is not None
 
-    def test_error_message_contains_type(self, temp_dir, output_dir):
-        """Error message includes the organism type."""
+    def test_output_file_set_in_metadata(self, temp_dir, output_dir):
+        """output_file in metadata points to the copied file."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
         config = self._make_config(fasta, output_dir)
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        with pytest.raises(GenomeValidationError, match="eukaryote"):
-            GenomeValidator(config, settings).run()
+        result = GenomeValidator(config, settings).run()
+        assert result.output_file is not None
 
-    # ── no error for other types ───────────────────────────────────────────────
+    def test_fragmented_true_in_metadata(self, temp_dir, output_dir):
+        """fragmented flag is True in metadata for eukaryote type."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
+        config = self._make_config(fasta, output_dir)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
 
-    def test_prokaryote_does_not_raise(self, temp_dir, output_dir):
-        """type='prokaryote' proceeds normally without error."""
+        result = GenomeValidator(config, settings).run()
+        assert result.fragmented is True
+
+    # ── no copy/fragmented for other types ────────────────────────────────────
+
+    def test_prokaryote_not_fragmented(self, temp_dir, output_dir):
+        """type='prokaryote' proceeds with full validation; fragmented is False."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
         config = self._make_config(fasta, output_dir, organism_type="prokaryote")
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        GenomeValidator(config, settings).run()
+        result = GenomeValidator(config, settings).run()
+        assert result.fragmented is False
 
-    def test_no_type_does_not_raise(self, temp_dir, output_dir):
-        """Missing 'type' key in global_options proceeds normally."""
+    def test_no_type_not_fragmented(self, temp_dir, output_dir):
+        """Missing 'type' key proceeds with full validation; fragmented is False."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
         config = GenomeConfig(
             filename=fasta.name,
@@ -1804,9 +1821,10 @@ class TestGenomeValidatorEukaryoteType:
         )
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        GenomeValidator(config, settings).run()
+        result = GenomeValidator(config, settings).run()
+        assert result.fragmented is False
 
-    # ── original file copied to output on error ────────────────────────────────
+    # ── original file copied to output ────────────────────────────────────────
 
     def test_original_file_copied_to_output_on_eukaryote(self, temp_dir, output_dir):
         """When type='eukaryote', the original file is copied to output dir."""
@@ -1814,8 +1832,7 @@ class TestGenomeValidatorEukaryoteType:
         config = self._make_config(fasta, output_dir)
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        with pytest.raises(GenomeValidationError):
-            GenomeValidator(config, settings).run()
+        GenomeValidator(config, settings).run()
 
         assert (output_dir / "genome.fasta").exists()
 
@@ -1825,8 +1842,7 @@ class TestGenomeValidatorEukaryoteType:
         config = self._make_config(fasta, output_dir)
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        with pytest.raises(GenomeValidationError):
-            GenomeValidator(config, settings).run()
+        GenomeValidator(config, settings).run()
 
         assert (output_dir / "genome.fasta").read_bytes() == fasta.read_bytes()
 
@@ -1847,8 +1863,8 @@ class TestGenomeValidatorEukaryoteType:
         )
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        with pytest.raises(GenomeValidationError, match="eukaryote"):
-            GenomeValidator(config, settings).run()
+        result = GenomeValidator(config, settings).run()
+        assert result.fragmented is True
 
 
 if __name__ == "__main__":

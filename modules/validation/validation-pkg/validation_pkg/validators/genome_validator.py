@@ -356,7 +356,7 @@ class GenomeValidator(BaseValidator):
             )
             copy_file(self.input_path, self.output_path, self.logger)
             self._sequence_limit_exceeded = True
-            raise GenomeValidationError(error_msg)
+            return
 
         # Check error threshold for number of sequences
         n_sequence_limit = self.genome_config.n_sequence_limit
@@ -376,7 +376,7 @@ class GenomeValidator(BaseValidator):
             )
             copy_file(self.input_path, self.output_path, self.logger)
             self._sequence_limit_exceeded = True
-            raise GenomeValidationError(error_msg)
+            return
 
         # Trust mode - validate only first sequence
         if self.validation_level == 'trust':
