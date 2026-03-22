@@ -144,22 +144,10 @@ Each pipeline (assembly, long-read ONT, long-read PacBio, short-read) provides i
 
 **Length calculation logic (per source):**
 
-The calculation of source-specific lengths varies by SV type to balance precision with robustness:
-
-**For INS (insertions):**
-- Uses `svlen` field directly from the VCF/TSV when available (most precise representation of insertion length)
+**For all other types (DEL, RPL, INV, TRA, INS):**
+- Uses `svlen` field directly from the VCF/TSV when available (most precise representation of the length)
 - Falls back to `NaN` if `svlen` is not provided
-- Rationale: start and end coordinates remains the same as it is reported in the reference genome that's why the SV length for insertion is taken directly from VCF file.
-
-**For all other types (DEL, RPL, INV, TRA):**
-- Calculated as `end - start + 1` based on the reported breakpoint coordinates  
-- Falls back to `NaN` if coordinates are unavailable
-- Rationale: For these variation types, coordinate-based length is the standard biological measure
-
-**Example:**
-- **Insertion:** VCF reports `SVLEN=50` → `long_ont_length = 50` (uses svlen)
-- **Deletion:** VCF reports `START=1000, END=1500` → `asm_length = 501` (uses 1500 - 1000 + 1)
-- **Deletion with insertion:** VCF reports coordinates only, no svlen → `short_length = (end - start + 1)` (uses coordinates)
+- Rationale: start and end coordinates remains the same for insertions as it is reported in the reference genome that's why the SV length is taken directly from VCF file.
 
 ### Assembly coordinates for translocations (asm_start_mod, asm_end_mod)
 
