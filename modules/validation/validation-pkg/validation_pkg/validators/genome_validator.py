@@ -349,7 +349,7 @@ class GenomeValidator(BaseValidator):
                 f"({n_sequence_limit} -> the assembly is too fragmented for further analysis)"
             )
             self.logger.add_validation_issue(
-                level='WARNING',
+                level='ERROR',
                 category='genome',
                 message=error_msg,
                 details={
@@ -359,7 +359,7 @@ class GenomeValidator(BaseValidator):
             )
             copy_file(self.input_path, self.output_path, self.logger)
             self._sequence_limit_exceeded = True
-            return
+            raise GenomeValidationError(error_msg)
 
         # Trust mode - validate only first sequence
         if self.validation_level == 'trust':

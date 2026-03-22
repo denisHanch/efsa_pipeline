@@ -253,8 +253,7 @@ class ConfigManager:
         """Parse genome and plasmid configurations (internal method)."""
         # Required genomes
         config.ref_genome = ConfigManager._parse_genome_config(
-            data['ref_genome_filename'], 'ref_genome_filename', config.config_dir, config.output_dir, config.options,
-            allow_n_sequence_limit=False
+            data['ref_genome_filename'], 'ref_genome_filename', config.config_dir, config.output_dir, config.options
         )
         # Optional modified genome
         if 'mod_genome_filename' in data and data['mod_genome_filename']:

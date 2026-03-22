@@ -1313,10 +1313,9 @@ class TestNSequenceLimit:
     """Tests for the n_sequence_limit genome config parameter.
 
     Rules:
-    - ref_genome_filename: n_sequence_limit is NOT allowed; if provided it is
-      ignored with a warning and the value is always None.
-    - mod_genome_filename (and plasmids): n_sequence_limit is optional; when
-      absent the default is 5.
+    - ref_genome_filename: n_sequence_limit is optional; when absent the
+      default is 5. Explicit values are accepted and stored.
+    - mod_genome_filename (and plasmids): same behaviour.
     """
 
     @pytest.fixture
@@ -1339,22 +1338,64 @@ class TestNSequenceLimit:
         config_file.write_text(json.dumps(config))
         return config_file
 
-    # ── ref_genome: n_sequence_limit is never set ─────────────────────────────
+    # ── ref_genome: n_sequence_limit behaves the same as mod_genome ──────────
 
-    def test_ref_genome_n_sequence_limit_is_none(self, temp_dir):
-        """ref_genome never has n_sequence_limit; it is always None."""
+    def test_ref_genome_n_sequence_limit_default_is_5(self, temp_dir):
+        """When n_sequence_limit is absent from ref_genome, default is 5."""
         config_file = self._write_config(temp_dir, {"filename": "ref.fasta"})
         config = ConfigManager.load(str(config_file))
-        assert config.ref_genome.n_sequence_limit is None
+        assert config.ref_genome.n_sequence_limit == 5
 
-    def test_ref_genome_n_sequence_limit_ignored_with_warning(self, temp_dir):
-        """n_sequence_limit on ref_genome is silently ignored (no error)."""
+    def test_ref_genome_n_sequence_limit_explicit_value(self, temp_dir):
+        """Explicit n_sequence_limit on ref_genome is stored correctly."""
         config_file = self._write_config(
             temp_dir,
             {"filename": "ref.fasta", "n_sequence_limit": 42},
         )
         config = ConfigManager.load(str(config_file))
-        assert config.ref_genome.n_sequence_limit is None
+        assert config.ref_genome.n_sequence_limit == 42
+
+    def test_ref_genome_n_sequence_limit_string_uses_default(self, temp_dir):
+        """Plain-string ref_genome value (no dict) also gets the default (5)."""
+        config_file = self._write_config(temp_dir, "ref.fasta")
+        config = ConfigManager.load(str(config_file))
+        assert config.ref_genome.n_sequence_limit == 5
+
+    def test_ref_genome_n_sequence_limit_zero_raises(self, temp_dir):
+        """n_sequence_limit=0 is rejected for ref_genome (must be positive)."""
+        config_file = self._write_config(
+            temp_dir,
+            {"filename": "ref.fasta", "n_sequence_limit": 0},
+        )
+        with pytest.raises(ConfigurationError, match="n_sequence_limit"):
+            ConfigManager.load(str(config_file))
+
+    def test_ref_genome_n_sequence_limit_negative_raises(self, temp_dir):
+        """Negative n_sequence_limit is rejected for ref_genome."""
+        config_file = self._write_config(
+            temp_dir,
+            {"filename": "ref.fasta", "n_sequence_limit": -3},
+        )
+        with pytest.raises(ConfigurationError, match="n_sequence_limit"):
+            ConfigManager.load(str(config_file))
+
+    def test_ref_genome_n_sequence_limit_float_raises(self, temp_dir):
+        """Float n_sequence_limit is rejected for ref_genome (must be integer)."""
+        config_file = self._write_config(
+            temp_dir,
+            {"filename": "ref.fasta", "n_sequence_limit": 5.5},
+        )
+        with pytest.raises(ConfigurationError, match="n_sequence_limit"):
+            ConfigManager.load(str(config_file))
+
+    def test_ref_genome_n_sequence_limit_string_value_raises(self, temp_dir):
+        """String n_sequence_limit is rejected for ref_genome."""
+        config_file = self._write_config(
+            temp_dir,
+            {"filename": "ref.fasta", "n_sequence_limit": "ten"},
+        )
+        with pytest.raises(ConfigurationError, match="n_sequence_limit"):
+            ConfigManager.load(str(config_file))
 
     # ── mod_genome: default and explicit value ────────────────────────────────
 
@@ -1381,18 +1422,18 @@ class TestNSequenceLimit:
         config = ConfigManager.load(str(config_file))
         assert config.mod_genome.n_sequence_limit == 42
 
-    def test_ref_none_mod_explicit(self, temp_dir):
-        """ref_genome.n_sequence_limit is None; mod_genome carries its own value."""
+    def test_ref_explicit_mod_explicit(self, temp_dir):
+        """Both ref_genome and mod_genome carry their own explicit n_sequence_limit."""
         config_file = self._write_config(
             temp_dir,
             {"filename": "ref.fasta", "n_sequence_limit": 20},
             mod_genome_value={"filename": "mod.fasta", "n_sequence_limit": 50},
         )
         loaded = ConfigManager.load(str(config_file))
-        assert loaded.ref_genome.n_sequence_limit is None
+        assert loaded.ref_genome.n_sequence_limit == 20
         assert loaded.mod_genome.n_sequence_limit == 50
 
-    # ── validation errors (mod_genome only) ──────────────────────────────────
+    # ── validation errors (mod_genome) ───────────────────────────────────────
 
     def test_n_sequence_limit_zero_raises(self, temp_dir):
         """n_sequence_limit=0 is rejected for mod_genome (must be positive)."""
@@ -1447,6 +1488,78 @@ class TestNSequenceLimit:
 
         loaded = ConfigManager.load(str(config_file))
         assert loaded.ref_plasmid.n_sequence_limit == 3
+
+
+class TestConfigOptionsType:
+    """Test suite for options.type configuration parsing and validation."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    def _create_config(self, temp_dir, type_value=None, include_type=True):
+        """Helper to create a minimal config with an optional type option."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
+
+        options = {}
+        if include_type:
+            options["type"] = type_value
+
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}],
+        }
+        if options:
+            config["options"] = options
+
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config, indent=2))
+        return config_file
+
+    def test_type_prokaryote(self, temp_dir):
+        """'prokaryote' is a valid type value."""
+        config_file = self._create_config(temp_dir, "prokaryote")
+        config = ConfigManager.load(str(config_file))
+        assert config.options["type"] == "prokaryote"
+        assert config.type == "prokaryote"
+
+    def test_type_eukaryote(self, temp_dir):
+        """'eukaryote' is a valid type value."""
+        config_file = self._create_config(temp_dir, "eukaryote")
+        config = ConfigManager.load(str(config_file))
+        assert config.options["type"] == "eukaryote"
+        assert config.type == "eukaryote"
+
+    def test_type_omitted_returns_none(self, temp_dir):
+        """When type is not specified, Config.type returns None."""
+        config_file = self._create_config(temp_dir, include_type=False)
+        config = ConfigManager.load(str(config_file))
+        assert config.type is None
+
+    def test_type_invalid_raises_error(self, temp_dir):
+        """An unrecognised type value raises ConfigurationError."""
+        config_file = self._create_config(temp_dir, "virus")
+        with pytest.raises(ConfigurationError, match="Invalid type"):
+            ConfigManager.load(str(config_file))
+
+    def test_type_wrong_type_raises_error(self, temp_dir):
+        """A non-string type value raises ConfigurationError."""
+        config_file = self._create_config(temp_dir, 123)
+        with pytest.raises(ConfigurationError, match="'type' must be a string"):
+            ConfigManager.load(str(config_file))
+
+    def test_config_type_property(self):
+        """Config.type property returns the correct value from options."""
+        config = Config()
+        assert config.type is None
+
+        config.options["type"] = "prokaryote"
+        assert config.type == "prokaryote"
+
+        config.options["type"] = "eukaryote"
+        assert config.type == "eukaryote"
 
 
 if __name__ == "__main__":
