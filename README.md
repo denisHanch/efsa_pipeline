@@ -509,7 +509,7 @@ Each pipeline (assembly, long-read ONT, long-read PacBio, short-read) provides i
 
 **Length calculation logic (per source):**
 
-**For all other types (DEL, RPL, INV, TRA, INS):**
+**For all types (DEL, RPL, INV, TRA, INS):**
 - Uses `svlen` field directly from the VCF/TSV when available (most precise representation of the length)
 - Falls back to `NaN` if `svlen` is not provided
 - Rationale: start and end coordinates remains the same for insertions as it is reported in the reference genome that's why the SV length is taken directly from VCF file.
