@@ -15,7 +15,8 @@ validated_inputs (hidden, set by validation):
   mod_fasta_avail      – True when a validated modified genome is present
 
 general_options (pipeline execution switches):
-  run_ref_x_mod        – True when both ref_genome and mod_genome and inter-genome validation succeeded
+  run_ref_x_mod        – True when both ref_genome and mod_genome and inter-genome validation succeeded;
+                         False when any genome is too fragmented (eukaryote type or n_sequences > limit)
   run_syri             – True when 1–n_sequence_limit contigs found (prokaryotic assembly);
                          False for >n_sequence_limit contigs (fragmented/eukaryotic) 
   run_truvari          – always False (reserved for future use / manual override)
@@ -75,12 +76,17 @@ def build_params(validation_results: dict) -> dict:
     contig_file_size = len(gxg_metadata.get("contig_files", []))
     mod_n_sequence_limit = validation_results.get("mod_n_sequence_limit") or 5
 
+    ref_fragmented = getattr(validation_results.get("ref_genome"), 'fragmented', False)
+    mod_fragmented = getattr(validation_results.get("mod_genome"), 'fragmented', False)
+
     params = {
         # validated_inputs
         "ref_fasta_avail":    ref_path is not None,
         "mod_fasta_avail":    mod_path is not None,
         # general_options — pipeline switches
-        "run_ref_x_mod":      ref_path is not None and mod_path is not None and gxg.get("passed", False),
+        "run_ref_x_mod":      (ref_path is not None and mod_path is not None
+                               and not ref_fragmented and not mod_fragmented
+                               and gxg.get("passed", False)),
         "run_syri":           1 <= contig_file_size <= mod_n_sequence_limit,
         "run_truvari":        False,
         "run_illumina":       "illumina" in by_type,

@@ -341,6 +341,23 @@ class GenomeValidator(BaseValidator):
         """Validate parsed sequences (trust/strict modes only)."""
         self.logger.debug("Validating sequences...")
 
+        # Check if organism type is eukaryote — too complex for inter-genome alignment
+        organism_type = self.genome_config.global_options.get('type')
+        if organism_type == 'eukaryote':
+            error_msg = (
+                "Organism type is 'eukaryote' — the assembly is too complex for "
+                "inter-genome alignment and will not be processed further"
+            )
+            self.logger.add_validation_issue(
+                level='ERROR',
+                category='genome',
+                message=error_msg,
+                details={'type': organism_type}
+            )
+            copy_file(self.input_path, self.output_path, self.logger)
+            self._sequence_limit_exceeded = True
+            raise GenomeValidationError(error_msg)
+
         # Check error threshold for number of sequences
         n_sequence_limit = self.genome_config.n_sequence_limit
         if n_sequence_limit is not None and len(self.sequences) > n_sequence_limit:

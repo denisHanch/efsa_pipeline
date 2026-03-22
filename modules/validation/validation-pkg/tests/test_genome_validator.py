@@ -1717,5 +1717,139 @@ class TestGenomeValidatorErrorNSequences:
         assert (output_dir / "genome.fasta").read_bytes() == fasta.read_bytes()
 
 
+class TestGenomeValidatorEukaryoteType:
+    """Test eukaryote type check — copy-only when type='eukaryote'."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def output_dir(self, temp_dir):
+        out_dir = temp_dir / "output"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir
+
+    def _make_fasta(self, path: Path, n: int) -> Path:
+        """Write a FASTA file with n sequences of 200 bp each."""
+        records = [SeqRecord(Seq("ATCG" * 50), id=f"seq{i}") for i in range(1, n + 1)]
+        with open(path, "w") as f:
+            SeqIO.write(records, f, "fasta")
+        return path
+
+    def _make_config(self, filepath: Path, output_dir: Path, validation_level: str = "strict", organism_type: str = "eukaryote"):
+        return GenomeConfig(
+            filename=filepath.name,
+            basename=filepath.stem,
+            filepath=filepath,
+            coding_type=CT.NONE,
+            detected_format=GenomeFormat.FASTA,
+            output_dir=output_dir,
+            global_options={"validation_level": validation_level, "type": organism_type},
+            n_sequence_limit=None,
+        )
+
+    # ── error raised ──────────────────────────────────────────────────────────
+
+    def test_raises_for_eukaryote_strict(self, temp_dir, output_dir):
+        """Strict mode: GenomeValidationError raised when type='eukaryote'."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
+        config = self._make_config(fasta, output_dir, "strict")
+        settings = GenomeValidator.Settings(min_sequence_length=0)
+
+        with pytest.raises(GenomeValidationError, match="eukaryote"):
+            GenomeValidator(config, settings).run()
+
+    def test_raises_for_eukaryote_trust(self, temp_dir, output_dir):
+        """Trust mode: eukaryote check fires before trust-mode shortcut."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
+        config = self._make_config(fasta, output_dir, "trust")
+        settings = GenomeValidator.Settings(min_sequence_length=0)
+
+        with pytest.raises(GenomeValidationError, match="eukaryote"):
+            GenomeValidator(config, settings).run()
+
+    def test_error_message_contains_type(self, temp_dir, output_dir):
+        """Error message includes the organism type."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
+        config = self._make_config(fasta, output_dir)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
+
+        with pytest.raises(GenomeValidationError, match="eukaryote"):
+            GenomeValidator(config, settings).run()
+
+    # ── no error for other types ───────────────────────────────────────────────
+
+    def test_prokaryote_does_not_raise(self, temp_dir, output_dir):
+        """type='prokaryote' proceeds normally without error."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
+        config = self._make_config(fasta, output_dir, organism_type="prokaryote")
+        settings = GenomeValidator.Settings(min_sequence_length=0)
+
+        GenomeValidator(config, settings).run()
+
+    def test_no_type_does_not_raise(self, temp_dir, output_dir):
+        """Missing 'type' key in global_options proceeds normally."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
+        config = GenomeConfig(
+            filename=fasta.name,
+            basename=fasta.stem,
+            filepath=fasta,
+            coding_type=CT.NONE,
+            detected_format=GenomeFormat.FASTA,
+            output_dir=output_dir,
+            global_options={"validation_level": "strict"},
+            n_sequence_limit=None,
+        )
+        settings = GenomeValidator.Settings(min_sequence_length=0)
+
+        GenomeValidator(config, settings).run()
+
+    # ── original file copied to output on error ────────────────────────────────
+
+    def test_original_file_copied_to_output_on_eukaryote(self, temp_dir, output_dir):
+        """When type='eukaryote', the original file is copied to output dir."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
+        config = self._make_config(fasta, output_dir)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
+
+        with pytest.raises(GenomeValidationError):
+            GenomeValidator(config, settings).run()
+
+        assert (output_dir / "genome.fasta").exists()
+
+    def test_copied_file_has_correct_content_on_eukaryote(self, temp_dir, output_dir):
+        """Copied file content matches the original input file."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=3)
+        config = self._make_config(fasta, output_dir)
+        settings = GenomeValidator.Settings(min_sequence_length=0)
+
+        with pytest.raises(GenomeValidationError):
+            GenomeValidator(config, settings).run()
+
+        assert (output_dir / "genome.fasta").read_bytes() == fasta.read_bytes()
+
+    # ── ordering: eukaryote fires before n_sequence_limit ─────────────────────
+
+    def test_eukaryote_fires_before_sequence_limit(self, temp_dir, output_dir):
+        """Eukaryote guard triggers even when sequence count is below n_sequence_limit."""
+        fasta = self._make_fasta(temp_dir / "genome.fasta", n=2)
+        config = GenomeConfig(
+            filename=fasta.name,
+            basename=fasta.stem,
+            filepath=fasta,
+            coding_type=CT.NONE,
+            detected_format=GenomeFormat.FASTA,
+            output_dir=output_dir,
+            global_options={"validation_level": "strict", "type": "eukaryote"},
+            n_sequence_limit=10,  # well above n=2, so limit alone would not trigger
+        )
+        settings = GenomeValidator.Settings(min_sequence_length=0)
+
+        with pytest.raises(GenomeValidationError, match="eukaryote"):
+            GenomeValidator(config, settings).run()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
