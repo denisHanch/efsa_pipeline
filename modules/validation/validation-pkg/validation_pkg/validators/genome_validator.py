@@ -15,7 +15,7 @@ from validation_pkg.exceptions import (
     FastaFormatError,
     GenBankFormatError
 )
-from validation_pkg.utils.file_handler import open_compressed_writer
+from validation_pkg.utils.file_handler import open_compressed_writer, copy_file
 from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
 from validation_pkg.utils.base_validator import BaseValidator
 from validation_pkg.utils.sequence_stats import calculate_n50
@@ -37,6 +37,9 @@ class GenomeOutputMetadata(BaseOutputMetadata):
     # Inter-file validation fields
     sequence_ids: List[str] = None
     sequence_lengths: dict = None
+
+    # Fragmented assembly flag (sequence limit exceeded — inter-genome validation skipped)
+    fragmented: bool = False
 
     def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
         """Format genome-specific statistics for report output."""
@@ -110,7 +113,6 @@ class GenomeValidator(BaseValidator):
         # Validation thresholds
         allow_empty_sequences: bool = False
         allow_empty_id: bool = False
-        warn_n_sequences: int = 2
 
         # Editing specifications
         is_plasmid: bool = False
@@ -120,6 +122,7 @@ class GenomeValidator(BaseValidator):
         main_first: bool = False
 
         replace_id_with: Optional[str] = None
+        replace_id_with_incremental: Optional[str] = None
         min_sequence_length: int = 100
 
         def __post_init__(self):
@@ -129,14 +132,14 @@ class GenomeValidator(BaseValidator):
 
             # Genome-specific validation
             if self.plasmid_split and self.plasmids_to_one:
-                raise ValueError(
+                raise GenomeValidationError(
                     "plasmid_split and plasmids_to_one cannot both be True. "
                     "Choose one: plasmid_split creates separate files for each plasmid, "
                     "plasmids_to_one merges all plasmids into a single file."
                 )
 
             if self.main_longest and self.main_first:
-                raise ValueError(
+                raise GenomeValidationError(
                     "main_longest and main_first cannot both be True. "
                     "Choose one: main_longest selects the longest sequence as main, "
                     "main_first selects the first sequence as main."
@@ -185,6 +188,8 @@ class GenomeValidator(BaseValidator):
         # Trust/Strict modes - full validation and processing
         self._parse_file()
         self._validate_sequences()
+        if getattr(self, '_sequence_limit_exceeded', False):
+            return self.output_path
         self._apply_edits()  # include plasmid handle
         output_path = self._write_output()
         return output_path
@@ -239,6 +244,7 @@ class GenomeValidator(BaseValidator):
             pass
 
         self.output_metadata.num_sequences_filtered = self.num_sequences_filtered
+        self.output_metadata.fragmented = getattr(self, '_sequence_limit_exceeded', False)
 
         # Strict mode only - compute expensive statistics
         if self.validation_level == 'strict' and self.sequences:
@@ -335,6 +341,26 @@ class GenomeValidator(BaseValidator):
         """Validate parsed sequences (trust/strict modes only)."""
         self.logger.debug("Validating sequences...")
 
+        # Check error threshold for number of sequences
+        n_sequence_limit = self.genome_config.n_sequence_limit
+        if n_sequence_limit is not None and len(self.sequences) > n_sequence_limit:
+            error_msg = (
+                f"Number of sequences ({len(self.sequences)}) exceeds maximum allowed "
+                f"({n_sequence_limit} -> the assembly is too fragmented for further analysis)"
+            )
+            self.logger.add_validation_issue(
+                level='WARNING',
+                category='genome',
+                message=error_msg,
+                details={
+                    'num_sequences': len(self.sequences),
+                    'error_threshold': n_sequence_limit
+                }
+            )
+            copy_file(self.input_path, self.output_path, self.logger)
+            self._sequence_limit_exceeded = True
+            return
+
         # Trust mode - validate only first sequence
         if self.validation_level == 'trust':
             self.logger.debug("Trust mode - validating first sequence only")
@@ -366,18 +392,6 @@ class GenomeValidator(BaseValidator):
             return
 
         # Strict mode - full validation
-        # Warn about number of sequences
-        if len(self.sequences) >= self.settings.warn_n_sequences:
-            self.logger.add_validation_issue(
-                level='WARNING',
-                category='genome',
-                message=f"High number of sequences: {len(self.sequences)}",
-                details={
-                    'num_sequences': len(self.sequences),
-                    'threshold': self.settings.warn_n_sequences
-                }
-            )
-
         for idx, record in enumerate(self.sequences):
             # Check sequence ID
             if not record.id and not self.settings.allow_empty_id:
@@ -433,18 +447,20 @@ class GenomeValidator(BaseValidator):
                 self.logger.debug("All sequences filtered out")
                 return
 
-        # 2. Replace sequence IDs with auto-increment
+        # 2. Replace sequence IDs
         if self.settings.replace_id_with:
-            prefix = self.settings.replace_id_with
-            for idx, record in enumerate(self.sequences):
-                # Store original ID in description
+            new_id = self.settings.replace_id_with
+            for record in self.sequences:
                 record.description = f"{record.id}"
-                # First sequence: just prefix, subsequent: prefix + number (no separator)
-                if idx == 0:
-                    record.id = f"{prefix}"
-                else:
-                    record.id = f"{prefix}{idx}"
-            self.logger.debug(f"Replaced sequence IDs with '{prefix}' (auto-incremented for multiple sequences)")
+                record.id = new_id
+            self.logger.debug(f"Replaced sequence IDs with '{new_id}'")
+
+        if self.settings.replace_id_with_incremental:
+            prefix = self.settings.replace_id_with_incremental
+            for idx, record in enumerate(self.sequences):
+                record.description = f"{record.id}"
+                record.id = prefix if idx == 0 else f"{prefix}{idx}"
+            self.logger.debug(f"Replaced sequence IDs with '{prefix}' (incremental)")
 
         # 3. Handle plasmid sequences
         if self.settings.is_plasmid:
@@ -475,7 +491,7 @@ class GenomeValidator(BaseValidator):
             self.logger.debug(f"Selected first sequence as main: {main_sequence.id} ({len(main_sequence.seq)} bp)")
         else:
             # This should not happen due to __post_init__ validation
-            raise ValueError("Either main_longest or main_first must be True")
+            raise GenomeValidationError("Either main_longest or main_first must be True")
 
         return main_sequence, plasmid_sequences
 

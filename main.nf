@@ -19,19 +19,22 @@ include { validateParameters } from 'plugin/nf-schema'
 def helpMessage() {
     log.info"""
     Usage:
+
     nextflow run main.nf -resume
     
     Options:
-    -resume          Run pipeline from the point where it was interrupted or previously failed (Nextflow built-in)
-    --out_dir        Output directory             (default: ${params.out_dir})
-    --in_dir         Input directory              (default: ${params.in_dir})
-    --registry       Docker/Singularity registry  (default: ${params.registry})
-    --max_cpu        Maximum CPUs per process     (default: ${params.max_cpu})
-    -log             Enable logging               (default: ${params.log})
-    --clean_work     Remove workdir after success (default: ${params.clean_work})
-    -with-report     Generate HTML execution report (Nextflow built-in)
-    -with-timeline   Produce timeline visualization (Nextflow built-in)
-    -with-dag        Produce DAG of workflow (Nextflow built-in)
+
+    -params-file     Path to JSON file containing parameter values                  (Nextflow built-in)
+    -resume          Run pipeline from the point where it was interrupted or failed (Nextflow built-in)
+    --out_dir        Output directory                                               (default: ${params.out_dir})
+    --in_dir         Input directory                                                (default: ${params.in_dir})
+    --max_cpu        Maximum CPUs per process                                       (default: ${params.max_cpu})
+    --run_syri       Run reference vs modified FASTA comparison                     (default: ${params.run_syri})
+    --run_truvari    Run pairwise VCF comparisons                                   (default: ${params.run_truvari})
+    --clean_work     Remove workdir after success                                   (default: ${params.clean_work})
+    -with-report     Generate HTML execution report                                 (Nextflow built-in)
+    -with-timeline   Produce timeline visualization                                 (Nextflow built-in)
+    -with-dag        Produce DAG of workflow                                        (Nextflow built-in)
     --help           Show this help message
     """.stripIndent()
 }
@@ -47,44 +50,48 @@ workflow {
     validateParameters()
 
     // inputs
-    ref_fasta = Channel.fromPath(params.ref_fasta_path, checkIfExists: true) 
-    mod_fasta = Channel.fromPath(params.mod_fasta_path)
-
-    def mod_fasta_avail = !file("${params.in_dir}").listFiles()?.findAll { it.name ==~ /.*(assembled_genome|mod)\.(fa|fna|fasta)$/ }.isEmpty()
+    def ref_fasta = Channel.fromPath(params.ref_fasta_validated, checkIfExists: true) 
+    def mod_fasta = Channel.fromPath(params.mod_fasta_validated)
 
     def ref_plasmid = listFiles("${params.in_dir}", ".*ref_plasmid\\.(fa|fna|fasta)")
     def mod_plasmid = listFiles("${params.in_dir}", ".*mod_plasmid\\.(fa|fna|fasta)")
-
-    def ont_files = listFiles("${params.in_dir}/ont/")
-    def pacbio_files = listFiles("${params.in_dir}/pacbio/")
-    def illumina_files = listFiles("${params.in_dir}/illumina/")
 
     def activePipelines = []
     def sv_tbl = Channel.empty()
 
     // reference to modified fasta comparison - assembly pipeline
-    if (mod_fasta_avail) {
-        
-        ref_mod(ref_fasta, mod_fasta)
-    
-        sv_tbl = ref_mod.out.sv_tbl
-        activePipelines << ref_mod.out.sv_vcf
+    if (params.run_syri && params.mod_fasta_avail) {
+        if (params.contig_file_size >= 1) {
+                
+            def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
+            
+            ref_mod(ref_fasta, contigs_ch)
+
+            sv_tbl = sv_tbl.mix(ref_mod.out.sv_tbl) 
+            
+            activePipelines << ref_mod.out.sv_vcf
+
+        } else {
+            log.error "No contig FASTA files found in ${params.in_dir}. Please rerun the pipeline with --run_syri false"}
     
     } else {
         sv_tbl = sv_tbl.mix(create_asm_tbl("assembly"))
     }
 
     // pacbio reads pipeline
-    if (pacbio_files) {
+    if (params.run_pacbio) {
         mapping_tag = "map-pb"
-
-        pacbio_fastqs = loadFastqFiles("${params.in_dir}/pacbio/*.fastq.gz")
+            
+        pacbio_fastqs = loadFastqFiles("${params.pacbio_fastq}")
         
         nanoplot_pacbio(pacbio_fastqs, "pacbio")
         
         long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag, ref_plasmid, "pacbio/long-ref")
 
-        if (mod_fasta_avail) {
+        sv_tbl = sv_tbl.mix(long_ref_pacbio.out.sv_tbl)
+        activePipelines << long_ref_pacbio.out.sv_vcf
+
+        if (params.mod_fasta_avail) {
             describePipeline("long-pacbio", "reference & modified")
             long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "pacbio/long-mod")       
             compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
@@ -92,84 +99,82 @@ workflow {
         } else {
             describePipeline("long-pacbio", "reference only")
         }
-
-        sv_tbl = sv_tbl.mix(long_ref_pacbio.out.sv_tbl)
-        activePipelines << long_ref_pacbio.out.sv_vcf
     
     } else {
         sv_tbl = sv_tbl.mix(create_pacbio_tbl("pb"))
     }
 
     // nanopore reads pipeline
-    if (ont_files) {
+    if (params.run_nanopore) {
         mapping_tag = "map-ont"
         
-        ont_fastqs = loadFastqFiles("${params.in_dir}/ont/*.fastq.gz")
+        ont_fastqs = loadFastqFiles("${params.nanopore_fastq}")
 
         nanoplot_ont(ont_fastqs, "ont")
         
         long_ref_ont(ont_fastqs, ref_fasta, mapping_tag, ref_plasmid, "ont/long-ref")
 
-        if (mod_fasta_avail) {
+        sv_tbl = sv_tbl.mix(long_ref_ont.out.sv_tbl)
+        
+        activePipelines << long_ref_ont.out.sv_vcf
+
+        if (params.mod_fasta_avail) {
             describePipeline("long-ont", "reference & modified")
             long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "ont/long-mod")
-            compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")      
+            compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
+
         } else {
             describePipeline("long-ont", "reference only")
         }
-
-        sv_tbl = sv_tbl.mix(long_ref_ont.out.sv_tbl)
-        activePipelines << long_ref_ont.out.sv_vcf
 
     } else {
         sv_tbl = sv_tbl.mix(create_ont_tbl("ont"))
     }
 
     // illimina reads pipeline
-    if (illumina_files) {    
+    if (params.run_illumina) {    
         
-        fastqs = loadShortFastqFiles(illumina_files)
+        def illumina_files = listFiles("${params.in_dir}/illumina/")
+
+       fastqs = loadShortFastqFiles(illumina_files)
 
         qc(fastqs, "illumina/qc_trimming") | set { trimmed }
 
         short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid) 
         
-        if (mod_fasta_avail) {
+        sv_tbl = sv_tbl.mix(short_ref.out.sv_tbl)
+        activePipelines << short_ref.out.sv_vcf
+
+        if (params.mod_fasta_avail) {
             describePipeline("short", "reference & modified")
             short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
             compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
         } else {
             describePipeline("short", "reference only")
         }
-        sv_tbl = sv_tbl.mix(short_ref.out.sv_tbl)
-        activePipelines << short_ref.out.sv_vcf
     
     } else {
         sv_tbl = sv_tbl.mix(create_short_tbl("short"))
     }
 
-    if (activePipelines.size() == 0) {
-        log.error "❌  No valid inputs found. Skipping workflows.\n"
-        exit 0
-    } else {
+    if (params.run_truvari && activePipelines.size() >= 2 && params.run_syri) {
+        
         int comparisons = activePipelines.size() - 1
-        String plural = comparisons == 1 ? "" : "s"
-        log.info "ℹ️  Truvari: performing ${comparisons} comparison${plural}.\n"
-    }
 
-    if (activePipelines.size() >= 2 && mod_fasta_avail) {
+        log.info "ℹ️ Truvari: performing ${comparisons} comparison${comparisons == 1 ? "" : "s"}.\n"
         
         vcfs = activePipelines.inject(Channel.empty()) { acc, ch -> acc.mix(ch)}
+        
         truvari_comparison(ref_fasta, vcfs)
     }
     
     script = file("${workflow.projectDir}/modules/utils/create_sv_output.py")
 
     def tbl_channel = sv_tbl.collect().map { list ->
-    def asm = list.find { it.name.toLowerCase().contains("assembly") }
-    def long_pb = list.find { it.name.toLowerCase().contains("pb") }
-    def long_ont = list.find { it.name.toLowerCase().contains("ont") }
-    def sht = list.find { it.name.toLowerCase().contains("short") }
+    def asm = list.find { it.name.contains("mod") || it.name.contains("assembly") }
+    def long_pb = list.find { it.name.contains("pb") }
+    def long_ont = list.find { it.name.contains("ont") }
+    def sht = list.find { it.name.contains("short") }
         tuple(asm, long_ont, long_pb, sht)
     }
 

@@ -1,11 +1,9 @@
 
 // Processes for short-read pipeline
 
-/*
- * Index fasta file with samtools
-*/
+
 process samtools_index {
-    container params.containers.samtools
+    
     publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
 
     input:
@@ -21,11 +19,9 @@ process samtools_index {
     """   
 }
 
-/*
- * Create picard dictionary to run delly
-*/
+
 process picard_dict {
-    container params.containers.picard
+    
     publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
     
     input:
@@ -42,12 +38,9 @@ process picard_dict {
     """  
 }
 
-/*
- * Running delly SV caller
-*/
+
 process delly {
-    container params.containers.delly
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
     input:
@@ -67,12 +60,9 @@ process delly {
     """
 }
 
-/*
- * Convert bcf (default delly output) to vcf
-*/
+
 process convert_bcf_to_vcf {
-    container params.containers.bcftools
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
     input:
@@ -92,12 +82,8 @@ process convert_bcf_to_vcf {
 
 // Processes for long-read pipeline
 
-/*
- * variant calling with cuteSV
-*/
 process cute_sv {
-    container params.containers.cutesv
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
 
     input:
@@ -117,13 +103,10 @@ process cute_sv {
 }
 
 
-/*
- * variant calling with debreak
-*/
+
 process debreak {
-    container params.containers.debreak
-    tag "$pair_id"
-        publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
+
+    publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
 
     input:
     each path(fasta_file)
@@ -141,12 +124,8 @@ process debreak {
 }
 
 
-/*
- * variant calling with sniffles
-*/
 process sniffles {
-    container params.containers.sniffles
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: "copy"
 
     input:
@@ -164,12 +143,8 @@ process sniffles {
 }
 
 
-/*
- * merging SV
-*/
 process survivor {
-    container params.containers.survivor
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: "copy"
 
     input:
@@ -199,12 +174,9 @@ process survivor {
 }
 
 
-/*
- * Convert vcf file to tsv table 
-*/
-process vcf_to_table {
 
-    container params.containers.bcftools
+process vcf_to_table_asm {
+
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
 
     input:
@@ -217,24 +189,32 @@ process vcf_to_table {
     """
     set -euxo pipefail
 
-    if [[ "${name}" == "assembly" ]]; then
-        {
-            echo -e "chrom\tstart\tend\tsvtype"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\n' "${vcf}"
-        } > "${name}_sv_summary.tsv"
-    else
-        {
-            echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_reads\tscore\tRDCN"
-            bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%ALT\t[%RC]\t%QUAL\t[%RDCN]\n' "${vcf}"
-        } >> "${name}_short_sv_summary.tsv"
-    fi
+    echo -e "chrom\tstart\tend\tsvtype\tstart_mod\tend_mod" > "${name}_sv_summary.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/StartB\t%INFO/EndB\n' "${vcf}" >> "${name}_sv_summary.tsv"
     """
 }
 
+process vcf_to_table_short {
+
+    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+
+    input:
+    tuple val(name), path(vcf)
+
+    output:
+    path "*_sv_summary.tsv"
+
+    script:
+    """
+    set -euxo pipefail
+
+    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsvlen\tsupporting_reads\tscore\tRDCN" > "${name}_short_sv_summary.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%QUAL\t[%RDCN]\n' "${vcf}"  >> "${name}_short_sv_summary.tsv"
+    """
+}
 
 process vcf_to_table_long {
 
-    container params.containers.bcftools
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
 
     input:
@@ -250,13 +230,13 @@ process vcf_to_table_long {
 
     output="${pair_id}_${tag}_sv_summary.tsv"
 
-    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsupporting_methods\tscore\tsupporting_reads" > "\${output}"
-    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SUPP\t%QUAL\t[%DR{1}\t]\n' "${vcf}" | awk -F '\t' '{
+    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsvlen\tsupporting_methods\tscore\tsupporting_reads" > "\${output}"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SVLEN\t%INFO/SUPP\t%QUAL\t[%DR{1}\t]\n' "${vcf}" | awk -F '\t' '{
     sum = 0;
-    for(i=8; i<=NF; i++){
+    for(i=9; i<=NF; i++){
         if(\$i != "." && \$i != "") sum += (\$i + 0);
     }
-    print \$1"\t"\$2"\t"\$3"\t"\$4"\t"\$5"\t"\$6"\t"\$7"\t"sum;
+    print \$1"\t"\$2"\t"\$3"\t"\$4"\t"\$5"\t"\$6"\t"\$7"\t"\$8"\t"sum;
     }' >> "\${output}"
     """
 }

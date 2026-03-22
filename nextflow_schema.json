@@ -4,64 +4,103 @@
   "title": "Automated Prokaryotic Genome Assembly Analysis Pipeline",
   "description": "Schema for pipeline parameters",
   "type": "object",
-  "$defs": {
-    "input_output_options": {
-      "title": "Input/output options",
-      "type": "object",
-      "properties": {
-        "in_dir": {
-          "type": "string",
-          "format": "directory-path",
-          "default": "data/valid",
-          "description": "Input directory for Nextflow containing reference and modified genome FASTA files."
-        },
-        "out_dir": {
-          "type": "string",
-          "format": "directory-path",
-          "default": "data/outputs",
-          "description": "Output directory where pipeline results will be written."
-        },
-        "log_dir": {
-          "type": "string",
-          "format": "directory-path",
-          "default": "data/outputs/logs",
-          "description": "Directory where log files will be stored."
-        },
-        "ref_fasta_path": {
-          "type": "string",
-          "format": "file-path",
-          "default": "$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}",
-          "description": "Path pattern to the reference genome FASTA file."
-        },
-        "mod_fasta_path": {
-          "type": "string",
-          "format": "file-path",
-          "default": "$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}",
-          "description": "Path pattern to the modified/assembled genome FASTA file."
-        }
-      }
+
+  "properties": {
+    "in_dir": {
+      "type": "string",
+      "format": "directory",
+      "default": "data/valid"
     },
-    "general_options": {
-      "title": "General options",
-      "type": "object",
-      "properties": {
-        "help": {
-          "type": "boolean",
-          "default": false,
-          "description": "Display help message and exit."
-        },
-        "max_cpu": {
-          "type": "integer",
-          "minimum": 1,
-          "default": 1,
-          "description": "Maximum number of CPUs available for pipeline processes."
-        },
-        "clean_work": {
-          "type": "boolean",
-          "default": false,
-          "description": "Clean the Nextflow work directory after successful completion."
-        }
-      }
+    "out_dir": {
+      "type": "string",
+      "format": "directory",
+      "default": "data/outputs"
+    },
+    "log_dir": {
+      "type": "string",
+      "format": "directory",
+      "default": "data/outputs/logs"
+    },
+
+    "pacbio_fastq": {
+      "type": ["string", "null"],
+      "format": "file",
+      "default": null
+    },
+    "nanopore_fastq": {
+      "type": ["string", "null"],
+      "format": "file",
+      "default": null
+    },
+    "gff": {
+      "type": ["string", "null"],
+      "format": "file",
+      "default": null
+    },
+
+    "max_cpu": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "contig_file_size": {
+      "type": "integer",
+      "minimum": 0
+    },
+
+    "clean_work": {
+      "type": "boolean",
+      "default": true
+    },
+
+    "run_ref_x_mod": {
+      "type": "boolean",
+      "default": false
+    },
+    "run_truvari": {
+      "type": "boolean",
+      "default": false
+    },
+    "run_syri": {
+      "type": "boolean",
+      "default": false
+    },
+    "run_illumina": {
+      "type": "boolean",
+      "default": false
+    },
+    "run_nanopore": {
+      "type": "boolean",
+      "default": false
+    },
+    "run_pacbio": {
+      "type": "boolean",
+      "default": false
+    },
+    "run_vcf_annotation": {
+      "type": "boolean",
+      "default": false
+    },
+
+    "ref_fasta_validated": {
+      "type": "string",
+      "format": "file",
+      "hidden": true
+    },
+    "mod_fasta_validated": {
+      "type": "string",
+      "format": "file",
+      "hidden": true
+    },
+    "ref_fasta_avail": {
+      "type": "boolean",
+      "default": false,
+      "hidden": true
+    },
+    "mod_fasta_avail": {
+      "type": "boolean",
+      "default": false,
+      "hidden": true
     }
   }
 }

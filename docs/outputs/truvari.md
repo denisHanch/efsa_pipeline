@@ -2,7 +2,18 @@
 
 ## Pipeline Workflow
 
-The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is output by the pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sortVcf), indexing them (indexVcf), and then performing the Truvari comparison to generate the final comparison results.
+The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is output by the pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sort_vcf), indexing them (index_vcf), and then performing the Truvari comparison to generate the final comparison results.
+
+> **Important!**
+> To allow the pipeline to run, set `--run_truvari` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
+>
+> ```groovy
+> params {
+>     run_truvari = true
+> }
+> ```
+>
+> By default, this parameter is set to `false`.
 
 ```mermaid
 %%{init: {
@@ -28,8 +39,8 @@ subgraph Truvari_Comparision_Pipeline["Truvari Comparison Pipeline"]
     IL_VCF["Illumina VCF"]:::input
 
     %% Processes
-    SORT_VCF["sortVcf"]:::process
-    INDEX_VCF["indexVcf"]:::process
+    SORT_VCF["sort_vcf"]:::process
+    INDEX_VCF["index_vcf"]:::process
     TRUVARI["truvari"]:::process
 
     %% Output
@@ -70,7 +81,7 @@ truvari/
 
 ## Description
 
-This folder contains all structural variant (SV) callsets and their **Truvari benchmarking results** comparing SVs detected from sequencing data with the structural variants derived from the **reference vs modified genome comparison (SyRI)**.
+This folder contains all structural variant (SV) callsets and their **Truvari benchmarking results** comparing SVs detected from sequencing data with the structural variants derived from the **reference vs modified genome comparison (SyRI)**. 
 
 ## Reference SV Callsets
 
@@ -126,6 +137,6 @@ Petr Danecek, James K Bonfield, Jennifer Liddle, John Marshall, Valeriu Ohan, Ma
 
 ## See Also
 
-- [Reference vs Modified Processing Pipeline Output](fasta-ref-mod.md) - SyRI baseline variants
-- [Short-Read Processing Pipeline Output](illumina.md) - Short-read SV calls
-- [Long-Read Processing Pipeline Output](long-reads.md) - Long-read SV calls
+- [Reference vs Modified Processing Pipeline](fasta-ref-mod.md) - SyRI baseline variants
+- [Short-Read Processing Pipeline Results (Illumina)](illumina.md) - Short-read SV calls
+- [Long-Read Processing Pipeline (PacBio & Oxford Nanopore)](long-reads.md) - Long-read SV calls

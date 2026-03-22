@@ -15,9 +15,10 @@ The validation module supports three validation levels to balance thoroughness a
 ## Level Details
 
 ### Strict Mode (Default)
-- Validates every sequence in the file
+- Validates every record in the file
 - Performs comprehensive quality checks
 - Generates detailed statistics
+- Feature files: runs coordinate validation in parallel (when `threads > 1` and file has ≥ 1000 features); falls back to direct parsing if `gffread` produces no output
 - Recommended for first-time data processing
 
 **Use when:**
@@ -25,7 +26,7 @@ The validation module supports three validation levels to balance thoroughness a
 - Data quality is uncertain
 
 ### Trust Mode
-- Validates only the first sequence
+- Validates only the first record (reads) or a small sample (features)
 - Assumes remaining data is consistent
 - Faster processing for large files
 - Still performs format conversions

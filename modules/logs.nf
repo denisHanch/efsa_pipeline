@@ -12,7 +12,6 @@ def logUnmapped(reads, total_reads, out_folder_name, reference) {
         def percentage = (unmapped * 100.0) / totalInput
         def pctStr = String.format("%.2f", percentage)
 
-        // Build a plain String
         String msg = "📊 ${out_folder_name} mapping${reference}:\n" +
                      "    Unmapped reads: ${String.format("%,d", unmapped)} (${pctStr}%)\n" +
                      "    Total input reads: ${String.format("%,d", totalInput)}\n"
@@ -53,7 +52,7 @@ def logWorkflowCompletion(out_folder_name) {
             }
 
             if (params.clean_work && out_folder_name == "execution of main.nf") {
-                if( workDir.exists() ) {
+                if ( workDir.exists() ) {
                     workDir.deleteDir()
                     log.info "ℹ️  Nextflow work/ directory was removed.\n"
                 }
@@ -65,17 +64,17 @@ def logWorkflowCompletion(out_folder_name) {
     }
 }
 
-
-def loadFastqFiles(pathPattern) { 
-    return Channel.fromPath(pathPattern)
-                  .map { file ->
-                      def name = file.baseName.replaceFirst(/\.fastq/, '')
-                      [name, file]
-                  }
+def loadFastqFiles(input) {
+    return Channel.fromPath(input)
+        .map { f ->
+            def name = f.name.replaceFirst(/\.fastq\.gz$/, '')
+            tuple(name, f)
+        }
 }
 
 def loadShortFastqFiles(short_read_files) {
-    return Channel.from(short_read_files).map { file ->
+    return Channel.from(short_read_files).map { f ->
+            def file = file(f)
             def matcher = file.name =~ /^(.+?)(?:[_\.](S[0-9]+_L[0-9]+_)?(R[12]|[12]))?\.f(ast)?q\.gz$/
             if (matcher.matches()) {
                 [matcher[0][1], file]

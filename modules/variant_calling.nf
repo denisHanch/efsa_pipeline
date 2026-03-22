@@ -1,11 +1,8 @@
 
 // Processes for short-read pipeline
 
-/*
- * Calling short variants with FreeBayes
-*/
+
 process freebayes {
-    container params.containers.freebayes
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -23,14 +20,10 @@ process freebayes {
     """
 }
 
-/*
-* SNPEff build
-*/
 
 process build_config {
-    container params.containers.snpeff
+    
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
-
 
     input:
     each path(fasta_file)
@@ -48,7 +41,7 @@ process build_config {
     feature_path='${feature_file}'
 
     # Extract genome ID from first header line
-    genome_id=\$(grep '^>' \$fasta_path | head -n 1 | cut -d ' ' -f1 | sed 's/^>//' | tr -cd '[:alnum:]_')
+    genome_id=\$(grep '^>' \$fasta_path | head -n 1 | cut -d ' ' -f2 | sed 's/^>//' | tr -cd '[:alnum:]_')
     echo "Using genome ID: \$genome_id"
 
     mkdir -p data/\$genome_id
@@ -64,11 +57,7 @@ process build_config {
 }
 
 
-/*
- * Annotating variants with SNPeff
-*/
 process snpeff {
-    container params.containers.snpeff
     tag "$pair_id"
     publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
 
@@ -92,12 +81,8 @@ process snpeff {
 }
 
 
-/*
- * Getting variants statistics with bcftools stats
-*/
 process bcftools_stats {
-    container params.containers.bcftools
-    tag "$pair_id"
+
     publishDir "${params.out_dir}/${out_folder_name}/bcftools_stats", mode: 'copy'
 
     input:
@@ -113,13 +98,9 @@ process bcftools_stats {
     """
 }
 
-// Processes for comparision of VCF files (in main.nf pipeline)
+// Processes related to truvari pipeline
 
-/*
- * Truvari requires sorted vcfs for comparision
-*/
-process sortVcf {
-    container params.containers.bcftools
+process sort_vcf {
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 
@@ -135,11 +116,8 @@ process sortVcf {
     """
 }
 
-/*
- * Truvari require indexed vcfs for comparision
-*/
-process indexVcf {
-    container params.containers.bcftools
+
+process index_vcf {
     tag "$pair_id"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 
@@ -156,11 +134,8 @@ process indexVcf {
     """
 }
 
-/*
- * Running comparision btw files
-*/
+
 process truvari {
-    container params.containers.truvari
     tag "$pair_id1 & $pair_id2"
     publishDir "${params.out_dir}/truvari", mode: 'copy'
 

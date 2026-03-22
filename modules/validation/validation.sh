@@ -1,5 +1,5 @@
 #!/bin/bash
-# validate-efsa - Wrapper script for EFSA validation
+# validate - Wrapper script for EFSA validation
 
 # Default config path
 DEFAULT_CONFIG="./data/inputs/config.json"
@@ -13,7 +13,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -h|--help)
-            echo "Usage: validate-efsa [--config <path>]"
+            echo "Usage: validate [--config <path>]"
             echo ""
             echo "Options:"
             echo "  --config <path>    Path to config file (default: ./data/inputs/config.json)"
@@ -33,6 +33,13 @@ if [ ! -f "$CONFIG_PATH" ]; then
     echo "Error: Config file not found: $CONFIG_PATH"
     exit 1
 fi
+
+
+
+# Clear valid directory before running validation
+VALID_DIR="./data/valid"
+echo "Clearing valid directory: $VALID_DIR"
+rm -rf "${VALID_DIR:?}"/*
 
 # Run the validation script with error handling
 echo "Running EFSA validation with config: $CONFIG_PATH"

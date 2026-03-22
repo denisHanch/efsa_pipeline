@@ -105,6 +105,9 @@ class ValidationLogger:
         if self._initialized:
             return
 
+        # Actual log file path used (may be incremented from requested path)
+        self.log_file: Optional[Path] = None
+
         # Storage for validation issues
         self.validation_issues = []
 
@@ -145,6 +148,7 @@ class ValidationLogger:
 
             # Auto-increment if file exists
             log_file = get_incremented_path(log_file)
+            self.log_file = log_file
 
             # Use stdlib logging with structlog
             processors = [

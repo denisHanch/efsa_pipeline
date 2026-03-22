@@ -7,7 +7,6 @@
            reference, call structural variants (SVs) for long-read runs, and convert SV VCFs
            to tabular summaries.
 
-  Contract:
   - Inputs:
       - Channel of long-read FASTQ files (e.g., from params.in_dir/ont or /pacbio)
       - Channel of reference FASTA to map against
@@ -26,6 +25,7 @@ include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion
 include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads;get_unmapped_reads as get_unmapped_reads_plasmid } from "../modules/mapping.nf"
 include { vcf_to_table_long }  from "../modules/sv_calling.nf"
 
+def executed = false
 
 workflow long_read {
 
@@ -38,6 +38,9 @@ workflow long_read {
 
     main:
         // mapping to the reference
+
+        executed = true
+    
         mapping_long(fastqs, fasta, mapping_tag, out_folder_name) | set { indexed_bam }
 
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
@@ -72,4 +75,14 @@ workflow long_read {
         sv_vcf
         unmapped_fastq
         sv_tbl
+}
+
+workflow.onComplete {
+    if (executed) {
+        if (workflow.success) {
+            log.info "✅ The long-read processing pipeline completed successfully.\n"
+        } else {
+            log.error "❌ The long-read processing pipeline failed: ${workflow.errorReport}"
+        }
+    }
 }

@@ -6,7 +6,6 @@
            structural variants (SVs) where applicable, collect unmapped reads,
            perform basic VCF QC, and convert SV VCFs to TSV summary tables.
 
-  Contract:
   - Inputs:
       - Channel of trimmed short-read FASTQ files (produced by QC/trimming step)
       - Channel of reference FASTA to map against
@@ -23,8 +22,9 @@ include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_read
 include { freebayes; bcftools_stats; bcftools_stats as bcftools_stats_plasmid } from "../modules/variant_calling.nf"
 include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from "../workflows/subworkflows.nf"
 include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadShortFastqFiles } from "../modules/logs.nf"
-include { vcf_to_table }  from "../modules/sv_calling.nf"
+include { vcf_to_table_short }  from "../modules/sv_calling.nf"
 
+def executed = false
 
 workflow short_read {
     take:
@@ -33,14 +33,14 @@ workflow short_read {
         out_folder_name
         plasmid_fasta
 
-    main:        
+    main:
+        executed = true
         // mapping to the reference
         bwa_index(fasta, out_folder_name) | set { fasta_index } 
         mapping(fasta, fasta_index, trimmed, out_folder_name) | set { indexed_bam }
 
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
         
-        // printout % unmapped reads
         calc_total_reads(indexed_bam) | set { total_reads }
         calc_unmapped(unmapped_fastq) | set { nreads }
         logUnmapped(nreads, total_reads, out_folder_name, "")
@@ -58,15 +58,13 @@ workflow short_read {
         }
 
          if (out_folder_name == "illumina/short-ref") { 
+            
             // SNP & variant calling
             freebayes(fasta, indexed_bam, out_folder_name) | set { vcf }
             bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
             
-            // Optional annotation of vcf files
-            def gff_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref*\.gff3$/ } ?: []
-
-            if (gff_files) {
-                Channel.fromPath(gff_files) | set { gff }
+            if (params.run_vcf_annotation) {
+                Channel.fromPath(params.gff) | set { gff }
                 annotate_vcf(fasta, gff, vcf, "gff", "gff3", out_folder_name) | set {qc_vcf}
             
                 qc_vcf.mix(bcftools_out).collect() | set { qc_out }
@@ -77,7 +75,8 @@ workflow short_read {
         
             // SVs variant calling
             sv(fasta, indexed_bam, out_folder_name) | set { sv_vcf }
-            vcf_to_table(sv_vcf) | set { sv_tbl }
+            vcf_to_table_short(sv_vcf) | set { sv_tbl }
+        
         } else {
             sv_vcf = Channel.empty()
             sv_tbl = Channel.empty()
@@ -89,23 +88,13 @@ workflow short_read {
 
 }
 
-out_folder_name = "illumina/short-ref"
 
-workflow { 
-
-    log.info  "Processing files in directory: ${params.in_dir}"
-    
-    def plasmid_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref_plasmid\.(fa|fna|fasta)$/ } ?: []
-    def short_read_files = file("$params.in_dir/illumina/").listFiles()?.findAll { it.name =~ /\.(fastq|fq)(\.gz)?$/ } ?: []
-
-    Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true) | set { fasta }
-        
-    fastqs = loadShortFastqFiles(short_read_files)
-
-    qc(fastqs, "illumina/qc_trimming") | set { trimmed }
-
-    short_read(trimmed, fasta, out_folder_name, plasmid_files)
+workflow.onComplete {
+    if (executed) {
+        if (workflow.success) {
+            log.info "✅ The short-read processing pipeline completed successfully.\n"
+        } else {
+            log.error "❌ The short-read processing pipeline failed: ${workflow.errorReport}"
+        }
+    }
 }
-
-
-logWorkflowCompletion(out_folder_name)

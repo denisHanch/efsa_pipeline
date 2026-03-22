@@ -85,15 +85,13 @@ data/outputs/*
 data/valid/*
 !data/inputs/.gitkeep
 !data/outputs/.gitkeep
+!data/outputs/logs/.gitkeep
 !data/valid/.gitkeep
 # Nextflow specific ignores
 .nextflow*
 .DS_Store
-*timeline*.html
-*report*.html
 /work/
-work-*/
-*dag*
+
 
 
 # Logs

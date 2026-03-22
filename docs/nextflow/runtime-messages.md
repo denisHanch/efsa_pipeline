@@ -77,23 +77,25 @@ If the percentage of unmapped reads is unusually high, this may indicate:
 The Nextflow pipelines ran successfully and produced the expected outputs. Each step completed without errors:
 
 ```text
-✅ The reference to modified fasta comparision processing pipeline completed successfully.
+✅ The ref_mod processing pipeline completed successfully.
 
-✅ The long-ref processing pipeline completed successfully.
+✅ The long-read processing pipeline completed successfully.
 
-✅ The short-ref processing pipeline completed successfully.
+✅ The short-read processing pipeline completed successfully.
 
 ✅ Truvari: the comparison of vcf files finished successfully.
 
-✅ Execution of main.nf processing pipeline completed successfully.
+✅ The execution of main.nf processing pipeline completed successfully.
 ```
 
 ## Removal of Nextflow Work Directory
 
-When the pipeline is executed with the parameter:
+When the pipeline is executed with the option `--clean_work true` or when the parameter clean_work is set to true in the nextflow.config:
 
 ```text
-params.clean_work = true
+params {
+    clean_work = true
+}
 ```
 
 Nextflow automatically removes the temporary `work/` directory after successful completion and logs a message to confirm this.
@@ -106,7 +108,7 @@ Nextflow automatically removes the temporary `work/` directory after successful 
 
 - The `work/` directory contains intermediate files and temporary outputs generated during pipeline execution.
 - Removing it saves disk space while retaining all final results in the `out_dir`.
-- If you want to keep intermediate files for debugging or inspection, set: `params.clean_work = false` in nextflow.config or use `--clean_work false` when running the pipeline.
+- If you want to keep intermediate files for debugging or inspection, set: `clean_work = false` in the params section of the nextflow.config or use `--clean_work false` when running the pipeline.
 
 ## See Also
 

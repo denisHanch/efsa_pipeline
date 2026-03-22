@@ -5,7 +5,7 @@
   Purpose: Compare a reference FASTA to a modified/assembled FASTA, run nucmer -> deltaFilter -> show-coords -> syri,
            and convert resulting SV VCFs to TSV summary tables.
 
-  Contract:
+
   - Inputs:
       - Channel of reference fasta (globbed from params.in_dir)
       - Channel of modified/assembled fasta (globbed from params.in_dir)
@@ -16,40 +16,58 @@
       - For each reference/modified pair, produce a VCF and a corresponding TSV summary.
 */
 
-include { nucmer; deltaFilter; showCoords; syri } from "../modules/assembly.nf"
-include { logWorkflowCompletion } from "../modules/logs.nf"
-include { vcf_to_table } from "../modules/sv_calling.nf"
+include { nucmer; delta_filter; show_coords; syri; bcftools_concat; bgzip_tabix } from "../modules/assembly.nf"
+include { logWorkflowCompletion; listFiles } from "../modules/logs.nf"
+include { vcf_to_table_asm; create_empty_tbl } from "../modules/sv_calling.nf"
 
+def executed = false
 
 workflow ref_mod {
     take:
         ref_fasta
-        mod_fasta
+        contigs
     main:
-        log.info "▶ Running pipeline comparing reference and modified fasta."
+        log.info "▶ Running pipeline comparing reference and modified fasta or reference and contigs."
 
-        def prefix_name = "assembly"
+        contig_files = listFiles("${params.in_dir}/", ".*contig.*\\.fasta")
 
-        ref_mod_fasta = ref_fasta
-            .combine(mod_fasta)
-            .map { ref, mod -> tuple(prefix_name, ref, mod) }
+        ref_mod_fasta = contigs
+            .combine(ref_fasta)
+            .map { contig, ref -> 
+                def prefix = contig.baseName
+                tuple(prefix, ref, contig)
+            }
 
         ref_mod_fasta | nucmer | set { delta }
-        deltaFilter(prefix_name, delta) | set { filtered_delta }
-        showCoords(prefix_name, filtered_delta) | set { coords }
-        syri(ref_mod_fasta, coords, filtered_delta) | set { sv_vcf }
-        vcf_to_table(sv_vcf)  | set { sv_tbl }
+
+        delta | delta_filter | set { filtered_delta }
+
+        filtered_delta | show_coords | set { coords }
+
+        ref_mod_fasta.join(coords).join(filtered_delta) | set { syri_input_ch }
+
+        syri(syri_input_ch) | set { sv_vcf }
+        
+        bgzip_tabix(sv_vcf) | set { sv_vcf_bgz }
+
+        vcfs = sv_vcf_bgz.map { prefix, vcf, tbi -> vcf }.collect()
+
+        tbis = sv_vcf_bgz.map { prefix, vcf, tbi -> tbi }.collect()
+
+        bcftools_concat(vcfs, tbis) | vcf_to_table_asm | set { sv_tbl }
 
     emit: 
         sv_vcf
         sv_tbl
 }
 
-workflow {
-    def ref_fasta = Channel.fromPath("$params.in_dir/*{ref,reference_genome}.{fa,fna,fasta}", checkIfExists: true)
-    def mod_fasta = Channel.fromPath("$params.in_dir/*{assembled_genome,mod}.{fa,fna,fasta}", checkIfExists: true)
 
-    ref_mod(ref_fasta, mod_fasta)
+workflow.onComplete {
+    if (executed) {
+        if (workflow.success) {
+            log.info "✅ The ref_mod processing pipeline completed successfully.\n"
+        } else {
+            log.error "❌ The ref_mod processing pipeline failed: ${workflow.errorReport}"
+        }
+    }
 }
-
-logWorkflowCompletion("reference to modified fasta comparision")

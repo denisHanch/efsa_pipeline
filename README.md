@@ -50,13 +50,14 @@
 3. **Running QC** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder:
 
    ```bash
-   python3 ./modules/validation/main.py ./data/inputs/config.json
+   validate
+   validate --config <path>
    ```
 
 4.  Start the pipeline with a command:
 
    ```bash
-   nextflow run main.nf --max_cpu $(nproc) -resume
+   nextflow run main.nf --max_cpu $(nproc)  -params-file data/valid/validated_params.json  -resume
    ```
 
 
@@ -286,6 +287,8 @@ flowchart TD
         bwa_map --> samtools_sort["Samtools Sort & Stats"]
         samtools_sort --> picard["Picard / MultiQC"]
         samtools_sort --> sr_vcf["VCF Output (Short-Read)"]
+        sr_vcf --> short_mod["Optional: Compare to Modified"]
+        short_mod --> agg_tbl
     end
     style ShortReadPipeline fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
@@ -295,6 +298,8 @@ flowchart TD
         minimap2_pb --> samtools_sort_pb["Samtools Sort & Stats"]
         samtools_sort_pb --> pb_sv["SV Calling (CuteSV / Sniffles / Debreak)"]
         pb_sv --> pb_vcf["VCF Output (PacBio)"]
+        pb_vcf --> long_mod_pb["Optional: Compare to Modified"]
+        long_mod_pb --> agg_tbl
     end
     style LongReadPacBio fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
@@ -304,34 +309,51 @@ flowchart TD
         minimap2_ont --> samtools_sort_ont["Samtools Sort & Stats"]
         samtools_sort_ont --> ont_sv["SV Calling (CuteSV / Sniffles / Debreak)"]
         ont_sv --> ont_vcf["VCF Output (ONT)"]
+        ont_vcf --> long_mod_ont["Optional: Compare to Modified"]
+        long_mod_ont --> agg_tbl
     end
     style LongReadONT fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
     %% Reference vs Modified pipeline
     subgraph RefVsMod["Reference vs Modified Pipeline"]
-        ref_fasta --> nucmer["NUCmer Alignment"]
-        mod_fasta --> nucmer
+        ref_fasta --> run_syri_decision{"--run_syri?"}
+        mod_fasta --> run_syri_decision
+        run_syri_decision -->|Yes| nucmer["NUCmer Alignment"]
+        run_syri_decision -->|No| skip_syri["Skip SYRI"]
         nucmer --> delta_filter["Delta Filter"]
         delta_filter --> show_coords["Show Coords"]
-        show_coords --> syri_vcf["VCF Output (ref_x_modsyri)"]
+        show_coords --> syri_vcf["VCF Output (assemblysyri)"]
+        syri_vcf --> agg_tbl
     end
     style RefVsMod fill:#D0F0C0,stroke:#388E3C,stroke-width:2px
 
-    %% Truvari comparison
-    subgraph Truvari["Truvari Comparison"]
-        sr_vcf --> truvari["Compare SVs (Truvari)"]
-        pb_vcf --> truvari
-        ont_vcf --> truvari
-        syri_vcf --> truvari
+    %% SV table aggregation (central)
+    subgraph SVTable["SV Table Aggregation"]
+        agg_tbl["Mix SV Tables"] --> restructure["Restructure SV Table (create_sv_output.py)"]
+    end
+    style SVTable fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
+
+    %% Truvari comparison (central)
+    subgraph Truvari["Truvari Comparison (Conditional)"]
+        sr_vcf --> truvari_in["VCFs for Truvari"]
+        pb_vcf --> truvari_in
+        ont_vcf --> truvari_in
+        syri_vcf --> truvari_in
+        truvari_in --> check_truvari{"--run_truvari?"}
+        check_truvari -->|Yes| truvari["Compare SVs (Truvari)"]
+        check_truvari -->|No| skip_truvari["Skip Truvari"]
         truvari --> final_report["Truvari Reports / Summary"]
     end
     style Truvari fill:#D0F0C0,stroke:#2E7D32,stroke-width:2px
+
+    %% Central alignment
+    restructure --> truvari_in
 ```
+
 
 ## Running the Pipeline
 
 The main pipeline (`main.nf`) executes **all three workflows** in sequence.
-Each workflow can also be executed individually if required.
 
 ### Running Main Workflow
 
@@ -343,56 +365,29 @@ nextflow run main.nf --max_cpu $(nproc) -resume
 
 ### Available Nextflow Option
 
-| Option        | Description |
-|---------------|-------------|
-| `-resume`     | Resumes a pipeline run from the point where it was interrupted or previously failed. |
-| `-with-report` | Generates a visual HTML report of the workflow execution, including task durations, resource usage, and statuses. |
-| `-with-timeline` | Produces a timeline visualization showing when each process in the pipeline started and finished. |
-| `-with-dag`     | Generates a directed acyclic graph (DAG) showing task dependencies within the workflow. |
+
+| Option           | Description                                                                                                                                                                         |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-resume`        | Resume a pipeline run from the point where it previously stopped or failed.                                                                                                         |
+| `-with-report`   | Generate a visual HTML report of the workflow execution, including task durations, resource usage, and statuses. The report is saved by default to `data/outputs/logs/`. |
+| `-with-timeline` | Generate a timeline visualization showing when each pipeline process started and finished. The timeline is saved by default to `data/outputs/logs/timeline.html`.                   |
+| `-with-dag`      | Generate a directed acyclic graph (DAG) illustrating task dependencies in the workflow.                                                                                             |
 
 
 ### Available Options
 
-| Option         | Description                                  | Default                |
-| -------------- | -------------------------------------------- | ---------------------- |
-| `--in_dir`     | Input directory                              | `data/valid`           |
-| `--out_dir`    | Output directory                             | `data/outputs`         |
-| `--registry`   | Docker/Singularity container registry        | `ghcr.io/ecomolegmo`   |
-| `--max_cpu`    | Maximum CPUs per process                     | `1`                    |
-| `--clean_work` | Remove work directory after successful run   | `true`                 |
-| `--help`       | Display help message                         | –                      |
+| Option         | Description                                                       | Default                 |
+|----------------|-------------------------------------------------------------------|-------------------------|
+| `--in_dir`     | Input directory                                                   | `data/valid`            |
+| `--out_dir`    | Output directory                                                  | `data/outputs`          |
+| `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
+| `--run_truvari`| Enables filtering of VCFs based on truth set                      | `false`                 |
+| `--run_syri`   | Enables comparison between the assembly FASTA and reference FASTA | `true`                  |
+| `--clean_work` | Remove work directory after successful run                        | `true`                  |
+| `--help`       | Display help message                                              | –                       |
+
 
 ---
-
-### Running Individual Pipelines
-
-You can also run each of the three sub-pipelines independently.
-
-#### Short-read Processing
-
-For Illumina short-read data:
-
-```bash
-nextflow run workflows/short_read.nf --max_cpu $(nproc) -resume
-```
-
-#### Long-read Processing
-
-For Oxford Nanopore / PacBio long reads:
-
-```bash
-nextflow run workflows/long_read.nf --max_cpu $(nproc) -resume
-```
-
-#### Reference vs Modified Genome Comparison
-
-For comparing reference and modified FASTA assemblies:
-
-```bash
-nextflow run workflows/fasta_ref_x_mod.nf --max_cpu $(nproc) -resume
-```
-
- 
 ## Generation of per structural variation (SV) type CSV tables
 
 These utilities convert SV VCFs into compact TSV summaries and then merge available summaries into per-SV-type CSV tables.
@@ -411,13 +406,17 @@ flowchart LR
 
 ### Key points
 
+- By default a nextflow pipeline is collecting the tables from pipelines and runs restructure_sv_tbl to create all summary  
 - Variants are extracted into a table format with processes `vcf_to_table` and `vcf_to_table_long`
-- if one of the pipelines was not running (shourt/long/assembly) an empty tsv file is generated with a process create_empty_tbl
+- If one of the pipelines was not running (shourt/long/assembly) an empty tsv file is generated with a process create_empty_tbl
 - `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
-- Outputs overview:
+- Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
+- `linked_event` is the only relationship column in the final CSVs. It includes both same-type and cross-type overlaps.
 
-```
+### Outputs overview
+
+```text
 data/outputs/tables/
 ├── csv_per_sv_summary
 │   ├── Deletions.csv
@@ -432,51 +431,142 @@ data/outputs/tables/
     └── map-ont_sv_summary.tsv
 ```
 
+### Example command
 
-Example (local):
 ```bash
 python3 modules/utils/create_sv_output.py --asm assembly_sv_summary.tsv \
-  --long_ont sample1_ont_sv_summary.tsv --long_pacbio sample1_pacbio_sv_summary.tsv \
-  --short sample1_short_sv_summary.tsv --out csv_per_sv_sumary
+  --long_ont sample1_ont_sv_summary.tsv \
+  --long_pacbio sample1_pacbio_sv_summary.tsv \
+  --short sample1_short_sv_summary.tsv \
+  --out csv_per_sv_sumary
 ```
 
-### Explanation of csv_per_sv_summary CSV columns
+### All supported processing script options
 
-The final table of each CSV file has multiple columns.
-Each row represents one structural variant (SV) event, with coordinates and evidence aggregated across assembly-based, long-read, and short-read pipelines.
+| Option | Description |
+|---|---|
+| `--asm` | TSV file containing structural variant summary from assembly-based calling. Optional. |
+| `--long_ont` | TSV file containing structural variant summary from Oxford Nanopore long-read data. Optional. |
+| `--long_pacbio` | TSV file containing structural variant summary from PacBio long-read data. Optional. |
+| `--short` | TSV file containing structural variant summary from short-read sequencing data. Optional. |
+| `--out` | Output directory for the per-SV CSV files. Required. |
+| `--tol` | Within-type clustering tolerance in base pairs. Determines whether raw SV calls get merged into the same event. Default: `10`. |
+| `--cross_type_tol` | Tolerance in base pairs for linking final events with near-identical coordinates in `linked_event`. Default: `0`, which keeps overlap-only linking. |
+
+### Explanation of `csv_per_sv_summary` CSV columns
+
+The final table in each CSV file contains one row per final structural variant (SV) event, with coordinates and evidence aggregated across assembly-based, long-read, and short-read pipelines.
 
 **Column prefixes**
 
 - **asm_** — values reported by the assembly-based SV pipeline
-- **long_** — values reported by long-read pipelines (ONT or PacBio)
-- **short_** — values reported by short-read pipelines
+- **long_ont_** — values reported by the Oxford Nanopore long-read SV pipeline
+- **long_pacbio_** — values reported by the PacBio long-read SV pipeline
+- **short_** — values reported by the short-read SV pipeline
 
+### Common event-level and pipeline-derived columns
 
-**Common event-level and pipeline-derived columns**
+| Column name | Description |
+|---|---|
+| **event_id** | Unique identifier of the final structural variant event, such as `DEL_1` or `RPL_3`. |
+| **chrom** | Chromosome where the SV is located (VCF `CHROM`). |
+| **std_svtype** | Standardized SV type harmonized across pipelines. Current values are `DEL`, `INS`, `RPL`, `INV`, and `TRA`. |
+| **event_start** | **Most confident overlap start coordinate** of the clustered SV calls. Calculated as the maximum of all start coordinates across the cluster members. This represents the rightmost (most conservative) start position where all source pipelines agree.  |
+| **event_end** | **Most confident overlap end coordinate** of the clustered SV calls. Calculated as the minimum of all end coordinates across the cluster members. This represents the leftmost (most conservative) end position where all source pipelines agree. |
+| **event_length_bp** | **Length of the representative event region**, calculated differently based on SV type. **For INS (insertions only)**: the minimum `svlen` value reported across all source pipelines (recommended for precise insertion lengths from VCF headers). **For all other types (DEL, RPL, INV, TRA)**: calculated as `event_end - event_start + 1`, representing the length of the consensus overlapping interval. This dual approach ensures insertions retain precise reported lengths while other variation types use the most conservative coordinate-based calculation. |
+| **support_score** | Number of input sources contributing to the final event row. In the current implementation this is the count of non-empty calls among `asm`, `long_ont`, `long_pacbio`, and `short`. |
+| **percentage_overlap** | Comma-separated overlap percentages collected during same-type event clustering. Each value is calculated during one clustering merge step as `(intersection length / longer interval length) × 100`. This field is empty when the final event was built from a single record only. |
+| **linked_event** | Semicolon-separated list of overlapping final SV events on the same chromosome. This single column includes both same-type and cross-type links. Each linked entry has the format `<event_id> (<std_svtype>, <chrom>:<start>-<end>, <relation>)`. Standard relation values are `exact_coordinates`, `overlap`, `nested_in`, and `contains`, always from the point of view of the current row. If `--cross_type_tol` is set above `0`, near-identical boundaries may also be reported as `same_coordinates_within_<N>bp`. Leave empty when no linked events are found. |
 
-These columns describe the SV event independently of any specific pipeline:
+### Possible values in `linked_event`
 
-| Column name         | Description                                                                                                                                |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **event_id**        | Unique identifier of the structural variant (SV) event.                                                                                    |
-| **chrom**           | Chromosome where the SV is located (VCF `CHROM`).                                                                                          |
-| **std_svtype**      | Standardized SV type harmonized across pipelines (e.g. DEL, DUP, INS, INV).                                                                |
-| **event_start**     | Representative start coordinate of the SV (VCF `POS`), selected from available pipeline calls.                                             |
-| **event_end**       | Representative end coordinate of the SV (VCF `END`).                                                                                       |
-| **event_length_bp** | Length of the SV in base pairs, calculated as `event_end − event_start`.                                                                   |
-| **support_score**   | Integrated support score summarizing evidence across all pipelines, taking into account SV agreement, confidence scores, and read support. |
+The examples below use simplified coordinates for clarity.
 
-| **percentage_overlap**   | Percentage of genomic overlap between two structural variants, calculated as the length of the intersection of their genomic intervals divided by the length of the smaller variant, multiplied by 100. |
+| Example current event | Example linked event entry | Meaning |
+|---|---|---|
+| `DEL_2` at `chr1:23-67` | `RPL_1 (RPL, chr1:23-67, exact_coordinates)` | The linked event has exactly the same coordinates as the current event. |
+| `DEL_2` at `chr1:23-67` | `INV_1 (INV, chr1:10-90, nested_in)` | The current event is fully inside the linked event interval. |
+| `RPL_1` at `chr1:10-90` | `DEL_2 (DEL, chr1:23-67, contains)` | The current event fully contains the linked event interval. |
+| `DEL_2` at `chr1:23-67` | `DEL_3 (DEL, chr1:60-100, overlap)` | The two events partially overlap, but neither fully contains the other. |
+| `DEL_2` at `chr1:23-67` with `--cross_type_tol 5` | `RPL_2 (RPL, chr1:25-69, same_coordinates_within_5bp)` | The events do not overlap exactly, but their start and end coordinates are both within the specified tolerance. |
 
-**Additional pipeline-specific columns**
+### Additional pipeline-specific columns
 
-These columns are present only for certain pipelines:
-
-| Column name                          | Description                                                                                                                               |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **long_(ont|pacbio)_supporting_reads**        | Number of Oxford Nanopore / Pacbio reads supporting the structural variant (VCF `FORMAT` field `DR`) (SV).                                                                   |
-| **long_(ont|pacbio)_supporting_methods**     | Number of variant callers (max 3 cute_cv, debreak, sniffles) reads supporting the structural variant (SV).                                                                            |
+| Column name | Description |
+|---|---|
+| **long_(ont\|pacbio)_supporting_reads** | Number of Oxford Nanopore or PacBio reads supporting the structural variant (VCF `FORMAT` field `DR`, when present). |
+| **long_(ont\|pacbio)_supporting_methods** | Number or label of long-read variant calling methods supporting the structural variant, derived from the TSV summary when available. |
 | **short_reads_copy_number_estimate** | Estimated copy number derived from short-read depth information (VCF `FORMAT` field `RDCN`). |
+
+### Source-specific length columns and calculation strategy
+
+Each pipeline (assembly, long-read ONT, long-read PacBio, short-read) provides its own length estimate in the final table:
+
+- **asm_length** — Length reported by the assembly-based pipeline
+- **long_ont_length** — Length reported by Oxford Nanopore long-read calling
+- **long_pacbio_length** — Length reported by PacBio long-read calling  
+- **short_length** — Length reported by short-read variant calling
+
+**Length calculation logic (per source):**
+
+The calculation of source-specific lengths varies by SV type to balance precision with robustness:
+
+**For INS (insertions):**
+- Uses `svlen` field directly from the VCF/TSV when available (most precise representation of insertion length)
+- Falls back to `NaN` if `svlen` is not provided
+- Rationale: start and end coordinates remains the same as it is reported in the reference genome that's why the SV length for insertion is taken directly from VCF file.
+
+**For all other types (DEL, RPL, INV, TRA):**
+- Calculated as `end - start + 1` based on the reported breakpoint coordinates  
+- Falls back to `NaN` if coordinates are unavailable
+- Rationale: For these variation types, coordinate-based length is the standard biological measure
+
+**Example:**
+- **Insertion:** VCF reports `SVLEN=50` → `long_ont_length = 50` (uses svlen)
+- **Deletion:** VCF reports `START=1000, END=1500` → `asm_length = 501` (uses 1500 - 1000 + 1)
+
+
+### Assembly coordinates for translocations (asm_start_mod, asm_end_mod)
+
+Two additional assembly-specific columns appear **only in Translocations.csv**:
+
+- **asm_start_mod** — Start position of the translocation event in the modified (non-reference) genome
+- **asm_end_mod** — End position of the translocation event in the modified (non-reference) genome
+
+These columns are automatically removed from all non-translocation tables (Insertions, Deletions, Replacements, Inversions) to maintain table clarity and avoid sparse empty columns.
+
+**Rationale:** Translocations require two coordinate pairs to describe both breakpoint locations. The primary coordinates (`event_start`, `event_end`) mark the position in the reference genome (origin breakpoint), while these modifier coordinates mark the same event's position in the modified genome (destination breakpoint).
+
+### Event coordinate computation workflow
+
+The `create_sv_output.py` script processes SV records through the following steps:
+
+1. **Load and standardize records** from all available source pipelines (assembly, long-read ONT/PacBio, short-read)
+
+2. **Cluster records by (chromosome, standardized SV type)** using interval overlap with a tolerance window (`--tol`, default 10 bp). Records are considered part of the same event if:
+   - They share the same chromosome and standardized SV type
+   - Their intervals overlap (accounting for tolerance)
+   - At least one of the breakpoints (start or end) is within tolerance between members
+
+3. **Select best representative per source** within each cluster using a ranking strategy:
+   - Rank 1: Supporting reads / evidence count (higher is better)
+   - Rank 2: Quality score (higher is better)
+   - Rank 3: SV size (larger is weighted negatively)
+   
+   This ensures the highest-confidence call from each source is carried forward.
+
+4. **Calculate overlapping interval (event_start, event_end):**
+   - `event_start = max(all member start coordinates)` — the rightmost (most conservative) start
+   - `event_end = min(all member end coordinates)` — the leftmost (most conservative) end
+   - This interval represents the consensus region where all cluster members agree
+
+5. **Compute event_length_bp** based on SV type:
+   - **INS:** `min(all non-null source svlen values)` — minimum reported insertion length
+   - **Other types:** `event_end - event_start + 1` — length of consensus interval
+
+6. **Assemble final row** with all source-specific fields, filtering unnecessary columns (e.g., removing `asm_start_mod/asm_end_mod` from deletions, removing internal type fields)
+
+7. **Final pass: link overlapping events** by scanning all final rows on the same chromosome and recording any coordinate overlaps or near-overlaps (if `--cross_type_tol` is set)
 
 
 ## 🔄 Pipeline Runtime Messages & Mapping Summary
@@ -561,15 +651,15 @@ If the percentage of unmapped reads is unusually high, this may indicate:
 The Nextflow pipelines ran successfully and produced the expected outputs. Each step completed without errors:
 
 ```text
-✅ The reference to modified fasta comparision processing pipeline completed successfully.
+✅ The ref_mod processing pipeline completed successfully.
 
-✅ The long-ref processing pipeline completed successfully.
+✅ The long-read processing pipeline completed successfully.
 
-✅ The short-ref processing pipeline completed successfully.
+✅ The short-read processing pipeline completed successfully.
 
 ✅ Truvari: the comparison of vcf files finished successfully.
 
-✅ Execution of main.nf processing pipeline completed successfully.
+✅ The execution of main.nf processing pipeline completed successfully.
 ```
 
 
@@ -601,6 +691,7 @@ This directory contains all input data used by the Nextflow pipeline.
 data/valid/
 ├── assembled_genome.fasta
 ├── reference_genome.fasta
+├── mod_config_[0..4].fasta    # Presence of multiple contings incase of a fragmented assembly
 ├── ref_plasmid.fa             # Reference plasmid sequences (if used)
 ├── mod_plasmid.fa             # Modified/assembled plasmid sequences (if used)
 ├── ref_feature.gff            # Genome annotation file GTF/GFF (if used)
@@ -671,21 +762,29 @@ subgraph REF_X_MOD["Reference vs Modified Fasta Comparison Pipeline"]
 
     %% Inputs
     REF_FASTA["Reference FASTA"]:::input
-    MOD_FASTA["Modified FASTA"]:::input
+    CONTIGS["Contigs FASTA"]:::input
+
+    %% Combine ref + contigs
+    REF_MOD_COMB["ref_mod_fasta"]:::process
 
     %% Processes
     NUCMER["nucmer"]:::process
-    DELTA["deltaFilter"]:::process
-    SHOWCOORDS["showCoords"]:::process
+    DELTA["delta_filter"]:::process
+    SHOWCOORDS["show_coords"]:::process
     SYRI["syri"]:::process
+    BGZIP["bgzip + tabix"]:::process
+    CONCAT_TABLE["bcftools_concat + vcf_to_table_asm"]:::process
 
-    %% Output
+    %% Outputs
     VCF_OUT["Structural Variant VCF"]:::output
+    SV_TABLE["Structural Variant Table"]:::output
 
     %% Connections
-    REF_FASTA --> NUCMER
-    MOD_FASTA --> NUCMER
-    NUCMER --> DELTA --> SHOWCOORDS --> SYRI --> VCF_OUT
+    REF_FASTA --> REF_MOD_COMB
+    CONTIGS --> REF_MOD_COMB
+    REF_MOD_COMB --> NUCMER
+    NUCMER --> DELTA --> SHOWCOORDS --> SYRI --> BGZIP --> VCF_OUT
+    BGZIP --> CONCAT_TABLE --> SV_TABLE
 
 end
 
@@ -693,41 +792,71 @@ end
 classDef input fill:#E3F2FD,stroke:#1565C0
 classDef process fill:#B6ECE2,stroke:#065647
 classDef output fill:#E8F5E9,stroke:#2E7D32
-
 ```
+
+
+## Directory Structure
 
 This folder contains results from the **reference vs modified FASTA comparison pipeline**:
 
 ```
 fasta_ref_mod/
-├── ref_x_mod.delta
-├── ref_x_mod.filtered.coords
-├── ref_x_mod_filtered.delta
-└── ref_x_modsyri.vcf
+├── assembly.delta
+├── assembly.filtered.coords
+├── assembly_concat.vcf
+├── assembly_filtered.delta
+├── assemblysyri.vcf
+├── mod_contig_0
+│   ├── mod_contig_0.delta
+│   ├── mod_contig_0.filtered.coords
+│   ├── mod_contig_0.vcf.gz
+│   ├── mod_contig_0.vcf.gz.tbi
+│   └── mod_contig_0_filtered.delta
+└── mod_contig_0syri.vcf
 ```
 
-**Description of files:**
+## Output Files
 
-* `ref_x_mod.delta`
-  Raw alignment difference file between reference and modified FASTA (generated by `nucmer`/MUMmer).
+> **Important!**
+> To allow the pipeline to run, set `--run_syri` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
+>
+> ```groovy
+> params {
+>     run_syri = true
+> }
+> ```
+>
+> By default, this parameter is set to `true`.
 
-* `ref_x_mod.filtered.coords`
-  Filtered alignment coordinates showing high-confidence matches and structural differences.
+### `assembly.delta`
+Raw alignment difference file between reference and modified FASTA (generated by `nucmer`/MUMmer).
 
-* `ref_x_mod_filtered.delta`
-  Cleaned and filtered delta file used for downstream structural comparison.
+### `assembly.filtered.coords`
+Filtered alignment coordinates showing high-confidence matches and structural differences.
 
-* `ref_x_modsyri.vcf`
-  Structural variants and genome rearrangements detected by **SyRI**, stored in VCF format.
+### `assembly_filtered.delta`
+Cleaned and filtered delta file used for downstream structural comparison.
+
+### `assemblysyri.vcf`
+Structural variants and genome rearrangements detected by **SyRI**, stored in VCF format.
+
+### mod_contig_[0..4]`
+The folder contains syri comparison from each contig when assembly is fragmented into more than one contig. mod_contig_0.
+
+### mod_contig_[0..4].vcf.gz`
+A bgzipped VCF files of structural variants per contig.
+
+### mod_contig_[0..4].vcf.gz.tbi`
+Tabix index of a bgzipped VCF file used for efficient concatenation with bcftools.
 
 The table below summarises all tools used within the pipeline:
 
-| **Tool**        | **Link for Further Information**                       |
-| --------------- | ------------------------------------------------------ |
-| **Nucmer**      | [MUMmer](https://mummer4.github.io/manual/manual.html) |
-| **deltaFilter** | [MUMmer](https://mummer4.github.io/manual/manual.html) |
-| **showCoords**  | [MUMmer](https://mummer4.github.io/manual/manual.html) |
-| **Syri**        | [SyRI GitHub](https://schneebergerlab.github.io/syri/) |
+| **Tool**         | **Link for Further Information**                        |
+| ---------------- | ------------------------------------------------------  |
+| **Nucmer**       | [MUMmer](https://mummer4.github.io/manual/manual.html)  |
+| **delta_filter** | [MUMmer](https://mummer4.github.io/manual/manual.html)  |
+| **show_coords**  | [MUMmer](https://mummer4.github.io/manual/manual.html)  |
+| **Syri**         | [SyRI GitHub](https://schneebergerlab.github.io/syri/)  |
 
 
 ---
@@ -1161,7 +1290,19 @@ The table below summarises all tools used within the pipeline:
 
 ### `truvari/`
 
-The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is outputed by  pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sortVcf), indexing them (indexVcf), and then performing the Truvari comparison to generate the final comparison results.
+The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is outputed by  pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sort_vcf), indexing them (index_vcf), and then performing the Truvari comparison to generate the final comparison results.
+
+> **Important!**
+> To allow the pipeline to run, set `--run_truvari` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
+>
+> ```groovy
+> params {
+>     run_truvari = true
+> }
+> ```
+>
+> By default, this parameter is set to `false`.
+
 
 ```mermaid
 %%{init: {
@@ -1187,8 +1328,8 @@ subgraph Truvari_Comparision_Pipeline["Truvari Comparison Pipeline"]
     IL_VCF["Illumina VCF"]:::input
 
     %% Processes
-    SORT_VCF["sortVcf"]:::process
-    INDEX_VCF["indexVcf"]:::process
+    SORT_VCF["sort_vcf"]:::process
+    INDEX_VCF["index_vcf"]:::process
     TRUVARI["truvari"]:::process
 
     %% Output
@@ -1220,11 +1361,11 @@ truvari
 ├── SampleName.pacbio_sv_long_read.vcf.gz.csi
 ├── SampleName.ont_sv_long_read.vcf.gz
 ├── SampleName.ont_sv_long_read.vcf.gz.csi
-├── ref_x_modsyri.vcf.gz
-├── ref_x_modsyri.vcf.gz.csi
-├── ref_x_modsyri_SampleName_sv_short_read_truvari       → folder comparing the short-read SV pipeline with the reference-to-modified fasta pipeline
-├── ref_x_modsyri_SampleName.pacbio_sv_long_read_truvari  → folder comparing Pacbio long-read SV pipeline to reference-to-modified fasta pipeline
-└── ref_x_modsyri_SampleName.ont_sv_long_read_truvari   → folder comparing Nanopore long-read SV pipeline to reference-to-modified fasta pipeline
+├── assemblysyri.vcf.gz
+├── assemblysyri.vcf.gz.csi
+├── assemblysyri_SampleName_sv_short_read_truvari       → folder comparing the short-read SV pipeline with the reference-to-modified fasta pipeline
+├── assemblysyri_SampleName.pacbio_sv_long_read_truvari  → folder comparing Pacbio long-read SV pipeline to reference-to-modified fasta pipeline
+└── assemblysyri_SampleName.ont_sv_long_read_truvari   → folder comparing Nanopore long-read SV pipeline to reference-to-modified fasta pipeline
 ```
 
 #### Description
@@ -1234,7 +1375,7 @@ This folder contains all structural variant (SV) callsets and their **Truvari be
 
 #### Reference SV Callsets
 
-* `ref_x_modsyri.vcf.gz`
+* `assembly.vcf.gz`
   Structural variants derived from comparing the **reference genome** and the **modified genome** using **SyRI**.
 
 * `SampleName_sv_short_read.vcf.gz`
@@ -1253,13 +1394,13 @@ All `.csi` files represent index files for fast querying of VCF contents.
 
 Each Truvari output directory contains benchmarking results comparing the **SyRI structural variants** against sequencing-based SV calls:
 
-* `ref_x_modsyri_SampleName_sv_short_read_truvari/`
+* `assemblysyri_SampleName_sv_short_read_truvari/`
   Comparison between SyRI SVs and SVs called from **Illumina short reads**.
 
-* `ref_x_modsyri_SampleName.pacbio_sv_long_read_truvari/`
+* `assemblysyri_SampleName.pacbio_sv_long_read_truvari/`
   Comparison between SyRI SVs and SVs called from **PacBio long reads**.
 
-* `ref_x_modsyri_SampleName.ont_sv_long_read_truvari/`
+* `assemblysyri_SampleName.ont_sv_long_read_truvari/`
   Comparison between SyRI SVs and SVs called from **Oxford Nanopore long reads**.
 
 Each Truvari output folder usually contains:
@@ -1583,21 +1724,50 @@ end
 
 ```
 logs/
-├── .command.begin    # Timestamp file marking the start of a process
-├── .command.err      # Captures standard error output from the process
-├── .command.log      # Logs process execution messages from Nextflow
-├── .command.out      # Captures standard output from the process
-├── .command.run      # Execution metadata (exit status, runtime, resources)
-└── .command.sh       # The shell script containing the exact commands executed
+├── report.html               # A visual HTML report of the workflow execution, including task durations, resource usage, and statuses
+├── timeline.html             # A timeline visualization showing when each pipeline process started and finished
+└── 00/
+    └── a80c5c6b6654950042a976836ff441
+        ├── .command.begin    # Timestamp file marking the start of a process
+        ├── .command.err      # Captures standard error output from the process
+        ├── .command.log      # Logs process execution messages from Nextflow
+        ├── .command.out      # Captures standard output from the process
+        ├── .command.run      # Execution metadata (exit status, runtime, resources)
+        └── .command.sh       # The shell script containing the exact commands executed
 ```
 
 #### Description
 
 The `logs/` folder contains **detailed logs and command scripts** for each Nextflow process.
 
-* **`.command.begin`** — Marks the start time of a process.
-* **`.command.err`** — Captures standard error messages generated by the process.
-* **`.command.log`** — General execution logs from Nextflow for the process.
-* **`.command.out`** — Captures standard output of the process.
-* **`.command.run`** — Metadata about process execution (e.g., exit code, runtime, resource usage).
-* **`.command.sh`** — The shell script that Nextflow runs; contains the exact commands for the process.
+## File Descriptions
+
+### `.command.begin`
+Marks the start time of a process.
+
+### `.command.err`
+Captures standard error messages generated by the process.
+
+### `.command.log`
+General execution logs from Nextflow for the process.
+
+### `.command.out`
+Captures standard output of the process.
+
+### `.command.run`
+Metadata about process execution including:
+
+- Exit code
+- Runtime duration
+- Resource usage
+
+### `.command.sh`
+The shell script that Nextflow runs; contains the exact commands for the process.
+
+### report.html
+
+A visual HTML report of the workflow execution, including task durations, resource usage, and statuses (see [nextflow documentation](https://docs.seqera.io/nextflow/reports#execution-report))
+
+### timeline.html
+
+A timeline visualization showing when each pipeline process started and finished (see [nextflow documentation](https://docs.seqera.io/nextflow/reports#execution-timeline))

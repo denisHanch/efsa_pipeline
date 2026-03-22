@@ -1,4 +1,4 @@
-# Short-Read Processing Pipeline Output
+# Short-Read Processing Pipeline (Illumina)
 
 ## Pipeline Workflow
 
@@ -237,15 +237,11 @@ https://doi.org/10.1093/bioinformatics/bts378
 
 * Heng Li, Richard Durbin, Fast and accurate short read alignment with Burrows–Wheeler transform, Bioinformatics, Volume 25, Issue 14, July 2009, Pages 1754–1760, https://doi.org/10.1093/bioinformatics/btp324
 
-* 
-Cutadapt removes adapter sequences from high-throughput sequencing reads
-Citation Format  
-ABNT
-MARTIN, Marcel. Cutadapt removes adapter sequences from high-throughput sequencing reads. EMBnet.journal, [S.l.], v. 17, n. 1, p. pp. 10-12, may 2011. ISSN 2226-6089. Available at: <https://journal.embnet.org/index.php/embnetjournal/article/view/200>. Date accessed: 14 dec. 2025. doi:https://doi.org/10.14806/ej.17.1.200.
+* MARTIN, Marcel. Cutadapt removes adapter sequences from high-throughput sequencing reads. EMBnet.journal, [S.l.], v. 17, n. 1, p. pp. 10-12, may 2011. ISSN 2226-6089. Available at: <https://journal.embnet.org/index.php/embnetjournal/article/view/200>. Date accessed: 14 dec. 2025. doi:https://doi.org/10.14806/ej.17.1.200.
 
 
 ## See Also
 
-- [Long-Read Processing Pipeline Output](long-reads.md) - PacBio and ONT results
+- [Long-Read Processing Pipeline (PacBio & Oxford Nanopore)](long-reads.md) - PacBio and ONT results
 - [Unmapped Statistics](unmapped-stats.md) - Detailed unmapped read analysis
 - [Truvari Comparison](truvari.md) - Variant comparison results

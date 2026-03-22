@@ -44,6 +44,16 @@ Example configuration:
 
 See [Validation Settings](SETTINGS.md) for detailed information on validation levels.
 
+## Feature File Parallel Processing
+
+In strict mode, coordinate validation for feature (GFF/GTF/BED) files runs in parallel when `threads > 1` and the file contains at least 1,000 features. This applies both to the normal `gffread`-based path and the direct-parse fallback.
+
+| Condition | Behaviour |
+|-----------|-----------|
+| `strict` + `threads > 1` + ≥ 1000 features | Parallel coordinate validation |
+| `strict` + `threads = 1` or < 1000 features | Sequential coordinate validation |
+| `trust` or `minimal` | No coordinate validation |
+
 ## Thread Configuration
 
 ### Per-File Thread Settings
