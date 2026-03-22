@@ -126,9 +126,9 @@ class Config:
         return self.options.get('validation_level', 'strict')
 
     @property
-    def type(self) -> Optional[str]:
-        """Get organism type from options ('prokaryote' or 'eukaryote')."""
-        return self.options.get('type')
+    def type(self) -> str:
+        """Get organism type from options ('prokaryote' or 'eukaryote'), default 'prokaryote'."""
+        return self.options.get('type', 'prokaryote')
 
     def __repr__(self):
         """Return a detailed string representation of the configuration."""
