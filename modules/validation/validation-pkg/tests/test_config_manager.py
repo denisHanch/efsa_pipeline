@@ -1566,11 +1566,11 @@ class TestConfigOptionsType:
         assert config.options["type"] == "eukaryote"
         assert config.type == "eukaryote"
 
-    def test_type_omitted_returns_none(self, temp_dir):
-        """When type is not specified, Config.type returns None."""
+    def test_type_omitted_defaults_to_prokaryote(self, temp_dir):
+        """When type is not specified, Config.type defaults to 'prokaryote'."""
         config_file = self._create_config(temp_dir, include_type=False)
         config = ConfigManager.load(str(config_file))
-        assert config.type is None
+        assert config.type == "prokaryote"
 
     def test_type_invalid_raises_error(self, temp_dir):
         """An unrecognised type value raises ConfigurationError."""
@@ -1585,9 +1585,9 @@ class TestConfigOptionsType:
             ConfigManager.load(str(config_file))
 
     def test_config_type_property(self):
-        """Config.type property returns the correct value from options."""
+        """Config.type property defaults to 'prokaryote' and reflects explicit values."""
         config = Config()
-        assert config.type is None
+        assert config.type == "prokaryote"  # default
 
         config.options["type"] = "prokaryote"
         assert config.type == "prokaryote"
