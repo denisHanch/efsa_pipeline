@@ -295,13 +295,14 @@ Complete example with all optional fields and global options:
   "ref_genome_filename": {
     "filename": "ref.gbk",
     "validation_level": "strict",
-    "threads": 8
+    "threads": 8,
+    "n_sequence_limit": 5
   },
   "mod_genome_filename": {
     "filename": "mod.fasta.gz",
     "validation_level": "strict",
     "threads": 8,
-    "n_sequence_limit": 50
+    "n_sequence_limit": 5
   },
   "ref_plasmid_filename": {
     "filename": "plasmid_ref.gbk",
