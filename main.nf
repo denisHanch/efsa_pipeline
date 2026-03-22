@@ -91,14 +91,9 @@ workflow {
         sv_tbl = sv_tbl.mix(long_ref_pacbio.out.sv_tbl)
         activePipelines << long_ref_pacbio.out.sv_vcf
 
-        if (params.mod_fasta_avail) {
-            describePipeline("long-pacbio", "reference & modified")
-            long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "pacbio/long-mod")       
-            compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
-
-        } else {
-            describePipeline("long-pacbio", "reference only")
-        }
+        describePipeline("long-pacbio", "reference & modified")
+        long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "pacbio/long-mod")       
+        compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
     
     } else {
         sv_tbl = sv_tbl.mix(create_pacbio_tbl("pb"))
@@ -118,14 +113,9 @@ workflow {
         
         activePipelines << long_ref_ont.out.sv_vcf
 
-        if (params.mod_fasta_avail) {
-            describePipeline("long-ont", "reference & modified")
-            long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "ont/long-mod")
-            compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
-
-        } else {
-            describePipeline("long-ont", "reference only")
-        }
+        describePipeline("long-ont", "reference & modified")
+        long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "ont/long-mod")
+        compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
 
     } else {
         sv_tbl = sv_tbl.mix(create_ont_tbl("ont"))
@@ -145,13 +135,10 @@ workflow {
         sv_tbl = sv_tbl.mix(short_ref.out.sv_tbl)
         activePipelines << short_ref.out.sv_vcf
 
-        if (params.mod_fasta_avail) {
-            describePipeline("short", "reference & modified")
-            short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
-            compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
-        } else {
-            describePipeline("short", "reference only")
-        }
+        describePipeline("short", "reference & modified")
+        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
+        compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
+
     
     } else {
         sv_tbl = sv_tbl.mix(create_short_tbl("short"))
