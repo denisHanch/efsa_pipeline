@@ -7,6 +7,7 @@
   "mod_genome_filename": {
     "filename": "TBA",
     "validation_level": "strict/trust/minimal",
+    "n_sequence_limit": 5,
     "threads": 8
   },
   "ref_plasmid_filename": {

@@ -50,13 +50,14 @@
 3. **Running QC** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder:
 
    ```bash
-   python3 ./modules/validation/main.py ./data/inputs/config.json
+   validate
+   validate --config <path>
    ```
 
 4.  Start the pipeline with a command:
 
    ```bash
-   nextflow run main.nf --max_cpu $(nproc) -resume
+   nextflow run main.nf --max_cpu $(nproc)  -params-file data/valid/validated_params.json  -resume
    ```
 
 

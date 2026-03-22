@@ -15,7 +15,7 @@ from validation_pkg.exceptions import (
     FastaFormatError,
     GenBankFormatError
 )
-from validation_pkg.utils.file_handler import open_compressed_writer
+from validation_pkg.utils.file_handler import open_compressed_writer, copy_file
 from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
 from validation_pkg.utils.base_validator import BaseValidator
 from validation_pkg.utils.sequence_stats import calculate_n50
@@ -37,6 +37,9 @@ class GenomeOutputMetadata(BaseOutputMetadata):
     # Inter-file validation fields
     sequence_ids: List[str] = None
     sequence_lengths: dict = None
+
+    # Fragmented assembly flag (sequence limit exceeded — inter-genome validation skipped)
+    fragmented: bool = False
 
     def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
         """Format genome-specific statistics for report output."""
@@ -185,6 +188,8 @@ class GenomeValidator(BaseValidator):
         # Trust/Strict modes - full validation and processing
         self._parse_file()
         self._validate_sequences()
+        if getattr(self, '_sequence_limit_exceeded', False):
+            return self.output_path
         self._apply_edits()  # include plasmid handle
         output_path = self._write_output()
         return output_path
@@ -239,6 +244,7 @@ class GenomeValidator(BaseValidator):
             pass
 
         self.output_metadata.num_sequences_filtered = self.num_sequences_filtered
+        self.output_metadata.fragmented = getattr(self, '_sequence_limit_exceeded', False)
 
         # Strict mode only - compute expensive statistics
         if self.validation_level == 'strict' and self.sequences:
@@ -343,7 +349,7 @@ class GenomeValidator(BaseValidator):
                 f"({n_sequence_limit} -> the assembly is too fragmented for further analysis)"
             )
             self.logger.add_validation_issue(
-                level='ERROR',
+                level='WARNING',
                 category='genome',
                 message=error_msg,
                 details={
@@ -351,7 +357,9 @@ class GenomeValidator(BaseValidator):
                     'error_threshold': n_sequence_limit
                 }
             )
-            raise GenomeValidationError(error_msg)
+            copy_file(self.input_path, self.output_path, self.logger)
+            self._sequence_limit_exceeded = True
+            return
 
         # Trust mode - validate only first sequence
         if self.validation_level == 'trust':

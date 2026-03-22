@@ -1310,14 +1310,21 @@ class TestSecurityPathTraversal:
 
 
 class TestNSequenceLimit:
-    """Tests for the n_sequence_limit genome config parameter."""
+    """Tests for the n_sequence_limit genome config parameter.
+
+    Rules:
+    - ref_genome_filename: n_sequence_limit is NOT allowed; if provided it is
+      ignored with a warning and the value is always None.
+    - mod_genome_filename (and plasmids): n_sequence_limit is optional; when
+      absent the default is 5.
+    """
 
     @pytest.fixture
     def temp_dir(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             yield Path(tmpdir)
 
-    def _write_config(self, temp_dir: Path, ref_genome_value) -> Path:
+    def _write_config(self, temp_dir: Path, ref_genome_value, mod_genome_value=None) -> Path:
         """Write a minimal config JSON and create stub files."""
         (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
         (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
@@ -1325,84 +1332,100 @@ class TestNSequenceLimit:
             "ref_genome_filename": ref_genome_value,
             "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}],
         }
+        if mod_genome_value is not None:
+            (temp_dir / "mod.fasta").write_text(">seq1\nATCG\n")
+            config["mod_genome_filename"] = mod_genome_value
         config_file = temp_dir / "config.json"
         config_file.write_text(json.dumps(config))
         return config_file
 
-    # ── parsing ───────────────────────────────────────────────────────────────
+    # ── ref_genome: n_sequence_limit is never set ─────────────────────────────
 
-    def test_n_sequence_limit_parsed_from_dict(self, temp_dir):
-        """n_sequence_limit specified in genome dict is stored on GenomeConfig."""
+    def test_ref_genome_n_sequence_limit_is_none(self, temp_dir):
+        """ref_genome never has n_sequence_limit; it is always None."""
+        config_file = self._write_config(temp_dir, {"filename": "ref.fasta"})
+        config = ConfigManager.load(str(config_file))
+        assert config.ref_genome.n_sequence_limit is None
+
+    def test_ref_genome_n_sequence_limit_ignored_with_warning(self, temp_dir):
+        """n_sequence_limit on ref_genome is silently ignored (no error)."""
         config_file = self._write_config(
             temp_dir,
             {"filename": "ref.fasta", "n_sequence_limit": 42},
         )
         config = ConfigManager.load(str(config_file))
-        assert config.ref_genome.n_sequence_limit == 42
+        assert config.ref_genome.n_sequence_limit is None
 
-    def test_n_sequence_limit_default_when_not_specified(self, temp_dir):
-        """When n_sequence_limit is absent the default value (10) is used."""
-        config_file = self._write_config(temp_dir, {"filename": "ref.fasta"})
+    # ── mod_genome: default and explicit value ────────────────────────────────
+
+    def test_mod_genome_n_sequence_limit_default_is_5(self, temp_dir):
+        """When n_sequence_limit is absent from mod_genome, default is 5."""
+        config_file = self._write_config(
+            temp_dir, "ref.fasta", mod_genome_value={"filename": "mod.fasta"}
+        )
         config = ConfigManager.load(str(config_file))
-        assert config.ref_genome.n_sequence_limit == 10
+        assert config.mod_genome.n_sequence_limit == 5
 
-    def test_n_sequence_limit_string_genome_uses_default(self, temp_dir):
-        """Plain-string genome value (no dict) also gets the default."""
-        config_file = self._write_config(temp_dir, "ref.fasta")
+    def test_mod_genome_n_sequence_limit_string_uses_default(self, temp_dir):
+        """Plain-string mod_genome value (no dict) also gets the default (5)."""
+        config_file = self._write_config(temp_dir, "ref.fasta", mod_genome_value="mod.fasta")
         config = ConfigManager.load(str(config_file))
-        assert config.ref_genome.n_sequence_limit == 10
+        assert config.mod_genome.n_sequence_limit == 5
 
-    def test_n_sequence_limit_independent_per_genome(self, temp_dir):
-        """Each genome entry carries its own n_sequence_limit."""
-        (temp_dir / "mod.fasta").write_text(">seq1\nATCG\n")
-        (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
-        config = {
-            "ref_genome_filename": {"filename": "ref.fasta", "n_sequence_limit": 20},
-            "mod_genome_filename": {"filename": "mod.fasta", "n_sequence_limit": 50},
-            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}],
-        }
-        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
-        config_file = temp_dir / "config.json"
-        config_file.write_text(json.dumps(config))
+    def test_mod_genome_n_sequence_limit_explicit_value(self, temp_dir):
+        """Explicit n_sequence_limit on mod_genome is stored correctly."""
+        config_file = self._write_config(
+            temp_dir, "ref.fasta",
+            mod_genome_value={"filename": "mod.fasta", "n_sequence_limit": 42},
+        )
+        config = ConfigManager.load(str(config_file))
+        assert config.mod_genome.n_sequence_limit == 42
 
-        loaded = ConfigManager.load(str(config_file))
-        assert loaded.ref_genome.n_sequence_limit == 20
-        assert loaded.mod_genome.n_sequence_limit == 50
-
-    # ── validation errors ─────────────────────────────────────────────────────
-
-    def test_n_sequence_limit_zero_raises(self, temp_dir):
-        """n_sequence_limit=0 is rejected (must be positive)."""
+    def test_ref_none_mod_explicit(self, temp_dir):
+        """ref_genome.n_sequence_limit is None; mod_genome carries its own value."""
         config_file = self._write_config(
             temp_dir,
-            {"filename": "ref.fasta", "n_sequence_limit": 0},
+            {"filename": "ref.fasta", "n_sequence_limit": 20},
+            mod_genome_value={"filename": "mod.fasta", "n_sequence_limit": 50},
+        )
+        loaded = ConfigManager.load(str(config_file))
+        assert loaded.ref_genome.n_sequence_limit is None
+        assert loaded.mod_genome.n_sequence_limit == 50
+
+    # ── validation errors (mod_genome only) ──────────────────────────────────
+
+    def test_n_sequence_limit_zero_raises(self, temp_dir):
+        """n_sequence_limit=0 is rejected for mod_genome (must be positive)."""
+        config_file = self._write_config(
+            temp_dir, "ref.fasta",
+            mod_genome_value={"filename": "mod.fasta", "n_sequence_limit": 0},
         )
         with pytest.raises(ConfigurationError, match="n_sequence_limit"):
             ConfigManager.load(str(config_file))
 
     def test_n_sequence_limit_negative_raises(self, temp_dir):
-        """Negative n_sequence_limit is rejected."""
+        """Negative n_sequence_limit is rejected for mod_genome."""
         config_file = self._write_config(
-            temp_dir,
-            {"filename": "ref.fasta", "n_sequence_limit": -5},
+            temp_dir, "ref.fasta",
+            mod_genome_value={"filename": "mod.fasta", "n_sequence_limit": -5},
         )
         with pytest.raises(ConfigurationError, match="n_sequence_limit"):
             ConfigManager.load(str(config_file))
 
     def test_n_sequence_limit_float_raises(self, temp_dir):
-        """Float n_sequence_limit is rejected (must be integer)."""
+        """Float n_sequence_limit is rejected for mod_genome (must be integer)."""
         config_file = self._write_config(
-            temp_dir,
-            {"filename": "ref.fasta", "n_sequence_limit": 5.5},
+            temp_dir, "ref.fasta",
+            mod_genome_value={"filename": "mod.fasta", "n_sequence_limit": 5.5},
         )
         with pytest.raises(ConfigurationError, match="n_sequence_limit"):
             ConfigManager.load(str(config_file))
 
     def test_n_sequence_limit_string_value_raises(self, temp_dir):
-        """String n_sequence_limit is rejected."""
+        """String n_sequence_limit is rejected for mod_genome."""
         config_file = self._write_config(
-            temp_dir,
-            {"filename": "ref.fasta", "n_sequence_limit": "ten"},
+            temp_dir, "ref.fasta",
+            mod_genome_value={"filename": "mod.fasta", "n_sequence_limit": "ten"},
         )
         with pytest.raises(ConfigurationError, match="n_sequence_limit"):
             ConfigManager.load(str(config_file))
@@ -1410,7 +1433,7 @@ class TestNSequenceLimit:
     # ── plasmid entries inherit the same parsing ──────────────────────────────
 
     def test_n_sequence_limit_on_plasmid(self, temp_dir):
-        """n_sequence_limit is also parsed for plasmid genome entries."""
+        """n_sequence_limit is parsed for plasmid genome entries."""
         (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
         (temp_dir / "plasmid.fasta").write_text(">plasmid1\nATCG\n")
         (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")

@@ -131,13 +131,15 @@ Specifies a genome or plasmid file.
 | `filename` | string | — | Path to genome file (relative to config) |
 | `validation_level` | string | global / `"strict"` | Per-file validation level override |
 | `threads` | integer | global / auto | Per-file thread count override |
-| `n_sequence_limit` | integer | `10` | Maximum allowed number of sequences. Validation fails if the genome contains more sequences than this limit (assembly too fragmented). Set higher for highly fragmented assemblies. |
+| `n_sequence_limit` | integer | `5` (modified genome only) | Maximum allowed number of sequences. Only applies to `mod_genome_filename` — ignored with a warning on `ref_genome_filename`. Validation fails if the genome contains more sequences than this limit (assembly too fragmented). Set higher for highly fragmented assemblies. The file is still copied to `data/valid/` even when the limit is exceeded, but the pipeline will not run SyRI comparison. |
+
+> **Note:** `n_sequence_limit` is **not allowed on the reference genome**. If set, a warning is logged and the value is ignored. Reference genomes are not subject to sequence count validation.
 
 **Example:**
 ```json
-"ref_genome_filename": {
-  "filename": "data/reference.gbk",
-  "n_sequence_limit": 5
+"mod_genome_filename": {
+  "filename": "data/modified.fasta",
+  "n_sequence_limit": 10
 }
 ```
 
@@ -257,7 +259,7 @@ These settings customize validation behavior without modifying code.
 Override global options for specific files by adding settings to individual file entries:
 - `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (overrides global)
 - `threads`: Number of threads for compression (int, overrides global)
-- `n_sequence_limit`: Maximum number of sequences allowed in a genome/plasmid file (int, genome entries only, default: `10`)
+- `n_sequence_limit`: Maximum number of sequences allowed in a genome/plasmid file (int, **modified genome only**, default: `5`). Not applicable to reference genome — will be ignored with a warning if set there.
 
 **Warnings:** When a file-level setting overrides a global option, a WARNING is logged:
 ```
@@ -290,8 +292,7 @@ Complete example with all optional fields and global options:
   "ref_genome_filename": {
     "filename": "ref.gbk",
     "validation_level": "strict",
-    "threads": 8,
-    "n_sequence_limit": 10
+    "threads": 8
   },
   "mod_genome_filename": {
     "filename": "mod.fasta.gz",

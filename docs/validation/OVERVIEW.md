@@ -23,7 +23,8 @@ The validation process:
 2. Validates each input file according to its type (genome, reads, features)
 3. Converts files to standardized formats
 4. Outputs validated files to `data/valid/`
-5. Generates logs and reports in `logs/`
+5. Writes `data/valid/validated_params.json` with validated file paths and flags for Nextflow
+6. Generates logs and reports in `logs/`
 
 ## Running Validation
 
@@ -43,5 +44,40 @@ python3 ./modules/validation/main.py ./data/inputs/config.json
 After successful validation:
 
 - Validated files are placed in `data/valid/`
+- `data/valid/validated_params.json` is written with paths and flags for Nextflow (loaded automatically via `-params-file`)
+- If the modified genome exceeds `n_sequence_limit`, the file is still copied to `data/valid/` but `run_syri` will be set to `false`
 - Log file created in `./logs/validation_ID.log`
 - Report file created in `./logs/report_ID.txt`
+
+### `validated_params.json`
+
+This file is produced by the validation step and consumed by Nextflow via `-params-file`. It overrides the defaults in `nextflow.config` and `nextflow_schema.json`.
+
+#### Validated inputs (hidden params)
+
+| Parameter             | Type    | Description                                                        |
+| --------------------- | ------- | ------------------------------------------------------------------ |
+| `ref_fasta_validated` | string  | Path to the validated reference genome FASTA.                      |
+| `mod_fasta_validated` | string  | Path to the validated modified genome FASTA.                       |
+| `mod_fasta_avail`     | boolean | `true` when a validated modified genome is available.              |
+
+#### Pipeline switches
+
+| Parameter            | Type    | Description                                                                                           |
+| -------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
+| `run_ref_x_mod`      | boolean | `true` when both reference and modified genome validation succeeded; gates all ref-vs-mod steps.      |
+| `run_syri`           | boolean | `true` when the number of contig files is between 1 and `n_sequence_limit` (default `5`) of the modified genome; `false` otherwise. The threshold is controlled by `n_sequence_limit` in `config.json` under `mod_genome_filename`. |
+| `run_truvari`        | boolean | Always `false` by default; can be overridden manually.                                                |
+| `run_illumina`       | boolean | `true` when validated Illumina reads are present.                                                     |
+| `run_nanopore`       | boolean | `true` when validated Nanopore (ONT) reads are present.                                               |
+| `run_pacbio`         | boolean | `true` when validated PacBio reads are present.                                                       |
+| `contig_file_size`   | integer | Number of contig files produced by inter-genome characterisation.                                     |
+| `run_vcf_annotation` | boolean | `true` when a validated GFF feature file is available.                                                |
+
+#### File paths (null when absent)
+
+| Parameter       | Type   | Description                                          |
+| --------------- | ------ | ---------------------------------------------------- |
+| `pacbio_fastq`  | string | Path to the first validated PacBio FASTQ file.       |
+| `nanopore_fastq`| string | Path to the first validated Nanopore FASTQ file.     |
+| `gff`           | string | Path to the validated reference GFF/GFF3 file.       |

@@ -63,11 +63,8 @@ workflow short_read {
             freebayes(fasta, indexed_bam, out_folder_name) | set { vcf }
             bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
             
-            // Optional annotation of vcf files
-            def gff_files = file("$params.in_dir").listFiles()?.findAll { it.name =~ /ref*\.gff3$/ } ?: []
-
-            if (gff_files) {
-                Channel.fromPath(gff_files) | set { gff }
+            if (params.run_vcf_annotation) {
+                Channel.fromPath(params.gff) | set { gff }
                 annotate_vcf(fasta, gff, vcf, "gff", "gff3", out_folder_name) | set {qc_vcf}
             
                 qc_vcf.mix(bcftools_out).collect() | set { qc_out }
