@@ -60,7 +60,7 @@ workflow {
     def sv_tbl = Channel.empty()
 
     // reference to modified fasta comparison - assembly pipeline
-    if (params.run_syri && params.mod_fasta_avail) {
+    if (params.run_ref_x_mod) {
         if (params.contig_file_size >= 1) {
                 
             def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
