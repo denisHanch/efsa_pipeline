@@ -1561,6 +1561,67 @@ class TestConfigOptionsType:
         config.options["type"] = "eukaryote"
         assert config.type == "eukaryote"
 
+    def test_type_uppercase_raises_error(self, temp_dir):
+        """Type value is case-sensitive; 'PROKARYOTE' is not valid."""
+        config_file = self._create_config(temp_dir, "PROKARYOTE")
+        with pytest.raises(ConfigurationError, match="Invalid type"):
+            ConfigManager.load(str(config_file))
+
+    def test_type_mixed_case_raises_error(self, temp_dir):
+        """Mixed-case type value is not accepted."""
+        config_file = self._create_config(temp_dir, "Eukaryote")
+        with pytest.raises(ConfigurationError, match="Invalid type"):
+            ConfigManager.load(str(config_file))
+
+    def test_type_empty_string_raises_error(self, temp_dir):
+        """Empty string is not a valid type value."""
+        config_file = self._create_config(temp_dir, "")
+        with pytest.raises(ConfigurationError, match="Invalid type"):
+            ConfigManager.load(str(config_file))
+
+    def test_type_combined_with_other_options(self, temp_dir):
+        """type coexists correctly with threads and validation_level."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
+
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}],
+            "options": {
+                "type": "eukaryote",
+                "threads": 4,
+                "validation_level": "strict",
+            },
+        }
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config, indent=2))
+
+        loaded = ConfigManager.load(str(config_file))
+        assert loaded.type == "eukaryote"
+        assert loaded.threads == 4
+        assert loaded.validation_level == "strict"
+
+    def test_type_as_file_level_option_is_ignored(self, temp_dir):
+        """type specified at file level (not in options) is logged as warning and ignored."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "reads.fastq").write_text("@r1\nATCG\n+\nIIII\n")
+
+        config = {
+            "ref_genome_filename": {
+                "filename": "ref.fasta",
+                "type": "prokaryote",  # file-level, not in options block
+            },
+            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}],
+        }
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config, indent=2))
+
+        loaded = ConfigManager.load(str(config_file))
+        # Global type is not set (only file-level was given, which gets ignored)
+        assert loaded.type is None
+        # file-level type does not appear in ref_genome's global_options either
+        assert "type" not in loaded.ref_genome.global_options
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
