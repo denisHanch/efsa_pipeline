@@ -9,9 +9,6 @@ step completes. The file is consumed by the main Nextflow pipeline via
 
 Produced parameters
 -------------------
-validated_inputs (hidden, set by validation):
-  ref_fasta_validated  – absolute path to the validated reference FASTA
-  mod_fasta_validated  – absolute path to the validated modified FASTA
 general_options (pipeline execution switches):
   run_ref_x_mod        – True when both ref_genome and mod_genome and inter-genome validation succeeded;
                          False when any genome is too fragmented (eukaryote type or n_sequences > limit)
@@ -23,6 +20,8 @@ general_options (pipeline execution switches):
   run_vcf_annotation   – True when a validated GFF feature file is present
 
 input_output_options (file paths, null when absent):
+  ref_fasta_validated  – absolute path to the validated reference FASTA
+  mod_fasta_validated  – absolute path to the validated modified FASTA
   pacbio_fastq         – path to the first validated PacBio FASTQ
   nanopore_fastq       – path to the first validated Nanopore FASTQ (or None)
   gff                  – path to the validated reference GFF/GFF3 file
@@ -32,6 +31,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+_OPTIONAL_PATHS = {"ref_fasta_validated", "mod_fasta_validated", "pacbio_fastq", "gff"}
 
 
 @dataclass
@@ -55,7 +56,6 @@ class NextflowParams:
     def to_dict(self) -> dict:
         """Produce a dict for Nextflow -params-file JSON.
         Optional path fields are excluded when None; nanopore_fastq is always included."""
-        _OPTIONAL_PATHS = {"ref_fasta_validated", "mod_fasta_validated", "pacbio_fastq", "gff"}
         result = {
             "run_ref_x_mod": self.run_ref_x_mod,
             "run_truvari": self.run_truvari,
@@ -128,10 +128,10 @@ def build_params(validation_results: dict) -> NextflowParams:
         run_vcf_annotation=gff_path is not None,
         # input_output_options — nullable paths
         nanopore_fastq=by_type.get("ont"),
-        ref_fasta_validated=ref_path if ref_path else None,
-        mod_fasta_validated=mod_path if mod_path else None,
+        ref_fasta_validated=ref_path,
+        mod_fasta_validated=mod_path,
         pacbio_fastq=by_type.get("pacbio"),
-        gff=gff_path if gff_path else None,
+        gff=gff_path,
     )
 
 
