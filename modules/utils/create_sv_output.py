@@ -142,6 +142,8 @@ class Record:
     supporting_reads: Optional[int] = None
     score: Optional[float] = None
     copy_number: Optional[int] = None
+    chr2: Optional[str] = None
+    pos2: Optional[int] = None
     supporting_methods: Optional[str] = None
     svlen: Optional[int] = None
     start_mod: Optional[int] = None
@@ -286,6 +288,8 @@ def load_records(path, source):
         # treat any long* sources as long for supporting_methods
         supporting_methods = row.get("supporting_methods") if str(source).startswith("long") else None
         copy_number = _to_int(row.get("RDCN")) if source == "short" else None
+        chr2 = row.get("chr2") if source == "short" else None
+        pos2 = _to_int(row.get("pos2")) if source == "short" else None
         svlen = _to_int(row.get("svlen"))
 
         # Derive missing svlen from coordinates; especially for INS/TRA point calls where delly reports start==end
@@ -313,6 +317,8 @@ def load_records(path, source):
                 _to_int(row.get("supporting_reads")),
                 _to_float(row.get("score")),
                 copy_number,
+                chr2,
+                pos2,
                 supporting_methods,
                 svlen,
                 start_mod,
@@ -411,6 +417,8 @@ def build_output_table(clusters):
             "short_length": sht_length,
             "short_svtype_raw": sht.raw_svtype if sht else "",
             "short_info_svtype": sht.info_svtype if sht else "",
+            "short_chr2": sht.chr2 if sht else np.nan,
+            "short_pos2": sht.pos2 if sht else np.nan,
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
             "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
