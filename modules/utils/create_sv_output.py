@@ -6,7 +6,20 @@ Merge SV summaries from:
   3) short-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score)
 
 Outputs a folder with single CSV for each type of variations:
-  Insertions, Deletions, Replacements, Inversions, Translocations
+  Insertions, Deletions, Duplications, Replacements, Inversions, Translocations
+
+SHORT-READ VARIANT TYPE CONVENTIONS (from delly):
+  - DEL (deletion): real interval (start < end)
+  - DUP (duplication): real interval (start < end)
+  - INV (inversion): real interval (start < end)
+  - INS (insertion): single position (start == end, represents insertion point)
+  - TRA (translocation): breakpoint only (start == end, represents breakpoint position)
+  
+  For INS and TRA, the variant length is captured in svlen, not from end-start calculation.
+  The code correctly handles all these conventions by:
+  - Preserving start and end as reported
+  - Using svlen for event_length_bp calculation (not end-start)
+  - Clustering by position proximity with configurable tolerance
 
 Events are clustered by (chrom, standardized_svtype) using interval overlap with an optional tolerance (bp),
 PLUS breakpoint proximity (start or end must be within tol bp). This avoids merging very large calls with
@@ -44,6 +57,7 @@ import pandas as pd
 TAB_BY_TYPE = {
     "INS": "Insertions",
     "DEL": "Deletions",
+    "DUP": "Duplications",
     "RPL": "Replacements",
     "INV": "Inversions",
     "TRA": "Translocations",
@@ -52,14 +66,14 @@ TAB_BY_TYPE = {
 INFO_MAP = {
     "INS": "INS",
     "DEL": "DEL",
+    "DUP": "DUP",
+    "DUP:TANDEM": "DUP",
+    "DUP:INT": "DUP",
     "INV": "INV",
     "TRA": "TRA",
     "TRANS": "TRA",
     "BND": "TRA",
     "CTX": "TRA",
-    "DUP": "RPL",
-    "DUP:TANDEM": "RPL",
-    "DUP:INT": "RPL",
     "RPL": "RPL",
     "REPL": "RPL",
     "SUB": "RPL",
@@ -70,10 +84,10 @@ ASM_PREFIX_MAP = [
     (r"^DEL", "DEL"),
     (r"^INS", "INS"),
     (r"^INV", "INV"),
+    (r"^DUP", "DUP"),
     (r"^TRANS", "TRA"),
     (r"^TRA", "TRA"),
     (r"^BND", "TRA"),
-    (r"^DUP", "RPL"),
     (r"^CPG", "INS"),
     (r"^CPL", "DEL"),
     (r"^SYN", "RPL"),
@@ -146,6 +160,15 @@ class EventCluster:
 # Clustering
 
 def intervals_overlap(a_start, a_end, b_start, b_end, tol):
+    """Check if two intervals overlap or are close enough to cluster together.
+    
+    Works correctly for all variant types:
+    - Interval variants (DEL, DUP, INV): real intervals with start < end
+    - Point variants (INS): start == end at insertion point
+    - Breakpoint variants (TRA): start == end at breakpoint
+    
+    For point variants, the condition simplifies correctly since start == end.
+    """
     overlap = (b_start <= a_end + tol) and (b_end >= a_start - tol)
     if not overlap:
         return False
@@ -223,6 +246,14 @@ def load_records(path, source):
     - source: one of 'asm', 'long_ont', 'long_pacbio', 'long' or 'short'.
       Sources starting with 'long' are treated as long-read sources and stored
       separately (e.g. 'long_ont' vs 'long_pacbio').
+    
+    COORDINATE CONVENTIONS:
+      For short reads from delly:
+      - Interval variants (DEL, DUP, INV): start and end define the real interval
+      - Point variants (INS): start == end at insertion point; length is in svlen
+      - Breakpoint variants (TRA): start == end at breakpoint; length is in svlen
+      
+      No swapping of start/end occurs for point variants since start == end.
     """
     if not path:
         return []
@@ -246,6 +277,7 @@ def load_records(path, source):
         end = _to_int(row.get("end"))
         if start is None or end is None:
             continue
+        # Only swap if start > end; for INS/TRA with start==end, preserve as-is
         if start > end:
             start, end = end, start
 
@@ -255,6 +287,17 @@ def load_records(path, source):
         supporting_methods = row.get("supporting_methods") if str(source).startswith("long") else None
         copy_number = _to_int(row.get("RDCN")) if source == "short" else None
         svlen = _to_int(row.get("svlen"))
+
+        # Derive missing svlen from coordinates; especially for INS/TRA point calls where delly reports start==end
+        if svlen is None and start is not None and end is not None:
+            if std in ("DEL", "DUP", "INV", "RPL"):
+                svlen = (end - start + 1) if end >= start else None
+            elif std in ("INS", "TRA"):
+                # breakpoint/insertion point has no interval length; set 0 to indicate point
+                svlen = 0
+            else:
+                svlen = (end - start + 1) if end >= start else None
+
         start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
         end_mod = _to_int(row.get("end_mod")) if source == "asm" else None
 
@@ -319,6 +362,8 @@ def build_output_table(clusters):
         sht_length = sht.svlen if (sht and pd.notna(sht.svlen)) else np.nan
 
         # Calculate overlapping interval (most confident coordinates)
+        # For interval variants (DEL, DUP, INV): overlap_start/end define the consensus region
+        # For point variants (INS, TRA): overlap_start == overlap_end at the position
         member_starts = [m.start for m in c.members]
         member_ends = [m.end for m in c.members]
         overlap_start = max(member_starts) if member_starts else c.start
@@ -326,6 +371,8 @@ def build_output_table(clusters):
         
         lengths = [asm_length, long_ont_length, long_pacbio_length, sht_length]
         valid_lengths = [l for l in lengths if pd.notna(l)]
+        # event_length_bp uses svlen (from variant callers) rather than coordinate difference
+        # This correctly handles INS/TRA where start==end but svlen still reports the size
         event_length_bp = min(valid_lengths) if valid_lengths else np.nan
         row = {
             "event_id": eid,

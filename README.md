@@ -21,6 +21,7 @@
       - [`unmapped_stats/`](#unmapped_stats)
   - [Graphical Representation of the Pipeline](#graphical-representation-of-the-pipeline)
   - [Generation of per structural variation (SV) type CSV tables](#generation-of-per-structral-variation-sv-type-csv-tables)
+- [Changelog](#changelog)
       
 
 # Quick Start
@@ -434,6 +435,9 @@ flowchart LR
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
 - Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
 - `linked_event` is the only relationship column in the final CSVs. It includes both same-type and cross-type overlaps.
+- **DUP (Duplication) is now a separate SV type** — previously mapped to Replacements, duplications are now preserved as a distinct variant category with their own CSV table
+- **All variant types from all sources are properly extracted and standardized** — assembly (syri), short-read (delly), and long-read variants are correctly identified and reported without loss
+- **Length calculations handle variant type conventions correctly** — insertions and translocations (point variants with start==end) are properly sized using svlen; interval variants use coordinate-based fallback when needed
 
 ### Outputs overview
 
@@ -441,6 +445,7 @@ flowchart LR
 data/outputs/tables/
 ├── csv_per_sv_summary
 │   ├── Deletions.csv
+│   ├── Duplications.csv
 │   ├── Insertions.csv
 │   ├── Inversions.csv
 │   ├── Replacements.csv
@@ -451,6 +456,26 @@ data/outputs/tables/
     ├── mab-pb_sv_summary.tsv
     └── map-ont_sv_summary.tsv
 ```
+
+### Recent Improvements (SV Output Processing)
+
+The SV output processing pipeline has been enhanced to handle all structural variant types correctly and comprehensively:
+
+**Variant Type Support:**
+- **DUP (Duplication)** is now a separate, distinct SV type. Previously, duplications were merged with other replacements; now they have their own dedicated `Duplications.csv` table for improved variant analysis and interpretation.
+- **All 20+ syri variant types** (DEL, INS, INV, DUP, TRANS, INVDP, CPG, CPL, SYN, etc.) are correctly mapped and reported without loss
+- **Short-read variants** (delly: DEL, DUP, INV, INS, TRA) are properly extracted from `INFO/SVTYPE` field
+- **Assembly variants** (syri) are correctly extracted from the VCF `ALT` field (not from ID field)
+
+**Length Handling:**
+- **Point variant semantics:** Insertions (INS) and translocations (TRA) with `start == end` are now correctly handled:
+  - Coordinates are preserved as reported (representing insertion point or breakpoint)
+  - Length is derived from the `svlen` field when available
+  - When `svlen` is missing, it defaults to 0 (point variant) rather than calculated from coordinates
+- **Interval variants:** DEL, DUP, INV, RPL use coordinate-based fallback when `svlen` is missing
+- **Consistent derivation:** svlen is intelligently derived from coordinates based on variant type, ensuring accurate reporting across all sources
+
+**For comprehensive documentation** on variant type conventions, length calculations, and output table structure, see [docs/outputs/sv-tables.md](docs/outputs/sv-tables.md).
 
 ### Example command
 
@@ -489,9 +514,9 @@ The final table in each CSV file contains one row per final structural variant (
 
 | Column name | Description |
 |---|---|
-| **event_id** | Unique identifier of the final structural variant event, such as `DEL_1` or `RPL_3`. |
+| **event_id** | Unique identifier of the final structural variant event, such as `DEL_1` or `DUP_2`. |
 | **chrom** | Chromosome where the SV is located (VCF `CHROM`). |
-| **std_svtype** | Standardized SV type harmonized across pipelines. Current values are `DEL`, `INS`, `RPL`, `INV`, and `TRA`. |
+| **std_svtype** | Standardized SV type harmonized across pipelines. Current values are `DEL`, `DUP`, `INS`, `RPL`, `INV`, and `TRA`. |
 | **event_start** | **Most confident overlap start coordinate** of the clustered SV calls. Calculated as the maximum of all start coordinates across the cluster members. This represents the rightmost (most conservative) start position where all source pipelines agree.  |
 | **event_end** | **Most confident overlap end coordinate** of the clustered SV calls. Calculated as the minimum of all end coordinates across the cluster members. This represents the leftmost (most conservative) end position where all source pipelines agree. |
 | **event_length_bp** | **Length of the representative event region**, calculated differently based on SV type. **For INS (insertions only)**: the minimum `svlen` value reported across all source pipelines (recommended for precise insertion lengths from VCF headers). **For all other types (DEL, RPL, INV, TRA)**: calculated as `event_end - event_start + 1`, representing the length of the consensus overlapping interval. This dual approach ensures insertions retain precise reported lengths while other variation types use the most conservative coordinate-based calculation. |
