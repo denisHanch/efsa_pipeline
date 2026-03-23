@@ -88,6 +88,7 @@ process cute_sv {
 
     input:
     each path(fasta_file)
+    each path(fai)
     tuple val(pair_id), path(bam_file), path(bam_index) 
     val out_folder_name
 
@@ -98,7 +99,7 @@ process cute_sv {
     script:
     """
     mkdir ${pair_id}_out
-    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t ${params.max_cpu}
+    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t 1
     """
 }
 
