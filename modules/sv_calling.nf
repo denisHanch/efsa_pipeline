@@ -84,15 +84,11 @@ process convert_bcf_to_vcf {
 
 process cute_sv {
 
-    memory { 16.GB * task.attempt }
-    errorStrategy 'retry'
-    maxForks 1
-    maxRetries 3
-
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
 
     input:
     each path(fasta_file)
+    each path(fai)
     tuple val(pair_id), path(bam_file), path(bam_index) 
     val out_folder_name
 
