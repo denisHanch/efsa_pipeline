@@ -64,7 +64,7 @@ workflow long_read {
 
         // SV calling against the reference
         if (out_folder_name == "ont/long-ref" || out_folder_name == "pacbio/long-ref") { 
-            sv_long(fasta, ls, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
+            sv_long(fasta, fai, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
             vcf_to_table_long(mapping_tag, sv_vcf) | set { sv_tbl }
 
         } else {
