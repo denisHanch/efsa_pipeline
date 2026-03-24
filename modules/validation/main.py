@@ -221,6 +221,19 @@ def main():
     # Step 3: Run validation using functional API
     # ========================================================================
     report = ValidationReport(output_dir / "report.txt")
+    fatal_errors: list[str] = []
+
+    def register_required_failure(label: str, exc: Exception) -> None:
+        message = f"{label} validation failed: {exc}"
+        logger.error(message)
+        fatal_errors.append(message)
+
+    def register_missing_output(label: str, result) -> None:
+        output_file = getattr(result, "output_file", None) if result is not None else None
+        if not output_file:
+            message = f"{label} validation produced no usable output file"
+            logger.error(message)
+            fatal_errors.append(message)
 
     # Validate reference genome (required)
     ref_genome_res = None
@@ -228,8 +241,9 @@ def main():
         try:
             ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
             report.write(ref_genome_res, file_type="genome")
+            register_missing_output("ref_genome", ref_genome_res)
         except ValidationError as e:
-            logger.error(f"Required ref_genome validation failed: {e}")
+            register_required_failure("ref_genome", e)
 
     # Validate modified genome (optional)
     mod_genome_res = None
@@ -272,8 +286,10 @@ def main():
         try:
             reads_res = validate_reads(config.reads, reads_settings)
             report.write(reads_res, file_type="read")
+            for read_result in reads_res:
+                register_missing_output("reads", read_result)
         except ValidationError as e:
-            logger.error(f"Read validation failed: {e}")
+            register_required_failure("reads", e)
 
     # Add interread validation
     readxread_res = None
@@ -301,6 +317,9 @@ def main():
             report.write(res, file_type="feature")
         except ValidationError as e:
             logger.error(f"Optional mod_feature validation failed: {e}")
+
+    if fatal_errors:
+        report.add_fatal_errors(fatal_errors)
 
     report.flush(format='text')
     print(f"Log file: {log_file}")

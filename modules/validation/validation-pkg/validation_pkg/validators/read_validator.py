@@ -413,9 +413,11 @@ class ReadValidator(BaseValidator):
         # Special workflow for BAM files
         if self.read_config.detected_format == ReadFormat.BAM:
             if self.settings.ignore_bam:
-                self.logger.warning(f"Cannot process BAM files, the file will be ignored")
-                # Return None to indicate file was skipped
-                return None
+                self.logger.info(
+                    "BAM file will be copied to output directory without FASTQ conversion "
+                    "(ignore_bam=True). Downstream tools must handle BAM directly."
+                )
+                return self._copy_bam_to_output()
 
             # Step 1: Copy original BAM to output (if keep_bam is enabled)
             if self.settings.keep_bam:

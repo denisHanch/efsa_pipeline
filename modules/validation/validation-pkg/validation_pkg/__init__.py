@@ -229,7 +229,7 @@ __all__ = [
     # Logging
     'setup_logging',
     'get_logger',
-    'ValidationReport'
+    'ValidationReport',
 
     # Version info
     '__version__',

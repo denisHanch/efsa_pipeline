@@ -141,14 +141,36 @@ class TestReads:
         p = build_params(r)
         assert p.pacbio_fastq is None
 
-    def test_multiple_reads_same_type_keeps_first(self):
-        r = _base()
-        r["reads"] = [
-            _meta("/reads/ont1.fastq", ngs_type="ont"),
-            _meta("/reads/ont2.fastq", ngs_type="ont"),
-        ]
-        p = build_params(r)
-        assert p.nanopore_fastq == "/reads/ont1.fastq"
+    def test_multiple_reads_same_type_is_not_supported(self):
+        """Multiple ONT/PacBio files from a directory input must be rejected at config load time."""
+        # build_params itself does not enforce this — the guard lives in ConfigManager.
+        # This test documents that submitting two ONT paths is not a supported use case:
+        # ConfigManager._parse_reads_configs raises ValueError before we ever reach build_params.
+        from validation_pkg.config_manager import ConfigManager
+        with pytest.raises(ValueError, match="Only one ONT or PacBio file"):
+            # Simulate the directory-iteration branch with two ONT files
+            import types, pathlib
+            config_stub = types.SimpleNamespace(
+                config_dir=pathlib.Path("/fake"),
+                output_dir=pathlib.Path("/fake/valid"),
+                options={},
+                reads=[],
+            )
+            read_entry = {"directory": "ont_dir", "ngs_type": "ont"}
+            # Patch iterdir to return two files
+            fake_files = [pathlib.Path("/fake/ont_dir/a.fastq"), pathlib.Path("/fake/ont_dir/b.fastq")]
+            original_iterdir = pathlib.Path.iterdir
+            pathlib.Path.iterdir = lambda self: iter(fake_files)
+            original_exists = pathlib.Path.exists
+            original_is_dir = pathlib.Path.is_dir
+            pathlib.Path.exists = lambda self: True
+            pathlib.Path.is_dir = lambda self: True
+            try:
+                ConfigManager._parse_reads_configs({"reads": [read_entry]}, config_stub)
+            finally:
+                pathlib.Path.iterdir = original_iterdir
+                pathlib.Path.exists = original_exists
+                pathlib.Path.is_dir = original_is_dir
 
     def test_mixed_read_types(self):
         r = _base()

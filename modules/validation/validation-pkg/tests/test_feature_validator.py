@@ -1075,9 +1075,8 @@ class TestGTFConversionWithGffread:
         # Should handle special characters (gffread adds exon from mRNA)
         assert len(validator.features) == 2  # mRNA + exon
 
-    def test_gffread_not_available_error(self, temp_dir, output_dir, monkeypatch):
-        """Test error handling when gffread is not available - logs error and skips file."""
-        # Create GTF file
+    def test_gffread_not_available_falls_back_to_direct_parser(self, temp_dir, output_dir, monkeypatch):
+        """When gffread is unavailable the validator falls back to the direct GFF3 parser."""
         gtf_file = temp_dir / "test.gtf"
         with open(gtf_file, "w") as f:
             f.write('chr1\ttest\tgene\t100\t200\t.\t+\t.\tgene_id "G1";\n')
@@ -1096,13 +1095,11 @@ class TestGTFConversionWithGffread:
         monkeypatch.setattr('validation_pkg.validators.feature_validator.check_tool_available', lambda x: False)
 
         validator = FeatureValidator(feature_config, FeatureValidator.Settings())
-
-        # Should log error and skip file instead of crashing
         result = validator.run()
 
-        # Validator should complete with empty features
-        assert validator.features == []
-        assert result.num_features is None or result.num_features == 0
+        # Fallback direct GFF3 parser should parse the one feature in the file
+        assert len(validator.features) == 1
+        assert result.num_features == 1
 
 
 
