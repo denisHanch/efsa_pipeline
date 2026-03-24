@@ -290,20 +290,20 @@ def load_records(path, source):
         copy_number = _to_int(row.get("RDCN")) if source == "short" else None
         chr2 = row.get("chr2") if source == "short" else None
         pos2 = _to_int(row.get("pos2")) if source == "short" else None
+        start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
+        end_mod = _to_int(row.get("end_mod")) if source == "asm" else None
         svlen = _to_int(row.get("svlen"))
 
-        # Derive missing svlen from coordinates; especially for INS/TRA point calls where delly reports start==end
+        # Derive missing svlen from coordinates.
         if svlen is None and start is not None and end is not None:
             if std in ("DEL", "DUP", "INV", "RPL"):
                 svlen = (end - start + 1) if end >= start else None
-            elif std in ("INS", "TRA"):
-                # breakpoint/insertion point has no interval length; set 0 to indicate point
+            elif std == "INS":
+                svlen = None
+            elif std == "TRA":
                 svlen = 0
             else:
                 svlen = (end - start + 1) if end >= start else None
-
-        start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
-        end_mod = _to_int(row.get("end_mod")) if source == "asm" else None
 
         out.append(
             Record(
@@ -361,25 +361,36 @@ def build_output_table(clusters):
         else:
             pct_str = ""
 
-        # Calculate lengths for each source
+        # Calculate lengths for each source.
+        # Restore last week's insertion handling: INS lengths come only from reported svlen values.
         asm_length = asm.svlen if (asm and pd.notna(asm.svlen)) else np.nan
         long_ont_length = long_ont.svlen if (long_ont and pd.notna(long_ont.svlen)) else np.nan
         long_pacbio_length = long_pacbio.svlen if (long_pacbio and pd.notna(long_pacbio.svlen)) else np.nan
         sht_length = sht.svlen if (sht and pd.notna(sht.svlen)) else np.nan
 
-        # Calculate overlapping interval (most confident coordinates)
-        # For interval variants (DEL, DUP, INV): overlap_start/end define the consensus region
-        # For point variants (INS, TRA): overlap_start == overlap_end at the position
+        # Calculate event coordinates.
+        # Restore last week's insertion handling: INS uses cluster bounds rather than a single consensus point.
         member_starts = [m.start for m in c.members]
         member_ends = [m.end for m in c.members]
-        overlap_start = max(member_starts) if member_starts else c.start
-        overlap_end = min(member_ends) if member_ends else c.end
+        if c.std_type == "INS":
+            overlap_start = c.start
+            overlap_end = c.end
+        elif c.std_type == "TRA":
+            consensus_pos = int(round(float(np.median(member_starts)))) if member_starts else c.start
+            overlap_start = consensus_pos
+            overlap_end = consensus_pos
+        else:
+            overlap_start = max(member_starts) if member_starts else c.start
+            overlap_end = min(member_ends) if member_ends else c.end
         
         lengths = [asm_length, long_ont_length, long_pacbio_length, sht_length]
         valid_lengths = [l for l in lengths if pd.notna(l)]
-        # event_length_bp uses svlen (from variant callers) rather than coordinate difference
-        # This correctly handles INS/TRA where start==end but svlen still reports the size
-        event_length_bp = min(valid_lengths) if valid_lengths else np.nan
+        if c.std_type == "INS":
+            event_length_bp = min(valid_lengths) if valid_lengths else np.nan
+        else:
+            # event_length_bp uses svlen (from variant callers) rather than coordinate difference
+            # This correctly handles TRA where start==end but svlen still reports or defaults the size
+            event_length_bp = min(valid_lengths) if valid_lengths else np.nan
         row = {
             "event_id": eid,
             "chrom": c.chrom,
