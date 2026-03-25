@@ -2,7 +2,7 @@ name: "CI: Nextflow Integration Test"
 
 on:
   push:
-    branches: [main]
+    branches: [main, EFSA-221_github_worflow]
     paths:
       - "main.nf"
       - "nextflow.config"
