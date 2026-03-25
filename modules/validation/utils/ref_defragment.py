@@ -81,7 +81,7 @@ def _consume_sequences(
             seq_str = str(record.seq)
             seq_len = len(seq_str)
             logger.warning(f"  [{i}] Consuming contig '{record.id}' ({seq_len} bp)")
-            tsv_rows.append((record.id, seq_len, offset))
+            tsv_rows.append((record.id, seq_len, offset + 1))
             parts.append(seq_str)
             offset += seq_len
 
