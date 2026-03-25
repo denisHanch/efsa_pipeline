@@ -177,12 +177,6 @@ process calc_unmapped {
     
     reads=\$((total_lines / 4))
 
-    num_files=\$(echo $fastq | wc -w)
-
-    if [[ num_files -eq 2 ]]; then
-        reads=\$((reads * 2))
-    fi
-
     export reads
     """
 }
