@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 base=$(pwd)
-version="v1.0.0"
+version="v1.0.2"
 for tool in *; do 
     if [[ -f $tool ]]; then
         echo "Skipping $tool"

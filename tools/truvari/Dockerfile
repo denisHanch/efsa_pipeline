@@ -1,6 +1,8 @@
 # First stage
 FROM python:3.10-slim AS builder
 
+ARG TRUVARI_VERSION=5.4.0
+
 RUN apt-get update && apt-get install -y \
     build-essential \
     python3-dev \
@@ -8,7 +10,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install --upgrade pip
 
-RUN pip wheel Truvari --no-cache-dir -w /wheels
+RUN pip wheel truvari==${TRUVARI_VERSION} --no-cache-dir -w /wheels
 
 # Second stage: Final minimal image
 FROM python:3.10-slim
