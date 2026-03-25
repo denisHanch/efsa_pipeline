@@ -48,6 +48,14 @@ RUN apk add --no-cache --virtual .minimap2-build-deps \
     && rm -rf /tmp/minimap2-2.28 \
     && apk del .minimap2-build-deps
 
+# Install bedtools (available in Alpine repos)
+RUN apk add --no-cache bedtools
+
+# Install mosdepth (prebuilt binary requires glibc; gcompat provides compatibility layer on Alpine)
+RUN apk add --no-cache gcompat libstdc++ && \
+    curl -L https://github.com/brentp/mosdepth/releases/latest/download/mosdepth -o /usr/local/bin/mosdepth && \
+    chmod +x /usr/local/bin/mosdepth
+
 # Build and install gffread from source (not available in Alpine repos)
 RUN apk add --no-cache --virtual .gffread-build-deps \
         build-base \
