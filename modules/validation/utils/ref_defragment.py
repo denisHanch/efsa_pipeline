@@ -117,7 +117,7 @@ def _write_tsv(
     logger,
 ) -> Path:
     # data/inputs/../outputs/tables  →  data/outputs/tables
-    tsv_dir = genome_config.filepath.parent.parent / "outputs" / "tables"
+    tsv_dir = genome_config.filepath.parent.parent / "outputs" / "tables" / "tsv"
     tsv_dir.mkdir(parents=True, exist_ok=True)
     out_path = tsv_dir / f"{genome_config.basename}_defragmented_join_order.tsv"
     with open(out_path, "w") as fh:
