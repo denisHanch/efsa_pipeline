@@ -109,6 +109,19 @@ jobs:
           echo "--- Valid directory contents ---"
           find data/valid/ -type f | sort
 
+      - name: Pre-pull Docker images (with retry)
+        run: |
+          images=$(grep -oP "container\s*=\s*'\K[^']+" nextflow.config | sort -u)
+          for image in $images; do
+            for attempt in 1 2 3; do
+              echo "Pulling $image (attempt $attempt)..."
+              if docker pull "$image"; then
+                break
+              fi
+              sleep 10
+            done
+          done
+
       - name: Run Nextflow pipeline
         run: |
           nextflow run main.nf \
