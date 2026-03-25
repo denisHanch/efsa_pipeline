@@ -18,14 +18,13 @@ from validation_pkg import (
     validate_genome,
     validate_reads,
     validate_feature,
-    setup_logging,
-    get_logger,
     readxread_validation,
     genomexgenome_validation
 )
 from validation_pkg.exceptions import ValidationError
 from validation_pkg.utils.formats import CodingType, GenomeFormat
 from utils.ref_defragment import defragment_reference
+from validation_utils.logger import setup_logging, ValidationLogger
 
 import nextflow_params_handler as nf_params
 
@@ -350,10 +349,10 @@ if __name__ == '__main__':
     try:
         sys.exit(main())
     except Exception as e:
-        logger = get_logger()
-        logger.error(f"✗ Fatal error: {e}")
-        logger.debug(traceback.format_exc())
+        _fallback_logger = ValidationLogger()
+        _fallback_logger.error(f"✗ Fatal error: {e}")
+        _fallback_logger.debug(traceback.format_exc())
         if len(sys.argv) >= 2:
-            actual_log_file = getattr(get_logger(), 'log_file', None) or (Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log")
+            actual_log_file = (Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log")
             print(f"Log file: {actual_log_file}")
         sys.exit(1)

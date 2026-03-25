@@ -1222,7 +1222,7 @@ class TestParallelValidationLogging:
 
     def test_sequential_validation_no_parallel_logging(self, temp_dir, output_dir):
         """Test that sequential validation (threads=1) does NOT enable parallel logging."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_utils.logger import setup_logging
 
         fastq_file = temp_dir / "test.fastq"
         self._create_fastq(fastq_file, num_reads=100)
@@ -1243,7 +1243,7 @@ class TestParallelValidationLogging:
         )
 
         settings = ReadValidator.Settings(check_invalid_chars=True)
-        validator = ReadValidator(read_config, settings)
+        validator = ReadValidator(read_config, settings, logger=logger)
 
         # Run validation (sequential)
         validator._parse_file()
@@ -1255,7 +1255,7 @@ class TestParallelValidationLogging:
         assert '"process_id"' not in log_content
     def test_parallel_validation_enables_parallel_logging(self, temp_dir, output_dir):
         """Test that parallel validation (threads>1) logs parallel-related messages."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_utils.logger import setup_logging
 
         fastq_file = temp_dir / "test.fastq"
         self._create_fastq(fastq_file, num_reads=5000)
@@ -1276,7 +1276,7 @@ class TestParallelValidationLogging:
         )
 
         settings = ReadValidator.Settings(check_invalid_chars=True)
-        validator = ReadValidator(read_config, settings)
+        validator = ReadValidator(read_config, settings, logger=logger)
 
         # Run validation (parallel)
         validator._parse_file()
@@ -1288,7 +1288,7 @@ class TestParallelValidationLogging:
         assert '"parallel_mode": true' in log_content or 'Parallel validation enabled' in log_content
     def test_trust_mode_no_parallel_logging(self, temp_dir, output_dir):
         """Test that trust mode never enables parallel logging (always sequential)."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_utils.logger import setup_logging
 
         fastq_file = temp_dir / "test.fastq"
         self._create_fastq(fastq_file, num_reads=1000)
@@ -1309,7 +1309,7 @@ class TestParallelValidationLogging:
         )
 
         settings = ReadValidator.Settings(check_invalid_chars=True)
-        validator = ReadValidator(read_config, settings)
+        validator = ReadValidator(read_config, settings, logger=logger)
 
         # Run validation (trust mode - always sequential)
         validator._parse_file()
@@ -1321,7 +1321,7 @@ class TestParallelValidationLogging:
         assert '"process_id"' not in log_content
     def test_parallel_logging_cleanup_on_error(self, temp_dir, output_dir):
         """Test that parallel logging is disabled even if validation fails."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_utils.logger import setup_logging
 
         # Create FASTQ with invalid characters (properly formatted for BioPython)
         fastq_file = temp_dir / "invalid.fastq"
@@ -1352,7 +1352,7 @@ class TestParallelValidationLogging:
         )
 
         settings = ReadValidator.Settings(check_invalid_chars=True)
-        validator = ReadValidator(read_config, settings)
+        validator = ReadValidator(read_config, settings, logger=logger)
 
         # Parse file (should succeed)
         validator._parse_file()
@@ -1364,15 +1364,13 @@ class TestParallelValidationLogging:
 
     def test_full_validation_with_parallel_logging(self, temp_dir, output_dir):
         """Integration test: Full validation run with parallel logging."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_utils.logger import setup_logging
 
         fastq_file = temp_dir / "test.fastq"
         self._create_fastq(fastq_file, num_reads=10000)
 
         log_file = temp_dir / "test.log"
         logger = setup_logging(log_file=log_file, console_level="DEBUG")
-
-        # Initial state
 
         read_config = ReadConfig(
             filename="test.fastq",
@@ -1389,7 +1387,7 @@ class TestParallelValidationLogging:
             check_invalid_chars=True,
             allow_duplicate_ids=False
         )
-        validator = ReadValidator(read_config, settings)
+        validator = ReadValidator(read_config, settings, logger=logger)
 
         # Full validation run
         validator.run()
@@ -1402,7 +1400,7 @@ class TestParallelValidationLogging:
 
     def test_multiple_validations_cleanup(self, temp_dir, output_dir):
         """Test that parallel logging cleanup works across multiple validation runs."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_utils.logger import setup_logging
 
         fastq_file1 = temp_dir / "test1.fastq"
         fastq_file2 = temp_dir / "test2.fastq"
@@ -1424,7 +1422,7 @@ class TestParallelValidationLogging:
             global_options={"threads": 4, "validation_level": "strict"}
         )
 
-        validator1 = ReadValidator(read_config1, ReadValidator.Settings())
+        validator1 = ReadValidator(read_config1, ReadValidator.Settings(), logger=logger)
         validator1._parse_file()
         validator1._validate_sequences()
 
@@ -1442,7 +1440,7 @@ class TestParallelValidationLogging:
             global_options={"threads": 1, "validation_level": "strict"}
         )
 
-        validator2 = ReadValidator(read_config2, ReadValidator.Settings())
+        validator2 = ReadValidator(read_config2, ReadValidator.Settings(), logger=logger)
         validator2._parse_file()
         validator2._validate_sequences()
 

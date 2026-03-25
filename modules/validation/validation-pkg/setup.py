@@ -22,7 +22,10 @@ setup(
     description="Simple package to manage input validation for GMO pipeline",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=find_packages(),
+    packages=find_packages() + ['validation_utils'],
+    package_dir={
+        'validation_utils': '../utils',
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: EUPL-1.2 license",

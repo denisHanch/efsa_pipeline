@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, FeatureFormat
 from validation_pkg.utils import file_handler, path_utils
-from validation_pkg.logger import get_logger
+from validation_utils.logger import ValidationLogger
 from validation_pkg.exceptions import (
     ConfigurationError,
     FileNotFoundError as ValidationFileNotFoundError
@@ -168,7 +168,7 @@ class ConfigManager:
     @staticmethod
     def load(config_path: str, cli_options: Dict[str, Any] = None) -> Config:
         """Load and validate configuration from JSON file."""
-        logger = get_logger()
+        logger = ValidationLogger()
         logger.info(f"Loading configuration from: {config_path}")
         
         config_file = Path(config_path)
@@ -347,7 +347,7 @@ class ConfigManager:
     @staticmethod
     def _parse_genome_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None, allow_n_sequence_limit: bool = True) -> GenomeConfig:
         """Parse a genome configuration entry."""
-        logger = get_logger()
+        logger = ValidationLogger()
         n_sequence_limit = None
         filtered_value = value
 
@@ -381,7 +381,7 @@ class ConfigManager:
     @staticmethod
     def _parse_reads_configs(data: dict, config: Config):
         """Parse reads configuration (internal method)."""
-        logger = get_logger()
+        logger = ValidationLogger()
         reads_data = data['reads']
 
         if not isinstance(reads_data, list):
@@ -507,7 +507,7 @@ class ConfigManager:
     @staticmethod
     def _parse_options(data: dict, config: Config, cli_options: Dict[str, Any] = None):
         """Parse and validate global configuration options."""
-        logger = get_logger()
+        logger = ValidationLogger()
 
         # Get options dict from config, or empty dict if not present
         if 'options' not in data:
@@ -668,7 +668,7 @@ class ConfigManager:
 
     @staticmethod
     def _merge_options(field_name: str, global_options: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:        
-        logger = get_logger()
+        logger = ValidationLogger()
 
         # Extract file-level global options (threads, validation_level only)
         filelvl_options = {}
@@ -706,7 +706,7 @@ class ConfigManager:
     @staticmethod
     def _setup_output_directory(config: Config):
         """Set up output directory for validation results."""
-        logger = get_logger()
+        logger = ValidationLogger()
 
         # Create output directory path
         output_dir = config.config_dir.parent / "valid"

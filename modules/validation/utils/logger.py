@@ -1,7 +1,7 @@
 """Logging configuration for the bioinformatics validation package."""
 
 import sys
-import os
+import re
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, List
@@ -60,19 +60,16 @@ def format_process_info(logger, method_name, event_dict: dict) -> dict:
     file_context = event_dict.get("file_context")
     category = event_dict.get("category")
 
-    # Build the context prefix
     context_parts = []
 
     if worker_id:
         context_parts.append(f"{Colors.CYAN}Worker-{worker_id}{Colors.RESET}")
 
     if file_context:
-        # Shorten long file paths
         if len(file_context) > 40:
             file_context = "..." + file_context[-37:]
         context_parts.append(f"{Colors.MAGENTA}{file_context}{Colors.RESET}")
 
-    # Add category badge if present (e.g., [genome], [read], [feature])
     if category and category not in ['validation_pipeline']:
         category_color = {
             'genome': Colors.GREEN,
@@ -88,44 +85,52 @@ def format_process_info(logger, method_name, event_dict: dict) -> dict:
     return event_dict
 
 
+def get_incremented_path(path: Path, separator: str = "_") -> Path:
+    """Get next available filename by auto-incrementing if file exists."""
+    path = Path(path)
+
+    if not path.exists():
+        return path
+
+    stem = path.stem
+    suffix = path.suffix
+    parent = path.parent
+
+    match = re.match(r'^(.+)_(\d+)$', stem)
+    if match:
+        base_stem = match.group(1)
+        start_counter = int(match.group(2)) + 1
+    else:
+        base_stem = stem
+        start_counter = 1
+
+    counter = start_counter
+    while True:
+        new_name = f"{base_stem}{separator}{counter:03d}{suffix}"
+        new_path = parent / new_name
+        if not new_path.exists():
+            return new_path
+        counter += 1
+
+        if counter > 9999:
+            raise RuntimeError(f"Too many incremented files for {path}. Maximum is 9999.")
+
+
 class ValidationLogger:
     """Logger for validation package with structured logging support."""
 
-    _instance = None
-    _initialized = False
-
-    def __new__(cls):
-        """Singleton pattern - only one logger instance."""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
     def __init__(self):
-        """Initialize logger (only once)."""
-        if self._initialized:
-            return
-
-        # Actual log file path used (may be incremented from requested path)
+        """Initialize logger."""
         self.log_file: Optional[Path] = None
-
-        # Storage for validation issues
         self.validation_issues = []
-
-        # Thread safety for parallel processing
         self._issues_lock = Lock()
-
-        # Will hold the structlog logger instance
-        self.logger = None
-
-        # Storage for timing measurements
+        # Eagerly grab the structlog logger so fallback instances work if
+        # structlog has already been configured (e.g. by setup_logging in main.py).
+        self.logger = structlog.get_logger("validation_pipeline")
         self._timers: Dict[str, float] = {}
         self._timers_lock = Lock()
-
-        # Storage for per-file timing information
         self.file_timings: List[FileTimingSummary] = []
         self._timings_lock = Lock()
-
-        self._initialized = True
 
     def setup(
         self,
@@ -134,23 +139,17 @@ class ValidationLogger:
         clear_previous_issues: bool = True
     ):
         """Set up logging handlers."""
-        # Clear validation issues from previous runs (prevents contamination)
         if clear_previous_issues:
             self.clear_issues()
             self.clear_file_timings()
 
-        # Setup stdlib logging first (if file logging is requested)
         if log_file:
-            from validation_pkg.utils.path_utils import get_incremented_path
-
             log_file = Path(log_file)
             log_file.parent.mkdir(parents=True, exist_ok=True)
 
-            # Auto-increment if file exists
             log_file = get_incremented_path(log_file)
             self.log_file = log_file
 
-            # Use stdlib logging with structlog
             processors = [
                 structlog.contextvars.merge_contextvars,
                 structlog.stdlib.add_log_level,
@@ -161,7 +160,6 @@ class ValidationLogger:
                 structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
             ]
 
-            # Configure structlog to use stdlib logging
             structlog.configure(
                 processors=processors,
                 wrapper_class=structlog.stdlib.BoundLogger,
@@ -170,13 +168,11 @@ class ValidationLogger:
                 cache_logger_on_first_use=False,
             )
 
-            # Setup stdlib logger for file and console output
             stdlib_logger = logging.getLogger("validation_pipeline")
-            stdlib_logger.handlers.clear()  # Clear any existing handlers
+            stdlib_logger.handlers.clear()
             stdlib_logger.setLevel(logging.DEBUG)
             stdlib_logger.propagate = False
 
-            # Configure file handler with ProcessorFormatter for structured logs
             file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
             file_handler.setLevel(logging.DEBUG)
             file_handler.setFormatter(
@@ -187,14 +183,12 @@ class ValidationLogger:
             )
             stdlib_logger.addHandler(file_handler)
 
-            # Console-specific chain: same base processors plus context/color enrichment
             console_pre_chain = processors[:-1] + [
                 format_process_info,
                 add_log_level_colors,
-                processors[-1],  # wrap_for_formatter
+                processors[-1],
             ]
 
-            # Configure the ProcessorFormatter for console with colors
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setLevel(getattr(logging, console_level.upper()))
             console_handler.setFormatter(
@@ -206,7 +200,6 @@ class ValidationLogger:
             stdlib_logger.addHandler(console_handler)
 
         else:
-            # No file logging - use PrintLogger for simplicity
             processors = [
                 structlog.contextvars.merge_contextvars,
                 structlog.processors.add_log_level,
@@ -215,14 +208,12 @@ class ValidationLogger:
                 structlog.processors.format_exc_info,
             ]
 
-            # Console renderer with colors and context info
             console_processors = processors + [
-                format_process_info,  # Format worker/file context
+                format_process_info,
                 add_log_level_colors,
                 structlog.dev.ConsoleRenderer(colors=True)
             ]
 
-            # Configure structlog
             structlog.configure(
                 processors=console_processors,
                 wrapper_class=structlog.make_filtering_bound_logger(
@@ -233,7 +224,6 @@ class ValidationLogger:
                 cache_logger_on_first_use=False,
             )
 
-        # Get logger instance
         self.logger = structlog.get_logger("validation_pipeline")
 
         if log_file:
@@ -248,25 +238,20 @@ class ValidationLogger:
         """Reconfigure logging level after initial setup."""
         console_level_upper = console_level.upper()
 
-        # Check if we're using stdlib logging (has handlers)
         stdlib_logger = logging.getLogger("validation_pipeline")
 
         if stdlib_logger.handlers:
-            # Update existing handlers
             for handler in stdlib_logger.handlers:
                 if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
-                    # Console handler
                     handler.setLevel(getattr(logging, console_level_upper))
                     self.debug(f"Updated console logging level to {console_level_upper}")
 
-            # If file logging should be disabled, remove file handler
             if not enable_file_logging:
                 stdlib_logger.handlers = [
                     h for h in stdlib_logger.handlers
                     if not isinstance(h, logging.FileHandler)
                 ]
         else:
-            # Using PrintLogger - need to reconfigure structlog
             processors = [
                 structlog.contextvars.merge_contextvars,
                 structlog.processors.add_log_level,
@@ -291,7 +276,6 @@ class ValidationLogger:
                 cache_logger_on_first_use=False,
             )
 
-            # Get new logger instance
             self.logger = structlog.get_logger("validation_pipeline")
 
     def debug(self, message: str, **kwargs):
@@ -337,15 +321,11 @@ class ValidationLogger:
         with self._issues_lock:
             self.validation_issues.append(issue)
 
-        # Also log to console (but don't add to validation_issues again!)
         log_message = f"[{category}] {message}"
-
-        # Log with structured context
         log_kwargs = {'category': category}
         if details:
             log_kwargs.update(details)
 
-        # Use logger directly to avoid duplicate appending
         if self.logger:
             if level == 'ERROR':
                 self.logger.error(log_message, **log_kwargs)
@@ -367,7 +347,6 @@ class ValidationLogger:
                 raise KeyError(f"Timer '{name}' was never started")
             start_time = self._timers[name]
             elapsed = end_time - start_time
-            # Store the elapsed time instead of start time
             self._timers[name] = elapsed
             return elapsed
 
@@ -399,30 +378,22 @@ class ValidationLogger:
         with self._timings_lock:
             timings_copy = self.file_timings.copy()
 
-        # Calculate total time
         total_time = sum(t.elapsed_time for t in timings_copy)
 
-        # Print header
         self.info("")
         self.info("=" * 80)
         self.info("FILE PROCESSING SUMMARY")
         self.info("=" * 80)
 
-        # Find longest filename for formatting
         max_filename_len = max(len(t.input_file) for t in timings_copy) if timings_copy else 20
-        max_filename_len = min(max_filename_len, 50)  # Cap at 50 chars
+        max_filename_len = min(max_filename_len, 50)
 
-        # Print each file
         for timing in timings_copy:
-            # Truncate long filenames
             filename = timing.input_file
             if len(filename) > max_filename_len:
                 filename = "..." + filename[-(max_filename_len-3):]
 
-            # Format time
             time_str = f"{timing.elapsed_time:.2f}s"
-
-            # Format validator type with color
             type_label = timing.validator_type.upper()
 
             self.info(
@@ -430,7 +401,6 @@ class ValidationLogger:
                 category=timing.validator_type
             )
 
-        # Print total
         self.info("-" * 80)
         self.info(f"  {'TOTAL':<{max_filename_len}}             {total_time:>8.2f}s")
         self.info("=" * 80)
@@ -448,26 +418,17 @@ class ValidationLogger:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit - propagate exceptions."""
-        # Don't clear issues on exit - caller may want to inspect them
-        # If you want to clear, call clear_issues() explicitly
         return False
-
-
-# Convenience functions for easy import
-def get_logger() -> ValidationLogger:
-    """Get the singleton logger instance."""
-    return ValidationLogger()
 
 
 def setup_logging(
     console_level: str = "INFO",
     log_file: Optional[Path] = None,
-):
-    """Set up logging for the package."""
-    logger = get_logger()
+) -> ValidationLogger:
+    """Create and set up a new ValidationLogger instance."""
+    logger = ValidationLogger()
     logger.setup(console_level, log_file)
     return logger
 
 
-# Export for backwards compatibility
-__all__ = ['ValidationLogger', 'get_logger', 'setup_logging']
+__all__ = ['ValidationLogger', 'setup_logging', 'get_incremented_path']

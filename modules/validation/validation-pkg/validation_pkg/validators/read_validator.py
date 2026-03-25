@@ -215,9 +215,9 @@ class ReadValidator(BaseValidator):
             # Normalize coding_type from base class
             self._normalize_coding_type()
 
-    def __init__(self, read_config, settings: Optional[Settings] = None) -> None:
+    def __init__(self, read_config, settings: Optional[Settings] = None, logger=None) -> None:
         # Call base class initialization
-        super().__init__(read_config, settings)
+        super().__init__(read_config, settings, logger)
 
         # Keep read_config for type safety and specific access
         self.read_config = read_config

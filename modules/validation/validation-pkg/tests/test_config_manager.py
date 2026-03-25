@@ -322,8 +322,8 @@ class TestConfigManager:
 
     def test_missing_file_is_logged(self, temp_dir):
         """Test that a missing file error is logged via logger.error and add_validation_issue."""
-        from unittest.mock import patch, call
-        from validation_pkg.logger import get_logger
+        from unittest.mock import patch
+        from validation_utils.logger import ValidationLogger
 
         (temp_dir / "reads.fastq").write_text("@read1\nATCG\n+\nIIII\n")
 
@@ -335,11 +335,11 @@ class TestConfigManager:
         config_file = temp_dir / "config.json"
         config_file.write_text(json.dumps(config))
 
-        logger = get_logger()
+        logger = ValidationLogger()
         with patch.object(logger, 'error') as mock_error, \
              patch.object(logger, 'add_validation_issue') as mock_issue:
             with pytest.raises(ValidationFileNotFoundError):
-                ConfigManager.load(str(config_file))
+                ConfigManager.load(str(config_file), logger=logger)
 
             mock_error.assert_called_once()
             assert "ref_missing.fasta" in mock_error.call_args[0][0]
