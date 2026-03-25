@@ -68,20 +68,20 @@ jobs:
           cat > data/inputs/config.json << 'EOF'
           {
             "ref_genome_filename": {
-              "filename": "data/inputs/test/ref.fa",
+              "filename": "test/ref.fa",
               "validation_level": "minimal",
               "n_sequence_limit": 5,
               "threads": 2
             },
             "mod_genome_filename": {
-              "filename": "data/inputs/test/mod.fa",
+              "filename": "test/mod.fa",
               "validation_level": "minimal",
               "n_sequence_limit": 5,
               "threads": 2
             },
             "reads": [
               {
-                "directory": "data/inputs/test/illumina",
+                "directory": "test/illumina",
                 "ngs_type": "illumina",
                 "validation_level": "minimal",
                 "threads": 2
