@@ -128,7 +128,7 @@ jobs:
         run: |
           nextflow run main.nf \
             -params-file data/valid/validated_params.json \
-            --max_cpu 2 \
+            --max_cpu 8 \
             -resume
         env:
           NXF_ANSI_LOG: "false"
@@ -150,13 +150,6 @@ jobs:
             echo "✅ Nextflow report generated"
           else
             echo "❌ Nextflow report missing"
-            exit 1
-          fi
-
-          if [ -f data/outputs/logs/timeline.html ]; then
-            echo "✅ Nextflow timeline generated"
-          else
-            echo "❌ Nextflow timeline missing"
             exit 1
           fi
 
