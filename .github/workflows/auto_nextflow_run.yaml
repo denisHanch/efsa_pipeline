@@ -111,7 +111,9 @@ jobs:
 
       - name: Pre-pull Docker images (with retry)
         run: |
-          images=$(grep -oP "container\s*=\s*'\K[^']+" nextflow.config | sort -u)
+          # Extract containers only for short-read and ref-x-mod processes
+          PROCESSES="trimgalore|fastqc|multiqc|bwa_index|bwa_mapping|samtools_sort|samtools_stats|samtools_index_bam|samtools_index|picard_dict|picard|delly|convert_bcf_to_vcf|get_unmapped_reads|calc_total_reads|freebayes|bcftools_stats|vcf_to_table_short|nucmer|delta_filter|show_coords|syri|bgzip_tabix|bcftools_concat|vcf_to_table_asm"
+          images=$(grep -E "withName:\s*($PROCESSES)\s" nextflow.config | grep -oP "container\s*=\s*'\K[^']+" | sort -u)
           for image in $images; do
             for attempt in 1 2 3; do
               echo "Pulling $image (attempt $attempt)..."
