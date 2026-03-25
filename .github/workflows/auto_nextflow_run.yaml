@@ -63,6 +63,9 @@ jobs:
       - name: Install validation package
         run: pip install ./modules/validation/validation-pkg/
 
+      - name: Install pipeline Python dependencies
+        run: pip install pandas
+
       - name: Create test config (genomes + illumina reads)
         run: |
           cat > data/inputs/config.json << 'EOF'
@@ -160,6 +163,5 @@ jobs:
           name: nextflow-reports
           path: |
             data/outputs/logs/report.html
-            data/outputs/logs/timeline.html
             .nextflow.log
           retention-days: 14
