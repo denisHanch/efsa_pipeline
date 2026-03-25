@@ -6,7 +6,20 @@ Merge SV summaries from:
   3) short-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score)
 
 Outputs a folder with single CSV for each type of variations:
-  Insertions, Deletions, Replacements, Inversions, Translocations
+  Insertions, Deletions, Duplications, Replacements, Inversions, Translocations
+
+SHORT-READ VARIANT TYPE CONVENTIONS (from delly):
+  - DEL (deletion): real interval (start < end)
+  - DUP (duplication): real interval (start < end)
+  - INV (inversion): real interval (start < end)
+  - INS (insertion): single position (start == end, represents insertion point)
+  - TRA (translocation): breakpoint only (start == end, represents breakpoint position)
+  
+  For INS and TRA, the variant length is captured in svlen, not from end-start calculation.
+  The code correctly handles all these conventions by:
+  - Preserving start and end as reported
+  - Using svlen for event_length_bp calculation (not end-start)
+  - Clustering by position proximity with configurable tolerance
 
 Events are clustered by (chrom, standardized_svtype) using interval overlap with an optional tolerance (bp),
 PLUS breakpoint proximity (start or end must be within tol bp). This avoids merging very large calls with
@@ -44,6 +57,7 @@ import pandas as pd
 TAB_BY_TYPE = {
     "INS": "Insertions",
     "DEL": "Deletions",
+    "DUP": "Duplications",
     "RPL": "Replacements",
     "INV": "Inversions",
     "TRA": "Translocations",
@@ -52,14 +66,14 @@ TAB_BY_TYPE = {
 INFO_MAP = {
     "INS": "INS",
     "DEL": "DEL",
+    "DUP": "DUP",
+    "DUP:TANDEM": "DUP",
+    "DUP:INT": "DUP",
     "INV": "INV",
     "TRA": "TRA",
     "TRANS": "TRA",
     "BND": "TRA",
     "CTX": "TRA",
-    "DUP": "RPL",
-    "DUP:TANDEM": "RPL",
-    "DUP:INT": "RPL",
     "RPL": "RPL",
     "REPL": "RPL",
     "SUB": "RPL",
@@ -70,10 +84,10 @@ ASM_PREFIX_MAP = [
     (r"^DEL", "DEL"),
     (r"^INS", "INS"),
     (r"^INV", "INV"),
+    (r"^DUP", "DUP"),
     (r"^TRANS", "TRA"),
     (r"^TRA", "TRA"),
     (r"^BND", "TRA"),
-    (r"^DUP", "RPL"),
     (r"^CPG", "INS"),
     (r"^CPL", "DEL"),
     (r"^SYN", "RPL"),
@@ -128,6 +142,8 @@ class Record:
     supporting_reads: Optional[int] = None
     score: Optional[float] = None
     copy_number: Optional[int] = None
+    chr2: Optional[str] = None
+    pos2: Optional[int] = None
     supporting_methods: Optional[str] = None
     svlen: Optional[int] = None
     start_mod: Optional[int] = None
@@ -146,6 +162,15 @@ class EventCluster:
 # Clustering
 
 def intervals_overlap(a_start, a_end, b_start, b_end, tol):
+    """Check if two intervals overlap or are close enough to cluster together.
+    
+    Works correctly for all variant types:
+    - Interval variants (DEL, DUP, INV): real intervals with start < end
+    - Point variants (INS): start == end at insertion point
+    - Breakpoint variants (TRA): start == end at breakpoint
+    
+    For point variants, the condition simplifies correctly since start == end.
+    """
     overlap = (b_start <= a_end + tol) and (b_end >= a_start - tol)
     if not overlap:
         return False
@@ -223,6 +248,14 @@ def load_records(path, source):
     - source: one of 'asm', 'long_ont', 'long_pacbio', 'long' or 'short'.
       Sources starting with 'long' are treated as long-read sources and stored
       separately (e.g. 'long_ont' vs 'long_pacbio').
+    
+    COORDINATE CONVENTIONS:
+      For short reads from delly:
+      - Interval variants (DEL, DUP, INV): start and end define the real interval
+      - Point variants (INS): start == end at insertion point; length is in svlen
+      - Breakpoint variants (TRA): start == end at breakpoint; length is in svlen
+      
+      No swapping of start/end occurs for point variants since start == end.
     """
     if not path:
         return []
@@ -246,6 +279,7 @@ def load_records(path, source):
         end = _to_int(row.get("end"))
         if start is None or end is None:
             continue
+        # Only swap if start > end; for INS/TRA with start==end, preserve as-is
         if start > end:
             start, end = end, start
 
@@ -254,9 +288,22 @@ def load_records(path, source):
         # treat any long* sources as long for supporting_methods
         supporting_methods = row.get("supporting_methods") if str(source).startswith("long") else None
         copy_number = _to_int(row.get("RDCN")) if source == "short" else None
-        svlen = _to_int(row.get("svlen"))
+        chr2 = row.get("chr2") if source == "short" else None
+        pos2 = _to_int(row.get("pos2")) if source == "short" else None
         start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
         end_mod = _to_int(row.get("end_mod")) if source == "asm" else None
+        svlen = _to_int(row.get("svlen"))
+
+        # Derive missing svlen from coordinates.
+        if svlen is None and start is not None and end is not None:
+            if std in ("DEL", "DUP", "INV", "RPL"):
+                svlen = (end - start + 1) if end >= start else None
+            elif std == "INS":
+                svlen = None
+            elif std == "TRA":
+                svlen = 0
+            else:
+                svlen = (end - start + 1) if end >= start else None
 
         out.append(
             Record(
@@ -270,6 +317,8 @@ def load_records(path, source):
                 _to_int(row.get("supporting_reads")),
                 _to_float(row.get("score")),
                 copy_number,
+                chr2,
+                pos2,
                 supporting_methods,
                 svlen,
                 start_mod,
@@ -312,21 +361,36 @@ def build_output_table(clusters):
         else:
             pct_str = ""
 
-        # Calculate lengths for each source
+        # Calculate lengths for each source.
+        # Restore last week's insertion handling: INS lengths come only from reported svlen values.
         asm_length = asm.svlen if (asm and pd.notna(asm.svlen)) else np.nan
         long_ont_length = long_ont.svlen if (long_ont and pd.notna(long_ont.svlen)) else np.nan
         long_pacbio_length = long_pacbio.svlen if (long_pacbio and pd.notna(long_pacbio.svlen)) else np.nan
         sht_length = sht.svlen if (sht and pd.notna(sht.svlen)) else np.nan
 
-        # Calculate overlapping interval (most confident coordinates)
+        # Calculate event coordinates.
+        # Restore last week's insertion handling: INS uses cluster bounds rather than a single consensus point.
         member_starts = [m.start for m in c.members]
         member_ends = [m.end for m in c.members]
-        overlap_start = max(member_starts) if member_starts else c.start
-        overlap_end = min(member_ends) if member_ends else c.end
+        if c.std_type == "INS":
+            overlap_start = c.start
+            overlap_end = c.end
+        elif c.std_type == "TRA":
+            consensus_pos = int(round(float(np.median(member_starts)))) if member_starts else c.start
+            overlap_start = consensus_pos
+            overlap_end = consensus_pos
+        else:
+            overlap_start = max(member_starts) if member_starts else c.start
+            overlap_end = min(member_ends) if member_ends else c.end
         
         lengths = [asm_length, long_ont_length, long_pacbio_length, sht_length]
         valid_lengths = [l for l in lengths if pd.notna(l)]
-        event_length_bp = min(valid_lengths) if valid_lengths else np.nan
+        if c.std_type == "INS":
+            event_length_bp = min(valid_lengths) if valid_lengths else np.nan
+        else:
+            # event_length_bp uses svlen (from variant callers) rather than coordinate difference
+            # This correctly handles TRA where start==end but svlen still reports or defaults the size
+            event_length_bp = min(valid_lengths) if valid_lengths else np.nan
         row = {
             "event_id": eid,
             "chrom": c.chrom,
@@ -364,6 +428,8 @@ def build_output_table(clusters):
             "short_length": sht_length,
             "short_svtype_raw": sht.raw_svtype if sht else "",
             "short_info_svtype": sht.info_svtype if sht else "",
+            "short_chr2": sht.chr2 if sht else np.nan,
+            "short_pos2": sht.pos2 if sht else np.nan,
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
             "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
