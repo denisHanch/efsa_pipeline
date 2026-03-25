@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Read(//home/draesdom/Documents/uni_projects/EFSA/efsa_pipeline/**)"
-    ]
-  }
-}

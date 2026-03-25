@@ -1,3 +1,11 @@
+FROM debian:bookworm-slim AS debian-tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends bedtools curl ca-certificates && \
+    curl -L https://github.com/brentp/mosdepth/releases/latest/download/mosdepth -o /usr/local/bin/mosdepth && \
+    chmod +x /usr/local/bin/mosdepth && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 FROM docker:28.5.0-dind-alpine3.22
 ARG GFFREAD_REF=v0.12.7
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
@@ -48,6 +56,12 @@ RUN apk add --no-cache --virtual .minimap2-build-deps \
     && cd / \
     && rm -rf /tmp/minimap2-2.28 \
     && apk del .minimap2-build-deps
+
+# Install bedtools and mosdepth (copied from Debian stage; gcompat provides glibc compatibility on Alpine)
+COPY --from=debian-tools /usr/bin/bedtools /usr/local/bin/bedtools
+COPY --from=debian-tools /usr/local/bin/mosdepth /usr/local/bin/mosdepth
+RUN apk add --no-cache gcompat libstdc++ && \
+    ln -sf /usr/lib/libbz2.so.1 /usr/lib/libbz2.so.1.0
 
 # Build and install gffread from source (not available in Alpine repos)
 RUN apk add --no-cache --virtual .gffread-build-deps \

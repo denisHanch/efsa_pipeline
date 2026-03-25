@@ -5,13 +5,7 @@
 The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is output by the pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sort_vcf), indexing them (index_vcf), and then performing the Truvari comparison to generate the final comparison results.
 
 > **Important!**
-> To allow the pipeline to run, set `--run_truvari` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
->
-> ```groovy
-> params {
->     run_truvari = true
-> }
-> ```
+> To allow the pipeline to run, set `--run_truvari` to `true` when launching the pipeline, or enable it in the `data/validation/validated_params.json` file:
 >
 > By default, this parameter is set to `false`.
 

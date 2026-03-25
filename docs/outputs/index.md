@@ -33,11 +33,11 @@ After running the Nextflow pipeline, outputs are organized in the `data/outputs/
 
 ```
 data/outputs/
-├── fasta_ref_mod/      → Reference vs modified comparison
+├── fasta_ref_mod/      → Reference vs modified comparison (if run_ref_x_mod set to true in `data/validation/validated_params.json`)
 ├── illumina/           → Short-read mapping results
 ├── ont/                → Oxford Nanopore results
 ├── pacbio/             → PacBio results
-├── truvari/            → Variant comparison results
+├── truvari/            → Variant comparison results (if run_truvari set to true in `data/validation/validated_params.json`)
 ├── unmapped_stats/     → Unmapped read statistics
 └── logs/               → Execution logs
 ```

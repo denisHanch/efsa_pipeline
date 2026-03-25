@@ -1651,8 +1651,8 @@ class TestConfigOptionsType:
         config_file.write_text(json.dumps(config, indent=2))
 
         loaded = ConfigManager.load(str(config_file))
-        # Global type is not set (only file-level was given, which gets ignored)
-        assert loaded.type is None
+        # Global type is not set (only file-level was given, which gets ignored) - falls back to default
+        assert loaded.type == 'prokaryote'
         # file-level type does not appear in ref_genome's global_options either
         assert "type" not in loaded.ref_genome.global_options
 

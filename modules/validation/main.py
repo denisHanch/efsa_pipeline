@@ -160,7 +160,7 @@ def main():
         except ValidationError as e:
             logger.error(f"Inter-genome validation failed: {e}")
     else:
-        logger.error("Inter-genome validation skiped")
+        logger.info("Inter-genome validation skipped")
 
     # Validate plasmid genomes (optional)
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
@@ -179,11 +179,12 @@ def main():
 
     # Validate reads (required)
     reads_res = None
-    try:
-        reads_res = validate_reads(config.reads, reads_settings)
-        report.write(reads_res, file_type="read")
-    except ValidationError as e:
-        logger.error(f"Read validation failed: {e}")
+    if hasattr(config, 'reads') and config.reads:
+        try:
+            reads_res = validate_reads(config.reads, reads_settings)
+            report.write(reads_res, file_type="read")
+        except ValidationError as e:
+            logger.error(f"Read validation failed: {e}")
 
     # Add interread validation
     readxread_res = None
@@ -194,7 +195,7 @@ def main():
         except ValidationError as e:
             logger.error(f"Inter-read validation failed: {e}")
     else:
-        logger.error("Inter-read validation skiped")
+        logger.info("Inter-read validation skipped")
 
     # Validate features (optional — non-fatal)
     ref_feature_res = None
@@ -218,18 +219,12 @@ def main():
     # ========================================================================
     # Step 4: Write validated_params.json for Nextflow (-params-file)
     # ========================================================================
-    mod_n_sequence_limit = (
-        config.mod_genome.n_sequence_limit
-        if hasattr(config, 'mod_genome') and config.mod_genome
-        else None
-    )
     validation_results = {
-        "ref_genome":          ref_genome_res,
-        "mod_genome":          mod_genome_res,
-        "genomexgenome":       genomexgenome_res,
-        "reads":               reads_res,
-        "ref_feature":         ref_feature_res,
-        "mod_n_sequence_limit": mod_n_sequence_limit,
+        "ref_genome":    ref_genome_res,
+        "mod_genome":    mod_genome_res,
+        "genomexgenome": genomexgenome_res,
+        "reads":         reads_res,
+        "ref_feature":   ref_feature_res,
     }
     params = nf_params.build_params(validation_results)
     nf_params.write_params(params, output_dir / "validated_params.json")
