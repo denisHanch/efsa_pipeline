@@ -129,7 +129,7 @@ Specifies a genome or plasmid file.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `filename` | string | — | Path to genome file (relative to config) |
-| `validation_level` | string | global / `"strict"` | Per-file validation level override |
+| `validation_level` | string | global / `"trust"` | Per-file validation level override |
 | `threads` | integer | global / auto | Per-file thread count override |
 | `n_sequence_limit` | integer | `5` | Maximum allowed number of sequences. Applies to `ref_genome_filename` and `mod_genome_filename` only — **ignored with a warning on plasmids**. When the genome contains more sequences than this limit, the assembly is considered too fragmented: a warning is logged, the file is copied to `data/valid/` as-is, and the pipeline will not run SyRI or ref-vs-mod comparison. Set higher for highly fragmented assemblies. |
 
@@ -225,7 +225,7 @@ These settings customize validation behavior without modifying code.
 - `threads`: Number of threads for parallel processing (positive integer, default: auto-detect)
   - When omitted or set to `null`, the system auto-detects based on available CPU cores
   - System warns if threads exceed available cores
-- `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (default: `"strict"`)
+- `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (default: `"trust"`)
 - `logging_level`: `"DEBUG"`, `"INFO"`, `"WARNING"`, or `"ERROR"` (default: `"INFO"`)
   - Controls console logging verbosity
 - `type`: Organism type — `"prokaryote"` or `"eukaryote"`
