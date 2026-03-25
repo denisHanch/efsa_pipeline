@@ -316,10 +316,10 @@ flowchart TD
 
     %% Reference vs Modified pipeline
     subgraph RefVsMod["Reference vs Modified Pipeline"]
-        ref_fasta --> run_syri_decision{"--run_syri?"}
-        mod_fasta --> run_syri_decision
-        run_syri_decision -->|Yes| nucmer["NUCmer Alignment"]
-        run_syri_decision -->|No| skip_syri["Skip SYRI"]
+        ref_fasta --> run_ref_x_mod_decision{"--run_ref_x_mod?"}
+        mod_fasta --> run_ref_x_mod_decision
+        run_ref_x_modx_mod_decision -->|Yes| nucmer["NUCmer Alignment"]
+        run_ref_x_modx_mod_decision -->|No| skip_syri["Skip SYRI"]
         nucmer --> delta_filter["Delta Filter"]
         delta_filter --> show_coords["Show Coords"]
         show_coords --> syri_vcf["VCF Output (assemblysyri)"]
@@ -381,8 +381,6 @@ nextflow run main.nf --max_cpu $(nproc) -resume
 | `--in_dir`     | Input directory                                                   | `data/valid`            |
 | `--out_dir`    | Output directory                                                  | `data/outputs`          |
 | `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
-| `--run_truvari`| Enables filtering of VCFs based on truth set                      | `false`                 |
-| `--run_syri`   | Enables comparison between the assembly FASTA and reference FASTA | `true`                  |
 | `--clean_work` | Remove work directory after successful run                        | `true`                  |
 | `--help`       | Display help message                                              | –                       |
 
@@ -713,13 +711,13 @@ After successful pipeline execution, the outputs are organized as follows:
 
 ```
 data/outputs
-├── fasta_ref_mod       → Results from reference vs modified FASTA comparison
+├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod set to true in `data/validation/validated_params.json`)
 ├── illumina            → Short-read (Illumina) mapping results
 ├── logs                → Pipeline logs and Nextflow reports
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
 ├── tables              → Per-SV csv tables
-├── truvari             → Variant comparison results from Truvari
+├── truvari             → Variant comparison results from Truvari (if run_truvari set to true in `data/validation/validated_params.json`)
 └── unmapped_stats      → Summary statistics of unmapped reads for each workflow
 
 ```
@@ -806,11 +804,11 @@ fasta_ref_mod/
 ## Output Files
 
 > **Important!**
-> To allow the pipeline to run, set `--run_syri` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
+> To allow the pipeline to run, set `--run_ref_x_mod` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
 >
 > ```groovy
 > params {
->     run_syri = true
+>     run_ref_x_mod = true
 > }
 > ```
 >
@@ -1281,13 +1279,7 @@ The table below summarises all tools used within the pipeline:
 The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is outputed by  pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sort_vcf), indexing them (index_vcf), and then performing the Truvari comparison to generate the final comparison results.
 
 > **Important!**
-> To allow the pipeline to run, set `--run_truvari` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
->
-> ```groovy
-> params {
->     run_truvari = true
-> }
-> ```
+> To allow the pipeline to run, set `--run_truvari` to `true` when launching the pipeline, or enable it in the `data/validation/validated_params.json` file:
 >
 > By default, this parameter is set to `false`.
 

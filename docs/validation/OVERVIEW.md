@@ -51,14 +51,14 @@ After successful validation:
 
 ### `validated_params.json`
 
-This file is produced by the validation step and consumed by Nextflow via `-params-file`. It overrides the defaults in `nextflow.config` and `nextflow_schema.json`.
+This file is produced by the validation step and consumed by Nextflow via `-params-file`. It overrides the defaults in `nextflow.config` and `nextflow_schema.json`. 
 
 #### Pipeline switches
 
 | Parameter            | Type    | Description                                                                                           |
 | -------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
 | `run_ref_x_mod`      | boolean | `true` when both reference and modified genome validation succeeded and neither is fragmented; `false` when any genome exceeds `n_sequence_limit` or `type` is `"eukaryote"`. Gates all ref-vs-mod steps. |
-| `run_truvari`        | boolean | Always `false` by default; can be overridden manually.                                                |
+| `run_truvari`        | boolean | Always `false` by default; can be overridden in `data/validation/validated_params.json`.                                                |
 | `run_illumina`       | boolean | `true` when validated Illumina reads are present.                                                     |
 | `run_nanopore`       | boolean | `true` when validated Nanopore (ONT) reads are present.                                               |
 | `run_pacbio`         | boolean | `true` when validated PacBio reads are present.                                                       |

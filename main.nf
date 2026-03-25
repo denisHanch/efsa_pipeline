@@ -29,8 +29,6 @@ def helpMessage() {
     --out_dir        Output directory                                               (default: ${params.out_dir})
     --in_dir         Input directory                                                (default: ${params.in_dir})
     --max_cpu        Maximum CPUs per process                                       (default: ${params.max_cpu})
-    --run_syri       Run reference vs modified FASTA comparison                     (default: ${params.run_syri})
-    --run_truvari    Run pairwise VCF comparisons                                   (default: ${params.run_truvari})
     --clean_work     Remove workdir after success                                   (default: ${params.clean_work})
     -with-report     Generate HTML execution report                                 (Nextflow built-in)
     -with-timeline   Produce timeline visualization                                 (Nextflow built-in)
@@ -72,7 +70,7 @@ workflow {
             activePipelines << ref_mod.out.sv_vcf
 
         } else {
-            log.error "No contig FASTA files found in ${params.in_dir}. Please rerun the pipeline with --run_syri false"}
+            log.error "No contig FASTA files found in ${params.in_dir}. Please rerun the pipeline with run_ref_x_mod set to false in data/valid/validated_params.json"}
     
     } else {
         sv_tbl = sv_tbl.mix(create_asm_tbl("assembly"))
@@ -144,7 +142,7 @@ workflow {
         sv_tbl = sv_tbl.mix(create_short_tbl("short"))
     }
 
-    if (params.run_truvari && activePipelines.size() >= 2 && params.run_syri) {
+    if (params.run_truvari && activePipelines.size() >= 2) {
         
         int comparisons = activePipelines.size() - 1
 

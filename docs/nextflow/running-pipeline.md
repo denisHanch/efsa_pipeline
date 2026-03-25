@@ -46,7 +46,6 @@ The `-params-file data/valid/validated_params.json` flag loads the parameters ge
 | `--in_dir`     | Input directory                                                   | `data/valid`            |
 | `--out_dir`    | Output directory                                                  | `data/outputs`          |
 | `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
-| `--run_truvari`| Enables filtering of VCFs based on truth set                      | `false`                 |
 | `--clean_work` | Remove work directory after successful run                        | `true`                  |
 | `--help`       | Display help message                                              | –                       |
 
