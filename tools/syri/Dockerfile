@@ -1,6 +1,8 @@
 # First stage
 FROM python:3.10-slim AS builder
 
+ARG SYRI_REF=v1.7.1
+
 RUN apt-get update && apt-get install -y \
     git \
     wget \
@@ -15,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --upgrade pip
 
 WORKDIR /build
-RUN git clone https://github.com/schneebergerlab/syri.git
+RUN git clone --branch ${SYRI_REF} --depth 1 https://github.com/schneebergerlab/syri.git
 
 WORKDIR /build/syri
 
