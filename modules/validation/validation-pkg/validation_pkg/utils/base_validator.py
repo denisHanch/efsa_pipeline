@@ -40,12 +40,9 @@ class BaseValidator(ABC):
 
     def _initialize_defaults(self) -> None:
         """Set default values for validation_level and threads."""
-        if not self.validation_level:
-            self.validation_level = 'strict'
-
-        if not self.threads:
-            from validation_pkg.config_manager import DEFAULT_THREADS
-            self.threads = DEFAULT_THREADS
+        if self.validation_level is None:
+            self.validation_level = 'trust'
+        # threads=None means auto-detect; leave as-is
 
     def run(self) -> Any:
         """Execute validation workflow with timing and error handling."""

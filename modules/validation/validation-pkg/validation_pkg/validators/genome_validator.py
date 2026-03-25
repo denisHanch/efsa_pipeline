@@ -342,7 +342,7 @@ class GenomeValidator(BaseValidator):
         self.logger.debug("Validating sequences...")
 
         # Check if organism type is eukaryote — too complex for inter-genome alignment
-        organism_type = self.genome_config.global_options.get('type')
+        organism_type = self.genome_config.global_options.get('type', 'prokaryote')
         if organism_type == 'eukaryote':
             error_msg = (
                 "Organism type is 'eukaryote' — the assembly is too complex for "

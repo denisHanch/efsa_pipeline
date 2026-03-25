@@ -166,7 +166,7 @@ class ConfigManager:
     """Configuration file parser and validator."""
     
     @staticmethod
-    def load(config_path: str) -> Config:
+    def load(config_path: str, cli_options: Dict[str, Any] = None) -> Config:
         """Load and validate configuration from JSON file."""
         logger = get_logger()
         logger.info(f"Loading configuration from: {config_path}")
@@ -180,10 +180,10 @@ class ConfigManager:
 
         # Load JSON
         try:
-            logger.debug(f"Reading configuration file...")
+            logger.info(f"Reading configuration file...")
             with open(config_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            logger.debug(f"Configuration file parsed successfully")
+            logger.info(f"Configuration file parsed successfully")
         except json.JSONDecodeError as e:
             error_msg = f"Invalid JSON in configuration file: {e}"
             logger.error(error_msg)
@@ -201,10 +201,10 @@ class ConfigManager:
         
         # Validate and parse
         try:
-            logger.debug("Validating configuration structure...")
+            logger.info("Validating configuration structure...")
             ConfigManager._validate_required_fields(data)
-            logger.debug("Parsing options...")
-            ConfigManager._parse_options(data, config)
+            logger.info("Parsing options...")
+            ConfigManager._parse_options(data, config, cli_options=cli_options)
 
             # Reconfigure logging level based on config options (if specified)
             if config.options and 'logging_level' in config.options:
@@ -446,17 +446,21 @@ class ConfigManager:
     @staticmethod
     def _parse_read_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> ReadConfig:
         """Parse a read configuration entry."""
-        # Extract ngs_type from the value before parsing
+        # Extract ngs_type from the value before passing to the generic parser.
+        # Strip it from the dict so parse_config_file_value doesn't put it in
+        # extra and trigger a spurious "extra fields ignored" warning.
         if isinstance(value, dict):
             ngs_type = value.get('ngs_type', 'illumina')
+            filtered_value = {k: v for k, v in value.items() if k != 'ngs_type'}
         else:
             ngs_type = 'illumina'  # Default for string-only values
+            filtered_value = value
 
         if not ngs_type:
             raise ValueError("Missing required 'ngs_type'")
 
         return ConfigManager._parse_file_config(
-            value=value,
+            value=filtered_value,
             field_name=field_name,
             config_dir=config_dir,
             output_dir=output_dir,
@@ -493,13 +497,12 @@ class ConfigManager:
         )
 
     @staticmethod
-    def _parse_options(data: dict, config: Config):
+    def _parse_options(data: dict, config: Config, cli_options: Dict[str, Any] = None):
         """Parse and validate global configuration options."""
         logger = get_logger()
 
         # Get options dict from config, or empty dict if not present
         if 'options' not in data:
-            logger.debug("No options specified in config - using defaults")
             options = {}
         else:
             options = data['options']
@@ -518,27 +521,19 @@ class ConfigManager:
                     f"Other settings should be specified per-file in the config."
                 )
 
-        # Parse threads option (with default)
+        # Parse threads option
         if 'threads' in options:
             threads = options['threads']
 
             # Allow null/None to mean auto-detect
             if threads is None:
-                logger.info("Thread count: auto-detect (null specified)")
                 config.options['threads'] = None
             elif isinstance(threads, int):
-                # Validate positive integer
                 if threads <= 0:
                     raise ConfigurationError(f"'threads' must be a positive integer, got {threads}")
 
-                # Detect system CPU cores
                 system_cores = os.cpu_count()
-                if system_cores is None:
-                    system_cores_msg = "unknown"
-                else:
-                    system_cores_msg = f"{system_cores} cores"
 
-                # Warn if threads exceed system CPU cores
                 if system_cores and threads > system_cores:
                     logger.warning(
                         f"Requested {threads} threads but system only has {system_cores} CPU cores. "
@@ -546,23 +541,19 @@ class ConfigManager:
                         f"Consider using threads ≤ {system_cores} for optimal performance."
                     )
 
-                # Warn if excessive (diminishing returns beyond MAX_RECOMMENDED_THREADS)
                 if threads > MAX_RECOMMENDED_THREADS:
                     logger.warning(
                         f"Thread count {threads} is high - diminishing returns beyond {MAX_RECOMMENDED_THREADS} threads. "
                         f"Consider using 4-8 threads for optimal performance."
                     )
 
-                logger.info(f"Global option: threads={threads} (system has {system_cores_msg} available)")
                 config.options['threads'] = threads
             else:
                 raise ConfigurationError(
                     f"'threads' must be an integer or null, got {type(threads).__name__}: {threads}"
                 )
-        else:
-            logger.debug("Thread count: auto-detect (not specified)")
 
-        # Parse validation_level option (with default)
+        # Parse validation_level option
         if 'validation_level' in options:
             validation_level = options['validation_level']
 
@@ -579,10 +570,7 @@ class ConfigManager:
                     f"Must be one of: {', '.join(sorted(VALID_LEVELS))}"
                 )
 
-            logger.info(f"Global option: validation_level={validation_level}")
             config.options['validation_level'] = validation_level
-        else:
-            logger.debug("validation_level not specified in global options")
 
         # Parse logging_level option
         if 'logging_level' in options:
@@ -595,7 +583,6 @@ class ConfigManager:
                     f"'logging_level' must be a string, got {type(logging_level).__name__}: {logging_level}"
                 )
 
-            # Normalize to uppercase
             logging_level = logging_level.upper()
 
             if logging_level not in VALID_LOGGING_LEVELS:
@@ -604,10 +591,7 @@ class ConfigManager:
                     f"Must be one of: {', '.join(sorted(VALID_LOGGING_LEVELS))}"
                 )
 
-            logger.info(f"Global option: logging_level={logging_level}")
             config.options['logging_level'] = logging_level
-        else:
-            logger.debug("logging_level not specified in global options (default: INFO)")
 
         # Parse type option
         if 'type' in options:
@@ -626,10 +610,7 @@ class ConfigManager:
                     f"Must be one of: {', '.join(sorted(VALID_TYPES))}"
                 )
 
-            logger.info(f"Global option: type={organism_type}")
             config.options['type'] = organism_type
-        else:
-            logger.debug("type not specified in global options")
 
         # Parse force_defragment_ref option
         if 'force_defragment_ref' in options:
@@ -639,10 +620,43 @@ class ConfigManager:
                     f"'force_defragment_ref' must be a boolean (true/false), "
                     f"got {type(force_defragment_ref).__name__}: {force_defragment_ref}"
                 )
-            logger.info(f"Global option: force_defragment_ref={force_defragment_ref}")
             config.options['force_defragment_ref'] = force_defragment_ref
-        else:
-            logger.debug("force_defragment_ref not specified in global options")
+
+        # Track which keys each source contributed (for debug logging below)
+        json_keys = set(config.options.keys())
+
+        # Apply CLI options as fallback for keys not explicitly set in config.json
+        cli_keys = set()
+        if cli_options:
+            for key, value in cli_options.items():
+                if key not in config.options:
+                    config.options[key] = value
+                    cli_keys.add(key)
+
+        # Apply defaults for any options not explicitly set
+        DEFAULTS = {
+            'threads': None,
+            'validation_level': 'trust',
+            'logging_level': 'INFO',
+            'type': 'prokaryote',
+            'force_defragment_ref': False,
+        }
+        for key, default in DEFAULTS.items():
+            config.options.setdefault(key, default)
+
+        # Log all resolved options in one line
+        def _fmt(key):
+            value = config.options[key]
+            display = 'auto-detect' if value is None else value
+            if key in json_keys:
+                source = "config"
+            elif key in cli_keys:
+                source = "CLI"
+            else:
+                source = "default"
+            return f"{key}={display} [{source}]"
+
+        logger.info("Global options: " + ", ".join(_fmt(k) for k in DEFAULTS))
 
     @staticmethod
     def _merge_options(field_name: str, global_options: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:        

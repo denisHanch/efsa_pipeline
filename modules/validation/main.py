@@ -29,14 +29,48 @@ from utils.ref_defragment import defragment_reference
 
 import nextflow_params_handler as nf_params
 
+def _parse_cli_args(argv):
+    """Parse CLI arguments and return (config_path, cli_options)."""
+    args = list(argv)
+    cli_options = {}
+
+    # Extract boolean flag
+    if '--force-defragment-ref' in args:
+        cli_options['force_defragment_ref'] = True
+        args.remove('--force-defragment-ref')
+
+    # Extract key-value options
+    i = 0
+    remaining = []
+    while i < len(args):
+        if args[i] == '--threads' and i + 1 < len(args):
+            val = args[i + 1]
+            cli_options['threads'] = None if val == 'auto' else int(val)
+            i += 2
+        elif args[i] == '--validation-level' and i + 1 < len(args):
+            cli_options['validation_level'] = args[i + 1]
+            i += 2
+        elif args[i] == '--logging-level' and i + 1 < len(args):
+            cli_options['logging_level'] = args[i + 1].upper()
+            i += 2
+        elif args[i] == '--type' and i + 1 < len(args):
+            cli_options['type'] = args[i + 1]
+            i += 2
+        else:
+            remaining.append(args[i])
+            i += 1
+
+    return remaining, cli_options
+
+
 def main():
     # Check command line arguments
-    args = sys.argv[1:]
-    cli_force_defragment = '--force-defragment-ref' in args
-    args = [a for a in args if a != '--force-defragment-ref']
+    args, cli_options = _parse_cli_args(sys.argv[1:])
 
     if not args:
         print("Usage: python main.py <config_path> [--force-defragment-ref]")
+        print("       [--threads N|auto] [--validation-level LEVEL]")
+        print("       [--logging-level LEVEL] [--type TYPE]")
         print("\nExample:")
         print("  python main.py config.json")
         return 1
@@ -60,20 +94,16 @@ def main():
     # ========================================================================
     config = None
     try:
-        config = ConfigManager.load(config_path)
+        config = ConfigManager.load(config_path, cli_options=cli_options)
     except Exception as e:
         logger.error(f"Loading a config file failed: {e}")
         return 1
 
     # ========================================================================
-    # Step 1.5 (optional): Defragment reference if --force-defragment-ref
-    # config.json takes priority over CLI flag
+    # Step 1.5 (optional): Defragment reference if force_defragment_ref is set
+    # Priority: config.json > CLI arg > default (false)
     # ========================================================================
-    force_defragment = (
-        config.force_defragment_ref
-        if config.force_defragment_ref is not None
-        else cli_force_defragment
-    )
+    force_defragment = config.force_defragment_ref
     if force_defragment:
         logger.warning("=" * 70)
         logger.warning("UNSUPPORTED WORKAROUND: --force-defragment-ref is ACTIVE")
