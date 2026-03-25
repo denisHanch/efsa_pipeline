@@ -64,7 +64,7 @@ jobs:
         run: pip install ./modules/validation/validation-pkg/
 
       - name: Install pipeline Python dependencies
-        run: pip install pandas
+        run: pip install pandas multiqc
 
       - name: Create test config (genomes + illumina reads)
         run: |
