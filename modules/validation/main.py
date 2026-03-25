@@ -2,6 +2,11 @@
 
 import sys
 import traceback
+from pathlib import Path
+
+# Add modules/validation/ to sys.path so utils/ is importable.
+sys.path.insert(0, str(Path(__file__).parent))
+
 from validation_pkg import (
     ConfigManager,
     GenomeValidator,
@@ -19,21 +24,25 @@ from validation_pkg import (
     genomexgenome_validation
 )
 from validation_pkg.exceptions import ValidationError
-
-from pathlib import Path
+from validation_pkg.utils.formats import CodingType, GenomeFormat
+from utils.ref_defragment import defragment_reference
 
 import nextflow_params_handler as nf_params
 
 def main():
     # Check command line arguments
-    if len(sys.argv) < 2:
-        print("Usage: python main.py <config_path>")
+    args = sys.argv[1:]
+    cli_force_defragment = '--force-defragment-ref' in args
+    args = [a for a in args if a != '--force-defragment-ref']
+
+    if not args:
+        print("Usage: python main.py <config_path> [--force-defragment-ref]")
         print("\nExample:")
         print("  python main.py config.json")
         return 1
 
     # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
-    config_path = Path(sys.argv[1]).resolve()
+    config_path = Path(args[0]).resolve()
     output_dir = config_path.parent.parent / "valid"
     logger = None
     log_file = None
@@ -56,6 +65,56 @@ def main():
         logger.error(f"Loading a config file failed: {e}")
         return 1
 
+    # ========================================================================
+    # Step 1.5 (optional): Defragment reference if --force-defragment-ref
+    # config.json takes priority over CLI flag
+    # ========================================================================
+    force_defragment = (
+        config.force_defragment_ref
+        if config.force_defragment_ref is not None
+        else cli_force_defragment
+    )
+    if force_defragment:
+        logger.warning("=" * 70)
+        logger.warning("UNSUPPORTED WORKAROUND: --force-defragment-ref is ACTIVE")
+        logger.warning("=" * 70)
+        logger.warning(
+            "The reference genome is highly fragmented and is NOT suitable "
+            "for this pipeline. Merging contigs is a workaround only."
+        )
+        logger.warning(
+            "All downstream results (inter-genome alignment, feature "
+            "coordinate mapping, variant calling) may be INCORRECT or "
+            "MEANINGLESS when run on an artificially merged reference."
+        )
+        logger.warning(
+            "EFSA pipeline does NOT support fragmented references. "
+            "Do NOT use these results for regulatory submissions or "
+            "biological conclusions without expert review."
+        )
+        logger.warning(
+            f"Original reference: {config.ref_genome.filepath} "
+            "— consider obtaining a properly assembled genome instead."
+        )
+        logger.warning("=" * 70)
+        try:
+            merged_fasta, join_tsv = defragment_reference(config.ref_genome)
+        except Exception as e:
+            logger.error(f"Defragmentation failed: {e}")
+            return 1
+        config.ref_genome.filepath = merged_fasta
+        config.ref_genome.filename = merged_fasta.name
+        config.ref_genome.coding_type = CodingType.NONE
+        config.ref_genome.detected_format = GenomeFormat.FASTA
+        config.ref_genome._extract_basename()
+        logger.warning(
+            f"Reference replaced for this run. "
+            f"Merged file: {merged_fasta} | Join order: {join_tsv}"
+        )
+        logger.warning(
+            "Proceeding with validation on merged reference. "
+            "Results should be interpreted with extreme caution."
+        )
 
     # ========================================================================
     # Step 2: Edit settings for each validator

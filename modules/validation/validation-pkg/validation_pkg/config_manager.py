@@ -20,7 +20,7 @@ T = TypeVar('T', bound='BaseValidatorConfig')
 
 # ===== Global Configuration Constants =====
 # Only these fields can be specified in config.json "options" section
-ALLOWED_GLOBAL_OPTIONS = {'threads', 'validation_level', 'logging_level', 'type'}
+ALLOWED_GLOBAL_OPTIONS = {'threads', 'validation_level', 'logging_level', 'type', 'force_defragment_ref'}
 # Only these fields can be overridden at the file level
 ALLOWED_FILE_OPTIONS = {'threads', 'validation_level'}
 MAX_RECOMMENDED_THREADS = 16
@@ -129,6 +129,11 @@ class Config:
     def type(self) -> str:
         """Get organism type from options ('prokaryote' or 'eukaryote'), default 'prokaryote'."""
         return self.options.get('type', 'prokaryote')
+
+    @property
+    def force_defragment_ref(self) -> Optional[bool]:
+        """If True, merge all ref contigs before validation (unsupported workaround)."""
+        return self.options.get('force_defragment_ref', False)
 
     def __repr__(self):
         """Return a detailed string representation of the configuration."""
@@ -625,6 +630,19 @@ class ConfigManager:
             config.options['type'] = organism_type
         else:
             logger.debug("type not specified in global options")
+
+        # Parse force_defragment_ref option
+        if 'force_defragment_ref' in options:
+            force_defragment_ref = options['force_defragment_ref']
+            if not isinstance(force_defragment_ref, bool):
+                raise ConfigurationError(
+                    f"'force_defragment_ref' must be a boolean (true/false), "
+                    f"got {type(force_defragment_ref).__name__}: {force_defragment_ref}"
+                )
+            logger.info(f"Global option: force_defragment_ref={force_defragment_ref}")
+            config.options['force_defragment_ref'] = force_defragment_ref
+        else:
+            logger.debug("force_defragment_ref not specified in global options")
 
     @staticmethod
     def _merge_options(field_name: str, global_options: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:        
