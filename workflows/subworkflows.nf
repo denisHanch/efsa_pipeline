@@ -42,6 +42,7 @@ workflow mapping {
 
     emit:
         indexed_bam
+        
 }
 
 workflow sv {
@@ -105,12 +106,14 @@ workflow mapping_long {
 workflow sv_long {
     take:
         fasta
+        fai
         indexed_bam
         mapping_tag
         out_folder_name
+        
 
     main:
-        cute_sv(fasta, indexed_bam, out_folder_name) | set { cute_vcf }
+        cute_sv(fasta, fai, indexed_bam, out_folder_name) | set { cute_vcf }
         debreak(fasta, indexed_bam, out_folder_name) | set { debreak_vcf }
         sniffles(fasta, indexed_bam, out_folder_name) | set { sniffles_vcf }
 
