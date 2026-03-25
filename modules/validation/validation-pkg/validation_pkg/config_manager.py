@@ -122,7 +122,7 @@ class Config:
 
     @property
     def validation_level(self) -> str:
-        """Get validation level from options, or default to 'strict'."""
+        """Get validation level from options, or default to 'trust'."""
         return self.options.get('validation_level', 'trust')
 
     @property
