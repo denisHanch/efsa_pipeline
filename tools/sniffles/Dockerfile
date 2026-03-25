@@ -1,6 +1,8 @@
 # First stage
 FROM python:3.10-slim AS builder
 
+ARG SNIFFLES_VERSION=2.7.3
+
 RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
@@ -10,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install --upgrade pip
 
-RUN pip wheel sniffles --no-cache-dir -w /wheels
+RUN pip wheel sniffles==${SNIFFLES_VERSION} --no-cache-dir -w /wheels
 
 # Second stage: Final minimal image
 FROM python:3.10-slim

@@ -1,6 +1,8 @@
 # First stage: Build the binary
 FROM python:3.10-slim AS builder
 
+ARG CUTESV_VERSION=2.1.3
+
 RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
@@ -10,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install --upgrade pip
 
-RUN pip wheel cuteSV --no-cache-dir -w /wheels
+RUN pip wheel cuteSV==${CUTESV_VERSION} --no-cache-dir -w /wheels
 
 # Second stage: Final minimal image
 FROM python:3.10-slim

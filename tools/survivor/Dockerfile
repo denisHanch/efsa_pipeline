@@ -1,6 +1,8 @@
 # First stage: Build the SURVIVOR binary
 FROM python:3.10-slim AS build
 
+ARG SURVIVOR_REF=v1.0.7
+
 RUN apt-get update && apt-get install -y \
     libbz2-dev \
     build-essential \
@@ -10,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     gcc \
  && rm -rf /var/lib/apt/lists/*
 
-RUN git clone https://github.com/fritzsedlazeck/SURVIVOR.git
+RUN git clone --branch ${SURVIVOR_REF} --depth 1 https://github.com/fritzsedlazeck/SURVIVOR.git
 WORKDIR /SURVIVOR/Debug
 RUN make
 
