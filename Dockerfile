@@ -1,4 +1,5 @@
 FROM docker:28.5.0-dind-alpine3.22
+ARG GFFREAD_REF=v0.12.7
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories && \
     apk update --no-cache --allow-untrusted
@@ -66,7 +67,7 @@ RUN apk add --no-cache gcompat libstdc++ xz-libs && \
 RUN apk add --no-cache --virtual .gffread-build-deps \
         build-base \
     && cd /tmp \
-    && git clone https://github.com/gpertea/gffread.git \
+    && git clone --branch ${GFFREAD_REF} --depth 1 https://github.com/gpertea/gffread.git \
     && cd gffread \
     && make release \
     && cp gffread /usr/local/bin/ \
