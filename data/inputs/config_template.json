@@ -49,6 +49,7 @@
     "threads": 8,
     "validation_level": "strict/trust/minimal",
     "logging_level":"DEBUG/INFO/WARNING/ERROR",
-    "type":"prokaryote/eukaryote"
+    "type":"prokaryote/eukaryote",
+    "force_defragment_ref":false
   }
 }
