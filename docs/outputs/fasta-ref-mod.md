@@ -56,17 +56,6 @@ classDef output fill:#E8F5E9,stroke:#2E7D32
 
 ## Directory Structure
 
-> **Important!**
-> To allow the pipeline to run, set `--run_syri` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
->
-> ```groovy
-> params {
->     run_syri = true
-> }
-> ```
->
-> By default, this parameter is set to `true`.
-
 This folder contains results from the **reference vs modified FASTA comparison pipeline**:
 
 ```

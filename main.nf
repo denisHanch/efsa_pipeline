@@ -29,8 +29,6 @@ def helpMessage() {
     --out_dir        Output directory                                               (default: ${params.out_dir})
     --in_dir         Input directory                                                (default: ${params.in_dir})
     --max_cpu        Maximum CPUs per process                                       (default: ${params.max_cpu})
-    --run_syri       Run reference vs modified FASTA comparison                     (default: ${params.run_syri})
-    --run_truvari    Run pairwise VCF comparisons                                   (default: ${params.run_truvari})
     --clean_work     Remove workdir after success                                   (default: ${params.clean_work})
     -with-report     Generate HTML execution report                                 (Nextflow built-in)
     -with-timeline   Produce timeline visualization                                 (Nextflow built-in)
@@ -60,7 +58,7 @@ workflow {
     def sv_tbl = Channel.empty()
 
     // reference to modified fasta comparison - assembly pipeline
-    if (params.run_syri && params.mod_fasta_avail) {
+    if (params.run_ref_x_mod) {
         if (params.contig_file_size >= 1) {
                 
             def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
@@ -72,7 +70,7 @@ workflow {
             activePipelines << ref_mod.out.sv_vcf
 
         } else {
-            log.error "No contig FASTA files found in ${params.in_dir}. Please rerun the pipeline with --run_syri false"}
+            log.error "No contig FASTA files found in ${params.in_dir}. Please rerun the pipeline with run_ref_x_mod set to false in data/valid/validated_params.json"}
     
     } else {
         sv_tbl = sv_tbl.mix(create_asm_tbl("assembly"))
@@ -91,14 +89,9 @@ workflow {
         sv_tbl = sv_tbl.mix(long_ref_pacbio.out.sv_tbl)
         activePipelines << long_ref_pacbio.out.sv_vcf
 
-        if (params.mod_fasta_avail) {
-            describePipeline("long-pacbio", "reference & modified")
-            long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "pacbio/long-mod")       
-            compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
-
-        } else {
-            describePipeline("long-pacbio", "reference only")
-        }
+        describePipeline("long-pacbio", "reference & modified")
+        long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "pacbio/long-mod")       
+        compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
     
     } else {
         sv_tbl = sv_tbl.mix(create_pacbio_tbl("pb"))
@@ -118,14 +111,9 @@ workflow {
         
         activePipelines << long_ref_ont.out.sv_vcf
 
-        if (params.mod_fasta_avail) {
-            describePipeline("long-ont", "reference & modified")
-            long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "ont/long-mod")
-            compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
-
-        } else {
-            describePipeline("long-ont", "reference only")
-        }
+        describePipeline("long-ont", "reference & modified")
+        long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "ont/long-mod")
+        compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
 
     } else {
         sv_tbl = sv_tbl.mix(create_ont_tbl("ont"))
@@ -145,19 +133,16 @@ workflow {
         sv_tbl = sv_tbl.mix(short_ref.out.sv_tbl)
         activePipelines << short_ref.out.sv_vcf
 
-        if (params.mod_fasta_avail) {
-            describePipeline("short", "reference & modified")
-            short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
-            compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
-        } else {
-            describePipeline("short", "reference only")
-        }
+        describePipeline("short", "reference & modified")
+        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
+        compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
+
     
     } else {
         sv_tbl = sv_tbl.mix(create_short_tbl("short"))
     }
 
-    if (params.run_truvari && activePipelines.size() >= 2 && params.run_syri) {
+    if (params.run_truvari && activePipelines.size() >= 2) {
         
         int comparisons = activePipelines.size() - 1
 

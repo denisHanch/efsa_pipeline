@@ -23,7 +23,7 @@ include { nanoplot; multiqc } from "../modules/qc.nf"
 include { sv_long; mapping_long; mapping_long as mapping_long_plasmid; sv_long as sv_long_plasmid }  from "../workflows/subworkflows.nf"
 include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadFastqFiles } from "../modules/logs.nf"
 include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads;get_unmapped_reads as get_unmapped_reads_plasmid } from "../modules/mapping.nf"
-include { vcf_to_table_long }  from "../modules/sv_calling.nf"
+include { samtools_index; vcf_to_table_long }  from "../modules/sv_calling.nf"
 
 def executed = false
 
@@ -40,7 +40,8 @@ workflow long_read {
         // mapping to the reference
 
         executed = true
-    
+
+        samtools_index(fasta, out_folder_name) | set { fai }
         mapping_long(fastqs, fasta, mapping_tag, out_folder_name) | set { indexed_bam }
 
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
@@ -63,7 +64,7 @@ workflow long_read {
 
         // SV calling against the reference
         if (out_folder_name == "ont/long-ref" || out_folder_name == "pacbio/long-ref") { 
-            sv_long(fasta, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
+            sv_long(fasta, fai, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
             vcf_to_table_long(mapping_tag, sv_vcf) | set { sv_tbl }
 
         } else {

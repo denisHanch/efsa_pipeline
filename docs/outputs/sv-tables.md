@@ -24,12 +24,52 @@ flowchart LR
 - Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
 - `linked_event` is the only relationship column in the final CSVs. It includes both same-type and cross-type overlaps.
 
-### Outputs overview
+### VCF Extraction and Variant Type Handling
+
+The pipeline extracts variants from VCF files using different fields depending on the source:
+
+**Assembly (syri) variants:**
+- **Variant type source:** VCF `ALT` field (e.g., DEL, DUP, INV, INS, TRANS, INVDP, CPG, CPL, SYN, etc.)
+- **Extraction command:** `bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ALT\t%ID\t%INFO/StartB\t%INFO/EndB\n'`
+- **Columns extracted:** chrom, start (POS), end (INFO/END), svtype (ALT), info_svtype (ID), start_mod (InfoStartB), end_mod (EndB)
+
+**Short-read (delly) variants:**
+- **Variant type source:** VCF `INFO/SVTYPE` field (e.g., DEL, DUP, INV, INS, TRA)
+- **Extraction command:** `bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/CHR2\t%POS2\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%QUAL\t[%RDCN]\n'`
+- **Key feature:** Includes `svlen` directly from VCF for accurate insertion/translocation lengths
+
+**Long-read (cuteSV/sniffles/debreak/SURVIVOR) variants:**
+- **Variant type source:** VCF `ID` field or `SVTYPE` in INFO
+- **Extraction command:** `bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%ID\t%INFO/SVLEN\t[%DR{1}]\t%QUAL\t%INFO/SUPP\n'`
+- **Supporting reads:** Extracted from FORMAT/DR (`DR{1}`) for long-read evidence
+- **Supporting methods:** Populated from `INFO/SUPP` and stored in `long_(ont|pacbio)_supporting_methods`
+
+### Variant Type Standardization
+
+All extracted variant types are standardized to one of six categories in `create_sv_output.py`:
+
+- `DEL` (Deletion)
+- `DUP` (Duplication)
+- `INS` (Insertion)
+- `INV` (Inversion)
+- `TRA` (Translocation) — includes TRANS, BND, CTX, and other inter-chromosomal variants
+- `RPL` (Replacement/Other) — includes SUB, SNV, SYN, HDR, and unrecognized types
+
+**Mapping strategy:**
+1. Direct lookup in `INFO_MAP` for exact type matches
+2. Token-based search for substring matches (e.g., "INVDP" contains "INV" → INV)
+3. Assembly-specific prefix patterns for syri-specific types (e.g., CPG→INS, CPL→DEL, SYN→RPL)
+4. All unmatched types default to `RPL` (replacement)
+
+This ensures all 20+ syri variant types are correctly categorized and no variants are lost during processing.
+
+---
 
 ```text
 data/outputs/tables/
 ├── csv_per_sv_summary
 │   ├── Deletions.csv
+│   ├── Duplications.csv
 │   ├── Insertions.csv
 │   ├── Inversions.csv
 │   ├── Replacements.csv
@@ -78,12 +118,12 @@ The final table in each CSV file contains one row per final structural variant (
 
 | Column name | Description |
 |---|---|
-| **event_id** | Unique identifier of the final structural variant event, such as `DEL_1` or `RPL_3`. |
+| **event_id** | Unique identifier of the final structural variant event, such as `DEL_1` or `DUP_2`. |
 | **chrom** | Chromosome where the SV is located (VCF `CHROM`). |
-| **std_svtype** | Standardized SV type harmonized across pipelines. Current values are `DEL`, `INS`, `RPL`, `INV`, and `TRA`. |
+| **std_svtype** | Standardized SV type harmonized across pipelines. Current values are `DEL`, `DUP`, `INS`, `RPL`, `INV`, and `TRA`. |
 | **event_start** | **Most confident overlap start coordinate** of the clustered SV calls. Calculated as the maximum of all start coordinates across the cluster members. This represents the rightmost (most conservative) start position where all source pipelines agree.  |
 | **event_end** | **Most confident overlap end coordinate** of the clustered SV calls. Calculated as the minimum of all end coordinates across the cluster members. This represents the leftmost (most conservative) end position where all source pipelines agree. |
-| **event_length_bp** | **Length of the representative event region**, calculated differently based on SV type. **For INS (insertions only)**: the minimum `svlen` value reported across all source pipelines (recommended for precise insertion lengths from VCF headers). **For all other types (DEL, RPL, INV, TRA)**: calculated as `event_end - event_start + 1`, representing the length of the consensus overlapping interval. This dual approach ensures insertions retain precise reported lengths while other variation types use the most conservative coordinate-based calculation. |
+| **event_length_bp** | **Length of the representative event region**, derived from `svlen` (preferred) or calculated from coordinates as fallback. All types (DEL, DUP, INS, RPL, INV, TRA) use `svlen` directly when available from the VCF. When `svlen` is missing: **Interval types (DEL, DUP, INV, RPL):** length derived from `event_end - event_start + 1`. **Point types (INS, TRA):** set to `0` (no interval). The `event_length_bp` column in the final row shows the minimum valid `svlen` across all source pipelines for that event. |
 | **support_score** | Number of input sources contributing to the final event row. In the current implementation this is the count of non-empty calls among `asm`, `long_ont`, `long_pacbio`, and `short`. |
 | **percentage_overlap** | Comma-separated overlap percentages collected during same-type event clustering. Each value is calculated during one clustering merge step as `(intersection length / longer interval length) × 100`. This field is empty when the final event was built from a single record only. |
 | **linked_event** | Semicolon-separated list of overlapping final SV events on the same chromosome. This single column includes both same-type and cross-type links. Each linked entry has the format `<event_id> (<std_svtype>, <chrom>:<start>-<end>, <relation>)`. Standard relation values are `exact_coordinates`, `overlap`, `nested_in`, and `contains`, always from the point of view of the current row. If `--cross_type_tol` is set above `0`, near-identical boundaries may also be reported as `same_coordinates_within_<N>bp`. Leave empty when no linked events are found. |
@@ -106,35 +146,56 @@ The examples below use simplified coordinates for clarity.
 |---|---|
 | **long_(ont\|pacbio)_supporting_reads** | Number of Oxford Nanopore or PacBio reads supporting the structural variant (VCF `FORMAT` field `DR`, when present). |
 | **long_(ont\|pacbio)_supporting_methods** | Number or label of long-read variant calling methods supporting the structural variant, derived from the TSV summary when available. |
+| **short_chr2** | Partner chromosome for short-read translocation/breakend calls (from short-read TSV `chr2`, extracted from VCF `INFO/CHR2`). Empty for non-translocation short-read events or when unavailable. |
+| **short_pos2** | Partner breakpoint position for short-read translocation/breakend calls (from short-read TSV `pos2`, extracted from VCF `INFO/POS2`). Empty for non-translocation short-read events or when unavailable. |
 | **short_reads_copy_number_estimate** | Estimated copy number derived from short-read depth information (VCF `FORMAT` field `RDCN`). |
 
 ### Source-specific length columns and calculation strategy
 
-Each pipeline (assembly, long-read ONT, long-read PacBio, short-read) provides its own length estimate in the final table:
+#### Structural Variant Type Conventions by Data Source
 
-- **asm_length** — Length reported by the assembly-based pipeline
-- **long_ont_length** — Length reported by Oxford Nanopore long-read calling
-- **long_pacbio_length** — Length reported by PacBio long-read calling  
-- **short_length** — Length reported by short-read variant calling
+**Short-read variants (delly):**
+- `DEL`, `DUP`, `INV`: reported as real intervals with `start < end`
+- `INS`: reported as a single position (`start == end`) representing the insertion point
+- `TRA`: reported as a breakpoint (`start == end`) representing the breakpoint position
+- For `INS` and `TRA`, the inserted/translocated sequence length is provided in the `svlen` field, not from coordinate difference
 
-**Length calculation logic (per source):**
+**Assembly variants (syri):**
+- Syri uses the VCF `ALT` field for variant types: `DEL`, `INS`, `INV`, `DUP`, `TRANS` (translocation), `CPG` (copy gain), `CPL` (copy loss), `SYN` (syntenic), and alignment/inverted variants
+- These are mapped to standardized types: `DEL`, `INS`, `INV`, `DUP`, `TRA`, `RPL` (replacements)
+- Coordinates extracted as real intervals from VCF `POS` and `INFO/END` fields
+- Breakpoint information available in `INFO/StartB` and `INFO/EndB` (stored as `asm_start_mod` and `asm_end_mod`)
 
-The calculation of source-specific lengths varies by SV type to balance precision with robustness:
+**Long-read variants (cuteSV, sniffles, debreak, SURVIVOR merged):**
+- Reported with `SVTYPE` in INFO field
+- Handled similarly to short-read variants with clustering and best-record selection
 
-**For INS (insertions):**
-- Uses `svlen` field directly from the VCF/TSV when available (most precise representation of insertion length)
-- Falls back to `NaN` if `svlen` is not provided
-- Rationale: start and end coordinates remains the same as it is reported in the reference genome that's why the SV length for insertion is taken directly from VCF file.
+#### Length Derivation Logic
 
-**For all other types (DEL, RPL, INV, TRA):**
-- Calculated as `end - start + 1` based on the reported breakpoint coordinates  
-- Falls back to `NaN` if coordinates are unavailable
-- Rationale: For these variation types, coordinate-based length is the standard biological measure
+The `create_sv_output.py` script handles `svlen` consistently across all sources:
 
-**Example:**
-- **Insertion:** VCF reports `SVLEN=50` → `long_ont_length = 50` (uses svlen)
-- **Deletion:** VCF reports `START=1000, END=1500` → `asm_length = 501` (uses 1500 - 1000 + 1)
-- **Deletion with insertion:** VCF reports coordinates only, no svlen → `short_length = (end - start + 1)` (uses coordinates)
+1. **If `svlen` is provided in the input TSV/VCF**: Use it directly (most reliable representation of length)
+2. **If `svlen` is missing**:
+   - **For interval variants (DEL, DUP, INV, RPL):** Derive `svlen = end - start + 1`
+   - **For point variants (INS, TRA):** Set `svlen = 0` (no interval, length is semantic information in the variant call)
+   - **For unknown types**: Attempt coordinate-based derivation, fallback to `None`
+
+This ensures accurate length reporting regardless of variant type and source pipeline.
+
+#### Event Length Calculation for Final Rows
+
+In the final CSV tables:
+- **event_length_bp** is computed as the minimum valid `svlen` across all source records in the clustered event
+- If no sources provide `svlen`, `event_length_bp` is `NaN`
+- This conservative approach ensures reported lengths represent the smallest (most confident) size estimate
+
+Each source pipeline registers its own length in the table:
+- **asm_length** — Assembly pipeline svlen
+- **long_ont_length** — Oxford Nanopore long-read svlen
+- **long_pacbio_length** — PacBio long-read svlen
+- **short_length** — Short-read svlen
+
+---
 
 ### Assembly coordinates for translocations (asm_start_mod, asm_end_mod)
 
@@ -143,7 +204,7 @@ Two additional assembly-specific columns appear **only in Translocations.csv**:
 - **asm_start_mod** — Start position of the translocation event in the modified (non-reference) genome
 - **asm_end_mod** — End position of the translocation event in the modified (non-reference) genome
 
-These columns are automatically removed from all non-translocation tables (Insertions, Deletions, Replacements, Inversions) to maintain table clarity and avoid sparse empty columns.
+These columns are automatically removed from all non-translocation tables (Insertions, Deletions, Duplications, Replacements, Inversions) to maintain table clarity and avoid sparse empty columns.
 
 **Rationale:** Translocations require two coordinate pairs to describe both breakpoint locations. The primary coordinates (`event_start`, `event_end`) mark the position in the reference genome (origin breakpoint), while these modifier coordinates mark the same event's position in the modified genome (destination breakpoint).
 

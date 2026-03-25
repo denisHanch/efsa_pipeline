@@ -21,6 +21,7 @@
       - [`unmapped_stats/`](#unmapped_stats)
   - [Graphical Representation of the Pipeline](#graphical-representation-of-the-pipeline)
   - [Generation of per structural variation (SV) type CSV tables](#generation-of-per-structral-variation-sv-type-csv-tables)
+- [Changelog](#changelog)
       
 
 # Quick Start
@@ -112,6 +113,31 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
    ```
 
 # Input Validation
+
+## Input Scenarios and Preprocessing Logic
+
+The validation module not only verifies input formats, but also determines how genome assemblies are interpreted and preprocessed before entering the pipeline.
+
+Depending on the structure of `ref.fa` and `mod.fa`, different strategies are applied for:
+- chromosome and plasmid separation
+- contig handling
+- usage of minimap2 for sequence mapping
+- preparation of files in `data/valid/`
+
+The following table summarizes all supported scenarios:
+
+| #     | Scenario                                                  | Type (`config.json`)       | Input Structure                                                                                | Plasmids Handling                                                                                                                                               | `run_ref_x_mod` | **minimap2 Mapping**                                              | mod.fa Processing                                                                                          | Modules Run          | Output in `data/valid/`                                                      |
+| ----- | --------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------- |
+| **1** | Single contig + plasmids                      | `prokaryote`               | **ref.fa:** 1 sequence (+ optional plasmids) <br> **mod.fa:** 1 sequence (+ optional plasmids) | In **ref.fa**: <br> - Longest sequence → chromosome <br> - Remaining → plasmids <br><br> In **mod.fa**: plasmids = sequences **not mapped** to reference    | True            | **Used** to identify unmapped regions (plasmids in mod.fa)        | Reduced to **1 contig** (chromosome only)                                                                  | All modules          | `ref.fa`, `mod.fa` (1 contig) <br> `*_contig_0.fasta` <br> `*_plasmid.fasta` |
+| **2** | Fragmented assembly (below limit)             | `prokaryote`               | **ref.fa:** 1 sequence <br> **mod.fa:** multiple sequences (≤ limit)                           | In reference: <br> - Longest = chromosome <br> - Rest = plasmids <br><br> In **mod.fa**: <br> - Unmapped sequences → plasmids <br> - Mapped sequences → contigs | True            | **Used** to split mod.fa into mapped contigs vs unmapped plasmids | - Split into individual contigs (`*_contig.fasta`) <br> - `mod.fa` becomes multifasta **without plasmids** | All modules          | `ref.fa`, `mod.fa` + contig set <br> `*_contig.fasta` <br> `*_plasmid.fasta` |
+| **3** | Fragmented assembly (above limit)             | `prokaryote`               | **ref.fa:** 1 sequence <br> **mod.fa:** multiple sequences (> limit)                           | In reference: <br> - Longest = chromosome <br> - Rest → `*ref_plasmid.fasta` <br><br> In **mod.fa**: no plasmid detection                                       | False           | **Not used**                                                      | No processing (mod.fa copied as-is)                                                                        | Mapping-only modules | `ref.fa`, `mod.fa` (copied) <br> `*_plasmid.fasta`                           |
+| **4** | Multiple sequences in reference  | `prokaryote` / `eukaryote` | **ref.fa:** multiple sequences (non-plasmid) <br> **mod.fa:** one or more sequences            | No plasmids considered                                                                                                                                          | False           | **Not used**                                                      | No processing (files copied as-is)                                                                         | Mapping-only modules | `ref.fa`, `mod.fa` (copied)                                                  |
+
+> **Important!**
+> 
+> By default the limit (`n_sequence_limit`) mentioned in the table above set to 5 for both reference and assembly fasta files.
+>
+
 
 > **Important!**
 > 
@@ -316,10 +342,10 @@ flowchart TD
 
     %% Reference vs Modified pipeline
     subgraph RefVsMod["Reference vs Modified Pipeline"]
-        ref_fasta --> run_syri_decision{"--run_syri?"}
-        mod_fasta --> run_syri_decision
-        run_syri_decision -->|Yes| nucmer["NUCmer Alignment"]
-        run_syri_decision -->|No| skip_syri["Skip SYRI"]
+        ref_fasta --> run_ref_x_mod_decision{"--run_ref_x_mod?"}
+        mod_fasta --> run_ref_x_mod_decision
+        run_ref_x_modx_mod_decision -->|Yes| nucmer["NUCmer Alignment"]
+        run_ref_x_modx_mod_decision -->|No| skip_syri["Skip SYRI"]
         nucmer --> delta_filter["Delta Filter"]
         delta_filter --> show_coords["Show Coords"]
         show_coords --> syri_vcf["VCF Output (assemblysyri)"]
@@ -381,8 +407,6 @@ nextflow run main.nf --max_cpu $(nproc) -resume
 | `--in_dir`     | Input directory                                                   | `data/valid`            |
 | `--out_dir`    | Output directory                                                  | `data/outputs`          |
 | `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
-| `--run_truvari`| Enables filtering of VCFs based on truth set                      | `false`                 |
-| `--run_syri`   | Enables comparison between the assembly FASTA and reference FASTA | `true`                  |
 | `--clean_work` | Remove work directory after successful run                        | `true`                  |
 | `--help`       | Display help message                                              | –                       |
 
@@ -413,6 +437,9 @@ flowchart LR
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
 - Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
 - `linked_event` is the only relationship column in the final CSVs. It includes both same-type and cross-type overlaps.
+- **DUP (Duplication) is now a separate SV type** — previously mapped to Replacements, duplications are now preserved as a distinct variant category with their own CSV table
+- **All variant types from all sources are properly extracted and standardized** — assembly (syri), short-read (delly), and long-read variants are correctly identified and reported without loss
+- **Length calculations handle variant type conventions correctly** — insertions and translocations (point variants with start==end) are properly sized using svlen; interval variants use coordinate-based fallback when needed
 
 ### Outputs overview
 
@@ -420,6 +447,7 @@ flowchart LR
 data/outputs/tables/
 ├── csv_per_sv_summary
 │   ├── Deletions.csv
+│   ├── Duplications.csv
 │   ├── Insertions.csv
 │   ├── Inversions.csv
 │   ├── Replacements.csv
@@ -430,6 +458,26 @@ data/outputs/tables/
     ├── mab-pb_sv_summary.tsv
     └── map-ont_sv_summary.tsv
 ```
+
+### Recent Improvements (SV Output Processing)
+
+The SV output processing pipeline has been enhanced to handle all structural variant types correctly and comprehensively:
+
+**Variant Type Support:**
+- **DUP (Duplication)** is now a separate, distinct SV type. Previously, duplications were merged with other replacements; now they have their own dedicated `Duplications.csv` table for improved variant analysis and interpretation.
+- **All 20+ syri variant types** (DEL, INS, INV, DUP, TRANS, INVDP, CPG, CPL, SYN, etc.) are correctly mapped and reported without loss
+- **Short-read variants** (delly: DEL, DUP, INV, INS, TRA) are properly extracted from `INFO/SVTYPE` field
+- **Assembly variants** (syri) are correctly extracted from the VCF `ALT` field (not from ID field)
+
+**Length Handling:**
+- **Point variant semantics:** Insertions (INS) and translocations (TRA) with `start == end` are now correctly handled:
+  - Coordinates are preserved as reported (representing insertion point or breakpoint)
+  - Length is derived from the `svlen` field when available
+  - When `svlen` is missing, it defaults to 0 (point variant) rather than calculated from coordinates
+- **Interval variants:** DEL, DUP, INV, RPL use coordinate-based fallback when `svlen` is missing
+- **Consistent derivation:** svlen is intelligently derived from coordinates based on variant type, ensuring accurate reporting across all sources
+
+**For comprehensive documentation** on variant type conventions, length calculations, and output table structure, see [docs/outputs/sv-tables.md](docs/outputs/sv-tables.md).
 
 ### Example command
 
@@ -468,9 +516,9 @@ The final table in each CSV file contains one row per final structural variant (
 
 | Column name | Description |
 |---|---|
-| **event_id** | Unique identifier of the final structural variant event, such as `DEL_1` or `RPL_3`. |
+| **event_id** | Unique identifier of the final structural variant event, such as `DEL_1` or `DUP_2`. |
 | **chrom** | Chromosome where the SV is located (VCF `CHROM`). |
-| **std_svtype** | Standardized SV type harmonized across pipelines. Current values are `DEL`, `INS`, `RPL`, `INV`, and `TRA`. |
+| **std_svtype** | Standardized SV type harmonized across pipelines. Current values are `DEL`, `DUP`, `INS`, `RPL`, `INV`, and `TRA`. |
 | **event_start** | **Most confident overlap start coordinate** of the clustered SV calls. Calculated as the maximum of all start coordinates across the cluster members. This represents the rightmost (most conservative) start position where all source pipelines agree.  |
 | **event_end** | **Most confident overlap end coordinate** of the clustered SV calls. Calculated as the minimum of all end coordinates across the cluster members. This represents the leftmost (most conservative) end position where all source pipelines agree. |
 | **event_length_bp** | **Length of the representative event region**, calculated differently based on SV type. **For INS (insertions only)**: the minimum `svlen` value reported across all source pipelines (recommended for precise insertion lengths from VCF headers). **For all other types (DEL, RPL, INV, TRA)**: calculated as `event_end - event_start + 1`, representing the length of the consensus overlapping interval. This dual approach ensures insertions retain precise reported lengths while other variation types use the most conservative coordinate-based calculation. |
@@ -496,6 +544,8 @@ The examples below use simplified coordinates for clarity.
 |---|---|
 | **long_(ont\|pacbio)_supporting_reads** | Number of Oxford Nanopore or PacBio reads supporting the structural variant (VCF `FORMAT` field `DR`, when present). |
 | **long_(ont\|pacbio)_supporting_methods** | Number or label of long-read variant calling methods supporting the structural variant, derived from the TSV summary when available. |
+| **short_chr2** | Partner chromosome for short-read translocation/breakend calls (from short-read TSV `chr2`, extracted from VCF `INFO/CHR2`). Empty for non-translocation short-read events or when unavailable. |
+| **short_pos2** | Partner breakpoint position for short-read translocation/breakend calls (from short-read TSV `pos2`, extracted from VCF `INFO/POS2`). Empty for non-translocation short-read events or when unavailable. |
 | **short_reads_copy_number_estimate** | Estimated copy number derived from short-read depth information (VCF `FORMAT` field `RDCN`). |
 
 ### Source-specific length columns and calculation strategy
@@ -509,22 +559,10 @@ Each pipeline (assembly, long-read ONT, long-read PacBio, short-read) provides i
 
 **Length calculation logic (per source):**
 
-The calculation of source-specific lengths varies by SV type to balance precision with robustness:
-
-**For INS (insertions):**
-- Uses `svlen` field directly from the VCF/TSV when available (most precise representation of insertion length)
+**For all types (DEL, RPL, INV, TRA, INS):**
+- Uses `svlen` field directly from the VCF/TSV when available (most precise representation of the length)
 - Falls back to `NaN` if `svlen` is not provided
-- Rationale: start and end coordinates remains the same as it is reported in the reference genome that's why the SV length for insertion is taken directly from VCF file.
-
-**For all other types (DEL, RPL, INV, TRA):**
-- Calculated as `end - start + 1` based on the reported breakpoint coordinates  
-- Falls back to `NaN` if coordinates are unavailable
-- Rationale: For these variation types, coordinate-based length is the standard biological measure
-
-**Example:**
-- **Insertion:** VCF reports `SVLEN=50` → `long_ont_length = 50` (uses svlen)
-- **Deletion:** VCF reports `START=1000, END=1500` → `asm_length = 501` (uses 1500 - 1000 + 1)
-
+- Rationale: start and end coordinates remains the same for insertions as it is reported in the reference genome that's why the SV length is taken directly from VCF file.
 
 ### Assembly coordinates for translocations (asm_start_mod, asm_end_mod)
 
@@ -725,13 +763,13 @@ After successful pipeline execution, the outputs are organized as follows:
 
 ```
 data/outputs
-├── fasta_ref_mod       → Results from reference vs modified FASTA comparison
+├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod set to true in `data/validation/validated_params.json`)
 ├── illumina            → Short-read (Illumina) mapping results
 ├── logs                → Pipeline logs and Nextflow reports
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
 ├── tables              → Per-SV csv tables
-├── truvari             → Variant comparison results from Truvari
+├── truvari             → Variant comparison results from Truvari (if run_truvari set to true in `data/validation/validated_params.json`)
 └── unmapped_stats      → Summary statistics of unmapped reads for each workflow
 
 ```
@@ -818,11 +856,11 @@ fasta_ref_mod/
 ## Output Files
 
 > **Important!**
-> To allow the pipeline to run, set `--run_syri` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
+> To allow the pipeline to run, set `--run_ref_x_mod` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
 >
 > ```groovy
 > params {
->     run_syri = true
+>     run_ref_x_mod = true
 > }
 > ```
 >
@@ -1293,13 +1331,7 @@ The table below summarises all tools used within the pipeline:
 The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is outputed by  pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sort_vcf), indexing them (index_vcf), and then performing the Truvari comparison to generate the final comparison results.
 
 > **Important!**
-> To allow the pipeline to run, set `--run_truvari` to `true` when launching the pipeline, or enable it in the `nextflow.config` file under the `params` section:
->
-> ```groovy
-> params {
->     run_truvari = true
-> }
-> ```
+> To allow the pipeline to run, set `--run_truvari` to `true` when launching the pipeline, or enable it in the `data/validation/validated_params.json` file:
 >
 > By default, this parameter is set to `false`.
 

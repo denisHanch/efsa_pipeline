@@ -129,11 +129,9 @@ Specifies a genome or plasmid file.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `filename` | string | — | Path to genome file (relative to config) |
-| `validation_level` | string | global / `"strict"` | Per-file validation level override |
+| `validation_level` | string | global / `"trust"` | Per-file validation level override |
 | `threads` | integer | global / auto | Per-file thread count override |
-| `n_sequence_limit` | integer | `5` (modified genome only) | Maximum allowed number of sequences. Only applies to `mod_genome_filename` — ignored with a warning on `ref_genome_filename`. Validation fails if the genome contains more sequences than this limit (assembly too fragmented). Set higher for highly fragmented assemblies. The file is still copied to `data/valid/` even when the limit is exceeded, but the pipeline will not run SyRI comparison. |
-
-> **Note:** `n_sequence_limit` is **not allowed on the reference genome**. If set, a warning is logged and the value is ignored. Reference genomes are not subject to sequence count validation.
+| `n_sequence_limit` | integer | `5` | Maximum allowed number of sequences. Applies to `ref_genome_filename` and `mod_genome_filename` only — **ignored with a warning on plasmids**. When the genome contains more sequences than this limit, the assembly is considered too fragmented: a warning is logged, the file is copied to `data/valid/` as-is, and the pipeline will not run SyRI or ref-vs-mod comparison. Set higher for highly fragmented assemblies. |
 
 **Example:**
 ```json
@@ -227,9 +225,12 @@ These settings customize validation behavior without modifying code.
 - `threads`: Number of threads for parallel processing (positive integer, default: auto-detect)
   - When omitted or set to `null`, the system auto-detects based on available CPU cores
   - System warns if threads exceed available cores
-- `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (default: `"strict"`)
+- `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (default: `"trust"`)
 - `logging_level`: `"DEBUG"`, `"INFO"`, `"WARNING"`, or `"ERROR"` (default: `"INFO"`)
   - Controls console logging verbosity
+- `type`: Organism type — `"prokaryote"` or `"eukaryote"`
+  - When set to `"eukaryote"`, all genome files are copied to `data/valid/` without further processing and the pipeline will not run SyRI or ref-vs-mod comparison (assembly too complex for inter-genome alignment)
+  - When set to `"prokaryote"` (or omitted), normal validation and `n_sequence_limit` checks apply
 
 **Example:**
 ```json
@@ -241,7 +242,8 @@ These settings customize validation behavior without modifying code.
   "options": {
     "threads": 8,
     "validation_level": "trust",
-    "logging_level": "DEBUG"
+    "logging_level": "DEBUG",
+    "type": "prokaryote"
   }
 }
 ```
@@ -253,13 +255,14 @@ These settings customize validation behavior without modifying code.
 - Invalid threads → `ConfigurationError` (e.g., negative numbers)
 - Invalid validation_level → `ConfigurationError` (e.g., `"invalid_level"`)
 - Invalid logging_level → `ConfigurationError` (e.g., `"verbose"`, must be DEBUG/INFO/WARNING/ERROR/CRITICAL)
+- Invalid type → `ConfigurationError` (e.g., `"bacteria"`, must be `"prokaryote"` or `"eukaryote"`)
 
 ### File-Level Settings
 
 Override global options for specific files by adding settings to individual file entries:
 - `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (overrides global)
 - `threads`: Number of threads for compression (int, overrides global)
-- `n_sequence_limit`: Maximum number of sequences allowed in a genome/plasmid file (int, **modified genome only**, default: `5`). Not applicable to reference genome — will be ignored with a warning if set there.
+- `n_sequence_limit`: Maximum number of sequences allowed in a genome file (int, default: `5`). Applies to `ref_genome_filename` and `mod_genome_filename` only; ignored with a warning on plasmids.
 
 **Warnings:** When a file-level setting overrides a global option, a WARNING is logged:
 ```
@@ -292,25 +295,24 @@ Complete example with all optional fields and global options:
   "ref_genome_filename": {
     "filename": "ref.gbk",
     "validation_level": "strict",
-    "threads": 8
+    "threads": 8,
+    "n_sequence_limit": 5
   },
   "mod_genome_filename": {
     "filename": "mod.fasta.gz",
     "validation_level": "strict",
     "threads": 8,
-    "n_sequence_limit": 50
+    "n_sequence_limit": 5
   },
   "ref_plasmid_filename": {
     "filename": "plasmid_ref.gbk",
     "validation_level": "strict",
-    "threads": 8,
-    "n_sequence_limit": 5
+    "threads": 8
     },
   "mod_plasmid_filename": {
     "filename": "plasmid_mod.fasta",
     "validation_level": "strict",
-    "threads": 8,
-    "n_sequence_limit": 5
+    "threads": 8
     },
   "reads": [
     {
@@ -345,7 +347,8 @@ Complete example with all optional fields and global options:
   "options": {
     "threads": 8,
     "validation_level": "strict",
-    "logging_level":"INFO"
+    "logging_level": "INFO",
+    "type": "prokaryote"
   }
 }
 ```
