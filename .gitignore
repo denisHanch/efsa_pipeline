@@ -80,6 +80,9 @@ dmypy.json
 # Ignore contents of the data dirs, but keep the folders themselves
 data/inputs/*
 !data/inputs/config_template.json
+!data/inputs/test/
+!data/inputs/test/**
+
 data/valid/*
 data/outputs/*
 data/valid/*

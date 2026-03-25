@@ -1,0 +1,155 @@
+name: "CI: Nextflow Integration Test"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "main.nf"
+      - "nextflow.config"
+      - "nextflow_schema.json"
+      - "workflows/**"
+      - "modules/**"
+      - ".github/workflows/nextfow-run.yaml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "main.nf"
+      - "nextflow.config"
+      - "nextflow_schema.json"
+      - "workflows/**"
+      - "modules/**"
+      - ".github/workflows/nextfow-run.yaml"
+  workflow_dispatch:
+
+concurrency:
+  group: "nextflow-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java (required by Nextflow)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Nextflow
+        uses: nf-core/setup-nextflow@v2
+        with:
+          version: ">=24.09.0"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-validation-${{ hashFiles('modules/validation/validation-pkg/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-validation-
+
+      - name: Install validation package
+        run: pip install ./modules/validation/validation-pkg/
+
+      - name: Create test config (genomes + illumina reads)
+        run: |
+          cat > data/inputs/config.json << 'EOF'
+          {
+            "ref_genome_filename": {
+              "filename": "data/inputs/test/ref.fa",
+              "validation_level": "minimal",
+              "n_sequence_limit": 5,
+              "threads": 2
+            },
+            "mod_genome_filename": {
+              "filename": "data/inputs/test/mod.fa",
+              "validation_level": "minimal",
+              "n_sequence_limit": 5,
+              "threads": 2
+            },
+            "reads": [
+              {
+                "directory": "data/inputs/test/illumina",
+                "ngs_type": "illumina",
+                "validation_level": "minimal",
+                "threads": 2
+              }
+            ],
+            "options": {
+              "threads": 2,
+              "validation_level": "minimal",
+              "logging_level": "INFO",
+              "type": "prokaryote"
+            }
+          }
+          EOF
+
+      - name: Run validation
+        run: |
+          rm -rf data/valid/*
+          python3 ./modules/validation/main.py ./data/inputs/config.json
+
+      - name: Verify validation outputs
+        run: |
+          echo "--- Validated params ---"
+          cat data/valid/validated_params.json
+          echo ""
+          echo "--- Valid directory contents ---"
+          find data/valid/ -type f | sort
+
+      - name: Run Nextflow pipeline
+        run: |
+          nextflow run main.nf \
+            -params-file data/valid/validated_params.json \
+            --max_cpu 2 \
+            -resume
+        env:
+          NXF_ANSI_LOG: "false"
+
+      - name: Verify pipeline outputs
+        run: |
+          echo "--- Output directory ---"
+          find data/outputs/ -type f | sort
+
+          # Check that the SV summary table was produced
+          if ls data/outputs/*sv* 1>/dev/null 2>&1 || ls data/outputs/**/*sv* 1>/dev/null 2>&1; then
+            echo "✅ SV output files found"
+          else
+            echo "⚠️  No SV output files found (may be expected depending on data)"
+          fi
+
+          # Check that log files were produced
+          if [ -f data/outputs/logs/report.html ]; then
+            echo "✅ Nextflow report generated"
+          else
+            echo "❌ Nextflow report missing"
+            exit 1
+          fi
+
+          if [ -f data/outputs/logs/timeline.html ]; then
+            echo "✅ Nextflow timeline generated"
+          else
+            echo "❌ Nextflow timeline missing"
+            exit 1
+          fi
+
+      - name: Upload pipeline reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextflow-reports
+          path: |
+            data/outputs/logs/report.html
+            data/outputs/logs/timeline.html
+            .nextflow.log
+          retention-days: 14
