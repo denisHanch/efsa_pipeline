@@ -1,6 +1,9 @@
 # First stage: Build the debreak binary
 FROM python:3.10-slim AS builder
 
+ARG PYSAM_VERSION=0.23.3
+ARG DEBREAK_REF=v1.2
+
 RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
@@ -11,10 +14,10 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install --upgrade pip
 
-RUN pip wheel pysam --no-cache-dir -w /wheels
+RUN pip wheel pysam==${PYSAM_VERSION} --no-cache-dir -w /wheels
 
 WORKDIR /build
-RUN git clone https://github.com/Maggi-Chen/DeBreak.git
+RUN git clone --branch ${DEBREAK_REF} --depth 1 https://github.com/Maggi-Chen/DeBreak.git
 
 # Second stage: Final minimal image
 FROM python:3.10-slim

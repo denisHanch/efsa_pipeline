@@ -88,6 +88,7 @@ process cute_sv {
 
     input:
     each path(fasta_file)
+    each path(fai)
     tuple val(pair_id), path(bam_file), path(bam_index) 
     val out_folder_name
 
@@ -98,7 +99,7 @@ process cute_sv {
     script:
     """
     mkdir ${pair_id}_out
-    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t ${params.max_cpu}
+    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t 1
     """
 }
 
@@ -189,8 +190,8 @@ process vcf_to_table_asm {
     """
     set -euxo pipefail
 
-    echo -e "chrom\tstart\tend\tsvtype\tstart_mod\tend_mod" > "${name}_sv_summary.tsv"
-    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/StartB\t%INFO/EndB\n' "${vcf}" >> "${name}_sv_summary.tsv"
+    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tstart_mod\tend_mod" > "${name}_sv_summary.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ALT\t%ID\t%INFO/StartB\t%INFO/EndB\n' "${vcf}" >> "${name}_sv_summary.tsv"
     """
 }
 
@@ -208,8 +209,8 @@ process vcf_to_table_short {
     """
     set -euxo pipefail
 
-    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsvlen\tsupporting_reads\tscore\tRDCN" > "${name}_short_sv_summary.tsv"
-    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%QUAL\t[%RDCN]\n' "${vcf}"  >> "${name}_short_sv_summary.tsv"
+    echo -e "chrom\tstart\tend\tsvtype\tchr2\tpos2\tinfo_svtype\tsvlen\tsupporting_reads\tscore\tRDCN" > "${name}_short_sv_summary.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/CHR2\t%POS2\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%QUAL\t[%RDCN]\n' "${vcf}"  >> "${name}_short_sv_summary.tsv"
     """
 }
 
@@ -230,14 +231,8 @@ process vcf_to_table_long {
 
     output="${pair_id}_${tag}_sv_summary.tsv"
 
-    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsvlen\tsupporting_methods\tscore\tsupporting_reads" > "\${output}"
-    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ID\t%INFO/SVTYPE\t%INFO/SVLEN\t%INFO/SUPP\t%QUAL\t[%DR{1}\t]\n' "${vcf}" | awk -F '\t' '{
-    sum = 0;
-    for(i=9; i<=NF; i++){
-        if(\$i != "." && \$i != "") sum += (\$i + 0);
-    }
-    print \$1"\t"\$2"\t"\$3"\t"\$4"\t"\$5"\t"\$6"\t"\$7"\t"\$8"\t"sum;
-    }' >> "\${output}"
+    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsvlen\tsupporting_reads\tscore\tsupporting_methods" > "\${output}"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%ID\t%INFO/SVLEN\t[%DR{1}]\t%QUAL\t%INFO/SUPP\n' "${vcf}" >> "\${output}"
     """
 }
 

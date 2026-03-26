@@ -1,4 +1,5 @@
 FROM docker:28.5.0-dind-alpine3.22
+ARG GFFREAD_REF=v0.12.7
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories && \
     apk update --no-cache --allow-untrusted
@@ -48,11 +49,25 @@ RUN apk add --no-cache --virtual .minimap2-build-deps \
     && rm -rf /tmp/minimap2-2.28 \
     && apk del .minimap2-build-deps
 
+# Install bedtools by extracting directly from Debian package (no apt/GPG needed; gcompat handles glibc)
+RUN apk add --no-cache dpkg && \
+    cd /tmp && \
+    curl -L "http://ftp.debian.org/debian/pool/main/b/bedtools/bedtools_2.30.0+dfsg-3_amd64.deb" -o bedtools.deb && \
+    dpkg-deb -x bedtools.deb bedtools-pkg && \
+    mv bedtools-pkg/usr/bin/bedtools /usr/local/bin/ && \
+    rm -rf /tmp/bedtools.deb /tmp/bedtools-pkg && \
+    apk del dpkg
+
+# Install bedtools glibc compatibility libs
+RUN apk add --no-cache gcompat libstdc++ xz-libs && \
+    ln -sf /usr/lib/libbz2.so.1 /usr/lib/libbz2.so.1.0
+
+
 # Build and install gffread from source (not available in Alpine repos)
 RUN apk add --no-cache --virtual .gffread-build-deps \
         build-base \
     && cd /tmp \
-    && git clone https://github.com/gpertea/gffread.git \
+    && git clone --branch ${GFFREAD_REF} --depth 1 https://github.com/gpertea/gffread.git \
     && cd gffread \
     && make release \
     && cp gffread /usr/local/bin/ \

@@ -61,10 +61,6 @@
       "type": "boolean",
       "default": false
     },
-    "run_syri": {
-      "type": "boolean",
-      "default": false
-    },
     "run_illumina": {
       "type": "boolean",
       "default": false
@@ -90,16 +86,6 @@
     "mod_fasta_validated": {
       "type": "string",
       "format": "file",
-      "hidden": true
-    },
-    "ref_fasta_avail": {
-      "type": "boolean",
-      "default": false,
-      "hidden": true
-    },
-    "mod_fasta_avail": {
-      "type": "boolean",
-      "default": false,
       "hidden": true
     }
   }

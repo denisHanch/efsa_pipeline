@@ -8,13 +8,13 @@ The validation module supports three validation levels to balance thoroughness a
 
 | Level | Parsing | Validation | Edits | Output | Speed | Use Case |
 |-------|---------|------------|-------|--------|-------|----------|
-| **strict** (default) | All data | All data | All applied | BioPython write | Slowest | Structure validation sequence by sequence, statistics gathering |
-| **trust** | All data (genome)<br>First record only (reads) | First sequence only | All applied (genome)<br>None (reads) | BioPython write (genome)<br>File copy (reads) | Fast | Trust data, adapt file coding, name and location |
+| **strict** | All data | All data | All applied | BioPython write | Slowest | Structure validation sequence by sequence, statistics gathering |
+| **trust** (default) | All data (genome)<br>First record only (reads) | First sequence only | All applied (genome)<br>None (reads) | BioPython write (genome)<br>File copy (reads) | Fast | Trust data, adapt file coding, name and location |
 | **minimal** | None | None | None | File copy | Fastest | Rename and move files to meet the requirements |
 
 ## Level Details
 
-### Strict Mode (Default)
+### Strict Mode
 - Validates every record in the file
 - Performs comprehensive quality checks
 - Generates detailed statistics
@@ -25,7 +25,7 @@ The validation module supports three validation levels to balance thoroughness a
 - Processing data for the first time
 - Data quality is uncertain
 
-### Trust Mode
+### Trust Mode (Default)
 - Validates only the first record (reads) or a small sample (features)
 - Assumes remaining data is consistent
 - Faster processing for large files

@@ -51,10 +51,10 @@ flowchart TD
 
     %% Reference vs Modified pipeline
     subgraph RefVsMod["Reference vs Modified Pipeline"]
-        ref_fasta --> run_syri_decision{"--run_syri?"}
-        mod_fasta --> run_syri_decision
-        run_syri_decision -->|Yes| nucmer["NUCmer Alignment"]
-        run_syri_decision -->|No| skip_syri["Skip SYRI"]
+        ref_fasta --> run_ref_x_mod_decision{"--run_ref_x_mod?"}
+        mod_fasta --> run_ref_x_mod_decision
+        run_ref_x_mod_decision -->|Yes| nucmer["NUCmer Alignment"]
+        run_ref_x_mod_decision -->|No| skip_syri["Skip SYRI"]
         nucmer --> delta_filter["Delta Filter"]
         delta_filter --> show_coords["Show Coords"]
         show_coords --> syri_vcf["VCF Output (assemblysyri)"]

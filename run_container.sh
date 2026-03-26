@@ -35,7 +35,7 @@ echo ""
 echo "Type 'exit' when you're done to return to your host system."
 echo ""
 
-docker run --privileged -d --rm \
+docker run --privileged --init -d --rm \
     -v /etc/ssl/certs:/etc/ssl/certs:ro \
     -v /usr/share/ca-certificates:/usr/share/ca-certificates:ro \
     --name "$CONTAINER_NAME" \
