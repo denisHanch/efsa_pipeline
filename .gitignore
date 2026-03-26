@@ -93,8 +93,6 @@ data/valid/*
 # Nextflow specific ignores
 .nextflow*
 .DS_Store
-/work/
-CHANGELOG.md
 copilot-instructions.md
 
 
