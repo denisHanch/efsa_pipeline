@@ -73,7 +73,10 @@ class NextflowParams:
         return result
 
 
-def build_params(validation_results: dict) -> NextflowParams:
+def build_params(
+    validation_results: dict,
+    force_defragment_ref: bool = False,
+) -> NextflowParams:
     """
     Build a Nextflow params dataclass from validation results.
 
@@ -86,6 +89,10 @@ def build_params(validation_results: dict) -> NextflowParams:
           genomexgenome – dict with 'contig_files' key (from genomexgenome_validation), or None
           reads         – List[ReadOutputMetadata], each with a .ngs_type attribute
           ref_feature   – FeatureOutputMetadata or None
+    force_defragment_ref : bool
+        When True, GFF validation for the reference is skipped: ``gff`` is set to
+        None and ``run_vcf_annotation`` is forced to False, because feature
+        coordinates are no longer meaningful on a defragmented reference.
 
     Returns
     -------
@@ -100,7 +107,7 @@ def build_params(validation_results: dict) -> NextflowParams:
     mod_path = _path(validation_results.get("mod_genome"))
     gxg      = validation_results.get("genomexgenome") or {}
     reads    = validation_results.get("reads") or []
-    gff_path = _path(validation_results.get("ref_feature"))
+    gff_path = None if force_defragment_ref else _path(validation_results.get("ref_feature"))
 
     # reads grouped by ngs_type — keep first validated path per type
     by_type = {}

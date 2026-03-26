@@ -288,7 +288,7 @@ def main():
 
     # Validate features (optional — non-fatal)
     ref_feature_res = None
-    if hasattr(config, 'ref_feature') and config.ref_feature:
+    if hasattr(config, 'ref_feature') and config.ref_feature and not force_defragment:
         try:
             ref_feature_res = validate_feature(config.ref_feature, ref_feature_settings)
             report.write(ref_feature_res, file_type="feature")
@@ -315,7 +315,13 @@ def main():
         "reads":         reads_res,
         "ref_feature":   ref_feature_res,
     }
-    params = nf_params.build_params(validation_results)
+    if force_defragment:
+        logger.warning(
+            "force_defragment_ref is active: GFF validation for the reference is "
+            "skipped. Feature coordinates are not meaningful on a defragmented "
+            "reference — run_vcf_annotation will be disabled."
+        )
+    params = nf_params.build_params(validation_results, force_defragment_ref=force_defragment)
     nf_params.write_params(params, output_dir / "validated_params.json")
 
     return 0
