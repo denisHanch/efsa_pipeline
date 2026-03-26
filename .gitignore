@@ -106,4 +106,5 @@ work/
 
 # Logs
 **/logs/**
+!**/.gitkeep
 *.log
