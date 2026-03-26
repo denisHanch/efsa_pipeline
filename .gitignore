@@ -85,10 +85,18 @@ data/inputs/*
 
 data/valid/*
 data/outputs/*
+!data/outputs/.gitkeep
+!data/outputs/logs/
+data/outputs/logs/*
+!data/outputs/logs/.gitkeep
+!data/outputs/tables/
+data/outputs/tables/*
+!data/outputs/tables/csv_per_sv_summary/
+data/outputs/tables/csv_per_sv_summary/*
+!data/outputs/tables/csv_per_sv_summary/.gitkeep
+
 data/valid/*
 !data/inputs/.gitkeep
-!data/outputs/.gitkeep
-!data/outputs/logs/.gitkeep
 !data/valid/.gitkeep
 # Nextflow specific ignores
 .nextflow*
