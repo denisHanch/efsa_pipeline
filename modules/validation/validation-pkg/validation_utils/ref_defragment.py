@@ -7,7 +7,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 from validation_pkg.config_manager import GenomeConfig
-from validation_pkg.logger import get_logger
+from validation_utils.logger import ValidationLogger
 from validation_pkg.utils import file_handler
 
 
@@ -22,7 +22,7 @@ def defragment_reference(
     Returns:
         (merged_fasta_path, tsv_path) — both written next to the original file.
     """
-    logger = get_logger()
+    logger = ValidationLogger()
     _warn_before_start(genome_config, logger)
 
     tsv_rows, merged_seq = _consume_sequences(genome_config, logger)

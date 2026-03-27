@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Any
 from Bio import SeqIO
 from ..utils.base_settings import BaseSettings
 from ..exceptions import InterFileValidationError, ValidationError
-from ..logger import get_logger
+from validation_utils.logger import ValidationLogger
 from ..utils.file_handler import check_tool_available, open_compressed_writer
 from ..utils.path_utils import strip_all_extensions
 from ..utils.formats import CodingType
@@ -45,7 +45,8 @@ class GenomeXGenomeSettings(BaseSettings):
 def genomexgenome_validation(
     ref_genome_result,  # OutputMetadata or Dict[str, Any]
     mod_genome_result,  # OutputMetadata or Dict[str, Any]
-    settings: Optional[GenomeXGenomeSettings] = None
+    settings: Optional[GenomeXGenomeSettings] = None,
+    logger: Optional[ValidationLogger] = None
 ) -> Dict[str, Any]:
     """Validate consistency between two genome files (reference vs modified).
 
@@ -55,7 +56,7 @@ def genomexgenome_validation(
     Characterization failures are non-fatal and recorded as warnings.
     """
     settings = settings or GenomeXGenomeSettings()
-    logger = get_logger()
+    logger = logger if logger is not None else ValidationLogger()
 
     warnings = []
     errors = []

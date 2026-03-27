@@ -4,7 +4,7 @@ import sys
 import traceback
 from pathlib import Path
 
-# Add modules/validation/ to sys.path so utils/ is importable.
+# Add modules/validation/ to sys.path so nextflow_params_handler is importable.
 sys.path.insert(0, str(Path(__file__).parent))
 
 from validation_pkg import (
@@ -18,14 +18,13 @@ from validation_pkg import (
     validate_genome,
     validate_reads,
     validate_feature,
-    setup_logging,
-    get_logger,
     readxread_validation,
     genomexgenome_validation
 )
 from validation_pkg.exceptions import ValidationError
 from validation_pkg.utils.formats import CodingType, GenomeFormat
-from utils.ref_defragment import defragment_reference
+from validation_utils.ref_defragment import defragment_reference
+from validation_utils.logger import setup_logging, ValidationLogger
 
 import nextflow_params_handler as nf_params
 
@@ -221,6 +220,19 @@ def main():
     # Step 3: Run validation using functional API
     # ========================================================================
     report = ValidationReport(output_dir / "report.txt")
+    fatal_errors: list[str] = []
+
+    def register_required_failure(label: str, exc: Exception) -> None:
+        message = f"{label} validation failed: {exc}"
+        logger.error(message)
+        fatal_errors.append(message)
+
+    def register_missing_output(label: str, result) -> None:
+        output_file = getattr(result, "output_file", None) if result is not None else None
+        if not output_file:
+            message = f"{label} validation produced no usable output file"
+            logger.error(message)
+            fatal_errors.append(message)
 
     # Validate reference genome (required)
     ref_genome_res = None
@@ -228,8 +240,9 @@ def main():
         try:
             ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
             report.write(ref_genome_res, file_type="genome")
+            register_missing_output("ref_genome", ref_genome_res)
         except ValidationError as e:
-            logger.error(f"Required ref_genome validation failed: {e}")
+            register_required_failure("ref_genome", e)
 
     # Validate modified genome (optional)
     mod_genome_res = None
@@ -272,8 +285,10 @@ def main():
         try:
             reads_res = validate_reads(config.reads, reads_settings)
             report.write(reads_res, file_type="read")
+            for read_result in reads_res:
+                register_missing_output("reads", read_result)
         except ValidationError as e:
-            logger.error(f"Read validation failed: {e}")
+            register_required_failure("reads", e)
 
     # Add interread validation
     readxread_res = None
@@ -301,6 +316,9 @@ def main():
             report.write(res, file_type="feature")
         except ValidationError as e:
             logger.error(f"Optional mod_feature validation failed: {e}")
+
+    if fatal_errors:
+        report.add_fatal_errors(fatal_errors)
 
     report.flush(format='text')
     print(f"Log file: {log_file}")
@@ -331,10 +349,10 @@ if __name__ == '__main__':
     try:
         sys.exit(main())
     except Exception as e:
-        logger = get_logger()
-        logger.error(f"✗ Fatal error: {e}")
-        logger.debug(traceback.format_exc())
+        _fallback_logger = ValidationLogger()
+        _fallback_logger.error(f"✗ Fatal error: {e}")
+        _fallback_logger.debug(traceback.format_exc())
         if len(sys.argv) >= 2:
-            actual_log_file = getattr(get_logger(), 'log_file', None) or (Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log")
+            actual_log_file = (Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log")
             print(f"Log file: {actual_log_file}")
         sys.exit(1)

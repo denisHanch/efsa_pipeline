@@ -119,7 +119,7 @@ from validation_pkg.validators.feature_validator import FeatureValidator
 from validation_pkg.validators.feature_validator import FeatureOutputMetadata
 from validation_pkg.validators.interfile_read import ReadXReadSettings, readxread_validation
 from validation_pkg.validators.interfile_genome import GenomeXGenomeSettings, genomexgenome_validation
-from validation_pkg.logger import setup_logging, get_logger
+from validation_utils.logger import setup_logging, ValidationLogger
 from validation_pkg.report import ValidationReport
 
 # Functional API imports
@@ -228,8 +228,8 @@ __all__ = [
 
     # Logging
     'setup_logging',
-    'get_logger',
-    'ValidationReport'
+    'ValidationLogger',
+    'ValidationReport',
 
     # Version info
     '__version__',

@@ -13,107 +13,82 @@ Tests cover:
 import pytest
 import tempfile
 from pathlib import Path
-from validation_pkg.logger import ValidationLogger, setup_logging, get_logger
+from validation_utils.logger import ValidationLogger, setup_logging
 
 
 class TestLogger:
     """Test suite for ValidationLogger."""
-    
-    @pytest.fixture(autouse=True)
-    def reset_logger(self):
-        """Reset logger state before each test."""
-        logger = get_logger()
-        logger.clear_issues()
-        # Reset logger instance (structlog doesn't use handlers in the same way)
-        logger.logger = None
-        yield
-        logger.clear_issues()
-    
-    def test_logger_singleton(self):
-        """Test that logger follows singleton pattern."""
-        logger1 = get_logger()
-        logger2 = get_logger()
-        assert logger1 is logger2
-    
+
     def test_setup_logging_creates_log_file(self):
         """Test that setup_logging creates log file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             log_file = Path(tmpdir) / "test.log"
-            
+
             logger = setup_logging(log_file=log_file)
             logger.info("Test message")
-            
+
             assert log_file.exists()
             content = log_file.read_text()
             assert "Test message" in content
-    
+
     def test_add_validation_issue_stores_issue(self):
         """Test that validation issues are stored correctly."""
-        logger = get_logger()
+        logger = ValidationLogger()
         logger.setup()
-        
+
         logger.add_validation_issue(
             level='ERROR',
             category='genome',
             message='Test error message',
             details={'file': 'test.fasta', 'line': 42}
         )
-        
+
         assert len(logger.validation_issues) == 1
         issue = logger.validation_issues[0]
         assert issue['level'] == 'ERROR'
         assert issue['category'] == 'genome'
         assert issue['message'] == 'Test error message'
         assert issue['details']['file'] == 'test.fasta'
-    
+
     def test_add_multiple_validation_issues(self):
         """Test adding multiple issues."""
-        logger = get_logger()
+        logger = ValidationLogger()
         logger.setup()
-        
+
         logger.add_validation_issue('ERROR', 'genome', 'Error 1')
         logger.add_validation_issue('WARNING', 'feature', 'Warning 1')
         logger.add_validation_issue('ERROR', 'read', 'Error 2')
-        
+
         assert len(logger.validation_issues) == 3
-    
+
     def test_clear_issues(self):
         """Test that clear_issues removes all issues."""
-        logger = get_logger()
+        logger = ValidationLogger()
         logger.setup()
-        
+
         logger.add_validation_issue('ERROR', 'genome', 'Error 1')
         logger.add_validation_issue('WARNING', 'feature', 'Warning 1')
-        
+
         assert len(logger.validation_issues) == 2
-        
+
         logger.clear_issues()
-        
+
         assert len(logger.validation_issues) == 0
-    
+
     def test_log_file_directory_creation(self):
         """Test that log file parent directories are created."""
         with tempfile.TemporaryDirectory() as tmpdir:
             log_file = Path(tmpdir) / "nested" / "dir" / "test.log"
-            
+
             logger = setup_logging(log_file=log_file)
             logger.info("Test")
-            
+
             assert log_file.exists()
             assert log_file.parent.exists()
-    
+
 
 class TestParallelValidationLogging:
     """Test suite for parallel validation logging output."""
-
-    @pytest.fixture(autouse=True)
-    def reset_logger(self):
-        """Reset logger state before each test."""
-        logger = get_logger()
-        logger.clear_issues()
-        logger.logger = None
-        yield
-        logger.clear_issues()
 
     def _create_test_fastq(self, path, num_reads=1000):
         """Create a test FASTQ file"""
@@ -135,7 +110,6 @@ class TestParallelValidationLogging:
             fastq_file = tmpdir / "test.fastq"
             self._create_test_fastq(fastq_file, num_reads=100)
 
-            # Create logger
             logger = setup_logging()
 
             config = ReadConfig(
@@ -150,13 +124,11 @@ class TestParallelValidationLogging:
             )
 
             settings = ReadValidator.Settings(check_invalid_chars=True)
-            validator = ReadValidator(config, settings)
+            validator = ReadValidator(config, settings, logger=logger)
 
-            # Validate (should use sequential)
             validator._parse_file()
             validator._validate_sequences()
 
-            # Check output
             captured = capsys.readouterr()
             assert "Sequential validation" in captured.out or "Validating" in captured.err
 
@@ -171,7 +143,6 @@ class TestParallelValidationLogging:
             fastq_file = tmpdir / "test.fastq"
             self._create_test_fastq(fastq_file, num_reads=5000)
 
-            # Create logger
             logger = setup_logging()
 
             config = ReadConfig(
@@ -186,13 +157,11 @@ class TestParallelValidationLogging:
             )
 
             settings = ReadValidator.Settings(check_invalid_chars=True)
-            validator = ReadValidator(config, settings)
+            validator = ReadValidator(config, settings, logger=logger)
 
-            # Validate (should use parallel)
             validator._parse_file()
             validator._validate_sequences()
 
-            # Check output mentions parallel validation
             captured = capsys.readouterr()
             output = captured.out + captured.err
             assert "Parallel validation enabled" in output or "parallel" in output.lower()
@@ -208,7 +177,6 @@ class TestParallelValidationLogging:
             fastq_file = tmpdir / "test.fastq"
             self._create_test_fastq(fastq_file, num_reads=2000)
 
-            # Create logger
             logger = setup_logging()
 
             threads = 8
@@ -224,13 +192,11 @@ class TestParallelValidationLogging:
             )
 
             settings = ReadValidator.Settings(check_invalid_chars=True)
-            validator = ReadValidator(config, settings)
+            validator = ReadValidator(config, settings, logger=logger)
 
-            # Validate
             validator._parse_file()
             validator._validate_sequences()
 
-            # Check output shows worker count
             captured = capsys.readouterr()
             output = captured.out + captured.err
             assert f"{threads} worker" in output or f"threads={threads}" in output
@@ -246,7 +212,6 @@ class TestParallelValidationLogging:
             fastq_file = tmpdir / "test.fastq"
             self._create_test_fastq(fastq_file, num_reads=100)
 
-            # Create logger
             logger = setup_logging()
 
             config = ReadConfig(
@@ -257,17 +222,15 @@ class TestParallelValidationLogging:
                 coding_type=CodingType.NONE,
                 detected_format=ReadFormat.FASTQ,
                 output_dir=tmpdir,
-                global_options={"threads": 8, "validation_level": "trust"}  # threads=8 but trust mode
+                global_options={"threads": 8, "validation_level": "trust"}
             )
 
             settings = ReadValidator.Settings(check_invalid_chars=True)
-            validator = ReadValidator(config, settings)
+            validator = ReadValidator(config, settings, logger=logger)
 
-            # Validate (should use sequential despite threads=8)
             validator._parse_file()
             validator._validate_sequences()
 
-            # Check output shows sequential
             captured = capsys.readouterr()
             output = captured.out + captured.err
             assert "sequential" in output.lower() or "Trust mode" in output
@@ -276,36 +239,21 @@ class TestParallelValidationLogging:
 class TestTimingMethods:
     """Test suite for timing functionality."""
 
-    @pytest.fixture(autouse=True)
-    def reset_logger(self):
-        """Reset logger state before each test."""
-        logger = get_logger()
-        logger.clear_issues()
-        logger.logger = None
-        # Clear timers
-        with logger._timers_lock:
-            logger._timers.clear()
-        yield
-        logger.clear_issues()
-        with logger._timers_lock:
-            logger._timers.clear()
-
     def test_start_stop_timer_basic(self):
         """Test basic timer functionality."""
         import time
-        logger = get_logger()
+        logger = ValidationLogger()
         logger.setup()
 
         logger.start_timer("test_operation")
-        time.sleep(0.1)  # Sleep for 100ms
+        time.sleep(0.1)
         elapsed = logger.stop_timer("test_operation")
 
-        # Should be approximately 0.1 seconds (allow some tolerance)
         assert 0.09 < elapsed < 0.15, f"Expected ~0.1s, got {elapsed}s"
 
     def test_stop_timer_without_start_raises_error(self):
         """Test that stopping a non-existent timer raises KeyError."""
-        logger = get_logger()
+        logger = ValidationLogger()
         logger.setup()
 
         with pytest.raises(KeyError, match="Timer 'nonexistent' was never started"):
@@ -314,18 +262,15 @@ class TestTimingMethods:
     def test_multiple_timers_independent(self):
         """Test that multiple named timers work independently."""
         import time
-        logger = get_logger()
+        logger = ValidationLogger()
         logger.setup()
 
-        # Start two timers
         logger.start_timer("timer1")
         time.sleep(0.05)
         logger.start_timer("timer2")
         time.sleep(0.05)
 
-        # Stop timer1 (should be ~0.1s)
         elapsed1 = logger.stop_timer("timer1")
-        # Stop timer2 (should be ~0.05s)
         elapsed2 = logger.stop_timer("timer2")
 
         assert 0.09 < elapsed1 < 0.15, f"Timer1: expected ~0.1s, got {elapsed1}s"
@@ -334,7 +279,7 @@ class TestTimingMethods:
     def test_get_timers_returns_copy(self):
         """Test that get_timers returns a copy of timers dict."""
         import time
-        logger = get_logger()
+        logger = ValidationLogger()
         logger.setup()
 
         logger.start_timer("test")
@@ -345,35 +290,20 @@ class TestTimingMethods:
         assert "test" in timers
         assert isinstance(timers, dict)
 
-        # Modifying the copy should not affect internal state
         timers["test"] = 999.0
         timers_again = logger.get_timers()
         assert timers_again["test"] != 999.0
 
 
 class TestFileAutoIncrement:
-    """Test suite for log and report file auto-increment functionality."""
-
-    @pytest.fixture(autouse=True)
-    def reset_logger(self):
-        """Reset logger state before each test."""
-        logger = get_logger()
-        logger.clear_issues()
-        logger.logger = None
-        with logger._timers_lock:
-            logger._timers.clear()
-        yield
-        logger.clear_issues()
-        with logger._timers_lock:
-            logger._timers.clear()
+    """Test suite for log file auto-increment functionality."""
 
     def test_log_file_auto_increment(self):
         """Test that log files auto-increment instead of overwriting."""
         with tempfile.TemporaryDirectory() as tmpdir:
             log_file = Path(tmpdir) / "validation.log"
 
-            # First setup - should create validation.log
-            logger1 = get_logger()
+            logger1 = ValidationLogger()
             logger1.setup(log_file=log_file)
             logger1.info("First run")
 
@@ -381,12 +311,7 @@ class TestFileAutoIncrement:
             first_content = log_file.read_text()
             assert "First run" in first_content
 
-            # Reset logger
-            logger1.logger = None
-            logger1.clear_issues()
-
-            # Second setup - should create validation_001.log
-            logger2 = get_logger()
+            logger2 = ValidationLogger()
             logger2.setup(log_file=log_file)
             logger2.info("Second run")
 
@@ -395,7 +320,6 @@ class TestFileAutoIncrement:
             second_content = log_file_001.read_text()
             assert "Second run" in second_content
 
-            # Original file should still have first content
             first_content_after = log_file.read_text()
             assert "First run" in first_content_after
             assert "Second run" not in first_content_after

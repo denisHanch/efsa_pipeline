@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Any
 from ..utils.base_settings import BaseSettings
 from ..exceptions import ReadValidationError
-from ..logger import get_logger
+from validation_utils.logger import ValidationLogger
 
 
 @dataclass
@@ -16,11 +16,12 @@ class ReadXReadSettings(BaseSettings):
 
 def readxread_validation(
     reads_results: List[Dict[str, Any]],
-    settings: Optional[ReadXReadSettings] = None
+    settings: Optional[ReadXReadSettings] = None,
+    logger: Optional[ValidationLogger] = None
 ) -> Dict[str, Any]:
     """Validate consistency across multiple read files."""
     settings = settings or ReadXReadSettings()
-    logger = get_logger()
+    logger = logger if logger is not None else ValidationLogger()
 
     warnings = []
     errors = []

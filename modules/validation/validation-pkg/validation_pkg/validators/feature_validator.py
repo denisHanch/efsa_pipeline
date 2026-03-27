@@ -134,9 +134,9 @@ class FeatureValidator(BaseValidator):
             # Normalize coding_type from base class
             self._normalize_coding_type()
 
-    def __init__(self, feature_config, settings: Optional[Settings] = None) -> None:
+    def __init__(self, feature_config, settings: Optional[Settings] = None, logger=None) -> None:
         # Call base class initialization
-        super().__init__(feature_config, settings)
+        super().__init__(feature_config, settings, logger)
 
         # Keep feature_config for type safety and specific access
         self.feature_config = feature_config
@@ -289,16 +289,19 @@ class FeatureValidator(BaseValidator):
                 self.logger.info(f"Parsed {len(self.features)} features")
 
             except FeatureValidationError as e:
-                # Log error and skip file instead of crashing (for file parsing failures)
-                self.logger.warning(f"gffread failed for {self.feature_config.filename}: {e}")
+                self.logger.warning(
+                    f"gffread failed for {self.feature_config.filename}: {e}. "
+                    "Falling back to direct GFF3 parsing."
+                )
                 self.logger.add_validation_issue(
                     level='WARNING',
                     category='feature',
-                    message=f"Failed to parse feature file with gffread: {e}",
+                    message=f"gffread unavailable/failed; using direct GFF3 parser: {e}",
                     details={'file': self.feature_config.filename, 'error': str(e)}
                 )
-                self.features = []
-                self.logger.info(f"Skipping feature file due to parsing error")
+                with open(temp_input, 'r') as f:
+                    self.features = self._parse_gff(f)
+                self.logger.info(f"Direct GFF3 fallback parsed {len(self.features)} features")
 
         finally:
             for temp_file in temp_files:

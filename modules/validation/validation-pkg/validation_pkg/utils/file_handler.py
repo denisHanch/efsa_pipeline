@@ -105,8 +105,8 @@ def _log_compression_tool(tool_name: str, threads: int, is_parallel: bool, insta
         return
 
     try:
-        from validation_pkg.logger import get_logger
-        logger = get_logger()
+        from validation_utils.logger import ValidationLogger
+        logger = ValidationLogger()
 
         if is_parallel:
             logger.info(f"Using {tool_name} for compression ({threads} threads)")

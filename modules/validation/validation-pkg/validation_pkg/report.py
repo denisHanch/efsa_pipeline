@@ -220,8 +220,15 @@ class ValidationReport:
         # Storage for inter-file validation records
         self.interfile_records: List[InterFileValidationRecord] = []
 
+        # Fatal file-level errors (required inputs that failed)
+        self.fatal_errors: List[str] = []
+
         # Track start time
         self.start_time = datetime.now()
+
+    def add_fatal_errors(self, errors: List[str]) -> None:
+        """Record fatal file-level errors that failed required validation steps."""
+        self.fatal_errors.extend(errors)
 
     def write(
         self,
@@ -380,7 +387,7 @@ class ValidationReport:
         interfile_failed = len(self.interfile_records) - interfile_passed
 
         # Overall status
-        overall_status = "✓ PASSED" if interfile_failed == 0 else "✗ FAILED"
+        overall_status = "✓ PASSED" if interfile_failed == 0 and not self.fatal_errors else "✗ FAILED"
 
         lines.append("SUMMARY")
         lines.append("=" * 100)
@@ -416,6 +423,12 @@ class ValidationReport:
                 lines.append(f"    └─ Failed:  {interfile_failed} ✗")
             lines.append("")
 
+        if self.fatal_errors:
+            lines.append(f"  Fatal File-Level Errors ({len(self.fatal_errors)}):")
+            for i, error in enumerate(self.fatal_errors, 1):
+                lines.append(f"    {i}. {error}")
+            lines.append("")
+
         return lines
 
     def _get_summary_data(self) -> Dict[str, Any]:
@@ -446,7 +459,8 @@ class ValidationReport:
             "interfile_validations": len(self.interfile_records),
             "interfile_passed": interfile_passed,
             "interfile_failed": interfile_failed,
-            "overall_status": "PASSED" if interfile_failed == 0 else "FAILED"
+            "fatal_errors": self.fatal_errors,
+            "overall_status": "PASSED" if interfile_failed == 0 and not self.fatal_errors else "FAILED"
         }
 
     def _generate_file_results_section(self) -> List[str]:

@@ -145,9 +145,9 @@ class GenomeValidator(BaseValidator):
                     "main_first selects the first sequence as main."
                 )
 
-    def __init__(self, genome_config, settings: Optional[Settings] = None) -> None:
+    def __init__(self, genome_config, settings: Optional[Settings] = None, logger=None) -> None:
         # Call base class initialization
-        super().__init__(genome_config, settings)
+        super().__init__(genome_config, settings, logger)
 
         # Keep genome_config for type safety and specific access
         self.genome_config = genome_config

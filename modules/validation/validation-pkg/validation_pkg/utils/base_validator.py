@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import IO, Any, Type, Optional
 
-from validation_pkg.logger import get_logger
+from validation_utils.logger import ValidationLogger
 from validation_pkg.utils.base_settings import BaseSettings
 from validation_pkg.exceptions import ValidationError, CompressionError
 from validation_pkg.utils.file_handler import open_file_with_coding_type
@@ -16,10 +16,10 @@ class BaseValidator(ABC):
     # Subclasses must define their own Settings class
     Settings: Type[BaseSettings]
 
-    def __init__(self, config: Any, settings: Optional[BaseSettings] = None):
+    def __init__(self, config: Any, settings: Optional[BaseSettings] = None, logger: Optional['ValidationLogger'] = None):
         """Initialize common validator infrastructure."""
         # Common infrastructure
-        self.logger = get_logger()
+        self.logger = logger if logger is not None else ValidationLogger(name=self._validator_type)
         self.config = config
 
         # Extract common attributes from config
