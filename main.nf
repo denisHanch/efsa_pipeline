@@ -56,6 +56,7 @@ workflow {
 
     def activePipelines = []
     def sv_tbl = Channel.empty()
+    def supp_reads_ch = Channel.empty()
 
     // reference to modified fasta comparison - assembly pipeline
     if (params.run_ref_x_mod) {
@@ -87,6 +88,7 @@ workflow {
         long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag, ref_plasmid, "pacbio/long-ref")
 
         sv_tbl = sv_tbl.mix(long_ref_pacbio.out.sv_tbl)
+        supp_reads_ch = supp_reads_ch.mix(long_ref_pacbio.out.supp_reads)
         activePipelines << long_ref_pacbio.out.sv_vcf
 
         describePipeline("long-pacbio", "reference & modified")
@@ -108,6 +110,7 @@ workflow {
         long_ref_ont(ont_fastqs, ref_fasta, mapping_tag, ref_plasmid, "ont/long-ref")
 
         sv_tbl = sv_tbl.mix(long_ref_ont.out.sv_tbl)
+        supp_reads_ch = supp_reads_ch.mix(long_ref_ont.out.supp_reads)
         
         activePipelines << long_ref_ont.out.sv_vcf
 
@@ -163,7 +166,9 @@ workflow {
         tuple(asm, long_ont, long_pb, sht)
     }
 
-    restructure_sv_tbl(script, tbl_channel)
+    supp_reads_collected = supp_reads_ch.collect().ifEmpty(file('NO_FILE'))
+
+    restructure_sv_tbl(script, tbl_channel, supp_reads_collected)
 }
 
 logWorkflowCompletion("execution of main.nf")

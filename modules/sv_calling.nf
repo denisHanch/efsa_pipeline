@@ -214,6 +214,14 @@ process vcf_to_table_short {
     """
 }
 
+/*
+ * Convert a SURVIVOR-merged long-read VCF to a TSV summary table.
+ *
+ * Supporting-read counts are left as 0 here because SURVIVOR's DR field
+ * is unreliable.  The actual values are resolved downstream by
+ * create_sv_output.py using the per-caller supporting-reads TSVs
+ * produced by the extract_supp_reads processes.
+ */
 process vcf_to_table_long {
 
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
@@ -226,13 +234,12 @@ process vcf_to_table_long {
     path "${pair_id}_${tag}_sv_summary.tsv"
 
     script:
+    def outfile = "${pair_id}_${tag}_sv_summary.tsv"
     """
     set -euxo pipefail
 
-    output="${pair_id}_${tag}_sv_summary.tsv"
-
-    echo -e "chrom\tstart\tend\tsvtype\tinfo_svtype\tsvlen\tsupporting_reads\tscore\tsupporting_methods" > "\${output}"
-    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%ID\t%INFO/SVLEN\t[%DR{1}]\t%QUAL\t%INFO/SUPP\n' "${vcf}" >> "\${output}"
+    echo -e "chrom\\tstart\\tend\\tsvtype\\tinfo_svtype\\tsvlen\\tsupporting_reads\\tscore\\tsupporting_methods" > "${outfile}"
+    bcftools query -f '%CHROM\\t%POS\\t%INFO/END\\t%INFO/SVTYPE\\t%ID\\t%INFO/SVLEN\\t.\\t%QUAL\\t%INFO/SUPP\\n' "${vcf}" >> "${outfile}"
     """
 }
 
@@ -243,13 +250,15 @@ process restructure_sv_tbl {
     input:
     path script
     tuple path(assembly_tsv), path(long_ont_tsv), path(long_pb_tsv), path(short_tsv)
+    path supp_reads
 
     output:
     path "csv_per_sv_summary"
 
     script:
+    def supp_args = supp_reads.name != 'NO_FILE' ? "--supp_reads ${supp_reads.join(' ')}" : ''
     """
-    python ${script} --asm ${assembly_tsv} --short ${short_tsv} --long_ont ${long_ont_tsv} --long_pacbio ${long_pb_tsv} --out csv_per_sv_summary
+    python ${script} --asm ${assembly_tsv} --short ${short_tsv} --long_ont ${long_ont_tsv} --long_pacbio ${long_pb_tsv} ${supp_args} --out csv_per_sv_summary
     """
 }
 

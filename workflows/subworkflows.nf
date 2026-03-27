@@ -121,9 +121,13 @@ workflow sv_long {
         extract_supp_reads_2(debreak_vcf,"SUPPREAD", "debreak")
         extract_supp_reads_3(sniffles_vcf, "SUPPORT", "sniffles")
 
+        supp_reads = extract_supp_reads_1.out
+            .mix(extract_supp_reads_2.out)
+            .mix(extract_supp_reads_3.out)
+
         survivor(cute_vcf, debreak_vcf, sniffles_vcf, mapping_tag, out_folder_name) | set { merged_vcf }
         bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
-        sv_vcf_ch = merged_vcf.map { pair_id, vcf -> vcf }
     emit:
         merged_vcf
+        supp_reads
 }
