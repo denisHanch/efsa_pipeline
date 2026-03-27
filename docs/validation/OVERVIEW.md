@@ -19,6 +19,7 @@ The following table summarizes all supported scenarios:
 | **2** | Fragmented assembly (below limit)            | `prokaryote`               | **ref.fa:** 1 sequence <br> **mod.fa:** multiple sequences (≤ limit)                           | In reference: <br> - In **ref.fa**: <br> - Longest sequence → chromosome <br> - Remaining → plasmids `*ref_plasmid.fasta` <br><br> In **mod.fa**: <br> - Unmapped sequences → plasmids <br> - Mapped sequences → contigs | True            | **Used** to split mod.fa into mapped contigs vs unmapped plasmids | - Split into individual contigs (`*_contig.fasta`) <br> - `mod.fa` becomes multifasta **without plasmids** | All modules          | `ref.fa`, `mod.fa` + contig set <br> `*_contig.fasta` <br> `*_plasmid.fasta` |
 | **3** | Fragmented assembly (above limit)             | `prokaryote`               | **ref.fa:** 1 sequence <br> **mod.fa:** multiple sequences (> limit)                           | In reference: <br> - In **ref.fa**: <br> - Longest sequence → chromosome <br> - Remaining → plasmids `*ref_plasmid.fasta` <br><br> In **mod.fa**: no plasmid detection                                       | False           | **Not used**                                                      | No processing (mod.fa copied as-is)                                                                        | Mapping-only modules | `ref.fa`, `mod.fa` (copied) <br> `*_plasmid.fasta`                           |
 | **4** | Multiple sequences in reference  | `prokaryote` / `eukaryote` | **ref.fa:** multiple sequences (non-plasmid) <br> **mod.fa:** one or more sequences            | No plasmids considered                                                                                                                                          | False           | **Not used**                                                      | No processing (files copied as-is)                                                                         | Mapping-only modules | `ref.fa`, `mod.fa` (copied)                                                  |
+| **5** | Fragmented reference + `force_defragment_ref` (**unsupported workaround**) | `prokaryote` / `eukaryote` | **ref.fa:** multiple sequences (fragmented, above limit) → merged to 1 before validation | In **ref.fa**: all contigs and plasmids merged into single chromosome (`*_defragmented.fasta`) | True | Not used | Same for scenarios above | GFF annotation disabled | `ref.fa` (joined), `*_defragmented_join_order.tsv`, `mod.fa` depends on scenario |
 
 > **Important!**
 > 
@@ -54,9 +55,23 @@ The validation process:
 
 ## Running Validation
 
+Use the `validate` wrapper script (preferred):
+
 ```bash
-python3 ./modules/validation/main.py ./data/inputs/config.json
+validate                                      # default config path
+validate --config path/to/config.json         # custom config
+
+# Global options can be set via CLI flags (config.json takes priority if the same
+# option is also set there):
+validate --threads 8
+validate --validation-level strict
+validate --logging-level DEBUG
+validate --type eukaryote
+validate --force-defragment-ref               # unsupported workaround — at your own responsibility
+                                              # has no effect if force_defragment_ref is set in config.json
 ```
+
+Priority of configurations: config.json > cli_options > defaults
 
 ## Related Documentation
 

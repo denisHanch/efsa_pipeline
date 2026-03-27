@@ -333,7 +333,7 @@ class TestFeatureValidatorEditing:
             coding_type=CodingType.NONE,
             detected_format=FeatureFormat.GFF,
             output_dir=output_dir,
-            global_options={}
+            global_options={'validation_level': 'strict'}
         )
 
         settings = FeatureValidator.Settings(sort_by_position=True)
