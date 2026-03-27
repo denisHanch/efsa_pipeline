@@ -54,6 +54,7 @@ The `-params-file data/valid/validated_params.json` flag loads the parameters ge
 
 After running the pipeline:
 
+- Review the [Tool Parameter Reference](tool-parameters.md) for details on analysis thresholds and their rationale
 - Review [Runtime Messages](runtime-messages.md) to understand pipeline progress
 - Explore the [Output Directory Structure](directory-structures.md)
 - Check [Pipeline Visualization](pipeline-visualization.md) for workflow diagrams
