@@ -720,7 +720,19 @@ The Nextflow pipelines ran successfully and produced the expected outputs. Each 
 ✅ Truvari: the comparison of vcf files finished successfully.
 
 ✅ The execution of main.nf processing pipeline completed successfully.
+
+📋 Process execution manifest: data/outputs/logs/process_manifest.txt
 ```
+
+At the end of every run (success or failure), a **process execution manifest** is generated at `data/outputs/logs/process_manifest.txt`. This file lists every process that ran, its status (`COMPLETED`/`FAILED`/`CACHED`), and its exit code — essential for verifying result completeness.
+
+#### Error Handling
+
+The pipeline uses `errorStrategy = 'terminate'` globally. If any process fails, the pipeline stops immediately and:
+
+1. Copies all process logs (`.command.*` files) to `data/outputs/logs/`
+2. Generates `process_manifest.txt` listing failed processes with exit codes
+3. Logs a pointer to the manifest file for quick diagnosis
 
 
 ### Removal of Nextflow Work Directory
@@ -787,7 +799,12 @@ After successful pipeline execution, the outputs are organized as follows:
 data/outputs
 ├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod set to true in `data/validation/validated_params.json`)
 ├── illumina            → Short-read (Illumina) mapping results
-├── logs                → Pipeline logs and Nextflow reports
+├── logs/               → Pipeline logs, Nextflow reports, trace data, and process manifest
+│   ├── report.html
+│   ├── timeline.html
+│   ├── trace.tsv           → Per-process execution trace (task ID, name, status, exit code, timing)
+│   ├── process_manifest.txt → Summary of which processes succeeded/failed with exit codes
+│   └── ...                  → Per-process .command.* log files (copied on both success and failure)
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
 ├── tables              → Per-SV csv tables
@@ -1780,6 +1797,8 @@ end
 logs/
 ├── report.html               # A visual HTML report of the workflow execution, including task durations, resource usage, and statuses
 ├── timeline.html             # A timeline visualization showing when each pipeline process started and finished
+├── trace.tsv                 # Per-process execution trace (task ID, name, status, exit code, timing)
+├── process_manifest.txt      # Summary manifest: which processes succeeded/failed with exit codes
 └── 00/
     └── a80c5c6b6654950042a976836ff441
         ├── .command.begin    # Timestamp file marking the start of a process
@@ -1792,7 +1811,7 @@ logs/
 
 #### Description
 
-The `logs/` folder contains **detailed logs and command scripts** for each Nextflow process.
+The `logs/` folder contains **detailed logs and command scripts** for each Nextflow process. Logs are copied to this directory on both successful and failed runs, ensuring failure diagnostics are always preserved.
 
 ## File Descriptions
 
