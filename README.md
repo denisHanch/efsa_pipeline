@@ -800,11 +800,6 @@ data/outputs
 ├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod set to true in `data/validation/validated_params.json`)
 ├── illumina            → Short-read (Illumina) mapping results
 ├── logs/               → Pipeline logs, Nextflow reports, trace data, and process manifest
-│   ├── report.html
-│   ├── timeline.html
-│   ├── trace.tsv           → Per-process execution trace (task ID, name, status, exit code, timing)
-│   ├── process_manifest.txt → Summary of which processes succeeded/failed with exit codes
-│   └── ...                  → Per-process .command.* log files (copied on both success and failure)
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
 ├── tables              → Per-SV csv tables
