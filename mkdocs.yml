@@ -97,6 +97,7 @@ nav:
     - Performance: validation/PERFORMANCE.md
   - Nextflow Pipeline:
     - Running the Pipeline: nextflow/running-pipeline.md
+    - Tool Parameters: nextflow/tool-parameters.md
     - Runtime Messages: nextflow/runtime-messages.md
     - Directory Structures: nextflow/directory-structures.md
     - Pipeline Visualization: nextflow/pipeline-visualization.md

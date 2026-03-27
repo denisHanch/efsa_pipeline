@@ -410,6 +410,7 @@ nextflow run main.nf --max_cpu $(nproc) -resume
 | `--clean_work` | Remove work directory after successful run                        | `true`                  |
 | `--help`       | Display help message                                              | –                       |
 
+For a detailed reference on all hardcoded tool parameters (freebayes, nucmer, cuteSV, etc.), including the scientific rationale and trade-offs, see [Tool Parameter Reference](docs/nextflow/tool-parameters.md).
 
 ---
 ## Generation of per structural variation (SV) type CSV tables
