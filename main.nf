@@ -171,5 +171,6 @@ workflow {
 logWorkflowCompletion("execution of main.nf")
 
 workflow.onError {
-    println "Error: Pipeline execution stopped with the following message: ${workflow.errorMessage}"
+    log.error "Pipeline execution stopped with the following message: ${workflow.errorMessage}"
+    log.error "Check the process execution manifest in ${params.log_dir}/process_manifest.txt for details on which processes failed."
 }
