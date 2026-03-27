@@ -53,7 +53,7 @@ After successful pipeline execution, the outputs are organized as follows:
 data/outputs
 ├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod set to true in `data/validation/validated_params.json`)
 ├── illumina            → Short-read (Illumina) mapping results
-├── logs                → Pipeline logs and Nextflow reports
+├── logs/               → Pipeline logs, Nextflow reports, trace data, and process manifest
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
 ├── tables              → Per-SV csv tables
