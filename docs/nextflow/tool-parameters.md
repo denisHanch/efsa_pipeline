@@ -23,12 +23,6 @@ freebayes -f <ref> --min-coverage 10 --min-base-quality 20 --min-mapping-quality
 
 **Rationale:** These are standard community thresholds for calling SNPs and small indels with moderate Illumina coverage (30–100×). Each value departs from the freebayes default to reduce false positives — particularly important in a regulatory/safety context (GMO assessment). The freebayes defaults are intentionally permissive to support diverse use cases (e.g., low-frequency somatic variants); for GMO detection pipelines these permissive defaults would produce excessive noise.
 
-
-!!! info "Eukaryote considerations"
-    - **Repetitive regions:** Eukaryotic genomes contain more repetitive content than prokaryotes. The `--min-mapping-quality 30` filter is especially important here to avoid spurious calls from multi-mapped reads.
-    - **Coverage:** For larger eukaryotic genomes with lower per-base coverage, `--min-coverage 10` may filter out valid variant sites in under-covered regions. Consider lowering to 5 if average genome-wide coverage is below 20×.
-    - **Genome size:** The parameters themselves are genome-size agnostic; runtime will increase proportionally with genome size.
-
 **Trade-offs:**
 
 - *Increasing* thresholds improves specificity but may miss low-frequency or low-coverage variants.
