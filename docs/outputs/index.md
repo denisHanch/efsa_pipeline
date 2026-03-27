@@ -39,7 +39,7 @@ data/outputs/
 ├── pacbio/             → PacBio results
 ├── truvari/            → Variant comparison results (if run_truvari set to true in `data/validation/validated_params.json`)
 ├── unmapped_stats/     → Unmapped read statistics
-└── logs/               → Execution logs
+└── logs/               → Execution logs, trace data, and process manifest
 ```
 
 ## Quick Navigation
