@@ -166,9 +166,10 @@ class ConfigManager:
     """Configuration file parser and validator."""
     
     @staticmethod
-    def load(config_path: str, cli_options: Dict[str, Any] = None) -> Config:
+    def load(config_path: str, cli_options: Dict[str, Any] = None, logger: ValidationLogger = None) -> Config:
         """Load and validate configuration from JSON file."""
-        logger = ValidationLogger()
+        if logger is None:
+            logger = ValidationLogger()
         logger.info(f"Loading configuration from: {config_path}")
         
         config_file = Path(config_path)

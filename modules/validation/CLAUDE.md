@@ -25,7 +25,6 @@ modules/validation/
     │   ├── __init__.py            # Functional API (validate_genome, validate_reads, …); __all__ exports ValidationReport and __version__ individually
     │   ├── config_manager.py      # JSON config loader → Config / *Config dataclasses
     │   ├── exceptions.py          # Exception hierarchy rooted at ValidationError
-    │   ├── logger.py              # ValidationLogger singleton (structlog-based)
     │   ├── report.py              # ValidationReport — collects results, writes report.txt
     │   ├── utils/
     │   │   ├── base_settings.py   # BaseSettings, BaseOutputMetadata, BaseValidatorSettings
@@ -40,6 +39,11 @@ modules/validation/
     │       ├── feature_validator.py       # FeatureValidator + FeatureOutputMetadata
     │       ├── interfile_genome.py        # genomexgenome_validation + GenomeXGenomeSettings
     │       └── interfile_read.py          # readxread_validation + ReadXReadSettings
+    ├── validation_utils/
+    │   ├── logger.py              # ValidationLogger (structlog-based); setup_logging()
+    │   ├── ref_defragment.py      # defragment_reference() — unsupported workaround
+    │   └── tests/
+    │       └── test_ref_defragment.py
     └── tests/
         ├── test_config_manager.py
         ├── test_genome_validator.py
@@ -236,8 +240,41 @@ Properties (from options dict):
   .type            → str | None
 ```
 
-### `ConfigManager.load(config_path: str) → Config`
-Static method. Full validation pipeline:
+### Option flow
+
+```
+config.json "options"
+      ↓
+_parse_options() → stores only explicitly set keys in config.options
+      ↓
+config.options passed as global_options to each file config
+      ↓
+BaseValidator.__init__() reads global_options.get("validation_level") → None if not set
+      ↓
+BaseValidator._initialize_defaults() fills None → 'strict', None threads → DEFAULT_THREADS (8)
+```
+
+**Important:** defaults are not stored in `config.options` when an option is omitted from the JSON.
+The `Config` properties (`config.validation_level`, `config.type`, etc.) return defaults via
+`.get(key, default)`, but `config.options` itself may be an incomplete dict.
+
+### File-level override
+
+Individual file entries in `config.json` can override `threads` and `validation_level` only:
+
+```json
+{"filename": "ref.fasta", "validation_level": "trust", "threads": 4}
+```
+
+`_merge_options()` merges these into the file's `global_options`. Any other keys in a file entry
+are logged as warnings and ignored. `ngs_type` in read entries is extracted before calling
+`_parse_file_config` and passed via `extra_fields` to avoid this warning.
+
+### `ConfigManager.load(config_path, cli_options=None, logger=None) → Config`
+Static method. `logger` is optional — a `ValidationLogger` instance can be injected
+(useful in tests to assert on logged calls); defaults to a fresh `ValidationLogger()`.
+
+Full validation pipeline:
 1. Read and JSON-parse the file
 2. `_validate_required_fields()` — requires `ref_genome_filename` and non-empty `reads`
 3. `_setup_output_directory()` — creates `config_dir.parent / "valid"`
@@ -365,9 +402,11 @@ output_subdir_name    : Optional[str]
 
 ### `BaseValidator` (abstract)
 
-**Constructor receives:** `config: Any`, `settings: Optional[BaseSettings]`
+**Constructor receives:** `config: Any`, `settings: Optional[BaseSettings]`, `logger: Optional[ValidationLogger]`
 Extracts from config: `output_dir`, `validation_level`, `threads`, `input_path`.
 Default threads = 8 if not specified.
+Logger defaults to `ValidationLogger(name=self._validator_type)` — so genome/read/feature
+validators log under `"genome"`, `"read"`, `"feature"` respectively.
 
 **`run() → OutputMetadata`** — main entry point
 ```
@@ -640,17 +679,27 @@ readxread_validation(
 
 ---
 
-## Logger (`logger.py`)
+## Logger (`validation_utils/logger.py`)
 
-Singleton pattern. There is exactly one `ValidationLogger` instance throughout a run.
+Not a singleton — each call to `ValidationLogger()` creates a new instance, but all
+instances share the same underlying structlog/stdlib configuration set by `setup_logging`.
 
 ### Setup
 ```python
-from validation_pkg import setup_logging, get_logger
+from validation_utils.logger import ValidationLogger, setup_logging
 
+# Called once in main.py to configure handlers:
 logger = setup_logging(console_level='DEBUG', log_file=Path('data/valid/validation.log'))
-logger = get_logger()   # retrieve singleton anywhere
+
+# Anywhere else — creates a new instance bound to the shared structlog config:
+logger = ValidationLogger()              # name defaults to "validation"
+logger = ValidationLogger(name="genome") # used by BaseValidator subclasses
 ```
+
+### Logger name
+`ValidationLogger(name=...)` sets the structlog logger name (appears in log records).
+The stdlib routing logger is always `"validation"` regardless of the instance name.
+`BaseValidator` passes `self._validator_type` as the name automatically.
 
 ### Log methods
 ```python
@@ -661,6 +710,10 @@ logger.error(message, **context)     # also appends to validation_issues
 logger.critical(message, **context)  # also appends to validation_issues
 logger.add_validation_issue(level, category, message, details)
 ```
+
+### Console vs file output
+- **File** (`validation.log`): JSON, includes tracebacks (`format_exc_info`)
+- **Console**: human-readable coloured output, tracebacks suppressed
 
 ### Timers
 ```python
@@ -675,7 +728,7 @@ All shared state (`validation_issues`, `_timers`, `file_timings`) is protected b
 `threading.Lock`.
 
 ### Log file auto-increment
-If `validation.log` already exists it creates `validation_1.log`, `validation_2.log`,
+If `validation.log` already exists it creates `validation_001.log`, `validation_002.log`,
 and so on — the old log is never overwritten.
 
 ---
@@ -956,3 +1009,16 @@ dependencies:
 dev:
   pytest == 8.4.2
 ```
+
+---
+
+## Input scenarios
+
+The supported input scenarios (single contig, fragmented assembly below/above limit,
+multi-sequence reference) are documented in `docs/validation/OVERVIEW.md`.
+
+---
+
+## Known gaps / TODO
+
+- See `TODO.md` for outstanding items

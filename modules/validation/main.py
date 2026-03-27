@@ -4,7 +4,7 @@ import sys
 import traceback
 from pathlib import Path
 
-# Add modules/validation/ to sys.path so utils/ is importable.
+# Add modules/validation/ to sys.path so nextflow_params_handler is importable.
 sys.path.insert(0, str(Path(__file__).parent))
 
 from validation_pkg import (
@@ -23,7 +23,7 @@ from validation_pkg import (
 )
 from validation_pkg.exceptions import ValidationError
 from validation_pkg.utils.formats import CodingType, GenomeFormat
-from utils.ref_defragment import defragment_reference
+from validation_utils.ref_defragment import defragment_reference
 from validation_utils.logger import setup_logging, ValidationLogger
 
 import nextflow_params_handler as nf_params

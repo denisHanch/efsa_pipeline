@@ -19,7 +19,7 @@ class BaseValidator(ABC):
     def __init__(self, config: Any, settings: Optional[BaseSettings] = None, logger: Optional['ValidationLogger'] = None):
         """Initialize common validator infrastructure."""
         # Common infrastructure
-        self.logger = logger if logger is not None else ValidationLogger()
+        self.logger = logger if logger is not None else ValidationLogger(name=self._validator_type)
         self.config = config
 
         # Extract common attributes from config

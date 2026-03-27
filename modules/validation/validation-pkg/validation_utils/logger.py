@@ -11,6 +11,8 @@ import structlog
 import logging
 import time
 
+_STDLIB_LOGGER = "validation"
+
 
 @dataclass
 class FileTimingSummary:
@@ -70,7 +72,7 @@ def format_process_info(logger, method_name, event_dict: dict) -> dict:
             file_context = "..." + file_context[-37:]
         context_parts.append(f"{Colors.MAGENTA}{file_context}{Colors.RESET}")
 
-    if category and category not in ['validation_pipeline']:
+    if category and category not in [_STDLIB_LOGGER]:
         category_color = {
             'genome': Colors.GREEN,
             'read': Colors.BLUE,
@@ -116,17 +118,41 @@ def get_incremented_path(path: Path, separator: str = "_") -> Path:
             raise RuntimeError(f"Too many incremented files for {path}. Maximum is 9999.")
 
 
+def _build_console_processors(console_level: str) -> list:
+    """Build the structlog processor chain for console-only output."""
+    processors = [
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        format_process_info,
+        add_log_level_colors,
+        structlog.dev.ConsoleRenderer(colors=True),
+    ]
+    structlog.configure(
+        processors=processors,
+        wrapper_class=structlog.make_filtering_bound_logger(
+            getattr(structlog.stdlib.logging, console_level.upper(), structlog.stdlib.logging.INFO)
+        ),
+        context_class=dict,
+        logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
+        cache_logger_on_first_use=False,
+    )
+    return processors
+
+
 class ValidationLogger:
     """Logger for validation package with structured logging support."""
 
-    def __init__(self):
+    def __init__(self, name: str = "validation"):
         """Initialize logger."""
+        self._name = name
         self.log_file: Optional[Path] = None
         self.validation_issues = []
         self._issues_lock = Lock()
         # Eagerly grab the structlog logger so fallback instances work if
         # structlog has already been configured (e.g. by setup_logging in main.py).
-        self.logger = structlog.get_logger("validation_pipeline")
+        self.logger = structlog.get_logger(self._name)
         self._timers: Dict[str, float] = {}
         self._timers_lock = Lock()
         self.file_timings: List[FileTimingSummary] = []
@@ -150,7 +176,7 @@ class ValidationLogger:
             log_file = get_incremented_path(log_file)
             self.log_file = log_file
 
-            processors = [
+            file_processors = [
                 structlog.contextvars.merge_contextvars,
                 structlog.stdlib.add_log_level,
                 structlog.stdlib.add_logger_name,
@@ -161,33 +187,31 @@ class ValidationLogger:
             ]
 
             structlog.configure(
-                processors=processors,
+                processors=file_processors,
                 wrapper_class=structlog.stdlib.BoundLogger,
                 context_class=dict,
                 logger_factory=structlog.stdlib.LoggerFactory(),
                 cache_logger_on_first_use=False,
             )
 
-            stdlib_logger = logging.getLogger("validation_pipeline")
+            stdlib_logger = logging.getLogger(_STDLIB_LOGGER)
             stdlib_logger.handlers.clear()
             stdlib_logger.setLevel(logging.DEBUG)
             stdlib_logger.propagate = False
 
-            file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
-            file_handler.setLevel(logging.DEBUG)
-            file_handler.setFormatter(
+            stdlib_logger.addHandler(logging.FileHandler(log_file, mode='w', encoding='utf-8'))
+            stdlib_logger.handlers[0].setLevel(logging.DEBUG)
+            stdlib_logger.handlers[0].setFormatter(
                 structlog.stdlib.ProcessorFormatter(
                     processor=structlog.processors.JSONRenderer(),
-                    foreign_pre_chain=processors,
+                    foreign_pre_chain=file_processors,
                 )
             )
-            stdlib_logger.addHandler(file_handler)
 
-            console_pre_chain = processors[:-1] + [
-                format_process_info,
-                add_log_level_colors,
-                processors[-1],
-            ]
+            console_pre_chain = [
+                p for p in file_processors[:-1]
+                if p is not structlog.processors.format_exc_info
+            ] + [format_process_info, add_log_level_colors, file_processors[-1]]
 
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setLevel(getattr(logging, console_level.upper()))
@@ -200,31 +224,9 @@ class ValidationLogger:
             stdlib_logger.addHandler(console_handler)
 
         else:
-            processors = [
-                structlog.contextvars.merge_contextvars,
-                structlog.processors.add_log_level,
-                structlog.processors.TimeStamper(fmt="iso"),
-                structlog.processors.StackInfoRenderer(),
-                structlog.processors.format_exc_info,
-            ]
+            _build_console_processors(console_level)
 
-            console_processors = processors + [
-                format_process_info,
-                add_log_level_colors,
-                structlog.dev.ConsoleRenderer(colors=True)
-            ]
-
-            structlog.configure(
-                processors=console_processors,
-                wrapper_class=structlog.make_filtering_bound_logger(
-                    getattr(structlog.stdlib.logging, console_level.upper(), structlog.stdlib.logging.INFO)
-                ),
-                context_class=dict,
-                logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
-                cache_logger_on_first_use=False,
-            )
-
-        self.logger = structlog.get_logger("validation_pipeline")
+        self.logger = structlog.get_logger(self._name)
 
         if log_file:
             self.info(f"Detailed log file: {log_file}")
@@ -233,12 +235,10 @@ class ValidationLogger:
         self,
         console_level: str = "INFO",
         enable_file_logging: bool = True,
-        log_file: Optional[Path] = None
     ):
         """Reconfigure logging level after initial setup."""
         console_level_upper = console_level.upper()
-
-        stdlib_logger = logging.getLogger("validation_pipeline")
+        stdlib_logger = logging.getLogger(_STDLIB_LOGGER)
 
         if stdlib_logger.handlers:
             for handler in stdlib_logger.handlers:
@@ -252,60 +252,32 @@ class ValidationLogger:
                     if not isinstance(h, logging.FileHandler)
                 ]
         else:
-            processors = [
-                structlog.contextvars.merge_contextvars,
-                structlog.processors.add_log_level,
-                structlog.processors.TimeStamper(fmt="iso"),
-                structlog.processors.StackInfoRenderer(),
-                structlog.processors.format_exc_info,
-            ]
-
-            console_processors = processors + [
-                format_process_info,
-                add_log_level_colors,
-                structlog.dev.ConsoleRenderer(colors=True)
-            ]
-
-            structlog.configure(
-                processors=console_processors,
-                wrapper_class=structlog.make_filtering_bound_logger(
-                    getattr(structlog.stdlib.logging, console_level_upper, structlog.stdlib.logging.INFO)
-                ),
-                context_class=dict,
-                logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
-                cache_logger_on_first_use=False,
-            )
-
-            self.logger = structlog.get_logger("validation_pipeline")
+            _build_console_processors(console_level_upper)
+            self.logger = structlog.get_logger(self._name)
 
     def debug(self, message: str, **kwargs):
         """Log debug message with optional structured context."""
-        if self.logger:
-            self.logger.debug(message, **kwargs)
+        self.logger.debug(message, **kwargs)
 
     def info(self, message: str, **kwargs):
         """Log info message with optional structured context."""
-        if self.logger:
-            self.logger.info(message, **kwargs)
+        self.logger.info(message, **kwargs)
 
     def warning(self, message: str, **kwargs):
         """Log warning message with optional structured context."""
-        if self.logger:
-            self.logger.warning(message, **kwargs)
+        self.logger.warning(message, **kwargs)
         with self._issues_lock:
             self.validation_issues.append(('WARNING', message))
 
     def error(self, message: str, **kwargs):
         """Log error message with optional structured context."""
-        if self.logger:
-            self.logger.error(message, **kwargs)
+        self.logger.error(message, **kwargs)
         with self._issues_lock:
             self.validation_issues.append(('ERROR', message))
 
     def critical(self, message: str, **kwargs):
         """Log critical message with optional structured context."""
-        if self.logger:
-            self.logger.critical(message, **kwargs)
+        self.logger.critical(message, **kwargs)
         with self._issues_lock:
             self.validation_issues.append(('CRITICAL', message))
 
@@ -326,13 +298,12 @@ class ValidationLogger:
         if details:
             log_kwargs.update(details)
 
-        if self.logger:
-            if level == 'ERROR':
-                self.logger.error(log_message, **log_kwargs)
-            elif level == 'WARNING':
-                self.logger.warning(log_message, **log_kwargs)
-            else:
-                self.logger.info(log_message, **log_kwargs)
+        if level == 'ERROR':
+            self.logger.error(log_message, **log_kwargs)
+        elif level == 'WARNING':
+            self.logger.warning(log_message, **log_kwargs)
+        else:
+            self.logger.info(log_message, **log_kwargs)
 
     def start_timer(self, name: str):
         """Start a named timer for performance measurement (thread-safe)."""
@@ -357,13 +328,12 @@ class ValidationLogger:
 
     def add_file_timing(self, input_file: str, validator_type: str, elapsed_time: float):
         """Add file timing information (thread-safe)."""
-        timing = FileTimingSummary(
-            input_file=input_file,
-            validator_type=validator_type,
-            elapsed_time=elapsed_time
-        )
         with self._timings_lock:
-            self.file_timings.append(timing)
+            self.file_timings.append(FileTimingSummary(
+                input_file=input_file,
+                validator_type=validator_type,
+                elapsed_time=elapsed_time,
+            ))
 
     def clear_file_timings(self):
         """Clear all file timing information (thread-safe)."""
@@ -393,11 +363,8 @@ class ValidationLogger:
             if len(filename) > max_filename_len:
                 filename = "..." + filename[-(max_filename_len-3):]
 
-            time_str = f"{timing.elapsed_time:.2f}s"
-            type_label = timing.validator_type.upper()
-
             self.info(
-                f"  {filename:<{max_filename_len}}  [{type_label:>7}]  {time_str:>8}",
+                f"  {filename:<{max_filename_len}}  [{timing.validator_type.upper():>7}]  {timing.elapsed_time:.2f}s",
                 category=timing.validator_type
             )
 
