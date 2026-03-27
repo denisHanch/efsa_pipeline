@@ -1,5 +1,5 @@
 # First stage: Build the debreak binary
-FROM python:3.10-slim AS builder
+FROM python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4 AS builder
 
 ARG PYSAM_VERSION=0.23.3
 ARG DEBREAK_REF=v1.2
@@ -20,7 +20,7 @@ WORKDIR /build
 RUN git clone --branch ${DEBREAK_REF} --depth 1 https://github.com/Maggi-Chen/DeBreak.git
 
 # Second stage: Final minimal image
-FROM python:3.10-slim
+FROM python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4
 
 RUN apt-get update && apt-get install -y \
     libbz2-1.0 \
