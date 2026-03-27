@@ -1,6 +1,6 @@
 # Tool Parameter Reference
 
-This page documents the hardcoded analysis parameters used by the pipeline's bioinformatics tools. These values have been chosen for **bacterial/prokaryotic genomes** with typical sequencing coverage and may require adjustment for other organisms or experimental designs.
+This page documents the hardcoded analysis parameters used by the pipeline's bioinformatics tools. The pipeline supports both **prokaryotic** and **eukaryotic** genomes (set via the `type` field in `config.json`). The current parameter values are suitable for both organism types under typical sequencing conditions.
 
 ---
 
@@ -18,10 +18,16 @@ freebayes -f <ref> --min-coverage 10 --min-base-quality 20 --min-mapping-quality
 |-----------|-------|-------------------|-------------|
 | `--min-coverage` | 10 | 0 | Minimum number of reads covering a locus to call a variant. The default (0) would attempt calls at sites with a single read, producing many false positives. A value of 10 is a standard threshold for reliable variant calling with moderate Illumina coverage. |
 | `--min-base-quality` | 20 | 0 | Minimum per-base Phred quality score. Q20 (99% per-base accuracy) is the widely accepted quality floor for Illumina data. The default (0) would include low-confidence bases, significantly increasing error-driven false calls. |
-| `--min-mapping-quality` | 30 | 1 | Minimum read mapping Phred score. Q30 (99.9% mapping confidence) ensures only confidently placed reads contribute to variant calls. The default (1) would include multi-mapped and ambiguously placed reads, particularly problematic in repetitive bacterial regions. |
-| `--min-alternate-count` | 3 | 2 | Minimum number of reads supporting the alternate allele. Slightly stricter than the default (2), providing an additional guard against sequencing-error-driven false positives in haploid genomes. |
+| `--min-mapping-quality` | 30 | 1 | Minimum read mapping Phred score. Q30 (99.9% mapping confidence) ensures only confidently placed reads contribute to variant calls. The default (1) would include multi-mapped and ambiguously placed reads, which is problematic in repetitive regions of both prokaryotic and eukaryotic genomes. |
+| `--min-alternate-count` | 3 | 2 | Minimum number of reads supporting the alternate allele. Slightly stricter than the default (2), providing an additional guard against sequencing-error-driven false positives. |
 
-**Rationale:** These are standard community thresholds for calling SNPs and small indels in haploid bacterial genomes with moderate Illumina coverage (30–100×). Each value departs from the freebayes default to reduce false positives — particularly important in a regulatory/safety context (GMO assessment). The freebayes defaults are intentionally permissive to support diverse use cases (e.g., polyploid organisms, low-frequency somatic variants); for haploid bacterial genomes these permissive defaults would produce excessive noise.
+**Rationale:** These are standard community thresholds for calling SNPs and small indels with moderate Illumina coverage (30–100×). Each value departs from the freebayes default to reduce false positives — particularly important in a regulatory/safety context (GMO assessment). The freebayes defaults are intentionally permissive to support diverse use cases (e.g., low-frequency somatic variants); for GMO detection pipelines these permissive defaults would produce excessive noise.
+
+
+!!! info "Eukaryote considerations"
+    - **Repetitive regions:** Eukaryotic genomes contain more repetitive content than prokaryotes. The `--min-mapping-quality 30` filter is especially important here to avoid spurious calls from multi-mapped reads.
+    - **Coverage:** For larger eukaryotic genomes with lower per-base coverage, `--min-coverage 10` may filter out valid variant sites in under-covered regions. Consider lowering to 5 if average genome-wide coverage is below 20×.
+    - **Genome size:** The parameters themselves are genome-size agnostic; runtime will increase proportionally with genome size.
 
 **Trade-offs:**
 
@@ -47,17 +53,15 @@ All parameters use Delly defaults. No custom thresholds are applied.
 **Module:** `modules/sv_calling.nf`
 
 ```bash
-cuteSV <bam> <ref> <out.vcf> <work_dir> -t 1
+cuteSV <bam> <ref> <out.vcf> <work_dir> `-t ${params.max_cpu}`
 ```
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| `-t` | 1 | Number of threads. Set to 1 as a safe default for shared compute nodes. |
+| `-t` | `${params.max_cpu}` | Number of threads. Set to 1 as a safe default for shared compute nodes. |
 
-All other parameters use cuteSV defaults (minimum SV size 50 bp, minimum support 10 reads, etc.). These defaults are suitable for moderate-coverage PacBio/ONT data on bacterial genomes.
+All other parameters use cuteSV defaults (minimum SV size 50 bp, minimum support 10 reads, etc.). These defaults are suitable for moderate-coverage PacBio/ONT data on both prokaryotic and eukaryotic genomes.
 
-!!! tip
-    For faster execution on dedicated compute nodes, consider increasing the thread count (e.g., `-t ${params.max_cpu}`).
 
 ### Sniffles (structural variant calling)
 
@@ -98,7 +102,7 @@ nucmer --maxmatch -c 100 -b 500 -l 50 <ref> <mod> -p <prefix>
 | `-b` | 500 | Maximum gap (bp) between clustered matches. Allows merging across small indels or rearrangements. |
 | `-l` | 50 | Minimum exact match (MEM) length in bp. Balances sensitivity with noise reduction. |
 
-**Rationale:** These values are optimized for pairwise comparison of closely related prokaryotic genomes (reference vs. genetically modified organism). The settings are permissive enough to capture meaningful structural differences while filtering alignment noise.
+**Rationale:** These values are suitable for pairwise comparison of closely related genomes (reference vs. genetically modified organism) for both prokaryotic and eukaryotic organisms. The settings are permissive enough to capture meaningful structural differences while filtering alignment noise.
 
 **Trade-offs:**
 
@@ -127,7 +131,7 @@ delta-filter -m -i 90 -l 100 <delta>
 |------|----------|--------|---------------------------|
 | Freebayes | Short-read | `variant_calling.nf` | `--min-coverage 10`, `--min-base-quality 20`, `--min-mapping-quality 30`, `--min-alternate-count 3` |
 | Delly | Short-read | `sv_calling.nf` | Defaults only |
-| cuteSV | Long-read | `sv_calling.nf` | `-t 1` |
+| cuteSV | Long-read | `sv_calling.nf` | `-t ${params.max_cpu}` |
 | Sniffles | Long-read | `sv_calling.nf` | Defaults only |
 | DeBreak | Long-read | `sv_calling.nf` | `-t ${params.max_cpu}` |
 | NUCmer | Ref vs Mod | `assembly.nf` | `--maxmatch`, `-c 100`, `-b 500`, `-l 50` |
