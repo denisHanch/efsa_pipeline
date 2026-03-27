@@ -1,4 +1,4 @@
-FROM alpine:3.22
+FROM alpine:3.22@sha256:55ae5d250caebc548793f321534bc6a8ef1d116f334f18f4ada1b2daad3251b2
 ARG MINIMAP2_VERSION=2.28
 
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \

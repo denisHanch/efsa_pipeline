@@ -1,4 +1,4 @@
-FROM docker:28.5.0-dind-alpine3.22
+FROM docker:29.3.1-dind-alpine3.23@sha256:4d90f1f6c400315c2dba96d3ec93c01e64198395cbba04f79d12adce4f737029
 ARG GFFREAD_REF=v0.12.7
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories && \
@@ -37,7 +37,7 @@ RUN apk add --no-cache build-base bzip2-dev && \
     apk del build-base bzip2-dev
 
 # Copy pre-built minimap2 binary from dedicated image (built from tools/minimap2/Dockerfile)
-COPY --from=ecomolegmo/minimap2:v2.28 /usr/local/bin/minimap2 /usr/local/bin/minimap2
+COPY --from=ecomolegmo/minimap2:v2.28@sha256:74378de53e11225abc2cabb98c4ca089d38cff0f9aa1fccee3a4577fb4625651 /usr/local/bin/minimap2 /usr/local/bin/minimap2
 
 # Build and install gffread from source (not available in Alpine repos)
 RUN apk add --no-cache --virtual .gffread-build-deps \
