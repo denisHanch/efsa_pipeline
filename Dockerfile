@@ -35,32 +35,8 @@ RUN apk add --no-cache build-base bzip2-dev && \
     rm -rf /tmp/pbzip2* && \
     apk del build-base bzip2-dev
 
-# Build and install minimap2 from source (not available in Alpine repos, prebuilt binaries require glibc)
-RUN apk add --no-cache --virtual .minimap2-build-deps \
-        build-base \
-        zlib-dev \
-    && cd /tmp \
-    && curl -L https://github.com/lh3/minimap2/archive/refs/tags/v2.28.tar.gz | tar -xzf - \
-    && cd minimap2-2.28 \
-    && make \
-    && cp minimap2 /usr/local/bin/ \
-    && cd / \
-    && rm -rf /tmp/minimap2-2.28 \
-    && apk del .minimap2-build-deps
-
-# Install bedtools by extracting directly from Debian package (no apt/GPG needed; gcompat handles glibc)
-RUN apk add --no-cache dpkg && \
-    cd /tmp && \
-    curl -L "http://ftp.debian.org/debian/pool/main/b/bedtools/bedtools_2.30.0+dfsg-3_amd64.deb" -o bedtools.deb && \
-    dpkg-deb -x bedtools.deb bedtools-pkg && \
-    mv bedtools-pkg/usr/bin/bedtools /usr/local/bin/ && \
-    rm -rf /tmp/bedtools.deb /tmp/bedtools-pkg && \
-    apk del dpkg
-
-# Install bedtools glibc compatibility libs
-RUN apk add --no-cache gcompat libstdc++ xz-libs && \
-    ln -sf /usr/lib/libbz2.so.1 /usr/lib/libbz2.so.1.0
-
+# Copy pre-built minimap2 binary from dedicated image (built from tools/minimap2/Dockerfile)
+COPY --from=ecomolegmo/minimap2:v2.28 /usr/local/bin/minimap2 /usr/local/bin/minimap2
 
 # Copy pre-built gffread binary from dedicated image (built from tools/gffread/Dockerfile)
 COPY --from=ecomolegmo/gffread:v0.12.7 /usr/local/bin/gffread /usr/local/bin/gffread
