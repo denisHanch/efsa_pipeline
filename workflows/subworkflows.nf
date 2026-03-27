@@ -1,7 +1,7 @@
 
 include { fastqc; multiqc; trimgalore } from "../modules/qc.nf"
 include { bwa_mapping; samtools_index_bam; samtools_sort; samtools_stats; picard; calc_unmapped; minimap2 } from "../modules/mapping.nf"
-include { convert_bcf_to_vcf; delly; samtools_index; picard_dict; sniffles; debreak; cute_sv; survivor; vcf_to_table_short; vcf_to_table_long } from "../modules/sv_calling.nf"
+include { convert_bcf_to_vcf; delly; samtools_index; picard_dict; sniffles; debreak; cute_sv; survivor; vcf_to_table_short; vcf_to_table_long; extract_supp_reads as extract_supp_reads_1; extract_supp_reads as extract_supp_reads_2; extract_supp_reads as extract_supp_reads_3 } from "../modules/sv_calling.nf"
 include { snpeff; build_config; bcftools_stats } from "../modules/variant_calling.nf"
 
 
@@ -116,10 +116,18 @@ workflow sv_long {
         cute_sv(fasta, fai, indexed_bam, out_folder_name) | set { cute_vcf }
         debreak(fasta, indexed_bam, out_folder_name) | set { debreak_vcf }
         sniffles(fasta, indexed_bam, out_folder_name) | set { sniffles_vcf }
+        
+        extract_supp_reads_1(cute_vcf,"RE", "cute_sv")
+        extract_supp_reads_2(debreak_vcf,"SUPPREAD", "debreak")
+        extract_supp_reads_3(sniffles_vcf, "SUPPORT", "sniffles")
+
+        supp_reads = extract_supp_reads_1.out
+            .mix(extract_supp_reads_2.out)
+            .mix(extract_supp_reads_3.out)
 
         survivor(cute_vcf, debreak_vcf, sniffles_vcf, mapping_tag, out_folder_name) | set { merged_vcf }
         bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
-        sv_vcf_ch = merged_vcf.map { pair_id, vcf -> vcf }
     emit:
         merged_vcf
+        supp_reads
 }

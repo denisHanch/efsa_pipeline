@@ -452,6 +452,9 @@ data/outputs/tables/
 │   ├── Inversions.csv
 │   ├── Replacements.csv
 │   └── Translocations.csv
+├── supporting_reads/
+│   ├── sample1_method_supporting_reads.tsv
+│   └── ...
 └── tsv
     ├── assembly_sv_summary.tsv
     ├── short_sv_summary.tsv
