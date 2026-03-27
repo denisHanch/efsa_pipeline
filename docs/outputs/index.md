@@ -40,11 +40,6 @@ data/outputs/
 ├── truvari/            → Variant comparison results (if run_truvari set to true in `data/validation/validated_params.json`)
 ├── unmapped_stats/     → Unmapped read statistics
 └── logs/               → Execution logs, trace data, and process manifest
-    ├── report.html
-    ├── timeline.html
-    ├── trace.tsv             → Per-process status and exit codes
-    ├── process_manifest.txt  → Summary of succeeded/failed processes
-    └── ...                   → Per-process .command.* files
 ```
 
 ## Quick Navigation
