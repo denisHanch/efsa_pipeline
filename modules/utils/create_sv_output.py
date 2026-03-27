@@ -42,6 +42,7 @@ the same for clustering, but preserved as separate `long_ont_*` and `long_pacbio
 from __future__ import annotations
 
 import argparse
+import glob
 import os
 import re
 from dataclasses import dataclass, field
@@ -240,6 +241,96 @@ def choose_best_record(recs):
 
 def read_tsv(path):
     return pd.read_csv(path, sep="\t", dtype=str, comment="#")
+
+
+# ----------------------------
+# Supporting-read resolution
+# ----------------------------
+
+def _load_supp_reads_files(paths):
+    """Load all per-caller supporting-reads TSVs into a single DataFrame.
+
+    Expected columns per file: chrom, start, end, svtype, supporting_reads.
+    Returns a DataFrame with columns: chrom, start, svtype, std_type, reads.
+    """
+    frames = []
+    for path in paths:
+        try:
+            df = read_tsv(path)
+        except Exception:
+            continue
+        if df.empty:
+            continue
+        df = df.rename(columns={"supporting_reads": "reads"})
+        df["start"] = pd.to_numeric(df["start"], errors="coerce")
+        df["reads"] = pd.to_numeric(df["reads"], errors="coerce").fillna(0).astype(int)
+        df = df.dropna(subset=["chrom", "start"])
+        df["start"] = df["start"].astype(int)
+        # Standardise caller svtype so it matches the record's std_type
+        df["std_type"] = df["svtype"].apply(
+            lambda s: standardize_type(str(s).strip().upper(), None, "long")
+        )
+        frames.append(df[["chrom", "start", "std_type", "reads"]])
+
+    if not frames:
+        return pd.DataFrame(columns=["chrom", "start", "std_type", "reads"])
+    return pd.concat(frames, ignore_index=True)
+
+
+def resolve_supporting_reads(records, supp_files, tol=1000):
+    """Replace missing supporting_reads on long-read Records using pandas merge_asof.
+
+    For each long-read record, find matching caller entries by chrom + svtype
+    within *tol* bp of the start position, and sum the reads across all callers.
+    """
+    if not supp_files:
+        return records
+
+    caller_df = _load_supp_reads_files(supp_files)
+    if caller_df.empty:
+        return records
+
+    # Build a DataFrame of long-read records that need resolution
+    long_indices = [
+        i for i, r in enumerate(records)
+        if r.source.startswith("long")
+    ]
+    if not long_indices:
+        return records
+
+    long_rows = pd.DataFrame([
+        {"_idx": i, "chrom": records[i].chrom,
+         "start": records[i].start, "std_type": records[i].std_type}
+        for i in long_indices
+    ])
+
+    # Sum caller reads per (chrom, std_type, start) so each position
+    # carries the total across sniffles + cuteSV + debreak
+    caller_agg = (
+        caller_df
+        .groupby(["chrom", "std_type", "start"], as_index=False)["reads"]
+        .sum()
+        .sort_values("start")
+    )
+
+    # merge_asof: nearest match within tolerance, grouped by chrom + svtype
+    long_rows = long_rows.sort_values("start")
+    merged = pd.merge_asof(
+        long_rows,
+        caller_agg,
+        on="start",
+        by=["chrom", "std_type"],
+        tolerance=tol,
+        direction="nearest",
+    )
+
+    # Write resolved values back into the Record objects
+    for _, row in merged.iterrows():
+        reads = row.get("reads")
+        if pd.notna(reads) and int(reads) > 0:
+            records[int(row["_idx"])].supporting_reads = int(reads)
+
+    return records
 
 def load_records(path, source):
     """Load records from a TSV file into Record objects.
@@ -613,6 +704,11 @@ def main():
     records += load_records(getattr(args, "long_pacbio", None), "long_pacbio")
 
     records += load_records(args.short_reads, "short")
+
+    # Resolve long-read supporting reads from per-caller TSVs staged in the work directory
+    supp_files = sorted(glob.glob("*_supporting_reads.tsv"))
+    if supp_files:
+        records = resolve_supporting_reads(records, supp_files, tol=args.tol)
 
     if not records:
         os.makedirs(args.out, exist_ok=True)
