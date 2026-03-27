@@ -979,10 +979,10 @@ class TestConfigValidatorSettings:
 
         loaded_config = ConfigManager.load(str(config_file))
 
-        # File-level validation_level stored in global_options (no global options in config)
-        assert loaded_config.ref_genome.global_options == {"validation_level": "trust"}
-        # mod_genome has no global_options since none specified in config
-        assert loaded_config.mod_genome.global_options == {}
+        # File-level validation_level overrides the default in global_options
+        assert loaded_config.ref_genome.global_options['validation_level'] == 'trust'
+        # mod_genome gets the default validation_level
+        assert loaded_config.mod_genome.global_options['validation_level'] == 'trust'
 
     def test_read_config_file_level_validation_level(self, temp_dir):
         """Test that file-level validation_level is stored in global_options for reads."""
@@ -1007,7 +1007,7 @@ class TestConfigValidatorSettings:
 
         loaded_config = ConfigManager.load(str(config_file))
 
-        assert loaded_config.reads[0].global_options == {"validation_level": "trust"}
+        assert loaded_config.reads[0].global_options['validation_level'] == 'trust'
         assert loaded_config.reads[0].ngs_type == "illumina"
 
     def test_feature_config_file_level_validation_level(self, temp_dir):
@@ -1032,7 +1032,7 @@ class TestConfigValidatorSettings:
 
         loaded_config = ConfigManager.load(str(config_file))
 
-        assert loaded_config.ref_feature.global_options == {"validation_level": "minimal"}
+        assert loaded_config.ref_feature.global_options['validation_level'] == 'minimal'
 
     def test_non_global_options_logged_as_warnings(self, temp_dir):
         """Test that non-global options (like plasmid_split) are logged as warnings and ignored."""
@@ -1057,8 +1057,11 @@ class TestConfigValidatorSettings:
         # Should load successfully (non-global options just logged as warnings)
         loaded_config = ConfigManager.load(str(config_file))
 
-        # Only validation_level (global option) should be in global_options
-        assert loaded_config.ref_genome.global_options == {"validation_level": "trust"}
+        # Only allowed file-level options end up in global_options; non-global fields are ignored.
+        # All defaults are present; the file-level validation_level overrides the default.
+        assert loaded_config.ref_genome.global_options['validation_level'] == 'trust'
+        assert 'plasmid_split' not in loaded_config.ref_genome.global_options
+        assert 'min_sequence_length' not in loaded_config.ref_genome.global_options
 
     def test_directory_reads_inherit_file_level_settings(self, temp_dir):
         """Test that files from directory inherit file-level validation_level."""
@@ -1091,7 +1094,7 @@ class TestConfigValidatorSettings:
         # Both files from directory should inherit validation_level
         assert len(loaded_config.reads) == 2
         for read_config in loaded_config.reads:
-            assert read_config.global_options == {"validation_level": "trust"}
+            assert read_config.global_options['validation_level'] == 'trust'
 
     def test_global_and_file_level_options_merge(self, temp_dir):
         """Test that global options and file-level options merge correctly."""
@@ -1125,8 +1128,8 @@ class TestConfigValidatorSettings:
         assert loaded_config.mod_genome.global_options["validation_level"] == "trust"
         assert loaded_config.mod_genome.global_options["threads"] == 8
 
-    def test_empty_global_options_when_no_settings(self, temp_dir):
-        """Test that global_options is empty when no options provided in config."""
+    def test_global_options_contain_defaults_when_no_settings(self, temp_dir):
+        """Test that global_options contains all defaults when no options provided in config."""
         (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
         (temp_dir / "mod.fasta").write_text(">seq1\nATCG\n")
         (temp_dir / "reads.fastq").write_text("@read1\nATCG\n+\nIIII\n")
@@ -1142,10 +1145,17 @@ class TestConfigValidatorSettings:
 
         loaded_config = ConfigManager.load(str(config_file))
 
-        # global_options should be empty when no options specified
-        assert loaded_config.ref_genome.global_options == {}
-        assert loaded_config.mod_genome.global_options == {}
-        assert loaded_config.reads[0].global_options == {}
+        # global_options should contain all defaults when no options specified
+        expected_defaults = {
+            'threads': None,
+            'validation_level': 'trust',
+            'logging_level': 'INFO',
+            'type': 'prokaryote',
+            'force_defragment_ref': False,
+        }
+        assert loaded_config.ref_genome.global_options == expected_defaults
+        assert loaded_config.mod_genome.global_options == expected_defaults
+        assert loaded_config.reads[0].global_options == expected_defaults
 
 
 class TestSecurityPathTraversal:
@@ -1653,8 +1663,8 @@ class TestConfigOptionsType:
         loaded = ConfigManager.load(str(config_file))
         # Global type is not set (only file-level was given, which gets ignored) - falls back to default
         assert loaded.type == 'prokaryote'
-        # file-level type does not appear in ref_genome's global_options either
-        assert "type" not in loaded.ref_genome.global_options
+        # file-level type is ignored (not in ALLOWED_FILE_OPTIONS); global default applies
+        assert loaded.ref_genome.global_options['type'] == 'prokaryote'
 
 
 if __name__ == "__main__":

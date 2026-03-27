@@ -2,6 +2,11 @@
 
 import sys
 import traceback
+from pathlib import Path
+
+# Add modules/validation/ to sys.path so utils/ is importable.
+sys.path.insert(0, str(Path(__file__).parent))
+
 from validation_pkg import (
     ConfigManager,
     GenomeValidator,
@@ -19,21 +24,59 @@ from validation_pkg import (
     genomexgenome_validation
 )
 from validation_pkg.exceptions import ValidationError
-
-from pathlib import Path
+from validation_pkg.utils.formats import CodingType, GenomeFormat
+from utils.ref_defragment import defragment_reference
 
 import nextflow_params_handler as nf_params
 
+def _parse_cli_args(argv):
+    """Parse CLI arguments and return (config_path, cli_options)."""
+    args = list(argv)
+    cli_options = {}
+
+    # Extract boolean flag
+    if '--force-defragment-ref' in args:
+        cli_options['force_defragment_ref'] = True
+        args.remove('--force-defragment-ref')
+
+    # Extract key-value options
+    i = 0
+    remaining = []
+    while i < len(args):
+        if args[i] == '--threads' and i + 1 < len(args):
+            val = args[i + 1]
+            cli_options['threads'] = None if val == 'auto' else int(val)
+            i += 2
+        elif args[i] == '--validation-level' and i + 1 < len(args):
+            cli_options['validation_level'] = args[i + 1]
+            i += 2
+        elif args[i] == '--logging-level' and i + 1 < len(args):
+            cli_options['logging_level'] = args[i + 1].upper()
+            i += 2
+        elif args[i] == '--type' and i + 1 < len(args):
+            cli_options['type'] = args[i + 1]
+            i += 2
+        else:
+            remaining.append(args[i])
+            i += 1
+
+    return remaining, cli_options
+
+
 def main():
     # Check command line arguments
-    if len(sys.argv) < 2:
-        print("Usage: python main.py <config_path>")
+    args, cli_options = _parse_cli_args(sys.argv[1:])
+
+    if not args:
+        print("Usage: python main.py <config_path> [--force-defragment-ref]")
+        print("       [--threads N|auto] [--validation-level LEVEL]")
+        print("       [--logging-level LEVEL] [--type TYPE]")
         print("\nExample:")
         print("  python main.py config.json")
         return 1
 
     # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
-    config_path = Path(sys.argv[1]).resolve()
+    config_path = Path(args[0]).resolve()
     output_dir = config_path.parent.parent / "valid"
     logger = None
     log_file = None
@@ -51,11 +94,57 @@ def main():
     # ========================================================================
     config = None
     try:
-        config = ConfigManager.load(config_path)
+        config = ConfigManager.load(config_path, cli_options=cli_options)
     except Exception as e:
         logger.error(f"Loading a config file failed: {e}")
         return 1
 
+    # ========================================================================
+    # Step 1.5 (optional): Defragment reference if force_defragment_ref is set
+    # Priority: config.json > CLI arg > default (false)
+    # ========================================================================
+    force_defragment = config.force_defragment_ref
+    if force_defragment:
+        logger.warning("=" * 70)
+        logger.warning("UNSUPPORTED WORKAROUND: --force-defragment-ref is ACTIVE")
+        logger.warning("=" * 70)
+        logger.warning(
+            "The reference genome is highly fragmented and is NOT suitable "
+            "for this pipeline. Merging contigs is a workaround only."
+        )
+        logger.warning(
+            "All downstream results (inter-genome alignment, feature "
+            "coordinate mapping, variant calling) may be INCORRECT or "
+            "MEANINGLESS when run on an artificially merged reference."
+        )
+        logger.warning(
+            "EFSA pipeline does NOT support fragmented references. "
+            "Do NOT use these results for regulatory submissions or "
+            "biological conclusions without expert review."
+        )
+        logger.warning(
+            f"Original reference: {config.ref_genome.filepath} "
+            "— consider obtaining a properly assembled genome instead."
+        )
+        logger.warning("=" * 70)
+        try:
+            merged_fasta, join_tsv = defragment_reference(config.ref_genome)
+        except Exception as e:
+            logger.error(f"Defragmentation failed: {e}")
+            return 1
+        config.ref_genome.filepath = merged_fasta
+        config.ref_genome.filename = merged_fasta.name
+        config.ref_genome.coding_type = CodingType.NONE
+        config.ref_genome.detected_format = GenomeFormat.FASTA
+        config.ref_genome._extract_basename()
+        logger.warning(
+            f"Reference replaced for this run. "
+            f"Merged file: {merged_fasta} | Join order: {join_tsv}"
+        )
+        logger.warning(
+            "Proceeding with validation on merged reference. "
+            "Results should be interpreted with extreme caution."
+        )
 
     # ========================================================================
     # Step 2: Edit settings for each validator
@@ -199,7 +288,7 @@ def main():
 
     # Validate features (optional — non-fatal)
     ref_feature_res = None
-    if hasattr(config, 'ref_feature') and config.ref_feature:
+    if hasattr(config, 'ref_feature') and config.ref_feature and not force_defragment:
         try:
             ref_feature_res = validate_feature(config.ref_feature, ref_feature_settings)
             report.write(ref_feature_res, file_type="feature")
@@ -226,7 +315,13 @@ def main():
         "reads":         reads_res,
         "ref_feature":   ref_feature_res,
     }
-    params = nf_params.build_params(validation_results)
+    if force_defragment:
+        logger.warning(
+            "force_defragment_ref is active: GFF validation for the reference is "
+            "skipped. Feature coordinates are not meaningful on a defragmented "
+            "reference — run_vcf_annotation will be disabled."
+        )
+    params = nf_params.build_params(validation_results, force_defragment_ref=force_defragment)
     nf_params.write_params(params, output_dir / "validated_params.json")
 
     return 0

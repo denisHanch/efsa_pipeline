@@ -222,15 +222,27 @@ These settings customize validation behavior without modifying code.
 ### Global Options (`options` field)
 
 **Allowed global options:**
-- `threads`: Number of threads for parallel processing (positive integer, default: auto-detect)
-  - When omitted or set to `null`, the system auto-detects based on available CPU cores
-  - System warns if threads exceed available cores
-- `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (default: `"trust"`)
-- `logging_level`: `"DEBUG"`, `"INFO"`, `"WARNING"`, or `"ERROR"` (default: `"INFO"`)
-  - Controls console logging verbosity
-- `type`: Organism type — `"prokaryote"` or `"eukaryote"`
-  - When set to `"eukaryote"`, all genome files are copied to `data/valid/` without further processing and the pipeline will not run SyRI or ref-vs-mod comparison (assembly too complex for inter-genome alignment)
-  - When set to `"prokaryote"` (or omitted), normal validation and `n_sequence_limit` checks apply
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `threads` | integer / `null` | auto-detect | Number of threads. `null` or omit = auto-detect from CPU cores. System warns if value exceeds available cores. |
+| `validation_level` | string | `"trust"` | `"strict"`, `"trust"`, or `"minimal"` |
+| `logging_level` | string | `"INFO"` | `"DEBUG"`, `"INFO"`, `"WARNING"`, or `"ERROR"` |
+| `type` | string | `"prokaryote"` | `"prokaryote"` or `"eukaryote"`. Eukaryote skips inter-genome comparison. |
+| `force_defragment_ref` | boolean | `false` | **Unsupported workaround — use at your own risk.** Merges all reference contigs into one sequence before validation. Use only when the reference is too fragmented for any workflow. All downstream results (alignment, variant calling, feature mapping) may be incorrect or meaningless. See warning below. |
+
+> **⚠ Warning: `force_defragment_ref`**
+>
+> This option is an **unsupported workaround** and is used entirely **at your own responsibility**.
+> The EFSA pipeline does not support fragmented reference genomes. Merging contigs artificially
+> alters the coordinate space of the reference, which means all downstream results — inter-genome
+> alignment, variant calling, feature coordinate mapping — **may be incorrect or meaningless**.
+> Do **not** use these results for regulatory submissions or biological conclusions without expert review.
+> Obtain a properly assembled reference genome instead.
+>
+> When `force_defragment_ref` is set to `true` in `config.json`, it takes priority over the
+> `--force-defragment-ref` CLI flag. When set to `false` in `config.json`, the CLI flag is
+> **ignored** even if provided.
 
 **Example:**
 ```json
@@ -243,19 +255,31 @@ These settings customize validation behavior without modifying code.
     "threads": 8,
     "validation_level": "trust",
     "logging_level": "DEBUG",
-    "type": "prokaryote"
+    "type": "prokaryote",
+    "force_defragment_ref": false
   }
 }
 ```
 
-**Result:** ALL files will use `threads=8`, `validation_level='trust'`, and `logging_level='DEBUG'` by default.
+**Result:** ALL files will use the specified options. Any option not set here falls back to its default.
+
+#### Option priority
+
+Options can be set from three sources. The first matching source wins:
+
+```
+config.json "options"  →  CLI flags (validation.sh)  →  built-in defaults
+```
+
+A value in `config.json` always takes priority over a CLI flag, and a CLI flag takes priority over the built-in default. This applies to all options including `force_defragment_ref`: if the config sets it to `false`, passing `--force-defragment-ref` on the command line has no effect.
 
 **Validation:**
 - Invalid option names → `ConfigurationError` (e.g., `"abc"` not allowed)
 - Invalid threads → `ConfigurationError` (e.g., negative numbers)
 - Invalid validation_level → `ConfigurationError` (e.g., `"invalid_level"`)
-- Invalid logging_level → `ConfigurationError` (e.g., `"verbose"`, must be DEBUG/INFO/WARNING/ERROR/CRITICAL)
+- Invalid logging_level → `ConfigurationError` (e.g., `"verbose"`, must be DEBUG/INFO/WARNING/ERROR)
 - Invalid type → `ConfigurationError` (e.g., `"bacteria"`, must be `"prokaryote"` or `"eukaryote"`)
+- Invalid force_defragment_ref → `ConfigurationError` (must be `true` or `false`, not a string)
 
 ### File-Level Settings
 
