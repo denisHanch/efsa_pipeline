@@ -1,5 +1,5 @@
 # First stage
-FROM python:3.10-slim AS builder
+FROM python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4
 
 ARG SNIFFLES_VERSION=2.7.3
 
@@ -8,20 +8,9 @@ RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
     libbz2-dev \
- && rm -rf /var/lib/apt/lists/*
-
-RUN pip install --upgrade pip
-
-RUN pip wheel sniffles==${SNIFFLES_VERSION} --no-cache-dir -w /wheels
-
-# Second stage: Final minimal image
-FROM python:3.10-slim
-
-RUN apt-get update && apt-get install -y \
-    libbz2-dev \
     procps \
  && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /wheels /wheels
+RUN pip install --upgrade pip wheel
 
-RUN pip install --no-cache-dir /wheels/*
+RUN pip install --no-cache-dir sniffles==${SNIFFLES_VERSION}
