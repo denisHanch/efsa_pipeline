@@ -63,7 +63,7 @@ RUN apk add --no-cache gcompat libstdc++ xz-libs && \
 
 
 # Copy pre-built gffread binary from dedicated image (built from tools/gffread/Dockerfile)
-COPY --from=ecomolegmo/gffread:v0.12.7 /usr/local/bin/gffread /usr/local/bin/gffread
+COPY --from=ecomolegmo/gffread:v0.12.7@sha256:dad98757a1b8dcfae49f452678d59599bfb81d10c1a5272e418a352d1521b9aa /usr/local/bin/gffread /usr/local/bin/gffread
 
 # Copy and install validation package
 COPY modules/validation/ /tmp/validation/
