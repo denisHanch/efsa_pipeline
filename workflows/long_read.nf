@@ -64,18 +64,23 @@ workflow long_read {
 
         // SV calling against the reference
         if (out_folder_name == "ont/long-ref" || out_folder_name == "pacbio/long-ref") { 
-            sv_long(fasta, fai, indexed_bam, mapping_tag, out_folder_name) | set { sv_vcf }
-            vcf_to_table_long(mapping_tag, sv_vcf) | set { sv_tbl }
+            sv_long(fasta, fai, indexed_bam, mapping_tag, out_folder_name)
+            vcf_to_table_long(mapping_tag, sv_long.out.merged_vcf) | set { sv_tbl }
+            sv_vcf     = sv_long.out.merged_vcf
+            supp_reads = sv_long.out.supp_reads
 
         } else {
-            sv_vcf = Channel.empty()
-            sv_tbl = Channel.empty()
+            sv_vcf     = Channel.empty()
+            sv_tbl     = Channel.empty()
+            supp_reads = Channel.empty()
         }
+
 
     emit:
         sv_vcf
         unmapped_fastq
         sv_tbl
+        supp_reads
 }
 
 workflow.onComplete {
