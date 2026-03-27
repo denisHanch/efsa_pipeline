@@ -1,4 +1,5 @@
 FROM docker:28.5.0-dind-alpine3.22
+ARG GFFREAD_REF=v0.12.7
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories && \
     apk update --no-cache --allow-untrusted
@@ -38,8 +39,18 @@ RUN apk add --no-cache build-base bzip2-dev && \
 # Copy pre-built minimap2 binary from dedicated image (built from tools/minimap2/Dockerfile)
 COPY --from=ecomolegmo/minimap2:v2.28 /usr/local/bin/minimap2 /usr/local/bin/minimap2
 
-# Copy pre-built gffread binary from dedicated image (built from tools/gffread/Dockerfile)
-COPY --from=ecomolegmo/gffread:v0.12.7 /usr/local/bin/gffread /usr/local/bin/gffread
+# Build and install gffread from source (not available in Alpine repos)
+RUN apk add --no-cache --virtual .gffread-build-deps \
+        build-base \
+    && cd /tmp \
+    && git clone --branch ${GFFREAD_REF} --depth 1 https://github.com/gpertea/gffread.git \
+    && cd gffread \
+    && make release \
+    && cp gffread /usr/local/bin/ \
+    && chmod +x /usr/local/bin/gffread \
+    && cd / \
+    && rm -rf /tmp/gffread \
+    && apk del .gffread-build-deps
 
 # Copy and install validation package
 COPY modules/validation/ /tmp/validation/
