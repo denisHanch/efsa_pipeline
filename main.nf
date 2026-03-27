@@ -111,7 +111,6 @@ workflow {
 
         sv_tbl = sv_tbl.mix(long_ref_ont.out.sv_tbl)
         supp_reads_ch = supp_reads_ch.mix(long_ref_ont.out.supp_reads)
-        
         activePipelines << long_ref_ont.out.sv_vcf
 
         describePipeline("long-ont", "reference & modified")
@@ -166,9 +165,7 @@ workflow {
         tuple(asm, long_ont, long_pb, sht)
     }
 
-    supp_reads_collected = supp_reads_ch.collect().ifEmpty(file('NO_FILE'))
-
-    restructure_sv_tbl(script, tbl_channel, supp_reads_collected)
+    restructure_sv_tbl(script, tbl_channel, supp_reads_ch.collect().ifEmpty(file('NO_FILE')))
 }
 
 logWorkflowCompletion("execution of main.nf")

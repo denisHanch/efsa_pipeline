@@ -256,9 +256,8 @@ process restructure_sv_tbl {
     path "csv_per_sv_summary"
 
     script:
-    def supp_args = supp_reads.name != 'NO_FILE' ? "--supp_reads ${supp_reads.join(' ')}" : ''
     """
-    python ${script} --asm ${assembly_tsv} --short ${short_tsv} --long_ont ${long_ont_tsv} --long_pacbio ${long_pb_tsv} ${supp_args} --out csv_per_sv_summary
+    python ${script} --asm ${assembly_tsv} --short ${short_tsv} --long_ont ${long_ont_tsv} --long_pacbio ${long_pb_tsv} --out csv_per_sv_summary
     """
 }
 

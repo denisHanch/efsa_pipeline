@@ -42,6 +42,7 @@ the same for clustering, but preserved as separate `long_ont_*` and `long_pacbio
 from __future__ import annotations
 
 import argparse
+import glob
 import os
 import re
 from dataclasses import dataclass, field
@@ -692,13 +693,6 @@ def main():
         default=0,
         help="Tolerance in bp for linking near-identical final event coordinates in linked_event. Default 0 keeps overlap-only linking.",
     )
-    p.add_argument(
-        "--supp_reads",
-        nargs="*",
-        default=[],
-        help="Per-caller supporting-reads TSV files (from extract_supp_reads). "
-             "Used to resolve long-read supporting_reads instead of SURVIVOR's unreliable DR field.",
-    )
     args = p.parse_args()
 
     records = []
@@ -711,9 +705,10 @@ def main():
 
     records += load_records(args.short_reads, "short")
 
-    # Resolve long-read supporting reads from per-caller TSVs
-    if args.supp_reads:
-        records = resolve_supporting_reads(records, args.supp_reads, tol=args.tol)
+    # Resolve long-read supporting reads from per-caller TSVs staged in the work directory
+    supp_files = sorted(glob.glob("*_supporting_reads.tsv"))
+    if supp_files:
+        records = resolve_supporting_reads(records, supp_files, tol=args.tol)
 
     if not records:
         os.makedirs(args.out, exist_ok=True)
