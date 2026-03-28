@@ -24,17 +24,8 @@ RUN apk update && \
     && update-ca-certificates \
     && rm -rf /var/cache/apk/*
 
-# Install build dependencies and build pbzip2 from Debian source as pbzip2 is not available in Alpine
-RUN apk add --no-cache build-base bzip2-dev && \
-    cd /tmp && \
-    wget http://ftp.debian.org/debian/pool/main/p/pbzip2/pbzip2_1.1.13.orig.tar.gz -O pbzip2.tar.gz && \
-    tar xzf pbzip2.tar.gz && \
-    cd pbzip2-1.1.13 && \
-    make && \
-    make install && \
-    cd / && \
-    rm -rf /tmp/pbzip2* && \
-    apk del build-base bzip2-dev
+ # Copy pre-built pbzip2 binary from dedicated image (built from tools/minimap2/Dockerfile)
+ COPY --from=ecomolegmo/pbzip2:v1.1.13@sha256:4a308661071e1ba5e111199067353a8885a964bf93cacb00b5bb149097bacdcb /usr/bin/pbzip2 /usr/bin/pbzip2
 
 # Copy pre-built minimap2 binary from dedicated image (built from tools/minimap2/Dockerfile)
 COPY --from=ecomolegmo/minimap2:v2.30@sha256:50d38b713d7d68e105aa3870950492407d82128aa9f3c7c20307632edcab50a5 /usr/local/bin/minimap2 /usr/local/bin/minimap2
