@@ -37,7 +37,7 @@ RUN apk add --no-cache build-base bzip2-dev && \
     apk del build-base bzip2-dev
 
 # Copy pre-built minimap2 binary from dedicated image (built from tools/minimap2/Dockerfile)
-COPY --from=ecomolegmo/minimap2:v2.30@sha256:cd68810be1ec60941d92dc4a5fa7a286e214948f9c5e8ef500592d9d258647ce /usr/local/bin/minimap2 /usr/local/bin/minimap2
+COPY --from=ecomolegmo/minimap2:v2.30@sha256:50d38b713d7d68e105aa3870950492407d82128aa9f3c7c20307632edcab50a5 /usr/local/bin/minimap2 /usr/local/bin/minimap2
 
 # Build and install gffread from source (not available in Alpine repos)
 RUN apk add --no-cache --virtual .gffread-build-deps \
