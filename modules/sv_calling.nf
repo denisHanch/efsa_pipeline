@@ -83,6 +83,7 @@ process convert_bcf_to_vcf {
 // Processes for long-read pipeline
 
 process cute_sv {
+    label 'limit_1h'
 
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
 
@@ -106,6 +107,7 @@ process cute_sv {
 
 
 process debreak {
+    label 'limit_1h'
 
     publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
 
@@ -126,6 +128,7 @@ process debreak {
 
 
 process sniffles {
+    label 'limit_1h'
 
     publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: "copy"
 
@@ -214,14 +217,7 @@ process vcf_to_table_short {
     """
 }
 
-/*
- * Convert a SURVIVOR-merged long-read VCF to a TSV summary table.
- *
- * Supporting-read counts are left as 0 here because SURVIVOR's DR field
- * is unreliable.  The actual values are resolved downstream by
- * create_sv_output.py using the per-caller supporting-reads TSVs
- * produced by the extract_supp_reads processes.
- */
+
 process vcf_to_table_long {
 
     publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
