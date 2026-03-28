@@ -176,6 +176,8 @@ All files in the directory inherit the same settings:
 
 #### NGS Type Values
 
+`ngs_type` is case-insensitive — `"Illumina"`, `"ILLUMINA"`, and `"illumina"` are all accepted.
+
 | Value | Description | Typical Read Length |
 |-------|-------------|-------------------|
 | `"illumina"` | Illumina short reads (SE or PE) | 50-300 bp |
@@ -226,9 +228,9 @@ These settings customize validation behavior without modifying code.
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `threads` | integer / `null` | auto-detect | Number of threads. `null` or omit = auto-detect from CPU cores. System warns if value exceeds available cores. |
-| `validation_level` | string | `"trust"` | `"strict"`, `"trust"`, or `"minimal"` |
-| `logging_level` | string | `"INFO"` | `"DEBUG"`, `"INFO"`, `"WARNING"`, or `"ERROR"` |
-| `type` | string | `"prokaryote"` | `"prokaryote"` or `"eukaryote"`. Eukaryote skips inter-genome comparison. |
+| `validation_level` | string | `"trust"` | `"strict"`, `"trust"`, or `"minimal"`. Case-insensitive — stored as uppercase internally. |
+| `logging_level` | string | `"INFO"` | `"DEBUG"`, `"INFO"`, `"WARNING"`, or `"ERROR"`. Case-insensitive. |
+| `type` | string | `"prokaryote"` | `"prokaryote"` or `"eukaryote"`. Case-insensitive. Eukaryote skips inter-genome comparison. |
 | `force_defragment_ref` | boolean | `false` | **Unsupported workaround — use at your own risk.** Merges all reference contigs into one sequence before validation. Use only when the reference is too fragmented for any workflow. All downstream results (alignment, variant calling, feature mapping) may be incorrect or meaningless. See warning below. |
 
 > **⚠ Warning: `force_defragment_ref`**
@@ -276,15 +278,15 @@ A value in `config.json` always takes priority over a CLI flag, and a CLI flag t
 **Validation:**
 - Invalid option names → `ConfigurationError` (e.g., `"abc"` not allowed)
 - Invalid threads → `ConfigurationError` (e.g., negative numbers)
-- Invalid validation_level → `ConfigurationError` (e.g., `"invalid_level"`)
-- Invalid logging_level → `ConfigurationError` (e.g., `"verbose"`, must be DEBUG/INFO/WARNING/ERROR)
-- Invalid type → `ConfigurationError` (e.g., `"bacteria"`, must be `"prokaryote"` or `"eukaryote"`)
+- Invalid validation_level → `ConfigurationError` (e.g., `"invalid_level"`; `"Strict"` and `"STRICT"` are both accepted)
+- Invalid logging_level → `ConfigurationError` (e.g., `"verbose"`, must be DEBUG/INFO/WARNING/ERROR; case-insensitive)
+- Invalid type → `ConfigurationError` (e.g., `"bacteria"`; `"Prokaryote"` and `"PROKARYOTE"` are both accepted)
 - Invalid force_defragment_ref → `ConfigurationError` (must be `true` or `false`, not a string)
 
 ### File-Level Settings
 
 Override global options for specific files by adding settings to individual file entries:
-- `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (overrides global)
+- `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (overrides global; case-insensitive)
 - `threads`: Number of threads for compression (int, overrides global)
 - `n_sequence_limit`: Maximum number of sequences allowed in a genome file (int, default: `5`). Applies to `ref_genome_filename` and `mod_genome_filename` only; ignored with a warning on plasmids.
 

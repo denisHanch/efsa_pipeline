@@ -45,6 +45,8 @@ class NextflowParams:
     run_pacbio: bool = False
     contig_file_size: int = 0
     run_vcf_annotation: bool = False
+    # run metadata
+    validation_run_dir: Optional[str] = None
     # input_output_options — always present (may be None)
     nanopore_fastq: Optional[str] = None
     # input_output_options — omitted from JSON when None
@@ -57,6 +59,7 @@ class NextflowParams:
         """Produce a dict for Nextflow -params-file JSON.
         Optional path fields are excluded when None; nanopore_fastq is always included."""
         result = {
+            "validation_run_dir": self.validation_run_dir,
             "run_ref_x_mod": self.run_ref_x_mod,
             "run_truvari": self.run_truvari,
             "run_illumina": self.run_illumina,
@@ -76,6 +79,7 @@ class NextflowParams:
 def build_params(
     validation_results: dict,
     force_defragment_ref: bool = False,
+    run_dir: Optional[Path] = None,
 ) -> NextflowParams:
     """
     Build a Nextflow params dataclass from validation results.
@@ -132,6 +136,7 @@ def build_params(
     mod_fragmented = getattr(validation_results.get("mod_genome"), 'fragmented', False)
 
     return NextflowParams(
+        validation_run_dir=str(run_dir) if run_dir is not None else None,
         # general_options — pipeline switches
         run_ref_x_mod=(ref_path is not None and mod_path is not None
                        and not ref_fragmented and not mod_fragmented

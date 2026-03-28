@@ -49,6 +49,8 @@ The validation module supports three validation levels to balance thoroughness a
 
 ## Configuration
 
+`validation_level` is **case-insensitive** — `"strict"`, `"Strict"`, and `"STRICT"` are all accepted.
+
 Set the validation level in your `config.json`:
 
 ```json

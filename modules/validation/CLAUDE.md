@@ -74,10 +74,15 @@ modules/validation/
 # custom config path
 ./validation.sh --config path/to/config.json
 ```
-`validation.sh` runs with `set -euo pipefail`. Each run writes to its own
-timestamped sub-directory (`data/valid/run_YYYYMMDD_HHMMSS/`); previous runs
-are **preserved**. The sub-directory path is exported as
-`$EFSA_VALIDATION_RUN_DIR` for downstream steps.
+`validation.sh` runs with `set -euo pipefail`. All outputs go to `data/valid/`
+directly; previous runs are preserved via auto-incremented filenames
+(`validation_001.log`, `report_1.txt`, etc.). The script also creates a
+timestamped sub-directory (`data/valid/run_YYYYMMDD_HHMMSS/`) and exports its
+path as `$EFSA_VALIDATION_RUN_DIR`. `main.py` reads this env var and writes the
+log, report, and all validated files there. When called directly (without the
+shell wrapper), `main.py` creates its own timestamped sub-directory. Only
+`validated_params.json` is always written to the static `data/valid/` path so
+Nextflow can load it via a stable `-params-file` path.
 
 ### Directly
 ```bash
@@ -92,14 +97,16 @@ pytest tests/
 
 ---
 
-## Outputs (written to `data/valid/run_YYYYMMDD_HHMMSS/`)
+## Outputs
+
+Per-run files go to `data/valid/run_YYYYMMDD_HHMMSS/`; only `validated_params.json` lands directly in `data/valid/`.
 
 | File | Description |
 |---|---|
-| `validation.log` | Structured JSON log (structlog). Auto-incremented if exists. |
-| `report.txt` | Human-readable validation report with per-file statistics. |
-| Validated genome/reads/feature files | Standardised copies of every input file. |
-| `validated_params.json` | Nextflow `-params-file`; consumed by the main pipeline. |
+| `run_*/validation.log` | Structured JSON log (structlog). Auto-incremented if exists. |
+| `run_*/report.txt` | Human-readable validation report with per-file statistics. |
+| `run_*/` validated genome/reads/feature files | Standardised copies of every input file. |
+| `validated_params.json` | Nextflow `-params-file`; always at static `data/valid/` path. |
 
 ---
 
@@ -177,10 +184,10 @@ Full specification is in `validation-pkg/docs/CONFIG_GUIDE.md`.
 ### `options` keys
 | Key | Values | Default | Notes |
 |---|---|---|---|
-| `validation_level` | `"strict"`, `"trust"`, `"minimal"` | `"strict"` | Controls depth of validation |
+| `validation_level` | `"strict"`, `"trust"`, `"minimal"` | `"trust"` | Controls depth of validation. **Case-insensitive** — stored as uppercase internally. |
 | `threads` | positive int or `null` | `null` (auto-detect) | Warns if > CPU cores or > 16 |
-| `logging_level` | `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"` | `"INFO"` | Console log level |
-| `type` | `"prokaryote"`, `"eukaryote"` | `null` | Organism type hint |
+| `logging_level` | `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"` | `"INFO"` | Console log level. **Case-insensitive.** |
+| `type` | `"prokaryote"`, `"eukaryote"` | `"prokaryote"` | Organism type hint. **Case-insensitive** — stored as uppercase internally. |
 
 ---
 
@@ -215,7 +222,7 @@ n_sequence_limit : Optional[int]  # default 5; forbidden for plasmid configs
 **`ReadConfig`** (extends `BaseValidatorConfig`)
 ```
 detected_format : ReadFormat    # FASTQ or BAM
-ngs_type        : str           # "illumina", "ont", "pacbio" — validated in __post_init__
+ngs_type        : str           # "ILLUMINA", "ONT", "PACBIO" — uppercased and validated in __post_init__
 ```
 
 **`FeatureConfig`** (extends `BaseValidatorConfig`)
@@ -251,7 +258,7 @@ config.options passed as global_options to each file config
       ↓
 BaseValidator.__init__() reads global_options.get("validation_level") → None if not set
       ↓
-BaseValidator._initialize_defaults() fills None → 'strict', None threads → DEFAULT_THREADS (8)
+BaseValidator._initialize_defaults() uppercases validation_level; fills None → 'TRUST', None threads → DEFAULT_THREADS (8)
 ```
 
 **Important:** defaults are not stored in `config.options` when an option is omitted from the JSON.
@@ -280,8 +287,8 @@ Full validation pipeline:
 3. `_setup_output_directory()` — creates `config_dir.parent / "valid"`
 4. `_parse_genome_configs()` — ref (required), mod/plasmids (optional)
 5. `_parse_reads_configs()` — supports both `filename` and `directory` keys;
-   **raises `ValueError` if a `directory` entry for `ngs_type="ont"` or
-   `ngs_type="pacbio"` contains more than one file** — merge reads first
+   **raises `ValueError` if a `directory` entry for `ngs_type="ont"` / `"ONT"` or
+   `ngs_type="pacbio"` / `"PACBIO"` contains more than one file** — merge reads first
 6. `_parse_feature_configs()` — ref_feature, mod_feature (optional)
 7. `_parse_options()` — validates and normalises global options
 8. Returns fully populated `Config`
@@ -531,7 +538,7 @@ output_filename_suffix, output_subdir_name
 input_file, output_file, validation_level, elapsed_time
 base_name                  : str     # filename without R1/R2 suffix
 read_number                : int     # 1 or 2 (0 if not detected)
-ngs_type                   : str     # "illumina", "ont", "pacbio"
+ngs_type                   : str     # "ILLUMINA", "ONT", "PACBIO" (uppercased from input)
 illumina_pairing_detected  : str     # "illumina" if R1/R2 pattern matched; else ""
 num_reads                  : int
 

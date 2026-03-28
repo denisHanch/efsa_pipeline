@@ -14,11 +14,14 @@ validate --config=path/to/config.json
 
 output of the validation is on `/EFSA_workspace/data/valid/` 
 
-**!! WARNING !! - Every new run of validation rewrite the previous one**
+All outputs go to `data/valid/`. Previous runs are preserved via auto-incremented filenames (`validation_001.log`, `report_1.txt`, etc.).
 
 #   What to export
--   log: `/EFSA_workspace/data/valid/validation.log`
--   report: `/EFSA_workspace/data/valid/report.txt`
+-   log: `data/valid/validation.log`
+-   report: `data/valid/report.txt`
 
 # Configuration File — Specification & Guide
-- **[validation-pkg/docs/CONFIG_GUIDE.md](validation-pkg/docs/CONFIG_GUIDE.md)**
+- **[docs/validation/CONFIG_GUIDE.md](../../docs/validation/CONFIG_GUIDE.md)**
+
+## Key option notes
+- `validation_level`, `type`, `ngs_type`, and `logging_level` are **case-insensitive** — `"Trust"`, `"TRUST"`, and `"trust"` are all accepted.

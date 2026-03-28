@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import traceback
+from datetime import datetime
 from pathlib import Path
 
 # Add modules/validation/ to sys.path so nextflow_params_handler is importable.
@@ -77,12 +79,23 @@ def main():
     # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
     config_path = Path(args[0]).resolve()
     output_dir = config_path.parent.parent / "valid"
+
+    # Resolve run directory: use the timestamped dir created by validation.sh if available,
+    # otherwise create a new one so main.py can also be called directly.
+    run_dir_env = os.environ.get("EFSA_VALIDATION_RUN_DIR")
+    if run_dir_env:
+        run_dir = Path(run_dir_env)
+    else:
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = output_dir / f"run_{run_id}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
     logger = None
     log_file = None
 
-    # Setup logging
+    # Setup logging — log goes into the run directory
     try:
-        logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
+        logger = setup_logging(console_level='DEBUG', log_file=run_dir / "validation.log")
     except (PermissionError, OSError) as e:
         logger = setup_logging(console_level='DEBUG')
         logger.warning(f"Could not write log file ({e}); logging to console only")
@@ -97,6 +110,24 @@ def main():
     except Exception as e:
         logger.error(f"Loading a config file failed: {e}")
         return 1
+
+    # Redirect all validator output_dir fields to run_dir so validated files
+    # land in the timestamped subdirectory instead of data/valid/ directly.
+    def _set_run_dir(config):
+        for file_cfg in [
+            getattr(config, 'ref_genome',   None),
+            getattr(config, 'mod_genome',   None),
+            getattr(config, 'ref_plasmid',  None),
+            getattr(config, 'mod_plasmid',  None),
+            getattr(config, 'ref_feature',  None),
+            getattr(config, 'mod_feature',  None),
+        ]:
+            if file_cfg is not None:
+                file_cfg.output_dir = run_dir
+        for read_cfg in (getattr(config, 'reads', None) or []):
+            read_cfg.output_dir = run_dir
+
+    _set_run_dir(config)
 
     # ========================================================================
     # Step 1.5 (optional): Defragment reference if force_defragment_ref is set
@@ -219,7 +250,7 @@ def main():
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
-    report = ValidationReport(output_dir / "report.txt")
+    report = ValidationReport(run_dir / "report.txt")
     fatal_errors: list[str] = []
 
     def register_required_failure(label: str, exc: Exception) -> None:
@@ -339,7 +370,7 @@ def main():
             "skipped. Feature coordinates are not meaningful on a defragmented "
             "reference — run_vcf_annotation will be disabled."
         )
-    params = nf_params.build_params(validation_results, force_defragment_ref=force_defragment)
+    params = nf_params.build_params(validation_results, force_defragment_ref=force_defragment, run_dir=run_dir)
     nf_params.write_params(params, output_dir / "validated_params.json")
 
     return 0
