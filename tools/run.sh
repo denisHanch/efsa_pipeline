@@ -2,7 +2,7 @@
 
 base=$(pwd)
 version="v1.0.4"
-for tool in cutesv; do 
+for tool in *; do 
     if [[ -f $tool ]]; then
         echo "Skipping $tool"
         continue
@@ -19,7 +19,7 @@ for tool in cutesv; do
         cd "$base"
         continue
     fi
-    # docker push $tag
-    # docker push $latest
+    docker push $tag
+    docker push $latest
     cd "$base"
 done
