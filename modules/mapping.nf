@@ -72,7 +72,7 @@ process picard {
 
     script:
     """
-    picard CollectAlignmentSummaryMetrics \
+    java -jar /usr/picard/picard.jar CollectAlignmentSummaryMetrics \
     I=$bam_file \
     O=${pair_id}_alignment_metrics.txt \
     R=$fasta_file
