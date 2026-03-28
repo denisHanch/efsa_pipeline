@@ -1,74 +1,36 @@
-# First stage
-FROM python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4 AS builder
+
+FROM python:3.10-alpine3.23@sha256:c99275d6bc0c37d8e98b388d4c404861fda7dad5ff87e2995fe7b7bb33898aed
 
 ARG SYRI_REF=v1.7.1
 
-RUN apt-get update && apt-get install -y \
+RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositories && \
+    echo "http://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories && \apk add --no-cache \
+    bash \
     git \
     wget \
     unzip \
-    build-essential \
-    gcc \
-    python3-dev \
-    libc-dev \
-    libbz2-dev \
+    build-base \
+    bzip2-dev \
     libxml2-dev \
-    libz-dev \
+    zlib-dev \
     libffi-dev \
-    libglpk-dev \
+    glpk \
     libpng-dev \
-    libblas-dev \
-    liblapack-dev \
-    pkg-config \
-    procps \
- && rm -rf /var/lib/apt/lists/*
+    openblas \
+    procps-ng
 
 RUN pip install --upgrade pip
 
-WORKDIR /build
-RUN git clone --branch ${SYRI_REF} --depth 1 https://github.com/schneebergerlab/syri.git
+
+WORKDIR /syri
+RUN git clone --branch ${SYRI_REF} --depth 1 https://github.com/schneebergerlab/syri.git .
+
+# Install dependencies
+RUN pip install pandas numpy pysam scipy cython igraph matplotlib psutil
+
+# Install SyRI
+RUN pip install .
 
 
-WORKDIR /build/syri
-
-RUN pip install --upgrade pip && \
-    pip install cython numpy
-
-RUN pip install \
-    pandas \
-    "pysam>=0.22.0" \
-    "scipy>=1.11.0" \
-    "cython>=3.0.0" \
-    "python-igraph>=0.11.3" \
-    matplotlib \
-    psutil
-
-
-
-# Second stage: Final minimal image
-FROM python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4
-
-RUN apt-get update && apt-get install -y \
-    libbz2-dev \
-    libxml2 \
-    libz1 \
-    libffi8 \
-    libglpk40 \
-    libpng16-16 \
-    libblas3 \
-    liblapack3 \
-    procps \
- && rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /build/syri/syri /usr/local/bin/syri
-
-RUN pip install --no-cache-dir \
-    pandas \
-    "pysam>=0.22.0" \
-    "scipy>=1.11.0" \
-    "cython>=3.0.0" \
-    "python-igraph>=0.11.3" \
-    matplotlib \
-    psutil
-
+# Ensure syri is executable
 RUN chmod +x /usr/local/bin/syri
