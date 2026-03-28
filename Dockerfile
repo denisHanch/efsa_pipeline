@@ -30,18 +30,8 @@ RUN apk update && \
 # Copy pre-built minimap2 binary from dedicated image (built from tools/minimap2/Dockerfile)
 COPY --from=ecomolegmo/minimap2:v2.30@sha256:50d38b713d7d68e105aa3870950492407d82128aa9f3c7c20307632edcab50a5 /usr/local/bin/minimap2 /usr/local/bin/minimap2
 
-# Build and install gffread from source (not available in Alpine repos)
-RUN apk add --no-cache --virtual .gffread-build-deps \
-        build-base \
-    && cd /tmp \
-    && git clone --branch ${GFFREAD_REF} --depth 1 https://github.com/gpertea/gffread.git \
-    && cd gffread \
-    && make release \
-    && cp gffread /usr/local/bin/ \
-    && chmod +x /usr/local/bin/gffread \
-    && cd / \
-    && rm -rf /tmp/gffread \
-    && apk del .gffread-build-deps
+# Copy pre-built gffread binary from dedicated image (built from tools/gffread/Dockerfile)
+COPY --from=ecomolegmo/gffread:v0.12.7@sha256:dad98757a1b8dcfae49f452678d59599bfb81d10c1a5272e418a352d1521b9aa /usr/local/bin/gffread /usr/local/bin/gffread
 
 # Copy and install validation package
 COPY modules/validation/ /tmp/validation/
