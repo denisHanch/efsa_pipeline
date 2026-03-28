@@ -7,6 +7,7 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositori
         build-base \
         zlib-dev \
         curl \
+    && apk add --no-cache bash \
     && cd /tmp \
     && curl -L https://github.com/lh3/minimap2/archive/refs/tags/v${MINIMAP2_VERSION}.tar.gz | tar -xzf - \
     && cd minimap2-${MINIMAP2_VERSION} \
