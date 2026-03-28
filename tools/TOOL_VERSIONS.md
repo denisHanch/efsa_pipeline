@@ -10,6 +10,9 @@ This file documents explicit version pins used in custom tool images to improve 
 | tools/sniffles/Dockerfile | sniffles | 2.7.3 |
 | tools/truvari/Dockerfile | truvari | 5.4.0 |
 | tools/debreak/Dockerfile | pysam | 0.23.3 |
+| tools/pbzip2/Dockerfile | pbzip2 | 1.1.13 |
+| tools/minimap2/Dockerfile | minimap2 | 2.30 |
+| tools/trimgalore/Dockerfile | trimgalore | 0.6.10 |
 
 ## Git sources (pinned)
 
@@ -17,7 +20,7 @@ This file documents explicit version pins used in custom tool images to improve 
 |---|---|---|---|
 | tools/debreak/Dockerfile | https://github.com/Maggi-Chen/DeBreak.git | v1.2 | 21d9b4294089ccd9df0feec976239551f4359096 |
 | tools/syri/Dockerfile | https://github.com/schneebergerlab/syri.git | v1.7.1 | 61e5aecbb506553c22f88649015013fad28fb05e |
-| tools/survivor/Dockerfile | https://github.com/fritzsedlazeck/SURVIVOR.git | 07404b74d3fe42b20f1362f4d8625f284b9d536c | 07404b74d3fe42b20f1362f4d8625f284b9d536c |
+| tools/survivor/Dockerfile | https://github.com/fritzsedlazeck/SURVIVOR.git | 1.0.7 | 07404b74d3fe42b20f1362f4d8625f284b9d536c |
 | Dockerfile | https://github.com/gpertea/gffread.git | v0.12.7 | 5647f076f616c583ea32fd19629d549d70fc43ea |
 
 ## Notes
