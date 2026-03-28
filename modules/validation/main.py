@@ -47,13 +47,13 @@ def _parse_cli_args(argv):
             cli_options['threads'] = None if val == 'auto' else int(val)
             i += 2
         elif args[i] == '--validation-level' and i + 1 < len(args):
-            cli_options['validation_level'] = args[i + 1]
+            cli_options['validation_level'] = args[i + 1].upper()
             i += 2
         elif args[i] == '--logging-level' and i + 1 < len(args):
             cli_options['logging_level'] = args[i + 1].upper()
             i += 2
         elif args[i] == '--type' and i + 1 < len(args):
-            cli_options['type'] = args[i + 1]
+            cli_options['type'] = args[i + 1].upper()
             i += 2
         else:
             remaining.append(args[i])

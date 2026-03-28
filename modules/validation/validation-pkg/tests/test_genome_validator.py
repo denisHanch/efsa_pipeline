@@ -1396,7 +1396,7 @@ class TestGenomeValidatorOutputMetadata:
         # Basic fields
         assert metadata.output_file is not None
         assert metadata.output_filename is not None
-        assert metadata.validation_level == 'strict'
+        assert metadata.validation_level == 'STRICT'
 
         # Sequence statistics
         assert metadata.num_sequences == 3
@@ -1433,7 +1433,7 @@ class TestGenomeValidatorOutputMetadata:
 
         # Basic fields should be set
         assert metadata.output_file is not None
-        assert metadata.validation_level == 'trust'
+        assert metadata.validation_level == 'TRUST'
         assert metadata.num_sequences == 3
         assert metadata.longest_sequence_id is not None
         assert metadata.longest_sequence_length is not None
@@ -1465,7 +1465,7 @@ class TestGenomeValidatorOutputMetadata:
         # Only basic fields should be set
         assert metadata.output_file is not None
         assert metadata.output_filename is not None
-        assert metadata.validation_level == 'minimal'
+        assert metadata.validation_level == 'MINIMAL'
 
         # All other fields should be None
         assert metadata.num_sequences is None

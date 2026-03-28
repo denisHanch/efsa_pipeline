@@ -41,7 +41,9 @@ class BaseValidator(ABC):
     def _initialize_defaults(self) -> None:
         """Set default values for validation_level and threads."""
         if self.validation_level is None:
-            self.validation_level = 'trust'
+            self.validation_level = 'TRUST'
+        else:
+            self.validation_level = self.validation_level.upper()
         # threads=None means auto-detect; leave as-is
 
     def run(self) -> Any:
@@ -59,7 +61,7 @@ class BaseValidator(ABC):
 
         try:
             # Handle minimal mode separately
-            if self.validation_level == 'minimal':
+            if self.validation_level == 'MINIMAL':
                 output_path = self._handle_minimal_mode()
             else:
                 # Trust/Strict modes - call subclass implementation

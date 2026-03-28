@@ -194,11 +194,11 @@ class FeatureValidator(BaseValidator):
         if not self.settings.check_coordinates or not self.features:
             return
 
-        validate_count = TRUST_MODE_SAMPLE_SIZE if self.validation_level == 'trust' else len(self.features)
+        validate_count = TRUST_MODE_SAMPLE_SIZE if self.validation_level == 'TRUST' else len(self.features)
         features_to_validate = self.features[:validate_count]
 
         use_parallel = (
-            self.validation_level != 'trust'
+            self.validation_level != 'TRUST'
             and self.threads and self.threads > 1
             and len(self.features) >= MIN_PARALLEL_FEATURES
         )
@@ -310,7 +310,7 @@ class FeatureValidator(BaseValidator):
 
     def _edit_features(self) -> None:
         """Apply feature edits (sorting, ID replacement) in strict mode."""
-        if self.validation_level != 'strict':
+        if self.validation_level != 'STRICT':
             self.logger.debug(f"{self.validation_level.capitalize()} mode - skipping feature editing")
             return
 

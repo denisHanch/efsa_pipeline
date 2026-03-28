@@ -218,7 +218,7 @@ class GenomeValidator(BaseValidator):
         self._fill_base_metadata(output_path)
 
         # Minimal mode - only basic info available
-        if self.validation_level == 'minimal':
+        if self.validation_level == 'MINIMAL':
             return
 
         # Trust and Strict modes - sequences were parsed
@@ -247,7 +247,7 @@ class GenomeValidator(BaseValidator):
         self.output_metadata.fragmented = getattr(self, '_sequence_limit_exceeded', False)
 
         # Strict mode only - compute expensive statistics
-        if self.validation_level == 'strict' and self.sequences:
+        if self.validation_level == 'STRICT' and self.sequences:
             # Total genome size
             self.output_metadata.total_genome_size = sum(len(seq.seq) for seq in self.sequences)
 
@@ -307,7 +307,7 @@ class GenomeValidator(BaseValidator):
                 )
                 raise GenomeValidationError(error_msg)
 
-            if self.validation_level == 'trust':
+            if self.validation_level == 'TRUST':
                 self.logger.info(f"Trust mode - parsed {len(self.sequences)} sequence(s), will validate first only")
             else:
                 self.logger.debug(f"Parsed {len(self.sequences)} sequence(s)")
@@ -342,8 +342,8 @@ class GenomeValidator(BaseValidator):
         self.logger.debug("Validating sequences...")
 
         # Check if organism type is eukaryote — too complex for inter-genome alignment
-        organism_type = self.genome_config.global_options.get('type', 'prokaryote')
-        if organism_type == 'eukaryote':
+        organism_type = self.genome_config.global_options.get('type', 'PROKARYOTE').upper()
+        if organism_type == 'EUKARYOTE':
             error_msg = (
                 "Organism type is 'eukaryote' — the assembly is too complex for "
                 "inter-genome alignment and will not be processed further"
@@ -379,7 +379,7 @@ class GenomeValidator(BaseValidator):
             return
 
         # Trust mode - validate only first sequence
-        if self.validation_level == 'trust':
+        if self.validation_level == 'TRUST':
             self.logger.debug("Trust mode - validating first sequence only")
             if len(self.sequences) > 0:
                 record = self.sequences[0]

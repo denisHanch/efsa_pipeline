@@ -74,7 +74,9 @@ class ReadConfig(BaseValidatorConfig):
     detected_format: ReadFormat = None
 
     def __post_init__(self):
-        if self.ngs_type not in ["illumina", "ont", "pacbio"]:
+        if self.ngs_type is not None:
+            self.ngs_type = self.ngs_type.upper()
+        if self.ngs_type not in ["ILLUMINA", "ONT", "PACBIO"]:
             raise ValueError(f"Invalid ngs_type: {self.ngs_type}")
         self._initialize_defaults()
         self._extract_basename()
@@ -122,13 +124,13 @@ class Config:
 
     @property
     def validation_level(self) -> str:
-        """Get validation level from options, or default to 'trust'."""
-        return self.options.get('validation_level', 'trust')
+        """Get validation level from options, or default to 'TRUST'."""
+        return self.options.get('validation_level', 'TRUST')
 
     @property
     def type(self) -> str:
-        """Get organism type from options ('prokaryote' or 'eukaryote'), default 'prokaryote'."""
-        return self.options.get('type', 'prokaryote')
+        """Get organism type from options ('PROKARYOTE' or 'EUKARYOTE'), default 'PROKARYOTE'."""
+        return self.options.get('type', 'PROKARYOTE')
 
     @property
     def force_defragment_ref(self) -> Optional[bool]:
@@ -425,7 +427,7 @@ class ConfigManager:
                         continue
 
                     ngs_type = read_entry.get('ngs_type')
-                    if ngs_type in {'ont', 'pacbio'} and len(files) > 1:
+                    if ngs_type.upper() in {'ONT', 'PACBIO'} and len(files) > 1:
                         raise ValueError(
                             f"Directory input for ngs_type='{ngs_type}' contains {len(files)} files. "
                             "Only one ONT or PacBio file per entry is supported. "
@@ -566,12 +568,14 @@ class ConfigManager:
         if 'validation_level' in options:
             validation_level = options['validation_level']
 
-            VALID_LEVELS = {'strict', 'trust', 'minimal'}
+            VALID_LEVELS = {'STRICT', 'TRUST', 'MINIMAL'}
 
             if not isinstance(validation_level, str):
                 raise ConfigurationError(
                     f"'validation_level' must be a string, got {type(validation_level).__name__}: {validation_level}"
                 )
+
+            validation_level = validation_level.upper()
 
             if validation_level not in VALID_LEVELS:
                 raise ConfigurationError(
@@ -606,12 +610,14 @@ class ConfigManager:
         if 'type' in options:
             organism_type = options['type']
 
-            VALID_TYPES = {'prokaryote', 'eukaryote'}
+            VALID_TYPES = {'PROKARYOTE', 'EUKARYOTE'}
 
             if not isinstance(organism_type, str):
                 raise ConfigurationError(
                     f"'type' must be a string, got {type(organism_type).__name__}: {organism_type}"
                 )
+
+            organism_type = organism_type.upper()
 
             if organism_type not in VALID_TYPES:
                 raise ConfigurationError(
@@ -639,15 +645,17 @@ class ConfigManager:
         if cli_options:
             for key, value in cli_options.items():
                 if key not in config.options:
+                    if key in ('validation_level', 'type') and isinstance(value, str):
+                        value = value.upper()
                     config.options[key] = value
                     cli_keys.add(key)
 
         # Apply defaults for any options not explicitly set
         DEFAULTS = {
             'threads': None,
-            'validation_level': 'trust',
+            'validation_level': 'TRUST',
             'logging_level': 'INFO',
-            'type': 'prokaryote',
+            'type': 'PROKARYOTE',
             'force_defragment_ref': False,
         }
         for key, default in DEFAULTS.items():
@@ -688,6 +696,8 @@ class ConfigManager:
                     logger.debug(
                         f"{field_name}: File-level option '{key}={value_item}' specified"
                     )
+                if key == 'validation_level' and isinstance(value_item, str):
+                    value_item = value_item.upper()
                 filelvl_options[key] = value_item
             else:
                 remaining_extra[key] = value_item

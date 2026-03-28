@@ -1982,7 +1982,7 @@ class TestReadStatistics:
         # Basic fields
         assert metadata.output_file is not None
         assert metadata.num_reads == 5
-        assert metadata.validation_level == 'strict'
+        assert metadata.validation_level == 'STRICT'
 
         # Statistics should be calculated
         assert metadata.n50 == 800, f"Expected N50=800, got {metadata.n50}"
@@ -2009,7 +2009,7 @@ class TestReadStatistics:
         # Basic fields should be set
         assert metadata.output_file is not None
         assert metadata.num_reads == 5
-        assert metadata.validation_level == 'trust'
+        assert metadata.validation_level == 'TRUST'
 
         # Statistics should NOT be calculated in trust mode
         assert metadata.n50 is None
