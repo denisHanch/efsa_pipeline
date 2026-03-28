@@ -1,7 +1,7 @@
-FROM docker:28.5.0-dind-alpine3.22
+FROM docker:29.3.1-dind-alpine3.23@sha256:4d90f1f6c400315c2dba96d3ec93c01e64198395cbba04f79d12adce4f737029
 ARG GFFREAD_REF=v0.12.7
-RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories && \
-    echo "http://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories && \
+RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositories && \
+    echo "http://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories && \
     apk update --no-cache --allow-untrusted
 
 # Install necessary packages including compression tools
@@ -27,32 +27,8 @@ RUN apk update && \
  # Copy pre-built pbzip2 binary from dedicated image (built from tools/minimap2/Dockerfile)
  COPY --from=ecomolegmo/pbzip2:v1.1.13@sha256:4a308661071e1ba5e111199067353a8885a964bf93cacb00b5bb149097bacdcb /usr/bin/pbzip2 /usr/bin/pbzip2
 
-# Build and install minimap2 from source (not available in Alpine repos, prebuilt binaries require glibc)
-RUN apk add --no-cache --virtual .minimap2-build-deps \
-        build-base \
-        zlib-dev \
-    && cd /tmp \
-    && curl -L https://github.com/lh3/minimap2/archive/refs/tags/v2.28.tar.gz | tar -xzf - \
-    && cd minimap2-2.28 \
-    && make \
-    && cp minimap2 /usr/local/bin/ \
-    && cd / \
-    && rm -rf /tmp/minimap2-2.28 \
-    && apk del .minimap2-build-deps
-
-# Install bedtools by extracting directly from Debian package (no apt/GPG needed; gcompat handles glibc)
-RUN apk add --no-cache dpkg && \
-    cd /tmp && \
-    curl -L "http://ftp.debian.org/debian/pool/main/b/bedtools/bedtools_2.30.0+dfsg-3_amd64.deb" -o bedtools.deb && \
-    dpkg-deb -x bedtools.deb bedtools-pkg && \
-    mv bedtools-pkg/usr/bin/bedtools /usr/local/bin/ && \
-    rm -rf /tmp/bedtools.deb /tmp/bedtools-pkg && \
-    apk del dpkg
-
-# Install bedtools glibc compatibility libs
-RUN apk add --no-cache gcompat libstdc++ xz-libs && \
-    ln -sf /usr/lib/libbz2.so.1 /usr/lib/libbz2.so.1.0
-
+# Copy pre-built minimap2 binary from dedicated image (built from tools/minimap2/Dockerfile)
+COPY --from=ecomolegmo/minimap2:v2.30@sha256:50d38b713d7d68e105aa3870950492407d82128aa9f3c7c20307632edcab50a5 /usr/local/bin/minimap2 /usr/local/bin/minimap2
 
 # Build and install gffread from source (not available in Alpine repos)
 RUN apk add --no-cache --virtual .gffread-build-deps \
