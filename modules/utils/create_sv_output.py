@@ -41,15 +41,21 @@ the same for clustering, but preserved as separate `long_ont_*` and `long_pacbio
 """
 from __future__ import annotations
 
+import atexit
 import argparse
+import logging
 import glob
 import os
 import re
+from collections import Counter
 from dataclasses import dataclass, field
-from typing import List, Optional
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+import structlog
 
 # ----------------------------
 # SV type standardization
@@ -94,6 +100,145 @@ ASM_PREFIX_MAP = [
     (r"^SYN", "RPL"),
 ]
 
+DEFAULT_LOG_DIR = Path("data") / "outputs" / "logs"
+ROW_LOG_FIELDS = (
+    "chrom",
+    "#chrom",
+    "start",
+    "end",
+    "svtype",
+    "info_svtype",
+    "svlen",
+    "supporting_reads",
+    "score",
+    "supporting_methods",
+    "RDCN",
+    "chr2",
+    "pos2",
+    "start_mod",
+    "end_mod",
+)
+
+
+def _resolve_log_dir() -> Path:
+    """Resolve a writable log directory under data/outputs/logs/."""
+    env_log_dir = os.environ.get("SV_OUTPUT_LOG_DIR")
+    candidates: List[Path] = []
+
+    if env_log_dir:
+        candidates.append(Path(env_log_dir))
+
+    try:
+        candidates.append(Path(__file__).resolve().parents[2] / DEFAULT_LOG_DIR)
+    except Exception:
+        pass
+
+    candidates.append(Path.cwd() / DEFAULT_LOG_DIR)
+
+    last_error = None
+    seen = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            return candidate
+        except OSError as exc:
+            last_error = exc
+
+    raise OSError(
+        f"Unable to create a writable log directory under {DEFAULT_LOG_DIR}"
+    ) from last_error
+
+
+def _render_log_entry(_, __, event_dict):
+    """Render one log line as: [timestamp] {json-without-redundant-fields}."""
+    event_dict = dict(event_dict)
+    timestamp = event_dict.pop("timestamp", None)
+    prefix = f"[{timestamp}] " if timestamp else ""
+    return prefix + structlog.processors.JSONRenderer(sort_keys=True)(None, None, event_dict)
+
+
+def setup_logging():
+    """Configure a file-backed structlog logger for create_sv_output.py."""
+    log_dir = _resolve_log_dir()
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    log_path = log_dir / f"create_sv_output_{timestamp}_{os.getpid()}.log"
+
+    log_file = log_path.open("w", encoding="utf-8")
+    atexit.register(log_file.close)
+
+    structlog.configure(
+        processors=[
+            structlog.processors.TimeStamper(fmt="iso", utc=True),
+            structlog.processors.add_log_level,
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            _render_log_entry,
+        ],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        context_class=dict,
+        logger_factory=structlog.PrintLoggerFactory(file=log_file),
+        cache_logger_on_first_use=True,
+    )
+
+    logger = structlog.get_logger("create_sv_output")
+    logger.info("logging_initialized")
+    return logger, log_path
+
+
+def _json_safe(value):
+    if value is None:
+        return None
+
+    if isinstance(value, Path):
+        return str(value)
+
+    if isinstance(value, np.generic):
+        return value.item()
+
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+
+    return value
+
+
+def _row_snapshot(row: Dict[str, object]) -> Dict[str, object]:
+    snapshot: Dict[str, object] = {}
+    for key in ROW_LOG_FIELDS:
+        if key not in row:
+            continue
+        value = _json_safe(row.get(key))
+        if value in (None, ""):
+            continue
+        snapshot[key] = value
+    return snapshot
+
+
+def _clean_dict(values: Dict[str, object]) -> Dict[str, object]:
+    cleaned: Dict[str, object] = {}
+    for key, value in values.items():
+        safe_value = _json_safe(value)
+        if safe_value in (None, "", [], {}):
+            continue
+        cleaned[key] = safe_value
+    return cleaned
+
+
+def _is_missing(value) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str) and value.strip() == "":
+        return True
+    try:
+        return bool(pd.isna(value))
+    except Exception:
+        return False
+
 def _to_int(x):
     try:
         if pd.isna(x):
@@ -110,24 +255,28 @@ def _to_float(x):
     except Exception:
         return None
 
-def standardize_type(raw_svtype, info_svtype, source):
+def standardize_type_details(raw_svtype, info_svtype, source):
     if info_svtype is not None:
         key = str(info_svtype).strip().upper()
         if key in INFO_MAP:
-            return INFO_MAP[key]
+            return INFO_MAP[key], "info_svtype", key
 
     raw_u = str(raw_svtype).upper()
 
     for token, mapped in INFO_MAP.items():
         if token in raw_u:
-            return mapped
+            return mapped, "raw_svtype", token
 
     if source == "asm":
         for pat, mapped in ASM_PREFIX_MAP:
             if re.search(pat, raw_u):
-                return mapped
+                return mapped, "asm_prefix", pat
 
-    return "RPL"
+    return "RPL", "fallback_default", None
+
+
+def standardize_type(raw_svtype, info_svtype, source):
+    return standardize_type_details(raw_svtype, info_svtype, source)[0]
 
 # Data models
 
@@ -332,7 +481,7 @@ def resolve_supporting_reads(records, supp_files, tol=1000):
 
     return records
 
-def load_records(path, source):
+def load_records(path, source, logger=None):
     """Load records from a TSV file into Record objects.
 
     - path: path to tsv (str or None). If falsy, returns empty list.
@@ -349,32 +498,102 @@ def load_records(path, source):
       No swapping of start/end occurs for point variants since start == end.
     """
     if not path:
+        if logger is not None:
+            logger.info("load_records_input_missing", source=source, reason="path_not_provided")
         return []
+
+    path_str = str(path)
+    source_logger = logger.bind(source=source, input_path=path_str) if logger is not None else None
 
     try:
         df = read_tsv(path)
-    except Exception:
+    except Exception as exc:
+        if source_logger is not None:
+            source_logger.error(
+                "load_records_read_failed",
+                error=str(exc),
+            )
         return []
 
     out = []
+    rows_seen = 0
+    skipped_records = 0
+    modified_records = 0
+    skip_reasons: Counter = Counter()
+    modification_reasons: Counter = Counter()
+
+    if source_logger is not None:
+        source_logger.info(
+            "load_records_started",
+            total_rows=int(len(df.index)),
+        )
 
     # defensive: accept files that may be missing optional columns
-    for _, row in df.iterrows():
-        chrom = row.get("chrom") or row.get("#chrom")
+    for row_number, row in enumerate(df.to_dict(orient="records"), start=2):
+        rows_seen += 1
+        row_before = _row_snapshot(row)
+
+        chrom = row.get("chrom")
+        if _is_missing(chrom):
+            chrom = row.get("#chrom")
         raw_svtype = row.get("svtype")
-        if chrom is None or raw_svtype is None:
+        if _is_missing(chrom) or _is_missing(raw_svtype):
             # malformed row -> skip
+            skipped_records += 1
+            skip_reasons["missing_required_fields"] += 1
+            if source_logger is not None:
+                source_logger.warning(
+                    "load_records_row_skipped",
+                    row_number=row_number,
+                    reason="missing_required_fields",
+                    row=row_before,
+                )
             continue
+
+        chrom = str(chrom).strip()
+        raw_svtype = str(raw_svtype).strip()
 
         start = _to_int(row.get("start"))
         end = _to_int(row.get("end"))
         if start is None or end is None:
+            skipped_records += 1
+            skip_reasons["invalid_coordinates"] += 1
+            if source_logger is not None:
+                source_logger.warning(
+                    "load_records_row_skipped",
+                    row_number=row_number,
+                    reason="invalid_coordinates",
+                    row=row_before,
+                )
             continue
+
+        row_modifications = []
+        modification_details: Dict[str, object] = {}
+
         # Only swap if start > end; for INS/TRA with start==end, preserve as-is
         if start > end:
+            original_start, original_end = start, end
             start, end = end, start
+            row_modifications.append("coordinates_swapped")
+            modification_reasons["coordinates_swapped"] += 1
+            modification_details["coordinates_swapped"] = {
+                "from": {"start": original_start, "end": original_end},
+                "to": {"start": start, "end": end},
+            }
 
-        std = standardize_type(raw_svtype, row.get("info_svtype"), source)
+        std, std_resolution, std_match = standardize_type_details(
+            raw_svtype,
+            row.get("info_svtype"),
+            source,
+        )
+        if std_resolution == "fallback_default":
+            row_modifications.append("svtype_defaulted_to_rpl")
+            modification_reasons["svtype_defaulted_to_rpl"] += 1
+            modification_details["svtype_defaulted_to_rpl"] = {
+                "raw_svtype": _json_safe(raw_svtype),
+                "info_svtype": _json_safe(row.get("info_svtype")),
+                "std_type": std,
+            }
 
         # treat any long* sources as long for supporting_methods
         supporting_methods = row.get("supporting_methods") if str(source).startswith("long") else None
@@ -396,6 +615,45 @@ def load_records(path, source):
             else:
                 svlen = (end - start + 1) if end >= start else None
 
+            if svlen is not None:
+                row_modifications.append("svlen_derived")
+                modification_reasons["svlen_derived"] += 1
+                modification_details["svlen_derived"] = {
+                    "std_type": std,
+                    "derived_svlen": svlen,
+                    "start": start,
+                    "end": end,
+                }
+
+        if row_modifications:
+            modified_records += 1
+            if source_logger is not None:
+                row_after = dict(row_before)
+                row_after.update(
+                    _clean_dict(
+                        {
+                            "chrom": chrom,
+                            "start": start,
+                            "end": end,
+                            "svtype": raw_svtype,
+                            "info_svtype": row.get("info_svtype"),
+                            "svlen": svlen,
+                            "std_type": std,
+                        }
+                    )
+                )
+                source_logger.info(
+                    "load_records_row_modified",
+                    row_number=row_number,
+                    modifications=row_modifications,
+                    details=_clean_dict(modification_details),
+                    row_before=row_before,
+                    row_after=row_after,
+                    std_type=std,
+                    std_type_resolution=std_resolution,
+                    std_type_match=std_match,
+                )
+
         out.append(
             Record(
                 source,
@@ -415,6 +673,17 @@ def load_records(path, source):
                 start_mod,
                 end_mod,
             )
+        )
+
+    if source_logger is not None:
+        source_logger.info(
+            "load_records_completed",
+            total_rows=rows_seen,
+            loaded_records=len(out),
+            skipped_records=skipped_records,
+            modified_records=modified_records,
+            skip_reasons=dict(skip_reasons),
+            modification_reasons=dict(modification_reasons),
         )
 
     return out
@@ -695,27 +964,60 @@ def main():
     )
     args = p.parse_args()
 
+    logger, log_path = setup_logging()
+    logger.info(
+        "create_sv_output_started",
+        output_dir=str(args.out),
+        tol=args.tol,
+        cross_type_tol=args.cross_type_tol,
+        inputs=_clean_dict(
+            {
+                "asm": args.asm,
+                "long_reads": getattr(args, "long_reads", None),
+                "long_ont": getattr(args, "long_ont", None),
+                "long_pacbio": getattr(args, "long_pacbio", None),
+                "short": args.short_reads,
+            }
+        ),
+    )
+
     records = []
-    records += load_records(args.asm, "asm")
+    records += load_records(args.asm, "asm", logger=logger)
 
     # long inputs: accept both ONT and PacBio; also support legacy --long
-    records += load_records(getattr(args, "long_reads", None), "long")
-    records += load_records(getattr(args, "long_ont", None), "long_ont")
-    records += load_records(getattr(args, "long_pacbio", None), "long_pacbio")
+    records += load_records(getattr(args, "long_reads", None), "long", logger=logger)
+    records += load_records(getattr(args, "long_ont", None), "long_ont", logger=logger)
+    records += load_records(getattr(args, "long_pacbio", None), "long_pacbio", logger=logger)
 
-    records += load_records(args.short_reads, "short")
+    records += load_records(args.short_reads, "short", logger=logger)
 
     # Resolve long-read supporting reads from per-caller TSVs staged in the work directory
     supp_files = sorted(glob.glob("*_supporting_reads.tsv"))
     if supp_files:
+        logger.info(
+            "resolve_supporting_reads_started",
+            supporting_reads_files=supp_files,
+            tolerance=args.tol,
+        )
         records = resolve_supporting_reads(records, supp_files, tol=args.tol)
+        logger.info("resolve_supporting_reads_completed", total_records=len(records))
 
     if not records:
         os.makedirs(args.out, exist_ok=True)
+        logger.warning(
+            "create_sv_output_no_valid_records",
+            output_dir=str(args.out),
+        )
         print("No valid input records found; created output directory and exiting.")
+        print(f"Load-record audit log: {log_path}")
         return
 
     clusters = cluster_records(records, args.tol)
+    logger.info(
+        "cluster_records_completed",
+        total_records=len(records),
+        total_clusters=len(clusters),
+    )
 
     if not clusters:
         df = pd.DataFrame()
@@ -734,7 +1036,16 @@ def main():
     df = annotate_linked_events(df, args.cross_type_tol)
     write_csv_tables(df, args.out)
 
+    logger.info(
+        "create_sv_output_completed",
+        output_dir=str(args.out),
+        total_records=len(records),
+        total_clusters=len(clusters),
+        total_output_rows=int(len(df.index)),
+    )
+
     print(f"Wrote CSV tables to: {args.out}")
+    print(f"Load-record audit log: {log_path}")
 
 if __name__ == "__main__":
     main()
