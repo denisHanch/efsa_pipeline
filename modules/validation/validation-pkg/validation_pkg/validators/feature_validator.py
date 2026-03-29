@@ -309,11 +309,13 @@ class FeatureValidator(BaseValidator):
                     temp_file.unlink(missing_ok=True)
 
     def _edit_features(self) -> None:
-        """Apply feature edits (sorting, ID replacement) in strict mode."""
-        if self.validation_level != 'strict':
-            self.logger.debug(f"{self.validation_level.capitalize()} mode - skipping feature editing")
+        """Apply feature edits (sorting, ID replacement) in trust and strict modes."""
+        
+        # Minimal mode - skip edits, file will be copied as-is
+        if self.validation_level == 'minimal':
+            self.logger.debug("Minimal mode - skipping edits")
             return
-
+        
         if self.settings.sort_by_position:
             self.logger.debug("Sorting features by position...")
             self.features.sort(key=lambda f: (f.seqname, f.start, f.end))
