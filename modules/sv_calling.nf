@@ -83,7 +83,6 @@ process convert_bcf_to_vcf {
 // Processes for long-read pipeline
 
 process cute_sv {
-    label 'limit_1h'
 
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
 
@@ -100,14 +99,13 @@ process cute_sv {
     script:
     """
     mkdir ${pair_id}_out
-    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t ${params.max_cpu}
+    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t ${task.cpus}
     """
 }
 
 
 
 process debreak {
-    label 'limit_1h'
 
     publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
 
@@ -121,15 +119,14 @@ process debreak {
 
     script:
     """
-    debreak --bam $bam_file -r $fasta_file -o debreak_out -t ${params.max_cpu}
+    debreak --bam $bam_file -r $fasta_file -o debreak_out -t ${task.cpus}
     mv debreak_out/debreak.vcf debreak_out/${pair_id}_debreak.vcf
     """
 }
 
 
 process sniffles {
-    label 'limit_1h'
-
+    
     publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: "copy"
 
     input:
@@ -142,7 +139,7 @@ process sniffles {
 
     script:
     """
-    sniffles --input $bam_file --vcf ${pair_id}_sniffles.vcf --reference $fasta_file --threads ${params.max_cpu}
+    sniffles --input $bam_file --vcf ${pair_id}_sniffles.vcf --reference $fasta_file --threads ${task.cpus}
     """
 }
 
