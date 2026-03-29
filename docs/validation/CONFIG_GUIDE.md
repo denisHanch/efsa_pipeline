@@ -36,7 +36,6 @@ This document defines the **JSON** configuration file that `ConfigManager` uses 
 | `mod_plasmid_filename` | GenomeConfig | ❌ | Modified plasmid (FASTA or GenBank) |
 | `reads` | List[ReadConfig] | ✅ | Read files (FASTQ/BAM), minimum one |
 | `ref_feature_filename` | FeatureConfig | ❌ | Features for reference genome (BED, GFF, GTF) |
-| `mod_feature_filename` | FeatureConfig | ❌ | Features for modified genome (BED, GFF, GTF) |
 | `options` | dict | ❌ | Additional options (e.g., `{"threads": 8}`) |
 
 **Important:**
@@ -363,11 +362,6 @@ Complete example with all optional fields and global options:
     "validation_level": "strict",
     "threads": 8
   },
-  "mod_feature_filename": {
-    "filename": "features_mod.bed",
-    "validation_level": "strict",
-    "threads": 8
-    },
   "options": {
     "threads": 8,
     "validation_level": "strict",

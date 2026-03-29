@@ -40,11 +40,6 @@
     "validation_level": "strict/trust/minimal",
     "threads": 8
   },
-  "mod_feature_filename": {
-    "filename": "TBA",
-    "validation_level": "strict/trust/minimal",
-    "threads": 8
-    },
   "options": {
     "threads": 8,
     "validation_level": "strict/trust/minimal",
