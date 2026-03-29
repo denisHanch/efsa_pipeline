@@ -67,17 +67,30 @@ modules/validation/
 # from the repo root (default config)
 ./validation.sh
 
-# custom config path
-./validation.sh --config path/to/config.json
+# custom config path + all optional flags
+./validation.sh --config path/to/config.json \
+    [--threads N|auto] \
+    [--validation-level strict|trust|minimal] \
+    [--logging-level DEBUG|INFO|WARNING|ERROR] \
+    [--type prokaryote|eukaryote] \
+    [--force-defragment-ref]
 ```
 `validation.sh` runs with `set -euo pipefail`. Each run writes to its own
 timestamped sub-directory (`data/valid/run_YYYYMMDD_HHMMSS/`); previous runs
 are **preserved**. The sub-directory path is exported as
 `$EFSA_VALIDATION_RUN_DIR` for downstream steps.
 
+CLI flags are fallbacks — `config.json` `options` take priority if the same key
+is set in both places.
+
 ### Directly
 ```bash
-python3 ./modules/validation/main.py data/inputs/config.json
+python3 ./modules/validation/main.py data/inputs/config.json \
+    [--force-defragment-ref] \
+    [--threads N|auto] \
+    [--validation-level LEVEL] \
+    [--logging-level LEVEL] \
+    [--type TYPE]
 ```
 
 ### Tests
@@ -102,33 +115,38 @@ pytest tests/
 ## High-level workflow (`main.py`)
 
 ```
-1.  Parse sys.argv[1] as config_path
+1.  _parse_cli_args(sys.argv[1:]) → (config_path, cli_options)
+      cli_options: force_defragment_ref, threads, validation_level, logging_level, type
 2.  setup_logging() → data/valid/validation.log
-3.  ConfigManager.load(config_path) → Config          # returns 1 on failure
-4.  Instantiate per-validator Settings objects
-5.  Initialise fatal_errors list + register_required_failure / register_missing_output helpers
-6.  validate_genome(ref_genome_config, ref_settings)              # required
+3.  ConfigManager.load(config_path, cli_options=cli_options) → Config   # returns 1 on failure
+4.  [Step 1.5 — optional] if config.force_defragment_ref:
+      defragment_reference(config.ref_genome) → merged_fasta, join_tsv
+      Replaces config.ref_genome.filepath in-place for this run.
+      Logs unsupported-workaround warnings. Returns 1 on defragmentation failure.
+5.  Instantiate per-validator Settings objects
+6.  Initialise fatal_errors list + register_required_failure / register_missing_output helpers
+7.  validate_genome(ref_genome_config, ref_settings)              # required
       → register_missing_output on success, register_required_failure on ValidationError
-7.  validate_genome(mod_genome_config, mod_settings)              # optional
-8.  genomexgenome_validation(ref_res, mod_res, gxg_settings)      # only if both present
-9.  validate_genome(ref_plasmid_config, plasmid_settings)         # optional
-10. validate_genome(mod_plasmid_config, plasmid_settings)         # optional
-11. validate_reads(reads_configs, reads_settings)                  # required
+8.  validate_genome(mod_genome_config, mod_settings)              # optional
+9.  genomexgenome_validation(ref_res, mod_res, gxg_settings)      # only if both present
+10. validate_genome(ref_plasmid_config, plasmid_settings)         # optional
+11. validate_genome(mod_plasmid_config, plasmid_settings)         # optional
+12. validate_reads(reads_configs, reads_settings)                  # required
       → register_missing_output per read, register_required_failure on ValidationError
-12. readxread_validation(reads_res, readxread_settings)            # only if reads validated
-13. validate_feature(ref_feature_config, ref_feature_settings)    # optional
-14. validate_feature(mod_feature_config, mod_feature_settings)    # optional
-15. if fatal_errors: report.add_fatal_errors(fatal_errors)
-16. report.flush(format='text')
-17. nf_params.build_params(validation_results) → NextflowParams
-18. nf_params.write_params(params, data/valid/validated_params.json)
-19. sys.exit(0)   # always 0; errors surfaced through report and log
+13. readxread_validation(reads_res, readxread_settings)            # only if reads validated
+14. validate_feature(ref_feature_config, ref_feature_settings)    # optional; SKIPPED if force_defragment
+15. validate_feature(mod_feature_config, mod_feature_settings)    # optional
+16. if fatal_errors: report.add_fatal_errors(fatal_errors)
+17. report.flush(format='text')
+18. nf_params.build_params(validation_results, force_defragment_ref=force_defragment) → NextflowParams
+19. nf_params.write_params(params, data/valid/validated_params.json)
+20. sys.exit(0)   # always 0; errors surfaced through report and log
 ```
 
 **Exit code is always 0.** Fatal errors (required inputs that failed) are
 accumulated in `fatal_errors`, forwarded to the report via `add_fatal_errors()`,
 and cause `overall_status` to show `✗ FAILED`. `main.py` returns 1 **only** if
-config loading itself fails.
+config loading or defragmentation fails.
 
 ---
 
@@ -173,10 +191,13 @@ Full specification is in `validation-pkg/docs/CONFIG_GUIDE.md`.
 ### `options` keys
 | Key | Values | Default | Notes |
 |---|---|---|---|
-| `validation_level` | `"strict"`, `"trust"`, `"minimal"` | `"strict"` | Controls depth of validation |
+| `validation_level` | `"strict"`, `"trust"`, `"minimal"` | `"trust"` | Controls depth of validation |
 | `threads` | positive int or `null` | `null` (auto-detect) | Warns if > CPU cores or > 16 |
 | `logging_level` | `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"` | `"INFO"` | Console log level |
-| `type` | `"prokaryote"`, `"eukaryote"` | `null` | Organism type hint |
+| `type` | `"prokaryote"`, `"eukaryote"` | `"prokaryote"` | Organism type hint |
+| `force_defragment_ref` | `true`, `false` | `false` | **UNSUPPORTED WORKAROUND**: merge all ref contigs into one sequence before validation. Disables ref feature validation and sets `run_vcf_annotation=false`. Results are not guaranteed to be meaningful. |
+
+All `options` keys can also be supplied as CLI flags (see [Running the module](#running-the-module)). `config.json` takes priority when both are present.
 
 ---
 
@@ -184,7 +205,7 @@ Full specification is in `validation-pkg/docs/CONFIG_GUIDE.md`.
 
 ### Key constants
 ```python
-ALLOWED_GLOBAL_OPTIONS  = {'threads', 'validation_level', 'logging_level', 'type'}
+ALLOWED_GLOBAL_OPTIONS  = {'threads', 'validation_level', 'logging_level', 'type', 'force_defragment_ref'}
 ALLOWED_FILE_OPTIONS    = {'threads', 'validation_level'}
 MAX_RECOMMENDED_THREADS = 16
 DEFAULT_THREADS         = 8
@@ -230,23 +251,26 @@ ref_feature  : Optional[FeatureConfig]
 mod_feature  : Optional[FeatureConfig]
 
 Properties (from options dict):
-  .threads         → int | None
-  .logging_level   → str
-  .validation_level → str
-  .type            → str | None
+  .threads              → int | None
+  .logging_level        → str         # default "INFO"
+  .validation_level     → str         # default "trust"
+  .type                 → str         # default "prokaryote"
+  .force_defragment_ref → bool        # default False
 ```
 
-### `ConfigManager.load(config_path: str) → Config`
-Static method. Full validation pipeline:
+### `ConfigManager.load(config_path: str, cli_options: Dict[str, Any] = None) → Config`
+Static method. `cli_options` dict (from `_parse_cli_args`) is applied as fallback
+for keys not set in `config.json`. Full validation pipeline:
 1. Read and JSON-parse the file
-2. `_validate_required_fields()` — requires `ref_genome_filename` and non-empty `reads`
-3. `_setup_output_directory()` — creates `config_dir.parent / "valid"`
-4. `_parse_genome_configs()` — ref (required), mod/plasmids (optional)
-5. `_parse_reads_configs()` — supports both `filename` and `directory` keys;
+2. `_parse_options(data, config, cli_options=cli_options)` — validates and
+   normalises global options; config.json values override CLI values
+3. `_validate_required_fields()` — requires `ref_genome_filename` and non-empty `reads`
+4. `_setup_output_directory()` — creates `config_dir.parent / "valid"`
+5. `_parse_genome_configs()` — ref (required), mod/plasmids (optional)
+6. `_parse_reads_configs()` — supports both `filename` and `directory` keys;
    **raises `ValueError` if a `directory` entry for `ngs_type="ont"` or
    `ngs_type="pacbio"` contains more than one file** — merge reads first
-6. `_parse_feature_configs()` — ref_feature, mod_feature (optional)
-7. `_parse_options()` — validates and normalises global options
+7. `_parse_feature_configs()` — ref_feature, mod_feature (optional)
 8. Returns fully populated `Config`
 
 Raises: `ValidationFileNotFoundError`, `ConfigurationError`, `ValueError`
@@ -544,10 +568,14 @@ sequence_ids  : List[str]    # unique seqnames referenced
 - **Strict:** validates every feature
 
 ### gffread fallback
-`_parse_input()` first tries `gffread` for format normalisation. If `gffread` is
-unavailable or exits non-zero, the validator **falls back to `_parse_gff()`**
-(direct GFF3 line parser) on the already-decompressed input — it no longer
-silently produces an empty output file. A `WARNING` validation issue is recorded.
+`_parse_input()` first tries `gffread` for format normalisation. Two fallback paths:
+
+1. **gffread succeeds but returns 0 features** → silently retries with direct
+   `_parse_gff()` on the decompressed input (no validation issue recorded, INFO logged).
+2. **gffread unavailable or exits non-zero** → falls back to `_parse_gff()` and records
+   a `WARNING` validation issue (`category='feature'`) with the error detail.
+
+In both cases the validator no longer produces an empty output file.
 If the file is genuinely unparseable, both paths return 0 features.
 
 ---
@@ -813,7 +841,7 @@ def _path(meta):
     return value if value and value != "None" else None
 ```
 
-### `build_params(validation_results: dict) → NextflowParams`
+### `build_params(validation_results: dict, force_defragment_ref: bool = False) → NextflowParams`
 Expected keys in `validation_results`:
 ```
 ref_genome    : GenomeOutputMetadata | None
@@ -822,6 +850,10 @@ genomexgenome : dict (from genomexgenome_validation) | None
 reads         : List[ReadOutputMetadata] | None
 ref_feature   : FeatureOutputMetadata | None
 ```
+
+When `force_defragment_ref=True`: `gff` is forced to `None` and
+`run_vcf_annotation` is forced to `False` (feature coordinates are not
+meaningful on a defragmented reference).
 
 Before building flags, reads are pre-filtered:
 ```python
