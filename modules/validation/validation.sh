@@ -12,6 +12,8 @@ LOGGING_LEVEL=""
 ORG_TYPE=""
 FORCE_DEFRAGMENT=false
 
+VENV_PYTHON="/opt/validation-venv/bin/python"
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -71,7 +73,10 @@ if [ ! -f "$CONFIG_PATH" ]; then
     exit 1
 fi
 
-
+if [ ! -x "$VENV_PYTHON" ]; then
+    echo "Error: Validation venv Python not found: $VENV_PYTHON"
+    exit 1
+fi
 
 # Clear valid directory before running validation
 VALID_DIR="./data/valid"
@@ -82,14 +87,14 @@ rm -rf "${VALID_DIR:?}"/*
 echo "Running EFSA validation with config: $CONFIG_PATH"
 echo "---"
 
-EXTRA_ARGS=""
-[ "$FORCE_DEFRAGMENT" = true ]   && EXTRA_ARGS="$EXTRA_ARGS --force-defragment-ref"
-[ -n "$THREADS" ]                && EXTRA_ARGS="$EXTRA_ARGS --threads $THREADS"
-[ -n "$VALIDATION_LEVEL" ]       && EXTRA_ARGS="$EXTRA_ARGS --validation-level $VALIDATION_LEVEL"
-[ -n "$LOGGING_LEVEL" ]          && EXTRA_ARGS="$EXTRA_ARGS --logging-level $LOGGING_LEVEL"
-[ -n "$ORG_TYPE" ]               && EXTRA_ARGS="$EXTRA_ARGS --type $ORG_TYPE"
+EXTRA_ARGS=()
+[ "$FORCE_DEFRAGMENT" = true ] && EXTRA_ARGS+=(--force-defragment-ref)
+[ -n "$THREADS" ] && EXTRA_ARGS+=(--threads "$THREADS")
+[ -n "$VALIDATION_LEVEL" ] && EXTRA_ARGS+=(--validation-level "$VALIDATION_LEVEL")
+[ -n "$LOGGING_LEVEL" ] && EXTRA_ARGS+=(--logging-level "$LOGGING_LEVEL")
+[ -n "$ORG_TYPE" ] && EXTRA_ARGS+=(--type "$ORG_TYPE")
 
-if python3 ./modules/validation/main.py "$CONFIG_PATH" $EXTRA_ARGS; then
+if "$VENV_PYTHON" ./modules/validation/main.py "$CONFIG_PATH" "${EXTRA_ARGS[@]}"; then
     echo "---"
     echo "Validation completed successfully"
     exit 0
