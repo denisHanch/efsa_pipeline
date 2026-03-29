@@ -1,5 +1,6 @@
 #!/bin/bash
 # validate - Wrapper script for EFSA validation
+set -euo pipefail
 
 # Default config path
 DEFAULT_CONFIG="./data/inputs/config.json"
@@ -78,10 +79,13 @@ if [ ! -x "$VENV_PYTHON" ]; then
     exit 1
 fi
 
-# Clear valid directory before running validation
+# Create run-stamped staging directory instead of destructively clearing the output dir
 VALID_DIR="./data/valid"
-echo "Clearing valid directory: $VALID_DIR"
-rm -rf "${VALID_DIR:?}"/*
+RUN_ID="$(date +%Y%m%d_%H%M%S)"
+STAGING_DIR="${VALID_DIR}/run_${RUN_ID}"
+mkdir -p "$STAGING_DIR"
+echo "Validation outputs will be written under: $STAGING_DIR"
+export EFSA_VALIDATION_RUN_DIR="$STAGING_DIR"
 
 # Run the validation script with error handling
 echo "Running EFSA validation with config: $CONFIG_PATH"

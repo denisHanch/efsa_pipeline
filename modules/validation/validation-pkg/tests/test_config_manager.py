@@ -1064,12 +1064,12 @@ class TestConfigValidatorSettings:
         assert 'min_sequence_length' not in loaded_config.ref_genome.global_options
 
     def test_directory_reads_inherit_file_level_settings(self, temp_dir):
-        """Test that files from directory inherit file-level validation_level."""
+        """Test that Illumina files from a directory inherit file-level validation_level."""
         (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
         (temp_dir / "mod.fasta").write_text(">seq1\nATCG\n")
 
-        # Create read directory with files
-        reads_dir = temp_dir / "ont_reads"
+        # Create read directory with Illumina files (multiple files allowed for illumina)
+        reads_dir = temp_dir / "illumina_reads"
         reads_dir.mkdir()
         (reads_dir / "read1.fastq").write_text("@read1\nATCG\n+\nIIII\n")
         (reads_dir / "read2.fastq").write_text("@read2\nATCG\n+\nIIII\n")
@@ -1079,8 +1079,8 @@ class TestConfigValidatorSettings:
             "mod_genome_filename": {"filename": "mod.fasta"},
             "reads": [
                 {
-                    "directory": "ont_reads/",
-                    "ngs_type": "ont",
+                    "directory": "illumina_reads/",
+                    "ngs_type": "illumina",
                     "validation_level": "trust"
                 }
             ]
@@ -1095,6 +1095,44 @@ class TestConfigValidatorSettings:
         assert len(loaded_config.reads) == 2
         for read_config in loaded_config.reads:
             assert read_config.global_options['validation_level'] == 'trust'
+
+    def test_directory_ont_multi_file_rejected(self, temp_dir):
+        """Multi-file ONT directory input must be rejected immediately."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+
+        reads_dir = temp_dir / "ont_reads"
+        reads_dir.mkdir()
+        (reads_dir / "read1.fastq").write_text("@read1\nATCG\n+\nIIII\n")
+        (reads_dir / "read2.fastq").write_text("@read2\nATCG\n+\nIIII\n")
+
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "reads": [{"directory": "ont_reads/", "ngs_type": "ont"}]
+        }
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config, indent=2))
+
+        with pytest.raises(Exception, match="Only one ONT or PacBio file"):
+            ConfigManager.load(str(config_file))
+
+    def test_directory_pacbio_multi_file_rejected(self, temp_dir):
+        """Multi-file PacBio directory input must be rejected immediately."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+
+        reads_dir = temp_dir / "pb_reads"
+        reads_dir.mkdir()
+        (reads_dir / "read1.bam").write_text("fake bam 1")
+        (reads_dir / "read2.bam").write_text("fake bam 2")
+
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "reads": [{"directory": "pb_reads/", "ngs_type": "pacbio"}]
+        }
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config, indent=2))
+
+        with pytest.raises(Exception, match="Only one ONT or PacBio file"):
+            ConfigManager.load(str(config_file))
 
     def test_global_and_file_level_options_merge(self, temp_dir):
         """Test that global options and file-level options merge correctly."""
