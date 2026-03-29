@@ -34,7 +34,7 @@ process bwa_mapping {
 
     script:
     """
-    bwa mem ${fasta_file} ${reads} -t ${params.max_cpu} > ${pair_id}.sam
+    bwa mem ${fasta_file} ${reads} -t ${task.cpus} > ${pair_id}.sam
     """
 }
 
@@ -115,7 +115,7 @@ process minimap2 {
 
     script:
     """
-    minimap2 -t ${params.max_cpu} -ax $mapping_tag $fasta_file $reads > ${pair_id}.sam
+    minimap2 -t ${task.cpus} -ax $mapping_tag $fasta_file $reads > ${pair_id}.sam
     """
 }
 
@@ -133,7 +133,7 @@ process samtools_sort {
 
     script:
     """
-    samtools sort --threads ${params.max_cpu} $sam -o ${pair_id}.bam
+    samtools sort --threads ${task.cpus} $sam -o ${pair_id}.bam
     """
 }
 
@@ -195,7 +195,7 @@ process get_unmapped_reads {
 
     script:
     """
-    samtools view -@ ${params.max_cpu} -f 4 -b $bam_file | samtools fastq > ${pair_id}_unmapped.fastq
+    samtools view -@ ${task.cpus} -f 4 -b $bam_file | samtools fastq > ${pair_id}_unmapped.fastq
     """
 }
 

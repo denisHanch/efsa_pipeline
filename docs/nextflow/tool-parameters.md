@@ -47,12 +47,12 @@ All parameters use Delly defaults. No custom thresholds are applied.
 **Module:** `modules/sv_calling.nf`
 
 ```bash
-cuteSV <bam> <ref> <out.vcf> <work_dir> `-t ${params.max_cpu}`
+cuteSV <bam> <ref> <out.vcf> <work_dir> -t ${task.cpus}
 ```
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| `-t` | `${params.max_cpu}` | Number of threads. Set to 1 as a safe default for shared compute nodes. |
+| `-t` | `${task.cpus}` | Number of threads assigned by Nextflow for this task (bounded by process-level CPU limits in `nextflow.config`). |
 
 All other parameters use cuteSV defaults (minimum SV size 50 bp, minimum support 10 reads, etc.). These defaults are suitable for moderate-coverage PacBio/ONT data on both prokaryotic and eukaryotic genomes.
 
@@ -68,12 +68,12 @@ All parameters use Sniffles defaults. No custom thresholds are applied.
 **Module:** `modules/sv_calling.nf`
 
 ```bash
-debreak --bam <bam> -r <ref> -o <out_dir> -t ${params.max_cpu}
+debreak --bam <bam> -r <ref> -o <out_dir> -t ${task.cpus}
 ```
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| `-t` | `${params.max_cpu}` | Number of threads. Uses the pipeline-wide `--max_cpu` setting. |
+| `-t` | `${task.cpus}` | Number of threads assigned by Nextflow for this task (bounded by process-level CPU limits in `nextflow.config`). |
 
 All other parameters use DeBreak defaults.
 
@@ -125,8 +125,8 @@ delta-filter -m -i 90 -l 100 <delta>
 |------|----------|--------|---------------------------|
 | Freebayes | Short-read | `variant_calling.nf` | `--min-coverage 10`, `--min-base-quality 20`, `--min-mapping-quality 30`, `--min-alternate-count 3` |
 | Delly | Short-read | `sv_calling.nf` | Defaults only |
-| cuteSV | Long-read | `sv_calling.nf` | `-t ${params.max_cpu}` |
+| cuteSV | Long-read | `sv_calling.nf` | `-t ${task.cpus}` |
 | Sniffles | Long-read | `sv_calling.nf` | Defaults only |
-| DeBreak | Long-read | `sv_calling.nf` | `-t ${params.max_cpu}` |
+| DeBreak | Long-read | `sv_calling.nf` | `-t ${task.cpus}` |
 | NUCmer | Ref vs Mod | `assembly.nf` | `--maxmatch`, `-c 100`, `-b 500`, `-l 50` |
 | Delta-filter | Ref vs Mod | `assembly.nf` | `-m`, `-i 90`, `-l 100` |
