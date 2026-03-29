@@ -116,7 +116,7 @@ def generateProcessManifest(File logDir) {
         manifestFile.append("# Note: Trace file not found. Enable trace in nextflow.config for process-level details.\n")
     }
 
-    log.info "📋 Process execution manifest: ${manifestFile.path}"
+    log.info "📋 Process execution manifest: ${manifestFile.path}\n"
 }
 
 def loadFastqFiles(input) {
