@@ -459,6 +459,7 @@ flowchart LR
 - **DUP (Duplication) is now a separate SV type** — previously mapped to Replacements, duplications are now preserved as a distinct variant category with their own CSV table
 - **All variant types from all sources are properly extracted and standardized** — assembly (syri), short-read (delly), and long-read variants are correctly identified and reported without loss
 - **Length calculations handle variant type conventions correctly** — insertions and translocations (point variants with start==end) are properly sized using svlen; interval variants use coordinate-based fallback when needed
+- **Final event anchoring is deterministic and size-aware** — `event_length_bp` is selected from the minimum absolute source `svlen`, and event coordinates are anchored to the same source call. If multiple sources share that minimum length, the call with the strongest total interval intersection against other source calls is selected.
 
 ### Outputs overview
 
@@ -495,9 +496,10 @@ The SV output processing pipeline has been enhanced to handle all structural var
 - **Point variant semantics:** Insertions (INS) and translocations (TRA) with `start == end` are now correctly handled:
   - Coordinates are preserved as reported (representing insertion point or breakpoint)
   - Length is derived from the `svlen` field when available
-  - When `svlen` is missing, it defaults to 0 (point variant) rather than calculated from coordinates
-- **Interval variants:** DEL, DUP, INV, RPL use coordinate-based fallback when `svlen` is missing
-- **Consistent derivation:** svlen is intelligently derived from coordinates based on variant type, ensuring accurate reporting across all sources
+  - When `svlen` is missing, INS remains missing (`NaN`) and TRA defaults to `0`
+- **Interval variants:** DEL, DUP, INV, RPL are normalized to coordinate length (`end - start`) to keep interval length semantics consistent across callers
+- **Absolute-length normalization:** signed `svlen` values (for example negative deletions) are normalized with `abs(svlen)` for event-length comparisons, preventing negative event sizes
+- **Consistent derivation:** `svlen` is derived from coordinates based on variant type when absent, ensuring stable reporting across sources
 
 **For comprehensive documentation** on variant type conventions, length calculations, and output table structure, see [docs/outputs/sv-tables.md](docs/outputs/sv-tables.md).
 
@@ -541,9 +543,9 @@ The final table in each CSV file contains one row per final structural variant (
 | **event_id** | Unique identifier of the final structural variant event, such as `DEL_1` or `DUP_2`. |
 | **chrom** | Chromosome where the SV is located (VCF `CHROM`). |
 | **std_svtype** | Standardized SV type harmonized across pipelines. Current values are `DEL`, `DUP`, `INS`, `RPL`, `INV`, and `TRA`. |
-| **event_start** | **Most confident overlap start coordinate** of the clustered SV calls. Calculated as the maximum of all start coordinates across the cluster members. This represents the rightmost (most conservative) start position where all source pipelines agree.  |
-| **event_end** | **Most confident overlap end coordinate** of the clustered SV calls. Calculated as the minimum of all end coordinates across the cluster members. This represents the leftmost (most conservative) end position where all source pipelines agree. |
-| **event_length_bp** | **Length of the representative event region**, calculated differently based on SV type. **For INS (insertions only)**: the minimum `svlen` value reported across all source pipelines (recommended for precise insertion lengths from VCF headers). **For all other types (DEL, RPL, INV, TRA)**: calculated as `event_end - event_start + 1`, representing the length of the consensus overlapping interval. This dual approach ensures insertions retain precise reported lengths while other variation types use the most conservative coordinate-based calculation. |
+| **event_start** | Start coordinate of the selected representative call used to anchor the final event. By design, this is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
+| **event_end** | End coordinate of the selected representative call used to anchor the final event. By design, this is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
+| **event_length_bp** | Representative event size in base pairs, computed as the minimum available **absolute** `svlen` (`min(abs(svlen))`) across assembly, long ONT, long PacBio, and short source representatives. If no source provides `svlen`, this field is `NaN` and coordinates fall back to type-aware cluster coordinate logic. |
 | **support_score** | Number of input sources contributing to the final event row. In the current implementation this is the count of non-empty calls among `asm`, `long_ont`, `long_pacbio`, and `short`. |
 | **percentage_overlap** | Comma-separated overlap percentages collected during same-type event clustering. Each value is calculated during one clustering merge step as `(intersection length / longer interval length) × 100`. This field is empty when the final event was built from a single record only. |
 | **linked_event** | Semicolon-separated list of overlapping final SV events on the same chromosome. This single column includes both same-type and cross-type links. Each linked entry has the format `<event_id> (<std_svtype>, <chrom>:<start>-<end>, <relation>)`. Standard relation values are `exact_coordinates`, `overlap`, `nested_in`, and `contains`, always from the point of view of the current row. If `--cross_type_tol` is set above `0`, near-identical boundaries may also be reported as `same_coordinates_within_<N>bp`. Leave empty when no linked events are found. |
@@ -581,10 +583,13 @@ Each pipeline (assembly, long-read ONT, long-read PacBio, short-read) provides i
 
 **Length calculation logic (per source):**
 
-**For all types (DEL, RPL, INV, TRA, INS):**
-- Uses `svlen` field directly from the VCF/TSV when available (most precise representation of the length)
-- Falls back to `NaN` if `svlen` is not provided
-- Rationale: start and end coordinates remains the same for insertions as it is reported in the reference genome that's why the SV length is taken directly from VCF file.
+- Uses source `svlen` from input when provided.
+- If missing, derives:
+  - `DEL`, `DUP`, `INV`, `RPL`: `end - start`
+  - `TRA`: `0`
+  - `INS`: left missing
+- For interval variants, source `svlen` is normalized to coordinate interval length (`end - start`) after absolute normalization.
+- For event-level comparisons, `svlen` is treated as absolute size (`abs(svlen)`) to handle caller conventions where deletions are reported as negative lengths.
 
 ### Assembly coordinates for translocations (asm_start_mod, asm_end_mod)
 
@@ -611,18 +616,19 @@ The `create_sv_output.py` script processes SV records through the following step
 3. **Select best representative per source** within each cluster using a ranking strategy:
    - Rank 1: Supporting reads / evidence count (higher is better)
    - Rank 2: Quality score (higher is better)
-   - Rank 3: SV size (larger is weighted negatively)
+   - Rank 3: Absolute SV size (`abs(svlen)`), with smaller values preferred as a tie-breaker
    
    This ensures the highest-confidence call from each source is carried forward.
 
-4. **Calculate overlapping interval (event_start, event_end):**
-   - `event_start = max(all member start coordinates)` — the rightmost (most conservative) start
-   - `event_end = min(all member end coordinates)` — the leftmost (most conservative) end
-   - This interval represents the consensus region where all cluster members agree
+4. **Build source length candidates** from selected source representatives:
+   - `asm_length`, `long_ont_length`, `long_pacbio_length`, `short_length` from source `svlen`
+   - Event-length comparison uses `abs(svlen)` to normalize signed caller conventions
 
-5. **Compute event_length_bp** based on SV type:
-   - **INS:** `min(all non-null source svlen values)` — minimum reported insertion length
-   - **Other types:** `event_end - event_start + 1` — length of consensus interval
+5. **Select representative event anchor and length:**
+   - Choose the minimum available absolute source length: `event_length_bp = min(abs(svlen))`
+   - Set `event_start` and `event_end` to the coordinates of the same source call
+   - If multiple sources share the same minimum length, choose the one with the largest total interval intersection against the other source representatives
+   - If no source has a usable `svlen`, keep `event_length_bp = NaN` and fall back to type-aware cluster-coordinate logic
 
 6. **Assemble final row** with all source-specific fields, filtering unnecessary columns (e.g., removing `asm_start_mod/asm_end_mod` from deletions, removing internal type fields)
 

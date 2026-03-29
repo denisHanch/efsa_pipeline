@@ -384,10 +384,13 @@ def choose_best_record(recs: List[Record]) -> Optional[Record]:
         return None
 
     def key(r: Record) -> Tuple[int, float, int]:
+        reads = r.supporting_reads if r.supporting_reads is not None else -1
+        score = r.score if r.score is not None else -1
+        size = abs(r.svlen) if r.svlen is not None else -1
         return (
-            r.supporting_reads or -1,
-            r.score or -1,
-            -(r.svlen if r.svlen is not None else -1),
+            reads,
+            score,
+            -size,
         )
 
     return max(recs, key=key)
@@ -606,25 +609,61 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
         pos2 = _to_int(row.get("pos2")) if source == "short" else None
         start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
         end_mod = _to_int(row.get("end_mod")) if source == "asm" else None
-        svlen = _to_int(row.get("svlen"))
+        svlen_input = _to_int(row.get("svlen"))
+        svlen = abs(svlen_input) if svlen_input is not None else None
+        coord_len = (end - start) if (start is not None and end is not None and end >= start) else None
 
-        # Derive missing svlen from coordinates.
-        if svlen is None and start is not None and end is not None:
-            if std in ("DEL", "DUP", "INV", "RPL"):
-                svlen = (end - start + 1) if end >= start else None
-            elif std == "INS":
-                svlen = None
-            elif std == "TRA":
+        # Normalize and derive svlen with interval semantics: abs(svlen) should match end-start.
+        if std in ("DEL", "DUP", "INV", "RPL"):
+            if coord_len is not None:
+                if svlen is None:
+                    svlen = coord_len
+                    row_modifications.append("svlen_derived")
+                    modification_reasons["svlen_derived"] += 1
+                    modification_details["svlen_derived"] = {
+                        "std_type": std,
+                        "derived_svlen": svlen,
+                        "formula": "end-start",
+                        "start": start,
+                        "end": end,
+                    }
+                elif svlen != coord_len:
+                    previous_svlen = svlen
+                    svlen = coord_len
+                    row_modifications.append("svlen_normalized_to_end_minus_start")
+                    modification_reasons["svlen_normalized_to_end_minus_start"] += 1
+                    modification_details["svlen_normalized_to_end_minus_start"] = {
+                        "std_type": std,
+                        "input_abs_svlen": previous_svlen,
+                        "normalized_svlen": svlen,
+                        "formula": "end-start",
+                        "start": start,
+                        "end": end,
+                    }
+        elif std == "INS":
+            # Keep insertion lengths from caller svlen when present; do not derive from coordinates.
+            svlen = svlen if svlen is not None else None
+        elif std == "TRA":
+            if svlen is None:
                 svlen = 0
-            else:
-                svlen = (end - start + 1) if end >= start else None
-
-            if svlen is not None:
                 row_modifications.append("svlen_derived")
                 modification_reasons["svlen_derived"] += 1
                 modification_details["svlen_derived"] = {
                     "std_type": std,
                     "derived_svlen": svlen,
+                    "formula": "breakpoint_default",
+                    "start": start,
+                    "end": end,
+                }
+        else:
+            if svlen is None and coord_len is not None:
+                svlen = coord_len
+                row_modifications.append("svlen_derived")
+                modification_reasons["svlen_derived"] += 1
+                modification_details["svlen_derived"] = {
+                    "std_type": std,
+                    "derived_svlen": svlen,
+                    "formula": "end-start",
                     "start": start,
                     "end": end,
                 }
@@ -733,28 +772,66 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
         sht_length = sht.svlen if (sht and pd.notna(sht.svlen)) else np.nan
 
         # Calculate event coordinates.
-        # Restore last week's insertion handling: INS uses cluster bounds rather than a single consensus point.
+        # If we can compute event_length_bp from source svlen values, anchor event_start/end
+        # to the same source call that provided the minimum length.
         member_starts = [m.start for m in c.members]
         member_ends = [m.end for m in c.members]
-        if c.std_type == "INS":
-            overlap_start = c.start
-            overlap_end = c.end
-        elif c.std_type == "TRA":
-            consensus_pos = int(round(float(np.median(member_starts)))) if member_starts else c.start
-            overlap_start = consensus_pos
-            overlap_end = consensus_pos
+
+        length_candidates = [
+            ("asm", asm, asm_length),
+            ("long_ont", long_ont, long_ont_length),
+            ("long_pacbio", long_pacbio, long_pacbio_length),
+            ("short", sht, sht_length),
+        ]
+        valid_candidates = []
+        for source_name, rec, length in length_candidates:
+            if rec is None or pd.isna(length):
+                continue
+            valid_candidates.append((source_name, rec, abs(int(length))))
+
+        if valid_candidates:
+            min_len = min(x[2] for x in valid_candidates)
+            min_len_candidates = [x for x in valid_candidates if x[2] == min_len]
+
+            if len(min_len_candidates) == 1:
+                _, min_len_record, _ = min_len_candidates[0]
+            else:
+                # If two or more sources share the same minimum length, choose the one
+                # whose interval has the strongest intersection with other source calls.
+                def _intersection_score(candidate: Record) -> int:
+                    score = 0
+                    for _, other_rec, _ in valid_candidates:
+                        if other_rec is candidate:
+                            continue
+                        score += max(
+                            0,
+                            min(candidate.end, other_rec.end) - max(candidate.start, other_rec.start) + 1,
+                        )
+                    return score
+
+                # Keep deterministic fallback order from length_candidates when scores tie.
+                _, min_len_record, _ = max(
+                    min_len_candidates,
+                    key=lambda x: _intersection_score(x[1]),
+                )
+
+            event_length_bp = min_len
+            overlap_start = min_len_record.start
+            overlap_end = min_len_record.end
         else:
-            overlap_start = max(member_starts) if member_starts else c.start
-            overlap_end = min(member_ends) if member_ends else c.end
-        
-        lengths = [asm_length, long_ont_length, long_pacbio_length, sht_length]
-        valid_lengths = [l for l in lengths if pd.notna(l)]
-        if c.std_type == "INS":
-            event_length_bp = min(valid_lengths) if valid_lengths else np.nan
-        else:
-            # event_length_bp uses svlen (from variant callers) rather than coordinate difference
-            # This correctly handles TRA where start==end but svlen still reports or defaults the size
-            event_length_bp = min(valid_lengths) if valid_lengths else np.nan
+            # Fallback when no svlen is available from any source.
+            if c.std_type == "INS":
+                overlap_start = c.start
+                overlap_end = c.end
+            elif c.std_type == "TRA":
+                consensus_pos = int(round(float(np.median(member_starts)))) if member_starts else c.start
+                overlap_start = consensus_pos
+                overlap_end = consensus_pos
+            else:
+                overlap_start = max(member_starts) if member_starts else c.start
+                overlap_end = min(member_ends) if member_ends else c.end
+
+            event_length_bp = np.nan
         row = {
             "event_id": eid,
             "chrom": c.chrom,
