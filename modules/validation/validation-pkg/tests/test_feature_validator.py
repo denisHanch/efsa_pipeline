@@ -1067,6 +1067,7 @@ class TestGTFConversionWithGffread:
 
     def test_gffread_not_available_falls_back_to_direct_parser(self, temp_dir, output_dir, monkeypatch):
         """When gffread is unavailable the validator falls back to the direct GFF3 parser."""
+        # Create GTF file (9 tab-separated fields, parseable by manual parser)
         gtf_file = temp_dir / "test.gtf"
         with open(gtf_file, "w") as f:
             f.write('chr1\ttest\tgene\t100\t200\t.\t+\t.\tgene_id "G1";\n')
@@ -1090,7 +1091,150 @@ class TestGTFConversionWithGffread:
         # Fallback direct GFF3 parser should parse the one feature in the file
         assert len(validator.features) == 1
         assert result.num_features == 1
+        assert validator.features[0].seqname == 'chr1'
+        assert validator.features[0].feature_type == 'gene'
 
+
+
+class TestManualGffParsing:
+    """Test the manual _parse_gff fallback path."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def output_dir(self, temp_dir):
+        out_dir = temp_dir / "output"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir
+
+    def _make_validator(self, gff_file, output_dir, fmt=FeatureFormat.GFF):
+        feature_config = FeatureConfig(
+            filename=gff_file.name,
+            basename=gff_file.stem,
+            filepath=gff_file,
+            coding_type=CodingType.NONE,
+            detected_format=fmt,
+            output_dir=output_dir,
+            global_options={}
+        )
+        return FeatureValidator(feature_config, FeatureValidator.Settings())
+
+    # --- unit tests for _parse_gff directly ---
+
+    def test_parse_gff_basic(self, temp_dir, output_dir):
+        """_parse_gff parses a standard GFF3 line correctly."""
+        gff_file = temp_dir / "basic.gff"
+        gff_file.write_text(
+            "##gff-version 3\n"
+            "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=gene1\n"
+        )
+        validator = self._make_validator(gff_file, output_dir)
+        with open(gff_file) as f:
+            features = validator._parse_gff(f)
+
+        assert len(features) == 1
+        assert features[0].seqname == "chr1"
+        assert features[0].feature_type == "gene"
+        assert features[0].start == 100
+        assert features[0].end == 200
+        assert features[0].strand == "+"
+        assert "ID=gene1" in features[0].attributes
+
+    def test_parse_gff_skips_comments_and_blank_lines(self, temp_dir, output_dir):
+        """_parse_gff skips comment lines and blank lines."""
+        gff_file = temp_dir / "comments.gff"
+        gff_file.write_text(
+            "##gff-version 3\n"
+            "# a comment\n"
+            "\n"
+            "chr1\tsrc\texon\t10\t50\t.\t-\t.\tID=exon1\n"
+        )
+        validator = self._make_validator(gff_file, output_dir)
+        with open(gff_file) as f:
+            features = validator._parse_gff(f)
+
+        assert len(features) == 1
+        assert features[0].feature_type == "exon"
+
+    def test_parse_gff_skips_malformed_lines(self, temp_dir, output_dir):
+        """_parse_gff skips lines that don't have exactly 9 fields."""
+        gff_file = temp_dir / "malformed.gff"
+        gff_file.write_text(
+            "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=gene1\n"
+            "only\ttwo\tfields\n"
+            "chr2\tsrc\texon\t10\t20\t.\t+\t.\tID=exon1\n"
+        )
+        validator = self._make_validator(gff_file, output_dir)
+        with open(gff_file) as f:
+            features = validator._parse_gff(f)
+
+        assert len(features) == 2
+
+    def test_parse_gff_multiple_features(self, temp_dir, output_dir):
+        """_parse_gff parses multiple features in order."""
+        gff_file = temp_dir / "multi.gff"
+        gff_file.write_text(
+            "chr1\tsrc\tgene\t1\t1000\t.\t+\t.\tID=gene1\n"
+            "chr1\tsrc\tmRNA\t1\t1000\t.\t+\t.\tID=mrna1;Parent=gene1\n"
+            "chr1\tsrc\texon\t100\t500\t.\t+\t.\tID=exon1;Parent=mrna1\n"
+        )
+        validator = self._make_validator(gff_file, output_dir)
+        with open(gff_file) as f:
+            features = validator._parse_gff(f)
+
+        assert len(features) == 3
+        assert [f.feature_type for f in features] == ["gene", "mRNA", "exon"]
+
+    # --- integration tests for the fallback path ---
+
+    def test_gffread_process_error_falls_back_to_manual(self, temp_dir, output_dir, monkeypatch):
+        """When gffread exits with non-zero, validator falls back to manual parsing."""
+        import subprocess
+        gff_file = temp_dir / "test.gff"
+        gff_file.write_text(
+            "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=gene1\n"
+            "chr1\tsrc\texon\t120\t180\t.\t+\t.\tID=exon1;Parent=gene1\n"
+        )
+        validator = self._make_validator(gff_file, output_dir)
+
+        def raise_called_process_error(*args, **kwargs):
+            raise subprocess.CalledProcessError(1, "gffread", stderr="invalid input")
+
+        monkeypatch.setattr('validation_pkg.validators.feature_validator.check_tool_available', lambda x: True)
+        monkeypatch.setattr('subprocess.run', raise_called_process_error)
+
+        validator.run()
+
+        assert len(validator.features) == 2
+        assert validator.features[0].feature_type == "gene"
+        assert validator.features[1].feature_type == "exon"
+
+    def test_gffread_zero_features_falls_back_to_manual(self, temp_dir, output_dir, monkeypatch):
+        """When gffread writes an empty output file, validator falls back to manual parsing."""
+        gff_file = temp_dir / "test.gff"
+        gff_file.write_text(
+            "chr1\tsrc\tgene\t100\t200\t.\t+\t.\tID=gene1\n"
+        )
+        validator = self._make_validator(gff_file, output_dir)
+
+        # Make gffread 'succeed' but write nothing to the output file
+        def fake_run(cmd, **kwargs):
+            import subprocess
+            # Write empty output — gffread wrote nothing
+            output_path = cmd[cmd.index('-o') + 1]
+            open(output_path, 'w').close()
+            return subprocess.CompletedProcess(cmd, 0, stdout='', stderr='')
+
+        monkeypatch.setattr('validation_pkg.validators.feature_validator.check_tool_available', lambda x: True)
+        monkeypatch.setattr('subprocess.run', fake_run)
+
+        validator.run()
+
+        assert len(validator.features) == 1
+        assert validator.features[0].seqname == "chr1"
 
 
 class TestParallelCoordinateValidation:
