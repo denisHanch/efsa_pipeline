@@ -206,12 +206,13 @@ Validate multiple feature files.
 
 Configuration file loader and parser.
 
-#### `ConfigManager.load(config_path)`
+#### `ConfigManager.load(config_path, cli_options=None)`
 
 Load and validate a JSON configuration file.
 
 **Parameters:**
 - `config_path` (str): Path to config.json file
+- `cli_options` (dict, optional): CLI flag values used as fallback when a key is not set in `config.json`; `config.json` always takes priority
 
 **Returns:**
 - `Config`: Validated configuration object
@@ -236,7 +237,7 @@ print(f"Output directory: {config.output_dir}")
 # Access global options
 threads = config.threads          # Returns int or None
 logging_level = config.logging_level   # Returns str (default: 'INFO')
-validation_level = config.validation_level  # Returns str (default: 'strict')
+validation_level = config.validation_level  # Returns str (default: 'trust')
 ```
 
 ---
@@ -260,7 +261,7 @@ Main configuration container returned by `ConfigManager.load()`.
 **Properties:**
 - `threads`: Thread count from options (returns int or None)
 - `logging_level`: Logging level from options (returns str, default: 'INFO')
-- `validation_level`: Validation level from options (returns str, default: 'strict')
+- `validation_level`: Validation level from options (returns str, default: 'trust')
 
 ---
 

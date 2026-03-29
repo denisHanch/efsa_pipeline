@@ -297,18 +297,27 @@ if result.read_number:
 
 Use inter-file validation to check R1↔R2 completeness (see [INTERFILE_VALIDATION.md](INTERFILE_VALIDATION.md)).
 
-#### BAM to FASTQ Conversion
+#### BAM Handling
 
-Limited support for BAM files (requires pysam or samtools):
+BAM files are **copied to the output directory by default** (`ignore_bam=True`, `keep_bam=True`). Downstream tools must handle BAM directly. To enable BAM→FASTQ conversion, set `ignore_bam=False`:
 
 ```python
-# Input: reads.bam
-# Output: reads.fastq.gz (automatically converted)
+# Default: BAM is copied as-is, no FASTQ conversion
 validator = ReadValidator(config.reads[0])
-result = validator.run()
+result = validator.run()  # Output: reads.bam (copy)
+
+# Enable FASTQ conversion
+settings = ReadValidator.Settings(ignore_bam=False, keep_bam=False)
+validator = ReadValidator(config.reads[0], settings)
+result = validator.run()  # Output: reads.fastq.gz
+
+# Convert AND keep original BAM
+settings = ReadValidator.Settings(ignore_bam=False, keep_bam=True)
 ```
 
-**Note:** BAM conversion is experimental and may not preserve all information.
+**Requirements:** `pysam` installed or `samtools` in PATH. BAM must contain sequence and quality scores.
+
+**Limitations:** Secondary/supplementary alignments are skipped; paired-end info may be lost.
 
 ### Output Organization
 
@@ -524,8 +533,8 @@ result = validator.run()
 - Infer missing features (e.g., mRNA from CDS)
 
 **What Python does:**
-- Sort features by position (strict and trust modes)
-- Replace sequence IDs (strict and trust modes)
+- Sort features by position (**strict mode only**)
+- Replace sequence IDs (**strict mode only**)
 - Write compressed output
 
 **Installation:**
@@ -537,16 +546,16 @@ conda install -c bioconda gffread
 
 ```python
 class Settings:
-    sort_by_position: bool = True        # Sort features (strict and trust modes)
-    check_coordinates: bool = True       # Legacy (now handled by gffread)
-    replace_id_with: str = None          # Replace seqnames (strict and trust modes)
+    sort_by_position: bool = True        # Sort features — strict mode only
+    check_coordinates: bool = True       # Python-level coordinate validation (start≥1, start≤end)
+    replace_id_with: str = None          # Replace seqnames — strict mode only
     coding_type: str = None              # Output compression ('gz', 'bz2')
     output_filename_suffix: str = None   # Add suffix to output filename
     output_subdir_name: str = None       # Save to subdirectory
 ```
 
 **Notes:**
-- `check_coordinates` is preserved for backward compatibility but no longer used directly (gffread handles coordinate validation)
+- `check_coordinates`: validates `start >= 1` and `start <= end` after parsing; strict mode checks all features (parallel when threads > 1 and ≥ 1 000 features), trust mode checks first 10 only; issues are logged as warnings and do not stop processing
 - Editing settings (`sort_by_position`, `replace_id_with`) apply in **strict mode only**
 - Trust and minimal modes skip all editing
 

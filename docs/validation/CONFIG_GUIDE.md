@@ -199,7 +199,7 @@ Specifies feature annotation files (BED, GFF, GTF).
 ```json
 {
   "filename": "path/to/features.gff",
-  "validation_level": "strict",
+  "validation_level": "strict"
 }
 ```
 

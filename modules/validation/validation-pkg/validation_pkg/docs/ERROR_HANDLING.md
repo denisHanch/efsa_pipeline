@@ -87,7 +87,7 @@ Missing required field: ref_genome_filename
 Missing required field: reads
 Invalid validation_level 'invalid'. Must be one of: strict, trust, minimal
 'threads' must be a positive integer, got -1
-Invalid global options: {'unknown_option'}. Only 'threads', 'validation_level', 'logging_level' are allowed
+Invalid global options: {'unknown_option'}. Only 'force_defragment_ref', 'logging_level', 'threads', 'type', 'validation_level' are allowed
 ```
 
 **Solutions:**

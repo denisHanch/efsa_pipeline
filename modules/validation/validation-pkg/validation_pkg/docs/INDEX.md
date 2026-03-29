@@ -155,10 +155,12 @@ validation_pkg/
 │   ├── interfile_genome.py      # Genome comparison
 │   └── interfile_read.py        # Paired-end checking
 └── utils/
-    ├── file_handler.py   # File I/O and compression
-    ├── formats.py        # Format enums and detection
-    ├── path_utils.py     # Path resolution utilities
-    └── settings.py       # Base settings class
+    ├── base_settings.py  # BaseSettings, BaseOutputMetadata, BaseValidatorSettings
+    ├── base_validator.py # BaseValidator abstract class
+    ├── file_handler.py   # File I/O and compression utilities
+    ├── formats.py        # CodingType, GenomeFormat, ReadFormat, FeatureFormat enums
+    ├── path_utils.py     # Path resolution and directory-traversal security
+    └── sequence_stats.py # N50 calculation
 ```
 
 ### Data Flow
@@ -386,7 +388,7 @@ This technical documentation (located in `docs/validation/validation_pkg/`):
 **License:** EUPL-1.2
 
 **Python Requirements:**
-- Python 3.8+
+- Python 3.10+
 - BioPython
 - structlog
 - pysam (optional, for BAM support)

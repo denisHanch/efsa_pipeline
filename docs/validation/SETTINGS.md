@@ -74,11 +74,13 @@ Or set globally in options:
 
 ## Performance Impact
 
+Relative speed uses `strict` as the baseline (slowest).
+
 | Mode | Relative Speed | Resource Usage |
 |------|---------------|----------------|
-| minimal | 1x (baseline) | Minimal |
-| trust | 10-15x slower | Moderate |
-| strict | 100x+ slower | High |
+| strict | 1x (baseline) | High |
+| trust | 10-15x faster | Moderate |
+| minimal | 100x+ faster | Minimal |
 
 ## See Also
 

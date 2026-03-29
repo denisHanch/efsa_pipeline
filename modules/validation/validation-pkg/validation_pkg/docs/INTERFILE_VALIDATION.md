@@ -57,8 +57,8 @@ result = genomexgenome_validation(
 ```
 
 **Parameters:**
-- `ref_genome_result` (GenomeOutputMetadata or dict): Result from reference genome validation
-- `mod_genome_result` (GenomeOutputMetadata or dict): Result from modified genome validation
+- `ref_genome_result` (GenomeOutputMetadata): Result from reference genome validation
+- `mod_genome_result` (GenomeOutputMetadata): Result from modified genome validation
 - `settings` (GenomeXGenomeSettings, optional): Validation settings
 
 **Returns:** `dict` with keys:
@@ -68,7 +68,7 @@ result = genomexgenome_validation(
 - `metadata` (dict): Validation metadata
 
 **Raises:**
-- `GenomeValidationError`: If critical validation fails (when settings require it)
+- `InterFileValidationError`: If critical validation fails (non-empty `errors` list in result)
 
 ---
 
@@ -227,8 +227,13 @@ The `metadata` dict contains detailed validation information:
     'ref_only_ids': [],
     'mod_only_ids': [],
     'length_mismatches': {
-        # sequence_id: {'ref_length': int, 'mod_length': int}
-    }
+        # sequence_id: {'ref_length': int, 'mod_length': int, 'difference': int}
+    },
+    # Populated when settings.characterize=True (requires minimap2):
+    'contigs_found': True,           # whether mapped sequences were identified
+    'plasmids_found': True,          # whether unmapped sequences were identified
+    'contig_files': ['/path/to/contig_0.fasta'],  # individual contig FASTA files
+    'plasmid_file': '/path/to/plasmid.fasta'      # merged plasmid FASTA (None if none found)
 }
 ```
 

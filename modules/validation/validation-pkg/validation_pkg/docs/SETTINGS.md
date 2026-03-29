@@ -65,8 +65,8 @@ Only these fields are allowed in the `options` section:
 Number of threads for parallel compression.
 
 **Type:** `int` or `null`
-**Default:** Auto-detect (uses CPU count)
-**Range:** 1-64 (warning if > system cores)
+**Default:** `null` in config (validators use 8 when not specified)
+**Range:** 1-64 (warning if > system cores or > 16)
 **Recommended:** 8-16 for strict mode, 4 for trust/minimal
 
 **Example:**
@@ -88,7 +88,7 @@ Number of threads for parallel compression.
 Validation thoroughness level.
 
 **Type:** `str`
-**Default:** `"strict"` (if not specified)
+**Default:** `"trust"` (if not specified)
 **Options:** `"strict"`, `"trust"`, `"minimal"`
 
 | Level | Speed | Use Case |
@@ -621,10 +621,12 @@ settings = FeatureValidator.Settings(sort_by_position=True)
 
 #### `check_coordinates`
 
-Legacy setting preserved for backward compatibility. Coordinate validation is now handled entirely by gffread (`-v -E` flags) and this field is not used internally.
+Enable Python-level coordinate validation after parsing.
 
 **Type:** `bool`
 **Default:** `True`
+
+When `True`, each parsed feature is checked for `start >= 1` and `start <= end`. In **strict** mode all features are validated (in parallel when `threads > 1` and ≥ 1 000 features are present); in **trust** mode only the first 10 features are validated. Issues are logged as `WARNING` validation events and do not stop processing.
 
 ### Editing Options
 
