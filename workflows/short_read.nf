@@ -18,7 +18,7 @@
 */
 
 include { multiqc } from "../modules/qc.nf"
-include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid } from "../modules/mapping.nf"
+include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid; build_sv_flank_bed as build_sv_flank_bed_short; mosdepth as mosdepth_short } from "../modules/mapping.nf"
 include { freebayes; bcftools_stats; bcftools_stats as bcftools_stats_plasmid } from "../modules/variant_calling.nf"
 include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from "../workflows/subworkflows.nf"
 include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadShortFastqFiles } from "../modules/logs.nf"
@@ -75,7 +75,14 @@ workflow short_read {
         
             // SVs variant calling
             sv(fasta, indexed_bam, out_folder_name) | set { sv_vcf }
-            vcf_to_table_short(sv_vcf) | set { sv_tbl }
+            vcf_to_table_short(sv_vcf) | set { sv_tbl_raw }
+
+            sv_tbl_keyed = sv_tbl_raw.map { tsv ->
+                def pair_id = tsv.baseName.replaceFirst(/_short_sv_summary$/, '')
+                tuple(pair_id, tsv)
+            }
+            build_sv_flank_bed_short(sv_tbl_keyed) | set { sv_tbl_with_regions }
+            mosdepth_short(indexed_bam.join(sv_tbl_with_regions), "short") | set { sv_tbl }
         
         } else {
             sv_vcf = Channel.empty()

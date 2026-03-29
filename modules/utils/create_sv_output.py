@@ -117,6 +117,8 @@ ROW_LOG_FIELDS = (
     "pos2",
     "start_mod",
     "end_mod",
+    "coverage_before_100bp",
+    "coverage_after_100bp",
 )
 
 
@@ -302,6 +304,8 @@ class Record:
     svlen: Optional[int] = None
     start_mod: Optional[int] = None
     end_mod: Optional[int] = None
+    coverage_before_100bp: Optional[float] = None
+    coverage_after_100bp: Optional[float] = None
 
 @dataclass
 class EventCluster:
@@ -607,6 +611,8 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
         start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
         end_mod = _to_int(row.get("end_mod")) if source == "asm" else None
         svlen = _to_int(row.get("svlen"))
+        coverage_before_100bp = _to_float(row.get("coverage_before_100bp"))
+        coverage_after_100bp = _to_float(row.get("coverage_after_100bp"))
 
         # Derive missing svlen from coordinates.
         if svlen is None and start is not None and end is not None:
@@ -676,6 +682,8 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 svlen,
                 start_mod,
                 end_mod,
+                coverage_before_100bp,
+                coverage_after_100bp,
             )
         )
 
@@ -755,6 +763,7 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             # event_length_bp uses svlen (from variant callers) rather than coordinate difference
             # This correctly handles TRA where start==end but svlen still reports or defaults the size
             event_length_bp = min(valid_lengths) if valid_lengths else np.nan
+
         row = {
             "event_id": eid,
             "chrom": c.chrom,
@@ -778,6 +787,8 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "long_ont_score": long_ont.score if long_ont else np.nan,
             "long_ont_supporting_reads": long_ont.supporting_reads if long_ont else np.nan,
             "long_ont_supporting_methods": long_ont.supporting_methods if long_ont else np.nan,
+            "long_ont_coverage_before_100bp": long_ont.coverage_before_100bp if long_ont else np.nan,
+            "long_ont_coverage_after_100bp": long_ont.coverage_after_100bp if long_ont else np.nan,
 
             "long_pacbio_start": long_pacbio.start if long_pacbio else np.nan,
             "long_pacbio_end": long_pacbio.end if long_pacbio else np.nan,
@@ -786,6 +797,8 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "long_pacbio_score": long_pacbio.score if long_pacbio else np.nan,
             "long_pacbio_supporting_reads": long_pacbio.supporting_reads if long_pacbio else np.nan,
             "long_pacbio_supporting_methods": long_pacbio.supporting_methods if long_pacbio else np.nan,
+            "long_pacbio_coverage_before_100bp": long_pacbio.coverage_before_100bp if long_pacbio else np.nan,
+            "long_pacbio_coverage_after_100bp": long_pacbio.coverage_after_100bp if long_pacbio else np.nan,
 
             "short_start": sht.start if sht else np.nan,
             "short_end": sht.end if sht else np.nan,
@@ -797,6 +810,8 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
             "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
+            "short_coverage_before_100bp": sht.coverage_before_100bp if sht else np.nan,
+            "short_coverage_after_100bp": sht.coverage_after_100bp if sht else np.nan,
 
             "percentage_overlap": pct_str,
             "support_score": pipelines_confirmed,

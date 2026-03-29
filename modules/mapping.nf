@@ -97,6 +97,92 @@ process samtools_stats {
     """
 }
 
+process build_sv_flank_bed {
+    tag "$pair_id"
+
+    input:
+    tuple val(pair_id), path(sv_tsv)
+
+    output:
+    tuple val(pair_id), path("input_sv.tsv"), path("regions.bed")
+
+    script:
+    """
+    set -euo pipefail
+
+    cp "${sv_tsv}" input_sv.tsv
+
+    awk '
+      BEGIN { FS=OFS="\\t" }
+      NR==1 {
+        for (i=1; i<=NF; i++) {
+          if (\$i=="chrom") c=i
+          else if (\$i=="start") s=i
+          else if (\$i=="end") e=i
+        }
+        next
+      }
+      {
+        if (!c || !s || !e) next
+        chrom=\$c; start=\$s+0; end=\$e+0
+        if (end < start) { tmp=start; start=end; end=tmp }
+
+        b0=start-101; if (b0 < 0) b0=0
+        b1=start-1
+        if (b1 > b0) print chrom, b0, b1, (NR-1)"|before"
+
+        a0=end; if (a0 < 0) a0=0
+        a1=end+100
+        if (a1 > a0) print chrom, a0, a1, (NR-1)"|after"
+      }
+    ' input_sv.tsv > regions.bed
+    """
+}
+
+process mosdepth {
+    tag "$pair_id"
+    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+
+    input:
+    tuple val(pair_id), path(bam_file), path(bam_index), path(input_sv_tsv), path(regions_bed)
+    val source_tag
+
+    output:
+    path "${pair_id}_${source_tag}_sv_summary.tsv"
+
+    script:
+    def outfile = "${pair_id}_${source_tag}_sv_summary.tsv"
+    """
+    set -euo pipefail
+
+    coverage_tsv="raw_cov.tsv"
+    prefix="${pair_id}_${source_tag}_flank"
+
+    # Default to an empty coverage table when no regions are available.
+    : > "\${coverage_tsv}"
+    if [ -s "${regions_bed}" ]; then
+      mosdepth --threads ${task.cpus} --no-per-base --by "${regions_bed}" "\${prefix}" "${bam_file}"
+      gunzip -c "\${prefix}.regions.bed.gz" \
+        | awk 'BEGIN{FS=OFS="\\t"} {split(\$4,a,"|"); print a[1], a[2], \$5}' > "\${coverage_tsv}"
+    fi
+
+    awk '
+      BEGIN{FS=OFS="\\t"}
+      NR==FNR { cov[\$1 "|" \$2] = \$3; next }
+      NR==1 { print \$0, "coverage_before_100bp", "coverage_after_100bp"; next }
+      function get_cov(id, side, key, value) {
+        key = id "|" side
+        value = cov[key]
+        return (value == "" ? "." : value)
+      }
+      {
+        id = NR - 1
+        print \$0, get_cov(id, "before"), get_cov(id, "after")
+      }
+    ' "\${coverage_tsv}" "${input_sv_tsv}" > "${outfile}"
+    """
+}
+
 
 // Processes for long-read pipeline
 
