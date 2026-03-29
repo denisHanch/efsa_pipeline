@@ -1,7 +1,5 @@
 # METHODS
 
-This file is intentionally non-duplicative.
-
 ## Canonical Parameter Reference
 
 Bioinformatics tool parameters, scientific rationale, and citations are documented in:
@@ -9,10 +7,6 @@ Bioinformatics tool parameters, scientific rationale, and citations are document
 - `docs/nextflow/tool-parameters.md`
 
 Use that file as the single source of truth for analysis thresholds and tool options.
-
-## What This File Covers
-
-This file only documents runtime resource policy and small-machine debugging.
 
 ### Resource Limit Policy
 
