@@ -539,6 +539,24 @@
       ]
     },
     {
+      "SPDXID": "SPDXRef-mosdepth",
+      "name": "mosdepth",
+      "versionInfo": "0.3.12",
+      "downloadLocation": "https://github.com/brentp/mosdepth/releases/tag/v0.3.12",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Brent Pedersen",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/brentp/mosdepth@v0.3.12"
+        }
+      ]
+    },
+    {
       "SPDXID": "SPDXRef-nf-schema",
       "name": "nf-schema",
       "versionInfo": "2.4.2",
@@ -582,6 +600,7 @@
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-trimgalore"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-cutadapt"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-pbzip2"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-mosdepth"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "DYNAMIC_LINK", "relatedSpdxElement": "SPDXRef-biopython"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "DYNAMIC_LINK", "relatedSpdxElement": "SPDXRef-numpy"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "DYNAMIC_LINK", "relatedSpdxElement": "SPDXRef-pysam"},

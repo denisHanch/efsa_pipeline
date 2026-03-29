@@ -69,6 +69,7 @@ EUPL-1.2 is a copyleft license. Its Appendix explicitly lists compatible license
 | FastQC | 0.11.9 | GPL-3.0-or-later | https://github.com/s-andrews/FastQC |
 | MultiQC | 1.33 | GPL-3.0-or-later | https://github.com/MultiQC/MultiQC |
 | NanoPlot | 1.46.2 | MIT | https://github.com/wdecoster/NanoPlot |
+| mosdepth | 0.3.12 | MIT | https://github.com/brentp/mosdepth |
 
 ### Read Processing
 
