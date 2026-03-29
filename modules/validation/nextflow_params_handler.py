@@ -101,12 +101,21 @@ def build_params(
         See module docstring for the full list of produced keys.
     """
     def _path(meta):
-        return str(getattr(meta, "output_file", None)) if meta is not None else None
+        if meta is None:
+            return None
+        value = getattr(meta, "output_file", None)
+        if value is None:
+            return None
+        value = str(value).strip()
+        return value if value and value != "None" else None
 
     ref_path = _path(validation_results.get("ref_genome"))
     mod_path = _path(validation_results.get("mod_genome"))
     gxg      = validation_results.get("genomexgenome") or {}
-    reads    = validation_results.get("reads") or []
+    reads    = [
+        r for r in (validation_results.get("reads") or [])
+        if r is not None and _path(r) is not None
+    ]
     gff_path = None if force_defragment_ref else _path(validation_results.get("ref_feature"))
 
     # reads grouped by ngs_type — keep first validated path per type
