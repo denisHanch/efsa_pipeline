@@ -131,7 +131,7 @@ jobs:
         run: |
           nextflow run main.nf \
             -params-file data/valid/validated_params.json \
-            --max_cpu 8 \
+            --max_cpu 4 \
             -resume
         env:
           NXF_ANSI_LOG: "false"
