@@ -2,7 +2,7 @@ name: "CI: Nextflow Integration Test"
 
 on:
   push:
-    branches: [main, feature/EFSA-221_github_workflow]
+    branches: [main, feature/EFSA-241_add_memory_cpu_req_to_processes]
     paths:
       - "main.nf"
       - "nextflow.config"
@@ -11,7 +11,7 @@ on:
       - "modules/**"
       - ".github/workflows/auto_nextflow_run.yaml"
   pull_request:
-    branches: [main, feature/EFSA-221_github_workflow]
+    branches: [main, feature/EFSA-241_add_memory_cpu_req_to_processes]
     paths:
       - "main.nf"
       - "nextflow.config"
@@ -130,6 +130,7 @@ jobs:
       - name: Run Nextflow pipeline
         run: |
           nextflow run main.nf \
+            -profile test \
             -params-file data/valid/validated_params.json \
             --max_cpu 1 \
             -resume

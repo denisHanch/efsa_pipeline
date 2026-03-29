@@ -19,9 +19,9 @@ process trimgalore {
     script:
     """
     if [ \$(echo ${reads} | wc -w) -gt 1 ]; then
-        trim_galore --gzip --cores ${params.max_cpu} -q 20 --illumina --phred33 --paired ${reads}
+        trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 --paired ${reads}
     else
-        trim_galore --gzip --cores ${params.max_cpu} -q 20 --illumina --phred33 ${reads}
+        trim_galore --gzip --cores ${task.cpus} -q 20 --illumina --phred33 ${reads}
     fi
     """
 }
@@ -81,6 +81,6 @@ process nanoplot {
     
     script:
     """
-    NanoPlot --huge --fastq $reads --outdir ${pair_id}_report --threads ${params.max_cpu}
+    NanoPlot --huge --fastq $reads --outdir ${pair_id}_report --threads ${task.cpus}
     """
 }
