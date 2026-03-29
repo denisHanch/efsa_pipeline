@@ -34,7 +34,7 @@ process picard_dict {
     script:
     """
     dict_name=\$(basename $fasta_file | sed 's/\\.[^.]*\$/.dict/')
-    picard CreateSequenceDictionary R=$fasta_file O=\$dict_name
+    java -jar /usr/picard/picard.jar CreateSequenceDictionary R=$fasta_file O=\$dict_name
     """  
 }
 

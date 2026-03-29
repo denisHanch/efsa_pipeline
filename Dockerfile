@@ -1,71 +1,58 @@
 FROM docker:29.3.1-dind-alpine3.23@sha256:4d90f1f6c400315c2dba96d3ec93c01e64198395cbba04f79d12adce4f737029
-ARG GFFREAD_REF=v0.12.7
-RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositories && \
-    echo "http://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories && \
-    apk update --no-cache --allow-untrusted
 
-# Install necessary packages including compression tools
-RUN apk update && \
-    apk add --no-cache \
-        bash \
-        emacs-nox \
-        mc \
-        python3 \
-        py3-pip \
-        openssh-client \
-        git \
-        curl \
-        ca-certificates \
-        tree \
-        openjdk17-jre-headless \
-        gzip \
-        bzip2 \
-        pigz \
-    && update-ca-certificates \
-    && rm -rf /var/cache/apk/*
+RUN printf '%s\n' \
+      'http://dl-cdn.alpinelinux.org/alpine/v3.23/main' \
+      'http://dl-cdn.alpinelinux.org/alpine/v3.23/community' \
+      > /etc/apk/repositories
 
-# Install build dependencies and build pbzip2 from Debian source as pbzip2 is not available in Alpine
-RUN apk add --no-cache build-base bzip2-dev && \
-    cd /tmp && \
-    wget http://ftp.debian.org/debian/pool/main/p/pbzip2/pbzip2_1.1.13.orig.tar.gz -O pbzip2.tar.gz && \
-    tar xzf pbzip2.tar.gz && \
-    cd pbzip2-1.1.13 && \
-    make && \
-    make install && \
-    cd / && \
-    rm -rf /tmp/pbzip2* && \
-    apk del build-base bzip2-dev
+# Install runtime packages in the main image, with explicit version pinning.
+RUN apk add --no-cache \
+      bash=5.3.3-r1 \
+      emacs-nox=30.2-r0 \
+      mc=4.8.33-r2 \
+      python3=3.12.12-r0 \
+      py3-pip=25.1.1-r1 \
+      openssh-client-default=10.2_p1-r0 \
+      git=2.52.0-r0 \
+      curl=8.17.0-r1 \
+      ca-certificates=20251003-r0 \
+      tree=2.2.1-r0 \
+      openjdk17-jre-headless=17.0.18_p8-r0 \
+      gzip=1.14-r2 \
+      bzip2=1.0.8-r6 \
+      pigz=2.8-r1 \
+      py3-pandas=2.3.3-r0 \
+    && update-ca-certificates
 
-# Copy pre-built minimap2 binary from dedicated image (built from tools/minimap2/Dockerfile)
+# Copy pre-built pbzip2, minimap2 and gffread binaries from dedicated image
+COPY --from=ecomolegmo/pbzip2:v1.1.13@sha256:4a308661071e1ba5e111199067353a8885a964bf93cacb00b5bb149097bacdcb /usr/bin/pbzip2 /usr/bin/pbzip2
 COPY --from=ecomolegmo/minimap2:v2.30@sha256:50d38b713d7d68e105aa3870950492407d82128aa9f3c7c20307632edcab50a5 /usr/local/bin/minimap2 /usr/local/bin/minimap2
+COPY --from=ecomolegmo/gffread:v0.12.7@sha256:dad98757a1b8dcfae49f452678d59599bfb81d10c1a5272e418a352d1521b9aa /usr/local/bin/gffread /usr/local/bin/gffread
 
-# Build and install gffread from source (not available in Alpine repos)
-RUN apk add --no-cache --virtual .gffread-build-deps \
-        build-base \
-    && cd /tmp \
-    && git clone --branch ${GFFREAD_REF} --depth 1 https://github.com/gpertea/gffread.git \
-    && cd gffread \
-    && make release \
-    && cp gffread /usr/local/bin/ \
-    && chmod +x /usr/local/bin/gffread \
-    && cd / \
-    && rm -rf /tmp/gffread \
-    && apk del .gffread-build-deps
-
-# Copy and install validation package
+# Copy validation package source
 COPY modules/validation/ /tmp/validation/
-# Install build dependencies for Python packages
+
+# Build deps only while creating an isolated venv for the validation package.
 RUN apk add --no-cache --virtual .build-deps \
-        gcc \
-        g++ \
-        python3-dev \
-        musl-dev \
-        linux-headers \
-    && pip3 install --no-cache-dir --break-system-packages /tmp/validation/validation-pkg/ \
-    && rm -rf /tmp/validation/ \
+      gcc=15.2.0-r2 \
+      g++=15.2.0-r2 \
+      python3-dev=3.12.12-r0 \
+      musl-dev=1.2.5-r21 \
+      linux-headers=6.16.12-r0 \
+    && python3 -m venv /opt/validation-venv \
+    && /opt/validation-venv/bin/pip install --upgrade pip setuptools wheel \
+    && /opt/validation-venv/bin/pip install --no-cache-dir /tmp/validation/validation-pkg/ \
+    && rm -rf /tmp/validation \
     && apk del .build-deps
 
-RUN apk add --no-cache py3-pandas
+# Create a venv for standalone scripts (e.g. create_sv_output.py) and install their deps.
+RUN python3 -m venv --system-site-packages /opt/scripts-venv \
+    && /opt/scripts-venv/bin/pip install --no-cache-dir \
+         structlog==25.5.0
+
+# Prepend scripts venv to PATH so plain `python3` resolves to it image-wide.
+ENV PATH="/opt/scripts-venv/bin:$PATH"
+
 
 # Copy the Nextflow binary from VM and make it executable
 COPY nextflow /usr/local/bin/nextflow
@@ -83,5 +70,4 @@ COPY .devcontainer/.inputrc /root/
 # Setup bash aliases
 RUN echo 'alias validate="validation.sh"' >> /root/.bashrc
 
-# Set bash as default shell
 ENV SHELL=/bin/bash

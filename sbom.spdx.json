@@ -1,0 +1,612 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "efsa-pipeline-sbom",
+  "documentNamespace": "https://github.com/efsa/efsa_pipeline/sbom-2026-03-29",
+  "documentDescribes": ["SPDXRef-efsa-pipeline"],
+  "creationInfo": {
+    "created": "2026-03-29T00:00:00Z",
+    "creators": ["Tool: efsa-pipeline manual scan", "Organization: EFSA"],
+    "licenseListVersion": "3.24"
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-efsa-pipeline",
+      "name": "efsa-pipeline",
+      "versionInfo": "NOASSERTION",
+      "downloadLocation": "https://github.com/efsa/efsa_pipeline",
+      "filesAnalyzed": false,
+      "licenseConcluded": "EUPL-1.2",
+      "licenseDeclared": "EUPL-1.2",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: EFSA"
+    },
+    {
+      "SPDXID": "SPDXRef-minimap2",
+      "name": "minimap2",
+      "versionInfo": "2.30",
+      "downloadLocation": "https://github.com/lh3/minimap2/releases/tag/v2.30",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Heng Li",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/lh3/minimap2@v2.30"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-bwa",
+      "name": "bwa",
+      "versionInfo": "0.7.17",
+      "downloadLocation": "https://github.com/lh3/bwa/releases/tag/v0.7.17",
+      "filesAnalyzed": false,
+      "licenseConcluded": "GPL-3.0-or-later",
+      "licenseDeclared": "GPL-3.0-or-later",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Heng Li",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/lh3/bwa@v0.7.17"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-mummer",
+      "name": "mummer",
+      "versionInfo": "4.0.1",
+      "downloadLocation": "https://github.com/mummer4/mummer/releases/tag/v4.0.1",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Artistic-2.0",
+      "licenseDeclared": "Artistic-2.0",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: mummer4",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/mummer4/mummer@v4.0.1"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-cuteSV",
+      "name": "cuteSV",
+      "versionInfo": "2.1.3",
+      "downloadLocation": "https://github.com/tjiangHIT/cuteSV/releases/tag/v2.1.3",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Tao Jiang",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/cuteSV@2.1.3"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-sniffles",
+      "name": "sniffles",
+      "versionInfo": "2.7.3",
+      "downloadLocation": "https://github.com/fritzsedlazeck/Sniffles/releases/tag/v2.7.3",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Fritz Sedlazeck",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/sniffles@2.7.3"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-debreak",
+      "name": "DeBreak",
+      "versionInfo": "1.2",
+      "downloadLocation": "https://github.com/Maggi-Chen/DeBreak",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Maggi Chen",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/Maggi-Chen/DeBreak@v1.2"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-delly",
+      "name": "delly",
+      "versionInfo": "1.7.3",
+      "downloadLocation": "https://github.com/dellytools/delly/releases/tag/v1.7.3",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: dellytools",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/dellytools/delly@v1.7.3"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-survivor",
+      "name": "SURVIVOR",
+      "versionInfo": "07404b74d3fe42b20f1362f4d8625f284b9d536c",
+      "downloadLocation": "https://github.com/fritzsedlazeck/SURVIVOR",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Fritz Sedlazeck",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/fritzsedlazeck/SURVIVOR@07404b74"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-freebayes",
+      "name": "freebayes",
+      "versionInfo": "1.2.0",
+      "downloadLocation": "https://github.com/freebayes/freebayes/releases/tag/v1.2.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Erik Garrison",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/freebayes/freebayes@v1.2.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-bcftools",
+      "name": "bcftools",
+      "versionInfo": "1.23",
+      "downloadLocation": "https://github.com/samtools/bcftools/releases/tag/1.23",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: samtools",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/samtools/bcftools@1.23"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-samtools",
+      "name": "samtools",
+      "versionInfo": "1.23",
+      "downloadLocation": "https://github.com/samtools/samtools/releases/tag/1.23",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: samtools",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/samtools/samtools@1.23"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-htslib",
+      "name": "htslib",
+      "versionInfo": "1.23",
+      "downloadLocation": "https://github.com/samtools/htslib/releases/tag/1.23",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: samtools",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/samtools/htslib@1.23"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-picard",
+      "name": "picard",
+      "versionInfo": "3.4.0",
+      "downloadLocation": "https://github.com/broadinstitute/picard/releases/tag/3.4.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: Broad Institute",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/broadinstitute/picard@3.4.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-snpeff",
+      "name": "snpEff",
+      "versionInfo": "4.1k",
+      "downloadLocation": "https://github.com/pcingola/SnpEff",
+      "filesAnalyzed": false,
+      "licenseConcluded": "LGPL-3.0-only",
+      "licenseDeclared": "LGPL-3.0-only",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Pablo Cingolani",
+      "comment": "LGPL-3.0 applies to the tool. SNPEff annotation databases are distributed under the terms of their original sources (ClinVar, dbSNP, Ensembl, etc.) and must be verified separately.",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/pcingola/SnpEff@v4.1k"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-truvari",
+      "name": "truvari",
+      "versionInfo": "5.4.0",
+      "downloadLocation": "https://github.com/ACEnglish/truvari/releases/tag/v5.4.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: ACEnglish",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/truvari@5.4.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-syri",
+      "name": "syri",
+      "versionInfo": "1.7.1",
+      "downloadLocation": "https://github.com/schneebergerlab/syri/releases/tag/v1.7.1",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: schneebergerlab",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/schneebergerlab/syri@v1.7.1"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-gffread",
+      "name": "gffread",
+      "versionInfo": "0.12.7",
+      "downloadLocation": "https://github.com/gpertea/gffread/releases/tag/v0.12.7",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Geo Pertea",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/gpertea/gffread@v0.12.7"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-fastqc",
+      "name": "FastQC",
+      "versionInfo": "0.11.9",
+      "downloadLocation": "https://github.com/s-andrews/FastQC",
+      "filesAnalyzed": false,
+      "licenseConcluded": "GPL-3.0-or-later",
+      "licenseDeclared": "GPL-3.0-or-later",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Simon Andrews",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/s-andrews/FastQC@v0.11.9"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-multiqc",
+      "name": "MultiQC",
+      "versionInfo": "1.33",
+      "downloadLocation": "https://github.com/MultiQC/MultiQC/releases/tag/v1.33",
+      "filesAnalyzed": false,
+      "licenseConcluded": "GPL-3.0-or-later",
+      "licenseDeclared": "GPL-3.0-or-later",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Phil Ewels",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/multiqc@1.33"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-nanoplot",
+      "name": "NanoPlot",
+      "versionInfo": "1.46.2",
+      "downloadLocation": "https://github.com/wdecoster/NanoPlot/releases/tag/v1.46.2",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Wouter De Coster",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/NanoPlot@1.46.2"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-trimgalore",
+      "name": "TrimGalore",
+      "versionInfo": "0.6.10",
+      "downloadLocation": "https://github.com/FelixKrueger/TrimGalore/releases/tag/0.6.10",
+      "filesAnalyzed": false,
+      "licenseConcluded": "GPL-3.0-or-later",
+      "licenseDeclared": "GPL-3.0-or-later",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Felix Krueger",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/FelixKrueger/TrimGalore@0.6.10"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-cutadapt",
+      "name": "cutadapt",
+      "versionInfo": "4.9",
+      "downloadLocation": "https://github.com/marcelm/cutadapt/releases/tag/v4.9",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Marcel Martin",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/cutadapt@4.9"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pbzip2",
+      "name": "pbzip2",
+      "versionInfo": "1.1.13",
+      "downloadLocation": "http://compression.ca/pbzip2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Jeff Gilchrist"
+    },
+    {
+      "SPDXID": "SPDXRef-biopython",
+      "name": "biopython",
+      "versionInfo": "1.85",
+      "downloadLocation": "https://biopython.org",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause AND LicenseRef-Biopython",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: Biopython Contributors",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/biopython@1.85"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-numpy",
+      "name": "numpy",
+      "versionInfo": "2.2.6",
+      "downloadLocation": "https://numpy.org",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: NumPy Developers",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/numpy@2.2.6"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pysam",
+      "name": "pysam",
+      "versionInfo": "0.23.3",
+      "downloadLocation": "https://github.com/pysam-developers/pysam",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: pysam-developers",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/pysam@0.23.3"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-structlog",
+      "name": "structlog",
+      "versionInfo": "25.4.0",
+      "downloadLocation": "https://github.com/hynek/structlog",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT OR Apache-2.0",
+      "licenseDeclared": "MIT OR Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Hynek Schlawack",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/structlog@25.4.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-typing-extensions",
+      "name": "typing_extensions",
+      "versionInfo": "4.15.0",
+      "downloadLocation": "https://github.com/python/typing_extensions",
+      "filesAnalyzed": false,
+      "licenseConcluded": "PSF-2.0",
+      "licenseDeclared": "PSF-2.0",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: Python Software Foundation",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/typing_extensions@4.15.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-nextflow",
+      "name": "nextflow",
+      "versionInfo": "25.10.4",
+      "downloadLocation": "https://github.com/nextflow-io/nextflow/releases/tag/v25.10.4",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: Seqera Labs",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/nextflow-io/nextflow@v25.10.4"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-mosdepth",
+      "name": "mosdepth",
+      "versionInfo": "0.3.12",
+      "downloadLocation": "https://github.com/brentp/mosdepth/releases/tag/v0.3.12",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Person: Brent Pedersen",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/brentp/mosdepth@v0.3.12"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-nf-schema",
+      "name": "nf-schema",
+      "versionInfo": "2.4.2",
+      "downloadLocation": "https://github.com/nextflow-io/nf-schema/releases/tag/2.4.2",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "supplier": "Organization: Seqera Labs",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/nextflow-io/nf-schema@2.4.2"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-efsa-pipeline"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-minimap2"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-bwa"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-mummer"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-cuteSV"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-sniffles"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-debreak"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-delly"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-survivor"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-freebayes"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-bcftools"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-samtools"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-htslib"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-picard"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-snpeff"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-truvari"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-syri"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-gffread"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-fastqc"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-multiqc"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-nanoplot"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-trimgalore"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-cutadapt"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-pbzip2"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-mosdepth"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "DYNAMIC_LINK", "relatedSpdxElement": "SPDXRef-biopython"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "DYNAMIC_LINK", "relatedSpdxElement": "SPDXRef-numpy"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "DYNAMIC_LINK", "relatedSpdxElement": "SPDXRef-pysam"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "DYNAMIC_LINK", "relatedSpdxElement": "SPDXRef-structlog"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "DYNAMIC_LINK", "relatedSpdxElement": "SPDXRef-typing-extensions"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-nextflow"},
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-nf-schema"}
+  ]
+}
