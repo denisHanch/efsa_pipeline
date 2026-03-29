@@ -1,0 +1,23 @@
+# Default: normalize all text files to LF
+* text=auto eol=lf
+
+# Explicitly enforce LF for pipeline code
+*.nf text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+
+# Config and metadata files (common in Nextflow projects)
+*.config text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+
+# Binary / data files (no normalization, no diff)
+*.gz binary
+*.bam binary
+*.bai binary
+*.zip binary
+*.tar binary
+*.bz2 binary
+*.xz binary
+*.7z binary
