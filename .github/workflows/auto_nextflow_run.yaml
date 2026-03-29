@@ -130,8 +130,9 @@ jobs:
       - name: Run Nextflow pipeline
         run: |
           nextflow run main.nf \
+            -profile standard,test \
             -params-file data/valid/validated_params.json \
-            --max_cpu 8 \
+            --max_cpu 1 \
             -resume
         env:
           NXF_ANSI_LOG: "false"
