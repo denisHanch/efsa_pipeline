@@ -1,14 +1,4 @@
-"""
-Tests for the custom exceptions module.
-
-Tests cover:
-- Exception hierarchy and inheritance
-- Raising and catching custom exceptions
-- Error message storage and display
-- Base class relationships (ValidationError, FileFormatError)
-- Validator-specific exceptions (GenomeValidationError, ReadValidationError, FeatureValidationError)
-- Configuration and compression errors
-"""
+"""Tests for the custom exceptions module."""
 
 import pytest
 from validation_pkg.exceptions import (

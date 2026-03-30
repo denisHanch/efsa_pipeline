@@ -1,16 +1,4 @@
-"""
-Tests for genome characterization (contigs vs plasmids via minimap2),
-which is now integrated into genomexgenome_validation.
-
-Tests cover:
-- characterize=True/False on GenomeXGenomeSettings
-- Successful run with mixed contigs and plasmids
-- Edge cases: all mapped, none mapped
-- minimap2 unavailability (demoted to warning, validation still passes)
-- Correct sequence content in output files
-- PAF best-hit selection (multi-hit queries, ribosomal RNA scenario)
-- Orientation tracking ('+' and '-' strand)
-"""
+"""Tests for genome characterization (contigs vs plasmids via minimap2)."""
 
 import pytest
 from pathlib import Path

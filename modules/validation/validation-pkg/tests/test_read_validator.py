@@ -1,15 +1,4 @@
-"""
-Comprehensive tests for ReadValidator.
-
-Tests cover:
-- File format detection and parsing (FASTQ, BAM)
-- Compression handling (gzip, bzip2, uncompressed)
-- Validation rules (empty IDs, duplicate IDs, invalid characters)
-- BAM file handling (pass-through, keep_bam, conversion)
-- Statistics collection (read counts, length, GC content, quality scores)
-- Output generation with various compression formats
-- Error handling and edge cases
-"""
+"""Tests for ReadValidator."""
 
 import pytest
 import tempfile

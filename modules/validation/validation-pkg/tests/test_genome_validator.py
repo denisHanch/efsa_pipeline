@@ -1,15 +1,4 @@
-"""
-Comprehensive tests for GenomeValidator.
-
-Tests cover:
-- File format detection and parsing (FASTA, GenBank)
-- Compression handling (gzip, bzip2, uncompressed)
-- Validation rules (empty sequences, duplicate IDs, invalid characters)
-- Editing specifications (min length, sequence prefix, plasmid split)
-- Statistics collection
-- Output generation with various compression formats
-- Error handling and edge cases
-"""
+"""Tests for GenomeValidator."""
 
 import pytest
 import tempfile

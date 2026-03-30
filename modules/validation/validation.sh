@@ -1,5 +1,5 @@
 #!/bin/bash
-# validate - Wrapper script for EFSA validation
+# validate - Wrapper script for validation
 set -euo pipefail
 
 # Default config path
@@ -85,10 +85,10 @@ RUN_ID="$(date +%Y%m%d_%H%M%S)"
 STAGING_DIR="${VALID_DIR}/run_${RUN_ID}"
 mkdir -p "$STAGING_DIR"
 echo "Validation outputs will be written under: $STAGING_DIR"
-export EFSA_VALIDATION_RUN_DIR="$STAGING_DIR"
+export VALIDATION_RUN_DIR="$STAGING_DIR"
 
 # Run the validation script with error handling
-echo "Running EFSA validation with config: $CONFIG_PATH"
+echo "Running validation with config: $CONFIG_PATH"
 echo "---"
 
 EXTRA_ARGS=()

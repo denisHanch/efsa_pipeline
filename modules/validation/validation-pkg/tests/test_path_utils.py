@@ -1,14 +1,4 @@
-"""
-Tests for path utility functions.
-
-Tests cover:
-- Path resolution relative to base directory
-- Path traversal attack prevention
-- Safe output directory creation
-- Extension stripping utilities
-- Incremental path generation
-- Security validation and error handling
-"""
+"""Tests for path utility functions."""
 
 import pytest
 import tempfile
