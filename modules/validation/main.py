@@ -77,9 +77,10 @@ def main():
         return 1
 
     config_path = Path(args[0]).resolve()
+    base_valid_dir = config_path.parent.parent / "valid"
     # Use the run-specific dir exported by validation.sh; fall back to data/valid/
     run_dir = os.environ.get("EFSA_VALIDATION_RUN_DIR")
-    output_dir = Path(run_dir) if run_dir else config_path.parent.parent / "valid"
+    output_dir = Path(run_dir) if run_dir else base_valid_dir
     logger = None
     log_file = None
 
@@ -268,17 +269,19 @@ def main():
         logger.info("Inter-genome validation skipped")
 
     # Validate plasmid genomes (optional)
+    ref_plasmid_res = None
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
         try:
-            res = validate_genome(config.ref_plasmid, plasmid_settings)
-            report.write(res, file_type="genome")
+            ref_plasmid_res = validate_genome(config.ref_plasmid, plasmid_settings)
+            report.write(ref_plasmid_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional ref_plasmid validation failed: {e}")
 
+    mod_plasmid_res = None
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
         try:
-            res = validate_genome(config.mod_plasmid, plasmid_settings)
-            report.write(res, file_type="genome")
+            mod_plasmid_res = validate_genome(config.mod_plasmid, plasmid_settings)
+            report.write(mod_plasmid_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional mod_plasmid validation failed: {e}")
 
@@ -332,6 +335,8 @@ def main():
     validation_results = {
         "ref_genome":    ref_genome_res,
         "mod_genome":    mod_genome_res,
+        "ref_plasmid":   ref_plasmid_res,
+        "mod_plasmid":   mod_plasmid_res,
         "genomexgenome": genomexgenome_res,
         "reads":         reads_res,
         "ref_feature":   ref_feature_res,
@@ -343,7 +348,7 @@ def main():
             "reference — run_vcf_annotation will be disabled."
         )
     params = nf_params.build_params(validation_results, force_defragment_ref=force_defragment)
-    nf_params.write_params(params, output_dir / "validated_params.json")
+    nf_params.write_params(params, base_valid_dir / "validated_params.json")
 
     return 0
 

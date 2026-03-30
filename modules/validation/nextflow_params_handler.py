@@ -18,21 +18,25 @@ general_options (pipeline execution switches):
   run_pacbio           – True when validated PacBio reads are present
   contig_file_size     – number of contig files from inter-genome characterisation
   run_vcf_annotation   – True when a validated GFF feature file is present
+  validation_timestamp – timestamp of the validation run (YYYYMMDD_HHMMSS)
 
-input_output_options (file paths, null when absent):
+input_output_options (file paths, null / empty list when absent):
   ref_fasta_validated  – absolute path to the validated reference FASTA
   mod_fasta_validated  – absolute path to the validated modified FASTA
-  pacbio_fastq         – path to the first validated PacBio FASTQ
-  nanopore_fastq       – path to the first validated Nanopore FASTQ (or None)
   gff                  – path to the validated reference GFF/GFF3 file
+  illumina_fastqs      – list of validated Illumina FASTQ paths
+  ont_fastqs           – list of validated Nanopore (ONT) FASTQ paths
+  pacbio_fastqs        – list of validated PacBio FASTQ paths
+  contig_files         – list of contig FASTA paths from inter-genome characterisation
 """
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
-_OPTIONAL_PATHS = {"ref_fasta_validated", "mod_fasta_validated", "pacbio_fastq", "gff"}
+_OPTIONAL_PATHS = {"ref_fasta_validated", "mod_fasta_validated", "gff", "ref_plasmid_fasta", "mod_plasmid_fasta"}
 
 
 @dataclass
@@ -45,17 +49,22 @@ class NextflowParams:
     run_pacbio: bool = False
     contig_file_size: int = 0
     run_vcf_annotation: bool = False
-    # input_output_options — always present (may be None)
-    nanopore_fastq: Optional[str] = None
+    validation_timestamp: str = ""
     # input_output_options — omitted from JSON when None
     ref_fasta_validated: Optional[str] = None
     mod_fasta_validated: Optional[str] = None
-    pacbio_fastq: Optional[str] = None
+    ref_plasmid_fasta: Optional[str] = None
+    mod_plasmid_fasta: Optional[str] = None
     gff: Optional[str] = None
+    # input_output_options — lists, always present (may be empty)
+    illumina_fastqs: List[str] = field(default_factory=list)
+    ont_fastqs: List[str] = field(default_factory=list)
+    pacbio_fastqs: List[str] = field(default_factory=list)
+    contig_files: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Produce a dict for Nextflow -params-file JSON.
-        Optional path fields are excluded when None; nanopore_fastq is always included."""
+        Optional single-path fields are excluded when None; list fields are always included."""
         result = {
             "run_ref_x_mod": self.run_ref_x_mod,
             "run_truvari": self.run_truvari,
@@ -64,7 +73,11 @@ class NextflowParams:
             "run_pacbio": self.run_pacbio,
             "contig_file_size": self.contig_file_size,
             "run_vcf_annotation": self.run_vcf_annotation,
-            "nanopore_fastq": self.nanopore_fastq,
+            "validation_timestamp": self.validation_timestamp,
+            "illumina_fastqs": self.illumina_fastqs,
+            "ont_fastqs": self.ont_fastqs,
+            "pacbio_fastqs": self.pacbio_fastqs,
+            "contig_files": self.contig_files,
         }
         for k in _OPTIONAL_PATHS:
             v = getattr(self, k)
@@ -109,8 +122,10 @@ def build_params(
         value = str(value).strip()
         return value if value and value != "None" else None
 
-    ref_path = _path(validation_results.get("ref_genome"))
-    mod_path = _path(validation_results.get("mod_genome"))
+    ref_path         = _path(validation_results.get("ref_genome"))
+    mod_path         = _path(validation_results.get("mod_genome"))
+    ref_plasmid_path = _path(validation_results.get("ref_plasmid"))
+    mod_plasmid_path = _path(validation_results.get("mod_plasmid"))
     gxg      = validation_results.get("genomexgenome") or {}
     reads    = [
         r for r in (validation_results.get("reads") or [])
@@ -118,15 +133,16 @@ def build_params(
     ]
     gff_path = None if force_defragment_ref else _path(validation_results.get("ref_feature"))
 
-    # reads grouped by ngs_type — keep first validated path per type
-    by_type = {}
+    # collect all validated paths per ngs_type
+    files_by_type: dict = {}
     for r in reads:
         ngs = getattr(r, "ngs_type", None)
-        if ngs and ngs not in by_type:
-            by_type[ngs] = _path(r)
+        p = _path(r)
+        if ngs and p:
+            files_by_type.setdefault(ngs, []).append(p)
 
     gxg_metadata = gxg.get("metadata") or {}
-    contig_file_size = len(gxg_metadata.get("contig_files", []))
+    contig_files = gxg_metadata.get("contig_files", [])
 
     ref_fragmented = getattr(validation_results.get("ref_genome"), 'fragmented', False)
     mod_fragmented = getattr(validation_results.get("mod_genome"), 'fragmented', False)
@@ -137,17 +153,22 @@ def build_params(
                        and not ref_fragmented and not mod_fragmented
                        and gxg.get("passed", False)),
         run_truvari=False,
-        run_illumina="illumina" in by_type,
-        run_nanopore="ont" in by_type,
-        run_pacbio="pacbio" in by_type,
-        contig_file_size=contig_file_size,
+        run_illumina="illumina" in files_by_type,
+        run_nanopore="ont" in files_by_type,
+        run_pacbio="pacbio" in files_by_type,
+        contig_file_size=len(contig_files),
         run_vcf_annotation=gff_path is not None,
-        # input_output_options — nullable paths
-        nanopore_fastq=by_type.get("ont"),
+        validation_timestamp=datetime.now().strftime("%Y%m%d_%H%M%S"),
+        # input_output_options
         ref_fasta_validated=ref_path,
         mod_fasta_validated=mod_path,
-        pacbio_fastq=by_type.get("pacbio"),
+        ref_plasmid_fasta=ref_plasmid_path,
+        mod_plasmid_fasta=mod_plasmid_path,
         gff=gff_path,
+        illumina_fastqs=files_by_type.get("illumina", []),
+        ont_fastqs=files_by_type.get("ont", []),
+        pacbio_fastqs=files_by_type.get("pacbio", []),
+        contig_files=contig_files,
     )
 
 

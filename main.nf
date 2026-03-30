@@ -51,8 +51,8 @@ workflow {
     def ref_fasta = Channel.fromPath(params.ref_fasta_validated, checkIfExists: true) 
     def mod_fasta = Channel.fromPath(params.mod_fasta_validated)
 
-    def ref_plasmid = listFiles("${params.in_dir}", ".*ref_plasmid\\.(fa|fna|fasta)")
-    def mod_plasmid = listFiles("${params.in_dir}", ".*mod_plasmid\\.(fa|fna|fasta)")
+    def ref_plasmid = params.ref_plasmid_fasta ? [file(params.ref_plasmid_fasta)] : []
+    def mod_plasmid = params.mod_plasmid_fasta ? [file(params.mod_plasmid_fasta)] : []
 
     def activePipelines = []
     def sv_tbl = Channel.empty()
@@ -62,7 +62,7 @@ workflow {
     if (params.run_ref_x_mod) {
         if (params.contig_file_size >= 1) {
                 
-            def contigs_ch = Channel.fromPath("$params.in_dir/*_contig_*.fasta")
+            def contigs_ch = Channel.fromPath(params.contig_files)
             
             ref_mod(ref_fasta, contigs_ch)
 
@@ -81,7 +81,7 @@ workflow {
     if (params.run_pacbio) {
         mapping_tag = "map-pb"
             
-        pacbio_fastqs = loadFastqFiles("${params.pacbio_fastq}")
+        pacbio_fastqs = loadFastqFiles(params.pacbio_fastqs)
         
         nanoplot_pacbio(pacbio_fastqs, "pacbio")
         
@@ -103,7 +103,7 @@ workflow {
     if (params.run_nanopore) {
         mapping_tag = "map-ont"
         
-        ont_fastqs = loadFastqFiles("${params.nanopore_fastq}")
+        ont_fastqs = loadFastqFiles(params.ont_fastqs)
 
         nanoplot_ont(ont_fastqs, "ont")
         
@@ -124,9 +124,7 @@ workflow {
     // illimina reads pipeline
     if (params.run_illumina) {    
         
-        def illumina_files = listFiles("${params.in_dir}/illumina/")
-
-       fastqs = loadShortFastqFiles(illumina_files)
+       fastqs = loadShortFastqFiles(params.illumina_fastqs)
 
         qc(fastqs, "illumina/qc_trimming") | set { trimmed }
 
