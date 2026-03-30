@@ -23,6 +23,8 @@ general_options (pipeline execution switches):
 input_output_options (file paths, null / empty list when absent):
   ref_fasta_validated  – absolute path to the validated reference FASTA
   mod_fasta_validated  – absolute path to the validated modified FASTA
+  ref_plasmid_fasta    – plasmid FASTA for reference (from explicit config or genome validator split)
+  mod_plasmid_fasta    – plasmid FASTA for modified (from explicit config or GXG characterisation)
   gff                  – path to the validated reference GFF/GFF3 file
   illumina_fastqs      – list of validated Illumina FASTQ paths
   ont_fastqs           – list of validated Nanopore (ONT) FASTQ paths
@@ -133,6 +135,17 @@ def build_params(
     ref_plasmid_path = _path(validation_results.get("ref_plasmid"))
     mod_plasmid_path = _path(validation_results.get("mod_plasmid"))
     gxg      = validation_results.get("genomexgenome") or {}
+    gxg_metadata = gxg.get("metadata") or {}
+
+    # Fall back to plasmids detected during genome validation when not explicitly configured
+    if ref_plasmid_path is None:
+        plasmid_filenames = getattr(validation_results.get("ref_genome"), "plasmid_filenames", None) or []
+        if plasmid_filenames:
+            ref_plasmid_path = str(plasmid_filenames[0])
+
+    if mod_plasmid_path is None:
+        mod_plasmid_path = gxg_metadata.get("plasmid_file") or None
+
     reads    = [
         r for r in (validation_results.get("reads") or [])
         if r is not None and _path(r) is not None
@@ -152,7 +165,6 @@ def build_params(
         else:
             fastqs_by_type.setdefault(ngs, []).append(p)
 
-    gxg_metadata = gxg.get("metadata") or {}
     contig_files = gxg_metadata.get("contig_files", [])
 
     ref_fragmented = getattr(validation_results.get("ref_genome"), 'fragmented', False)
