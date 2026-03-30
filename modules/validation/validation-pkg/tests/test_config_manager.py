@@ -49,8 +49,7 @@ class TestConfigManager:
         (temp_dir / "reads_R1.fastq").write_text("@read1\nATCG\n+\nIIII\n")
         (temp_dir / "reads_R2.fastq").write_text("@read2\nATCG\n+\nIIII\n")
         (temp_dir / "ref_features.gff").write_text("##gff-version 3\n")
-        (temp_dir / "mod_features.bed").write_text("chr1\t100\t200\n")
-        
+
         config = {
             "ref_genome_filename": {"filename": "ref.fasta"},
             "mod_genome_filename": {"filename": "mod.fasta"},
@@ -61,7 +60,6 @@ class TestConfigManager:
                 {"filename": "reads_R2.fastq", "ngs_type": "illumina"}
             ],
             "ref_feature_filename": {"filename": "ref_features.gff"},
-            "mod_feature_filename": {"filename": "mod_features.bed"},
             "options": {"threads": 8, "validation_level": "trust"}
         }
 
@@ -94,17 +92,15 @@ class TestConfigManager:
         assert config.mod_plasmid is not None
         assert len(config.reads) == 2
         assert config.ref_feature is not None
-        assert config.mod_feature is not None
         assert config.options["threads"] == 8
         assert config.options["validation_level"] == "trust"
-        
+
         # Check all absolute paths are set
         assert config.ref_genome.filepath.is_absolute()
         assert config.mod_genome.filepath.is_absolute()
         assert config.ref_plasmid.filepath.is_absolute()
         assert config.mod_plasmid.filepath.is_absolute()
         assert config.ref_feature.filepath.is_absolute()
-        assert config.mod_feature.filepath.is_absolute()
         assert all(read.filepath.is_absolute() for read in config.reads)
         
     
@@ -291,23 +287,6 @@ class TestConfigManager:
         config_file.write_text(json.dumps(config))
 
         with pytest.raises(ValidationFileNotFoundError, match="features_missing.gff"):
-            ConfigManager.load(str(config_file))
-
-    def test_missing_mod_feature_file(self, temp_dir):
-        """Test error when mod_feature file is specified but missing."""
-        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
-        (temp_dir / "reads.fastq").write_text("@read1\nATCG\n+\nIIII\n")
-
-        config = {
-            "ref_genome_filename": {"filename": "ref.fasta"},
-            "mod_feature_filename": {"filename": "mod_features_missing.gff"},  # File doesn't exist
-            "reads": [{"filename": "reads.fastq", "ngs_type": "illumina"}]
-        }
-
-        config_file = temp_dir / "config.json"
-        config_file.write_text(json.dumps(config))
-
-        with pytest.raises(ValidationFileNotFoundError, match="mod_features_missing.gff"):
             ConfigManager.load(str(config_file))
 
     def test_missing_file_is_logged(self, temp_dir):

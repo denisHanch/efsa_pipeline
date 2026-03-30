@@ -204,15 +204,6 @@ def main():
             output_filename_suffix='ref'
         )
 
-        # Settings for modified features
-        mod_feature_settings = FeatureValidator.Settings(
-            sort_by_position=False,
-            check_coordinates=False,
-            replace_id_with='chr',
-            coding_type=None,
-            output_filename_suffix='mod'
-        )
-
         # Inter genome validation settings (using defaults)
         genomexgenome_settings = GenomeXGenomeSettings(
             characterize=True,
@@ -324,13 +315,6 @@ def main():
             report.write(ref_feature_res, file_type="feature")
         except ValidationError as e:
             logger.error(f"Optional ref_feature validation failed: {e}")
-
-    if hasattr(config, 'mod_feature') and config.mod_feature:
-        try:
-            res = validate_feature(config.mod_feature, mod_feature_settings)
-            report.write(res, file_type="feature")
-        except ValidationError as e:
-            logger.error(f"Optional mod_feature validation failed: {e}")
 
     if fatal_errors:
         report.add_fatal_errors(fatal_errors)
