@@ -260,7 +260,7 @@ ReadValidator detects these patterns:
 | Standard Illumina | `sample_R1.fastq`, `sample_R2.fastq` |
 | Dot separator | `sample.R1.fastq`, `sample.R2.fastq` |
 | No separator | `sampleR1.fastq`, `sampleR2.fastq` |
-| With suffix | `sample_R1_trimmed.fastq`, `sample_R2_trimmed.fastq` |
+| With suffix | `sample_R1_suffix.fastq`, `sample_R2_suffix.fastq` |
 
 ### Access Pattern Information
 
@@ -281,7 +281,7 @@ else:
 # base_name: 'sample'
 # read_number: 1
 
-# File: experiment_1_trimmed.fastq.gz
+# File: experiment_1_suffix.fastq.gz
 # base_name: 'experiment'
 # read_number: 1
 ```
