@@ -173,12 +173,20 @@ def main():
             min_sequence_length=100
         )
 
-        # Settings for plasmid genomes (if you have them)
-        plasmid_settings = GenomeValidator.Settings(
+        # Settings for ref plasmid genomes (if you have them)
+        ref_plasmid_settings = GenomeValidator.Settings(
             is_plasmid=True,
             plasmids_to_one=True,
             coding_type=None,
-            output_filename_suffix='plasmid'
+            output_filename_suffix='ref_plasmid'
+        )
+
+        # Settings for mod plasmid genomes (if you have them)
+        mod_plasmid_settings = GenomeValidator.Settings(
+            is_plasmid=True,
+            plasmids_to_one=True,
+            coding_type=None,
+            output_filename_suffix='mod_plasmid'
         )
 
         # Settings for reads
@@ -257,22 +265,11 @@ def main():
         except ValidationError as e:
             logger.error(f"Optional mod_genome validation failed: {e}")
 
-    # Inter-genome validation — only if both genomes validated successfully and mod is not fragmented
-    genomexgenome_res = None
-    if mod_genome_res is not None and ref_genome_res is not None and not getattr(mod_genome_res, 'fragmented', False):
-        try:
-            genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings)
-            report.write(genomexgenome_res, file_type="genomexgenome")
-        except ValidationError as e:
-            logger.error(f"Inter-genome validation failed: {e}")
-    else:
-        logger.info("Inter-genome validation skipped")
-
     # Validate plasmid genomes (optional)
     ref_plasmid_res = None
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
         try:
-            ref_plasmid_res = validate_genome(config.ref_plasmid, plasmid_settings)
+            ref_plasmid_res = validate_genome(config.ref_plasmid, ref_plasmid_settings)
             report.write(ref_plasmid_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional ref_plasmid validation failed: {e}")
@@ -280,10 +277,21 @@ def main():
     mod_plasmid_res = None
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
         try:
-            mod_plasmid_res = validate_genome(config.mod_plasmid, plasmid_settings)
+            mod_plasmid_res = validate_genome(config.mod_plasmid, mod_plasmid_settings)
             report.write(mod_plasmid_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional mod_plasmid validation failed: {e}")
+
+    # Inter-genome validation — only if both genomes validated successfully and mod is not fragmented
+    genomexgenome_res = None
+    if mod_genome_res is not None and ref_genome_res is not None and not getattr(mod_genome_res, 'fragmented', False):
+        try:
+            genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings, mod_plasmid_res)
+            report.write(genomexgenome_res, file_type="genomexgenome")
+        except ValidationError as e:
+            logger.error(f"Inter-genome validation failed: {e}")
+    else:
+        logger.info("Inter-genome validation skipped")
 
     # Validate reads (required)
     reads_res = None

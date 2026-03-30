@@ -557,9 +557,10 @@ class GenomeValidator(BaseValidator):
         # Generate plasmid filename using utility
         base_name = strip_all_extensions(self.genome_config.filename, self.input_path)
 
-        # Add plasmid suffix and optional user suffix
+        # Build filename: user suffix first, then _plasmid only when not already a plasmid-only file
         if self.settings.output_filename_suffix:
-            plasmid_filename = f"{base_name}_{self.settings.output_filename_suffix}_plasmid{index}.fasta"
+            plasmid_infix = "" if self.settings.is_plasmid else "_plasmid"
+            plasmid_filename = f"{base_name}_{self.settings.output_filename_suffix}{plasmid_infix}{index}.fasta"
         else:
             plasmid_filename = f"{base_name}_plasmid{index}.fasta"
 

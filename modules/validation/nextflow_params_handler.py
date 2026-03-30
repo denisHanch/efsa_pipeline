@@ -166,6 +166,13 @@ def build_params(
             ref_plasmid_path = _relpath(str(run_dir / plasmid_filenames[0]))
 
     if mod_plasmid_path is None:
+        mod_genome_meta = validation_results.get("mod_genome")
+        plasmid_filenames = getattr(mod_genome_meta, "plasmid_filenames", None) or []
+        if plasmid_filenames and mod_genome_meta is not None:
+            run_dir = Path(mod_genome_meta.output_file).parent
+            mod_plasmid_path = _relpath(str(run_dir / plasmid_filenames[0]))
+
+    if mod_plasmid_path is None:
         mod_plasmid_path = _relpath(gxg_metadata.get("plasmid_file") or None)
 
     reads    = [
