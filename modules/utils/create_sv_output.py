@@ -613,6 +613,8 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
         pos2 = _to_int(row.get("pos2")) if source == "short" else None
         start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
         end_mod = _to_int(row.get("end_mod")) if source == "asm" else None
+        coverage_before_100bp = _to_float(row.get("coverage_before_100bp"))
+        coverage_after_100bp = _to_float(row.get("coverage_after_100bp"))
         svlen_input = _to_int(row.get("svlen"))
         svlen = abs(svlen_input) if svlen_input is not None else None
         coord_len = (end - start) if (start is not None and end is not None and end >= start) else None
