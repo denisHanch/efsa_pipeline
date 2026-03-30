@@ -74,7 +74,6 @@ class TestReadValidatorInitialization:
         settings = ReadValidator.Settings(
             check_invalid_chars=True,
             allow_duplicate_ids=False,
-            keep_bam=False
         )
 
         read_config = ReadConfig(
@@ -92,7 +91,6 @@ class TestReadValidatorInitialization:
 
         assert validator.settings.check_invalid_chars is True
         assert validator.settings.allow_duplicate_ids is False
-        assert validator.settings.keep_bam is False
 
 
 class TestReadValidatorParsing:

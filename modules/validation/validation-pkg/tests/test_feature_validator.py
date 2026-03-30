@@ -178,9 +178,8 @@ class TestFeatureValidatorParsing:
         )
 
         validator = FeatureValidator(feature_config, FeatureValidator.Settings())
-        validator.run()  # Should succeed with warning
-
-        assert len(validator.features) == 0
+        with pytest.raises(FeatureValidationError):
+            validator.run()
 
     def test_parse_malformed_gff(self, temp_dir, output_dir):
         """Test parsing malformed GFF lines."""
