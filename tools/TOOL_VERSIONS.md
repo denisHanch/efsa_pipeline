@@ -12,6 +12,7 @@ This file documents explicit version pins used in custom tool images to improve 
 | tools/debreak/Dockerfile | pysam | 0.23.3 |
 | tools/pbzip2/Dockerfile | pbzip2 | 1.1.13 |
 | tools/minimap2/Dockerfile | minimap2 | 2.30 |
+| tools/mosdepth/Dockerfile | mosdepth | 0.3.11 |
 | tools/trimgalore/Dockerfile | trimgalore | 0.6.10 |
 
 ## Git sources (pinned)
