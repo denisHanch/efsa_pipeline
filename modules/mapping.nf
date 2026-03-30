@@ -163,20 +163,20 @@ process mosdepth {
     if [ -s "${regions_bed}" ]; then
       mosdepth --threads ${task.cpus} --no-per-base --by "${regions_bed}" "\${prefix}" "${bam_file}"
       gunzip -c "\${prefix}.regions.bed.gz" \
-        | awk 'BEGIN{FS=OFS="\\t"} {split(\$4,a,"|"); print a[1], a[2], \$5}' > "\${coverage_tsv}"
+        | awk 'BEGIN{FS=OFS="\\t"} {split(\$4,a,/\\|/); print a[1], a[2], \$5}' > "\${coverage_tsv}"
     fi
 
     awk '
       BEGIN{FS=OFS="\\t"}
       NR==FNR { cov[\$1 "|" \$2] = \$3; next }
-      NR==1 { print \$0, "coverage_before_100bp", "coverage_after_100bp"; next }
+      FNR==1 { print \$0, "coverage_before_100bp", "coverage_after_100bp"; next }
       function get_cov(id, side, key, value) {
         key = id "|" side
         value = cov[key]
         return (value == "" ? "." : value)
       }
       {
-        id = NR - 1
+        id = FNR - 1
         print \$0, get_cov(id, "before"), get_cov(id, "after")
       }
     ' "\${coverage_tsv}" "${input_sv_tsv}" > "${outfile}"

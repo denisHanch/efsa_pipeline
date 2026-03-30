@@ -22,7 +22,7 @@
 include { nanoplot; multiqc } from "../modules/qc.nf"
 include { sv_long; mapping_long; mapping_long as mapping_long_plasmid; sv_long as sv_long_plasmid }  from "../workflows/subworkflows.nf"
 include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadFastqFiles } from "../modules/logs.nf"
-include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads;get_unmapped_reads as get_unmapped_reads_plasmid; build_sv_flank_bed as build_sv_flank_bed_long; mosdepth as mosdepth_long } from "../modules/mapping.nf"
+include { calc_unmapped as calc_unmapped_long; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads;get_unmapped_reads as get_unmapped_reads_plasmid; build_sv_flank_bed; mosdepth } from "../modules/mapping.nf"
 include { samtools_index; vcf_to_table_long }  from "../modules/sv_calling.nf"
 
 def executed = false
@@ -48,7 +48,7 @@ workflow long_read {
         
         // printout % unmapped reads
         calc_total_reads(indexed_bam) | set { total_reads }
-        calc_unmapped(unmapped_fastq) | set { nreads }
+        calc_unmapped_long(unmapped_fastq) | set { nreads }
         logUnmapped(nreads, total_reads, out_folder_name, "")
 
         // mapping reads to plasmid & variant calling
@@ -72,8 +72,8 @@ workflow long_read {
                 def pair_id = tsv.baseName.replace(suffix, "")
                 tuple(pair_id, tsv)
             }
-            build_sv_flank_bed_long(sv_tbl_keyed) | set { sv_tbl_with_regions }
-            mosdepth_long(indexed_bam.join(sv_tbl_with_regions), mapping_tag) | set { sv_tbl }
+            build_sv_flank_bed(sv_tbl_keyed) | set { sv_tbl_with_regions }
+            mosdepth(indexed_bam.join(sv_tbl_with_regions), mapping_tag) | set { sv_tbl }
             sv_vcf     = sv_long.out.merged_vcf
             supp_reads = sv_long.out.supp_reads
 
