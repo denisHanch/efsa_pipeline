@@ -700,8 +700,9 @@ class ConfigManager:
         """Set up output directory for validation results."""
         logger = get_logger()
 
-        # Create output directory path
-        output_dir = config.config_dir.parent / "valid"
+        # Create output directory path — prefer the run-specific dir set by validation.sh
+        run_dir = os.environ.get("EFSA_VALIDATION_RUN_DIR")
+        output_dir = Path(run_dir) if run_dir else config.config_dir.parent / "valid"
 
         # Create directory if it doesn't exist
         try:

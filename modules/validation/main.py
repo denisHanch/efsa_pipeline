@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import traceback
 from pathlib import Path
@@ -75,9 +76,10 @@ def main():
         print("  python main.py config.json")
         return 1
 
-    # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
     config_path = Path(args[0]).resolve()
-    output_dir = config_path.parent.parent / "valid"
+    # Use the run-specific dir exported by validation.sh; fall back to data/valid/
+    run_dir = os.environ.get("EFSA_VALIDATION_RUN_DIR")
+    output_dir = Path(run_dir) if run_dir else config_path.parent.parent / "valid"
     logger = None
     log_file = None
 
