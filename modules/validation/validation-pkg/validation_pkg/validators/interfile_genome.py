@@ -187,28 +187,9 @@ def genomexgenome_validation(
 
 
 def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
-    """Parse PAF output and return the best-scoring hit per query sequence.
+    """Parse PAF output and return the best hit per query (largest alignment block length).
 
-    PAF columns (0-indexed):
-      0  query name      1  query length
-      2  q_start         3  q_end
-      4  strand (+/-)    5  ref name
-      6  ref length      7  r_start
-      8  r_end           9  residue matches
-      10 alignment block length   11 mapping quality
-
-    For each query name the hit with the largest alignment block length
-    (col 10) is selected.  This correctly handles multi-copy elements such
-    as ribosomal RNA that produce many hits: only the highest-scoring
-    reference assignment is kept.
-
-    Returns
-    -------
-    Dict mapping query_name -> {
-        'ref_name'     : str,   # name of best-matching reference sequence (expected to be only one reference = should be same all the time)
-        'strand'       : str,   # '+' or '-'
-        'alignment_len': int,   # alignment block length of the winning hit
-    }
+    Returns dict mapping query_name -> {'ref_name': str, 'strand': str, 'alignment_len': int}.
     """
     best_hits: Dict[str, Dict] = {}
     # Track (q_start, r_start) per (query_name, ref_name) pair to detect ambiguous alignments

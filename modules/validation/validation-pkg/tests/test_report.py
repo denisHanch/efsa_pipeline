@@ -1,13 +1,4 @@
-"""
-Tests for validation report generation module.
-
-Tests cover:
-- FileValidationRecord and InterFileValidationRecord dataclasses
-- ValidationReport construction and data collection
-- Text and JSON report generation
-- Metadata formatting and handling
-- Error handling and edge cases
-"""
+"""Tests for validation report generation."""
 
 import pytest
 import json
