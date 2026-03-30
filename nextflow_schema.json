@@ -22,12 +22,46 @@
       "default": "data/outputs/logs"
     },
 
-    "pacbio_fastq": {
+    "illumina_fastqs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "ont_fastqs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "ont_bams": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "pacbio_fastqs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "pacbio_bams": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "contig_files": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "validation_timestamp": {
+      "type": "string",
+      "default": ""
+    },
+    "ref_plasmid_fasta": {
       "type": ["string", "null"],
       "format": "file",
       "default": null
     },
-    "nanopore_fastq": {
+    "mod_plasmid_fasta": {
       "type": ["string", "null"],
       "format": "file",
       "default": null

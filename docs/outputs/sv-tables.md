@@ -28,6 +28,7 @@ flowchart LR
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
 - Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
 - `linked_event` is the only relationship column in the final CSVs. It includes both same-type and cross-type overlaps.
+- Final event anchoring is deterministic and size-aware: `event_length_bp` uses minimum absolute `svlen`, and event coordinates are anchored to the same selected source call. Equal-length ties are resolved by strongest intersection with the other source calls.
 
 ### VCF Extraction and Variant Type Handling
 
@@ -161,9 +162,9 @@ The final table in each CSV file contains one row per final structural variant (
 | **event_id** | Unique identifier of the final structural variant event, such as `DEL_1` or `DUP_2`. |
 | **chrom** | Chromosome where the SV is located (VCF `CHROM`). |
 | **std_svtype** | Standardized SV type harmonized across pipelines. Current values are `DEL`, `DUP`, `INS`, `RPL`, `INV`, and `TRA`. |
-| **event_start** | **Most confident overlap start coordinate** of the clustered SV calls. Calculated as the maximum of all start coordinates across the cluster members. This represents the rightmost (most conservative) start position where all source pipelines agree.  |
-| **event_end** | **Most confident overlap end coordinate** of the clustered SV calls. Calculated as the minimum of all end coordinates across the cluster members. This represents the leftmost (most conservative) end position where all source pipelines agree. |
-| **event_length_bp** | **Length of the representative event region**, derived from `svlen` (preferred) or calculated from coordinates as fallback. All types (DEL, DUP, INS, RPL, INV, TRA) use `svlen` directly when available from the VCF. When `svlen` is missing: **Interval types (DEL, DUP, INV, RPL):** length derived from `event_end - event_start + 1`. **Point types (INS, TRA):** set to `0` (no interval). The `event_length_bp` column in the final row shows the minimum valid `svlen` across all source pipelines for that event. |
+| **event_start** | Start coordinate of the selected representative call used to anchor the final event. This is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
+| **event_end** | End coordinate of the selected representative call used to anchor the final event. This is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
+| **event_length_bp** | Representative event size in base pairs, computed as the minimum available **absolute** source length (`min(abs(svlen))`) across assembly, long ONT, long PacBio, and short source representatives. If no source provides `svlen`, this field is `NaN` and coordinates use fallback cluster logic. |
 | **support_score** | Number of input sources contributing to the final event row. In the current implementation this is the count of non-empty calls among `asm`, `long_ont`, `long_pacbio`, and `short`. |
 | **percentage_overlap** | Comma-separated overlap percentages collected during same-type event clustering. Each value is calculated during one clustering merge step as `(intersection length / longer interval length) × 100`. This field is empty when the final event was built from a single record only. |
 | **linked_event** | Semicolon-separated list of overlapping final SV events on the same chromosome. This single column includes both same-type and cross-type links. Each linked entry has the format `<event_id> (<std_svtype>, <chrom>:<start>-<end>, <relation>)`. Standard relation values are `exact_coordinates`, `overlap`, `nested_in`, and `contains`, always from the point of view of the current row. If `--cross_type_tol` is set above `0`, near-identical boundaries may also be reported as `same_coordinates_within_<N>bp`. Leave empty when no linked events are found. |
@@ -218,20 +219,25 @@ The examples below use simplified coordinates for clarity.
 
 The `create_sv_output.py` script handles `svlen` consistently across all sources:
 
-1. **If `svlen` is provided in the input TSV/VCF**: Use it directly (most reliable representation of length)
+1. **If `svlen` is provided in the input TSV/VCF**: Use it directly as source length
 2. **If `svlen` is missing**:
-   - **For interval variants (DEL, DUP, INV, RPL):** Derive `svlen = end - start + 1`
-   - **For point variants (INS, TRA):** Set `svlen = 0` (no interval, length is semantic information in the variant call)
+   - **For interval variants (DEL, DUP, INV, RPL):** Derive `svlen = end - start`
+   - **For TRA:** Set `svlen = 0` (breakpoint semantics)
+   - **For INS:** Keep as missing (`None`/`NaN`) unless explicitly provided by caller
    - **For unknown types**: Attempt coordinate-based derivation, fallback to `None`
+
+3. **If `svlen` is present but signed or inconsistent (interval variants):**
+   - Normalize sign first: `svlen = abs(svlen)`
+   - For `DEL`, `DUP`, `INV`, `RPL`, normalize to coordinate interval length: `svlen = end - start`
 
 This ensures accurate length reporting regardless of variant type and source pipeline.
 
 #### Event Length Calculation for Final Rows
 
 In the final CSV tables:
-- **event_length_bp** is computed as the minimum valid `svlen` across all source records in the clustered event
+- **event_length_bp** is computed as the minimum valid absolute `svlen` (`min(abs(svlen))`) across all source records in the clustered event
 - If no sources provide `svlen`, `event_length_bp` is `NaN`
-- This conservative approach ensures reported lengths represent the smallest (most confident) size estimate
+- This conservative approach ensures reported lengths represent the smallest source size estimate while handling signed caller conventions robustly
 
 Each source pipeline registers its own length in the table:
 - **asm_length** — Assembly pipeline svlen
@@ -266,18 +272,19 @@ The `create_sv_output.py` script processes SV records through the following step
 3. **Select best representative per source** within each cluster using a ranking strategy:
    - Rank 1: Supporting reads / evidence count (higher is better)
    - Rank 2: Quality score (higher is better)
-   - Rank 3: SV size (larger is weighted negatively)
+   - Rank 3: Absolute SV size (`abs(svlen)`), with smaller values preferred as tie-breaker
    
    This ensures the highest-confidence call from each source is carried forward.
 
-4. **Calculate overlapping interval (event_start, event_end):**
-   - `event_start = max(all member start coordinates)` — the rightmost (most conservative) start
-   - `event_end = min(all member end coordinates)` — the leftmost (most conservative) end
-   - This interval represents the consensus region where all cluster members agree
+4. **Build source length candidates** from selected source representatives:
+   - `asm_length`, `long_ont_length`, `long_pacbio_length`, `short_length` from source `svlen`
+   - Event-level comparison uses absolute lengths (`abs(svlen)`) to normalize caller sign conventions
 
-5. **Compute event_length_bp** based on SV type:
-   - **INS:** `min(all non-null source svlen values)` — minimum reported insertion length
-   - **Other types:** `event_end - event_start + 1` — length of consensus interval
+5. **Select event anchor and event length:**
+   - Set `event_length_bp = min(abs(svlen))` across available source representatives
+   - Set `event_start` and `event_end` to the coordinates of the same selected source call
+   - If multiple sources share the same minimum absolute length, choose the one with the largest total interval intersection against other source representatives
+   - If no usable source `svlen` exists, keep `event_length_bp = NaN` and use type-aware fallback coordinates
 
 6. **Assemble final row** with all source-specific fields, filtering unnecessary columns (e.g., removing `asm_start_mod/asm_end_mod` from deletions, removing internal type fields)
 

@@ -162,7 +162,7 @@ Specifies sequencing read files. Supports individual files or directories.
 
 #### Option 2: Directory of Files
 
-All files in the directory inherit the same settings:
+All files in the directory inherit the same settings. Each file becomes a separate read entry. This works for all NGS types (`illumina`, `ont`, `pacbio`).
 
 ```json
 "reads": [

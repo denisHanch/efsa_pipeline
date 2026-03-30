@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import traceback
 from pathlib import Path
@@ -75,9 +76,11 @@ def main():
         print("  python main.py config.json")
         return 1
 
-    # Derive output directory from config path (mirrors ConfigManager._setup_output_directory)
     config_path = Path(args[0]).resolve()
-    output_dir = config_path.parent.parent / "valid"
+    base_valid_dir = config_path.parent.parent / "valid"
+    # Use the run-specific dir exported by validation.sh; fall back to data/valid/
+    run_dir = os.environ.get("VALIDATION_RUN_DIR")
+    output_dir = Path(run_dir) if run_dir else base_valid_dir
     logger = None
     log_file = None
 
@@ -266,17 +269,19 @@ def main():
         logger.info("Inter-genome validation skipped")
 
     # Validate plasmid genomes (optional)
+    ref_plasmid_res = None
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
         try:
-            res = validate_genome(config.ref_plasmid, plasmid_settings)
-            report.write(res, file_type="genome")
+            ref_plasmid_res = validate_genome(config.ref_plasmid, plasmid_settings)
+            report.write(ref_plasmid_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional ref_plasmid validation failed: {e}")
 
+    mod_plasmid_res = None
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
         try:
-            res = validate_genome(config.mod_plasmid, plasmid_settings)
-            report.write(res, file_type="genome")
+            mod_plasmid_res = validate_genome(config.mod_plasmid, plasmid_settings)
+            report.write(mod_plasmid_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional mod_plasmid validation failed: {e}")
 
@@ -291,11 +296,12 @@ def main():
         except ValidationError as e:
             register_required_failure("reads", e)
 
-    # Add interread validation
+    # Add interread validation — skip when all reads are BAM (pairing check is meaningless)
     readxread_res = None
-    if reads_res is not None:
+    fastq_reads = [r for r in (reads_res or []) if getattr(r, "input_format", None) != "bam"]
+    if reads_res is not None and fastq_reads:
         try:
-            readxread_res = readxread_validation(reads_res, readxread_settings)
+            readxread_res = readxread_validation(fastq_reads, readxread_settings)
             report.write(readxread_res, file_type="readxread")
         except ValidationError as e:
             logger.error(f"Inter-read validation failed: {e}")
@@ -330,6 +336,8 @@ def main():
     validation_results = {
         "ref_genome":    ref_genome_res,
         "mod_genome":    mod_genome_res,
+        "ref_plasmid":   ref_plasmid_res,
+        "mod_plasmid":   mod_plasmid_res,
         "genomexgenome": genomexgenome_res,
         "reads":         reads_res,
         "ref_feature":   ref_feature_res,
@@ -341,7 +349,7 @@ def main():
             "reference — run_vcf_annotation will be disabled."
         )
     params = nf_params.build_params(validation_results, force_defragment_ref=force_defragment)
-    nf_params.write_params(params, output_dir / "validated_params.json")
+    nf_params.write_params(params, base_valid_dir / "validated_params.json")
 
     return 0
 

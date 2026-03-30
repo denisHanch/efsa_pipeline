@@ -78,7 +78,7 @@ modules/validation/
 `validation.sh` runs with `set -euo pipefail`. Each run writes to its own
 timestamped sub-directory (`data/valid/run_YYYYMMDD_HHMMSS/`); previous runs
 are **preserved**. The sub-directory path is exported as
-`$EFSA_VALIDATION_RUN_DIR` for downstream steps.
+`$VALIDATION_RUN_DIR` for downstream steps.
 
 CLI flags are fallbacks — `config.json` `options` take priority if the same key
 is set in both places.
@@ -268,8 +268,8 @@ for keys not set in `config.json`. Full validation pipeline:
 4. `_setup_output_directory()` — creates `config_dir.parent / "valid"`
 5. `_parse_genome_configs()` — ref (required), mod/plasmids (optional)
 6. `_parse_reads_configs()` — supports both `filename` and `directory` keys;
-   **raises `ValueError` if a `directory` entry for `ngs_type="ont"` or
-   `ngs_type="pacbio"` contains more than one file** — merge reads first
+   each file in the directory becomes a separate `ReadConfig` entry (all ngs types
+   support multiple files per directory)
 7. `_parse_feature_configs()` — ref_feature, mod_feature (optional)
 8. Returns fully populated `Config`
 

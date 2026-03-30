@@ -104,7 +104,8 @@ class ReadOutputMetadata(BaseOutputMetadata):
     # Read-specific fields
     base_name: str = None
     read_number: int = None
-    ngs_type: str = None  # Configured NGS type from config (pacbio, illumina, ont, etc.)
+    ngs_type: str = None      # Configured NGS type from config (pacbio, illumina, ont, etc.)
+    input_format: str = None  # Detected input format: "fastq" or "bam"
     illumina_pairing_detected: str = None  # "illumina" if Illumina paired-end pattern detected
     num_reads: int = None
 
@@ -396,8 +397,9 @@ class ReadValidator(BaseValidator):
         # Add read-specific fields
         self.output_metadata.num_reads = len(self.sequences)
 
-        # Store configured NGS type
+        # Store configured NGS type and detected input format
         self.output_metadata.ngs_type = self.read_config.ngs_type
+        self.output_metadata.input_format = self.read_config.detected_format.to_biopython()
 
         # Calculate read statistics in strict mode only
         if self.validation_level == 'strict' and self.sequences:

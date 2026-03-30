@@ -1,14 +1,4 @@
-"""
-Tests for the file_handler module.
-
-Tests cover:
-- File opening with automatic decompression
-- Compression detection and type handling
-- Format detection for genome, read, and feature files
-- Filename processing and path utilities
-- Compression conversion functions (gzip, bzip2)
-- Parallel compression tool selection and usage
-"""
+"""Tests for the file_handler module."""
 
 import pytest
 import gzip

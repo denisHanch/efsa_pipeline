@@ -1,14 +1,4 @@
-"""
-Tests for global option defaults and CLI option fallback in ConfigManager.
-
-Tests cover:
-- All 5 global options default to the correct values when omitted from config.json
-- Defaults are stored in config.options (not just accessible via properties)
-- Defaults are propagated into file-level global_options
-- force_defragment_ref option (config.json and CLI)
-- CLI options (cli_options) applied as fallback when not in config.json
-- Priority: config.json > cli_options > defaults
-"""
+"""Tests for global option defaults and CLI option fallback in ConfigManager."""
 
 import pytest
 import json

@@ -49,9 +49,9 @@ The validation process:
 1. Reads the configuration file from `data/inputs/config.json`
 2. Validates each input file according to its type (genome, reads, features)
 3. Converts files to standardized formats
-4. Outputs validated files to `data/valid/`
-5. Writes `data/valid/validated_params.json` with validated file paths and flags for Nextflow
-6. Generates logs and reports in `logs/`
+4. Outputs validated files to a timestamped run directory `data/valid/run_YYYYMMDD_HHMMSS/`
+5. Writes `data/valid/validated_params.json` (at the top level, not inside the run directory) with validated file paths and flags for Nextflow
+6. Generates a log and report inside the run directory
 
 ## Running Validation
 
@@ -84,11 +84,10 @@ Priority of configurations: config.json > cli_options > defaults
 
 After successful validation:
 
-- Validated files are placed in `data/valid/`
-- `data/valid/validated_params.json` is written with paths and flags for Nextflow (loaded automatically via `-params-file`)
-- If any genome exceeds `n_sequence_limit` or `type` is `"eukaryote"`, the file is still copied to `data/valid/` but `run_ref_x_mod` will be set to `false`
-- Log file created in `./logs/validation_ID.log`
-- Report file created in `./logs/report_ID.txt`
+- Validated files are placed in `data/valid/run_YYYYMMDD_HHMMSS/` (a new timestamped directory per run; previous runs are preserved)
+- `data/valid/validated_params.json` is written at the top level of `data/valid/` so Nextflow can always find it at a fixed path
+- If any genome exceeds `n_sequence_limit` or `type` is `"eukaryote"`, the file is still copied but `run_ref_x_mod` will be set to `false`
+- Log and report are written inside the run directory
 
 ### `validated_params.json`
 
@@ -96,22 +95,31 @@ This file is produced by the validation step and consumed by Nextflow via `-para
 
 #### Pipeline switches
 
-| Parameter            | Type    | Description                                                                                           |
-| -------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
-| `run_ref_x_mod`      | boolean | `true` when both reference and modified genome validation succeeded and neither is fragmented; `false` when any genome exceeds `n_sequence_limit` or `type` is `"eukaryote"`. Gates all ref-vs-mod steps. |
-| `run_truvari`        | boolean | Always `false` by default; can be overridden in `data/validation/validated_params.json`.                                                |
-| `run_illumina`       | boolean | `true` when validated Illumina reads are present.                                                     |
-| `run_nanopore`       | boolean | `true` when validated Nanopore (ONT) reads are present.                                               |
-| `run_pacbio`         | boolean | `true` when validated PacBio reads are present.                                                       |
-| `contig_file_size`   | integer | Number of contig files produced by inter-genome characterisation.                                     |
-| `run_vcf_annotation` | boolean | `true` when a validated GFF feature file is available.                                                |
+| Parameter               | Type    | Description                                                                                           |
+| ----------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
+| `run_ref_x_mod`         | boolean | `true` when both reference and modified genome validation succeeded and neither is fragmented; `false` when any genome exceeds `n_sequence_limit` or `type` is `"eukaryote"`. Gates all ref-vs-mod steps. |
+| `run_truvari`           | boolean | Always `false` by default; can be overridden manually in `data/valid/validated_params.json`.          |
+| `run_illumina`          | boolean | `true` when validated Illumina FASTQ reads are present.                                               |
+| `run_nanopore`          | boolean | `true` when validated Nanopore (ONT) reads are present (FASTQ or BAM).                               |
+| `run_pacbio`            | boolean | `true` when validated PacBio reads are present (FASTQ or BAM).                                       |
+| `contig_file_size`      | integer | Number of contig files produced by inter-genome characterisation.                                     |
+| `run_vcf_annotation`    | boolean | `true` when a validated GFF feature file is available.                                                |
+| `validation_timestamp`  | string  | Timestamp of the validation run (`YYYYMMDD_HHMMSS`).                                                  |
 
-#### File paths (null when absent)
+#### File paths (null or empty list when absent)
 
-| Parameter             | Type   | Description                                          |
-| --------------------- | ------ | ---------------------------------------------------- |
-| `ref_fasta_validated` | string | Path to the validated reference genome FASTA.        |
-| `mod_fasta_validated` | string | Path to the validated modified genome FASTA.         |
-| `pacbio_fastq`        | string | Path to the first validated PacBio FASTQ file.       |
-| `nanopore_fastq`      | string | Path to the first validated Nanopore FASTQ file.     |
-| `gff`                 | string | Path to the validated reference GFF/GFF3 file.       |
+| Parameter             | Type          | Description                                                    |
+| --------------------- | ------------- | -------------------------------------------------------------- |
+| `ref_fasta_validated` | string        | Path to the validated reference genome FASTA.                  |
+| `mod_fasta_validated` | string        | Path to the validated modified genome FASTA.                   |
+| `ref_plasmid_fasta`   | string        | Path to the validated reference plasmid FASTA (if present).    |
+| `mod_plasmid_fasta`   | string        | Path to the validated modified plasmid FASTA (if present).     |
+| `gff`                 | string        | Path to the validated reference GFF/GFF3 file.                 |
+| `illumina_fastqs`     | string array  | Paths to all validated Illumina FASTQ files.                   |
+| `ont_fastqs`          | string array  | Paths to all validated Nanopore FASTQ files.                   |
+| `ont_bams`            | string array  | Paths to all validated Nanopore BAM files (copied as-is).      |
+| `pacbio_fastqs`       | string array  | Paths to all validated PacBio FASTQ files.                     |
+| `pacbio_bams`         | string array  | Paths to all validated PacBio BAM files (copied as-is).        |
+| `contig_files`        | string array  | Paths to contig FASTA files from inter-genome characterisation. |
+
+> **BAM files:** When a PacBio or ONT input is provided as BAM, it is copied to the run directory without conversion. Its path appears in `pacbio_bams` / `ont_bams` — separate from the FASTQ lists — so Nextflow can handle the two formats independently. Inter-read (R1/R2 pairing) validation is skipped when all reads for a sample are BAM.

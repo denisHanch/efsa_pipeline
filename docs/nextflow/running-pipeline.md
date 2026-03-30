@@ -16,10 +16,11 @@ Running the pipeline is a **two-step process**: validate inputs first, then run 
 ### Step 1 — Validate inputs
 
 ```bash
-python3 ./modules/validation/main.py ./data/inputs/config.json
+./validation.sh                                    # default config path
+./validation.sh --config path/to/config.json       # custom config
 ```
 
-This produces `data/valid/validated_params.json`, which contains the validated file paths and pipeline switches that Nextflow consumes in the next step. See the [Validation Overview](../validation/OVERVIEW.md) for details on what this file contains.
+This writes validated files to `data/valid/run_YYYYMMDD_HHMMSS/` and produces `data/valid/validated_params.json` (at the top level, always at a fixed path). See the [Validation Overview](../validation/OVERVIEW.md) for details on what this file contains.
 
 ### Step 2 — Run the pipeline
 
@@ -43,7 +44,6 @@ The `-params-file data/valid/validated_params.json` flag loads the parameters ge
 
 | Option         | Description                                                       | Default                 |
 |----------------|-------------------------------------------------------------------|-------------------------|
-| `--in_dir`     | Input directory                                                   | `data/valid`            |
 | `--out_dir`    | Output directory                                                  | `data/outputs`          |
 | `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
 | `--clean_work` | Remove work directory after successful run                        | `true`                  |

@@ -1,14 +1,4 @@
-"""
-Tests for the logging functionality.
-
-Tests cover:
-- Logger initialization and configuration
-- Log level management
-- Timer functionality for performance tracking
-- Validation issue tracking
-- File timing summary
-- Console and file output formatting
-"""
+"""Tests for the logging functionality."""
 
 import pytest
 import tempfile

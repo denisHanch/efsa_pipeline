@@ -37,26 +37,9 @@ def resolve_filepath(base_dir: Path, filename: str) -> Path:
 
 
 def sanitize_path_component(component: str, allow_slashes: bool = False) -> str:
-    """
-    Sanitize a path component to prevent directory traversal attacks.
+    """Sanitize a path component to prevent directory traversal attacks.
 
-    Args:
-        component: The path component to sanitize
-        allow_slashes: Whether to allow forward slashes (for subdirectories)
-
-    Returns:
-        Sanitized path component
-
-    Raises:
-        ValueError: If component contains illegal characters or patterns
-
-    Examples:
-        >>> sanitize_path_component("valid_subdir")
-        'valid_subdir'
-        >>> sanitize_path_component("../etc/passwd")
-        ValueError: Invalid path component: contains '..'
-        >>> sanitize_path_component("/etc/passwd")
-        ValueError: Invalid path component: contains absolute path
+    Raises ValueError for '..', absolute paths, null bytes, or Windows reserved names.
     """
     # Remove leading/trailing whitespace
     component = component.strip()
@@ -106,27 +89,7 @@ def build_safe_output_dir(
     subdir_name: Optional[str] = None,
     create: bool = True
 ) -> Path:
-    """
-    Build output directory with path traversal protection.
-
-    Args:
-        base_dir: Base output directory (must exist)
-        subdir_name: Optional subdirectory name (will be sanitized)
-        create: Whether to create the directory if it doesn't exist
-
-    Returns:
-        Safe output directory path
-
-    Raises:
-        ValueError: If subdir_name contains illegal characters
-        ConfigurationError: If path would escape base_dir
-
-    Examples:
-        >>> build_safe_output_dir(Path("/output"), "results")
-        Path("/output/results")
-        >>> build_safe_output_dir(Path("/output"), "../etc")
-        ValueError: Invalid path component: contains '..'
-    """
+    """Build output directory path, sanitizing subdir_name against traversal attacks."""
     # Start with base directory
     output_dir = base_dir
 
@@ -158,22 +121,7 @@ def build_safe_output_dir(
 
 
 def strip_all_extensions(filename: str, path: Optional[Path] = None) -> str:
-    """
-    Strip all extensions from a filename.
-
-    Args:
-        filename: The filename to process
-        path: Optional Path object to get suffixes from
-
-    Returns:
-        Filename with all extensions removed
-
-    Examples:
-        >>> strip_all_extensions("genome.fasta.gz")
-        'genome'
-        >>> strip_all_extensions("reads_R1.fastq")
-        'reads_R1'
-    """
+    """Strip all extensions from a filename (e.g. 'genome.fasta.gz' → 'genome')."""
     if not filename:
         return filename
 

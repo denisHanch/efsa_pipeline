@@ -7,8 +7,8 @@
 
 
   - Inputs:
-      - Channel of reference fasta (globbed from params.in_dir)
-      - Channel of modified/assembled fasta (globbed from params.in_dir)
+      - Channel of reference fasta (from params.ref_fasta_validated)
+      - Channel of contig FASTAs (from params.contig_files)
   - Outputs:
       - Channel of structural variant VCFs (per-assembly)
       - Channel of SV summary TSVs (per-assembly)
@@ -17,7 +17,7 @@
 */
 
 include { nucmer; delta_filter; show_coords; syri; bcftools_concat; bgzip_tabix } from "../modules/assembly.nf"
-include { logWorkflowCompletion; listFiles } from "../modules/logs.nf"
+include { logWorkflowCompletion } from "../modules/logs.nf"
 include { vcf_to_table_asm; create_empty_tbl } from "../modules/sv_calling.nf"
 
 def executed = false
@@ -28,8 +28,6 @@ workflow ref_mod {
         contigs
     main:
         log.info "▶ Running pipeline comparing reference and modified fasta or reference and contigs."
-
-        contig_files = listFiles("${params.in_dir}/", ".*contig.*\\.fasta")
 
         ref_mod_fasta = contigs
             .combine(ref_fasta)

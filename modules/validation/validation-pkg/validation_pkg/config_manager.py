@@ -290,27 +290,7 @@ class ConfigManager:
         global_options: Dict[str, Any] = None,
         extra_fields: Optional[Dict[str, Any]] = None
     ) -> T:
-        """
-        Generic file configuration parser for genome, read, and feature files.
-
-        Consolidates common parsing logic across all file types to reduce code duplication.
-
-        Args:
-            value: Configuration value (string or dict) containing filename/options
-            field_name: Name of the configuration field (e.g., 'ref_genome_filename')
-            config_dir: Base directory for resolving relative paths
-            output_dir: Output directory for processed files
-            config_class: Dataclass type to instantiate (GenomeConfig, ReadConfig, or FeatureConfig)
-            format_class: Format enum class for file type detection (GenomeFormat, ReadFormat, or FeatureFormat)
-            global_options: Global configuration options to merge
-            extra_fields: Additional type-specific fields (e.g., ngs_type for reads)
-
-        Returns:
-            Instance of config_class with resolved paths and detected format/compression
-
-        Raises:
-            ValidationFileNotFoundError: If the file doesn't exist
-        """
+        """Parse a single file config entry into the appropriate config dataclass."""
         # Parse filename and extra fields using unified utility
         filename, extra = file_handler.parse_config_file_value(value, field_name)
 
@@ -422,14 +402,6 @@ class ConfigManager:
                             f"No valid read files found in directory: {dirpath}. "
                         )
                         continue
-
-                    ngs_type = read_entry.get('ngs_type')
-                    if ngs_type in {'ont', 'pacbio'} and len(files) > 1:
-                        raise ValueError(
-                            f"Directory input for ngs_type='{ngs_type}' contains {len(files)} files. "
-                            "Only one ONT or PacBio file per entry is supported. "
-                            "Merge reads first or submit a single file."
-                        )
 
                     logger.info(f"Found {len(files)} read file(s) in directory: {dirpath}")
 
@@ -708,8 +680,9 @@ class ConfigManager:
         """Set up output directory for validation results."""
         logger = get_logger()
 
-        # Create output directory path
-        output_dir = config.config_dir.parent / "valid"
+        # Create output directory path — prefer the run-specific dir set by validation.sh
+        run_dir = os.environ.get("VALIDATION_RUN_DIR")
+        output_dir = Path(run_dir) if run_dir else config.config_dir.parent / "valid"
 
         # Create directory if it doesn't exist
         try:
