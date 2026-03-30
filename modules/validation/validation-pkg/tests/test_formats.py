@@ -1,14 +1,4 @@
-"""
-Tests for the formats module.
-
-Tests cover:
-- CodingType enum (compression types and normalization)
-- GenomeFormat enum (FASTA, GenBank)
-- ReadFormat enum (FASTQ, BAM)
-- FeatureFormat enum (GFF, GTF, BED)
-- Flexible input handling via _missing_ method
-- Format conversion methods (to_biopython, to_extension)
-"""
+"""Tests for the formats module."""
 
 import pytest
 from pathlib import Path

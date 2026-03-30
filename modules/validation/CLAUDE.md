@@ -78,7 +78,7 @@ modules/validation/
 `validation.sh` runs with `set -euo pipefail`. Each run writes to its own
 timestamped sub-directory (`data/valid/run_YYYYMMDD_HHMMSS/`); previous runs
 are **preserved**. The sub-directory path is exported as
-`$EFSA_VALIDATION_RUN_DIR` for downstream steps.
+`$VALIDATION_RUN_DIR` for downstream steps.
 
 CLI flags are fallbacks — `config.json` `options` take priority if the same key
 is set in both places.

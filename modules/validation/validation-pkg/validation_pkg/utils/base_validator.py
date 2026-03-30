@@ -162,25 +162,6 @@ class BaseValidator(ABC):
         self.logger.debug("Minimal mode - validating format and coding requirements")
 
         try:
-            """
-            Validate that minimal mode requirements are met.
-
-            Minimal mode requires:
-            1. Input format matches expected output format (no conversion)
-            2. Input compression matches required output compression (no recompression)
-
-            Args:
-                detected_format: Detected format from input file
-                expected_format: Expected format enum value
-                input_coding: Detected coding type from input
-                required_coding: Required coding type for output
-                filename: Filename for error messages
-                logger: Logger instance for validation issues
-                category: Category for logging (genome/read/feature)
-
-            Raises:
-                ValidationError: If requirements not met
-            """
             # Check format matches
             if self.config.detected_format != self._expected_format:
                 error_msg = (
