@@ -296,11 +296,12 @@ def main():
         except ValidationError as e:
             register_required_failure("reads", e)
 
-    # Add interread validation
+    # Add interread validation — skip when all reads are BAM (pairing check is meaningless)
     readxread_res = None
-    if reads_res is not None:
+    fastq_reads = [r for r in (reads_res or []) if getattr(r, "input_format", None) != "bam"]
+    if reads_res is not None and fastq_reads:
         try:
-            readxread_res = readxread_validation(reads_res, readxread_settings)
+            readxread_res = readxread_validation(fastq_reads, readxread_settings)
             report.write(readxread_res, file_type="readxread")
         except ValidationError as e:
             logger.error(f"Inter-read validation failed: {e}")

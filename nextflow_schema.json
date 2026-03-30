@@ -32,7 +32,17 @@
       "items": { "type": "string" },
       "default": []
     },
+    "ont_bams": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
     "pacbio_fastqs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "pacbio_bams": {
       "type": "array",
       "items": { "type": "string" },
       "default": []

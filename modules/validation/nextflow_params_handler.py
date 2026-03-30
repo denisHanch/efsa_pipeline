@@ -26,7 +26,9 @@ input_output_options (file paths, null / empty list when absent):
   gff                  – path to the validated reference GFF/GFF3 file
   illumina_fastqs      – list of validated Illumina FASTQ paths
   ont_fastqs           – list of validated Nanopore (ONT) FASTQ paths
+  ont_bams             – list of validated Nanopore (ONT) BAM paths
   pacbio_fastqs        – list of validated PacBio FASTQ paths
+  pacbio_bams          – list of validated PacBio BAM paths
   contig_files         – list of contig FASTA paths from inter-genome characterisation
 """
 
@@ -59,7 +61,9 @@ class NextflowParams:
     # input_output_options — lists, always present (may be empty)
     illumina_fastqs: List[str] = field(default_factory=list)
     ont_fastqs: List[str] = field(default_factory=list)
+    ont_bams: List[str] = field(default_factory=list)
     pacbio_fastqs: List[str] = field(default_factory=list)
+    pacbio_bams: List[str] = field(default_factory=list)
     contig_files: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -76,7 +80,9 @@ class NextflowParams:
             "validation_timestamp": self.validation_timestamp,
             "illumina_fastqs": self.illumina_fastqs,
             "ont_fastqs": self.ont_fastqs,
+            "ont_bams": self.ont_bams,
             "pacbio_fastqs": self.pacbio_fastqs,
+            "pacbio_bams": self.pacbio_bams,
             "contig_files": self.contig_files,
         }
         for k in _OPTIONAL_PATHS:
@@ -133,13 +139,18 @@ def build_params(
     ]
     gff_path = None if force_defragment_ref else _path(validation_results.get("ref_feature"))
 
-    # collect all validated paths per ngs_type
-    files_by_type: dict = {}
+    # collect all validated paths per ngs_type, split by format (fastq vs bam)
+    fastqs_by_type: dict = {}
+    bams_by_type: dict = {}
     for r in reads:
         ngs = getattr(r, "ngs_type", None)
         p = _path(r)
-        if ngs and p:
-            files_by_type.setdefault(ngs, []).append(p)
+        if not ngs or not p:
+            continue
+        if getattr(r, "input_format", None) == "bam":
+            bams_by_type.setdefault(ngs, []).append(p)
+        else:
+            fastqs_by_type.setdefault(ngs, []).append(p)
 
     gxg_metadata = gxg.get("metadata") or {}
     contig_files = gxg_metadata.get("contig_files", [])
@@ -153,9 +164,9 @@ def build_params(
                        and not ref_fragmented and not mod_fragmented
                        and gxg.get("passed", False)),
         run_truvari=False,
-        run_illumina="illumina" in files_by_type,
-        run_nanopore="ont" in files_by_type,
-        run_pacbio="pacbio" in files_by_type,
+        run_illumina="illumina" in fastqs_by_type,
+        run_nanopore=("ont" in fastqs_by_type or "ont" in bams_by_type),
+        run_pacbio=("pacbio" in fastqs_by_type or "pacbio" in bams_by_type),
         contig_file_size=len(contig_files),
         run_vcf_annotation=gff_path is not None,
         validation_timestamp=datetime.now().strftime("%Y%m%d_%H%M%S"),
@@ -165,9 +176,11 @@ def build_params(
         ref_plasmid_fasta=ref_plasmid_path,
         mod_plasmid_fasta=mod_plasmid_path,
         gff=gff_path,
-        illumina_fastqs=files_by_type.get("illumina", []),
-        ont_fastqs=files_by_type.get("ont", []),
-        pacbio_fastqs=files_by_type.get("pacbio", []),
+        illumina_fastqs=fastqs_by_type.get("illumina", []),
+        ont_fastqs=fastqs_by_type.get("ont", []),
+        ont_bams=bams_by_type.get("ont", []),
+        pacbio_fastqs=fastqs_by_type.get("pacbio", []),
+        pacbio_bams=bams_by_type.get("pacbio", []),
         contig_files=contig_files,
     )
 
