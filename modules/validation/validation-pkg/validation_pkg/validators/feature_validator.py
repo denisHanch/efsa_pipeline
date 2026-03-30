@@ -308,6 +308,11 @@ class FeatureValidator(BaseValidator):
                 if temp_file and isinstance(temp_file, Path):
                     temp_file.unlink(missing_ok=True)
 
+        if not self.features:
+            raise FeatureValidationError(
+                f"No features could be parsed from {self.feature_config.filename}"
+            )
+
     def _edit_features(self) -> None:
         """Apply feature edits (sorting, ID replacement) in trust and strict modes."""
         
