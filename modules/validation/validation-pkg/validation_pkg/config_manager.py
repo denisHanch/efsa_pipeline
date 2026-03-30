@@ -423,14 +423,6 @@ class ConfigManager:
                         )
                         continue
 
-                    ngs_type = read_entry.get('ngs_type')
-                    if ngs_type in {'ont', 'pacbio'} and len(files) > 1:
-                        raise ValueError(
-                            f"Directory input for ngs_type='{ngs_type}' contains {len(files)} files. "
-                            "Only one ONT or PacBio file per entry is supported. "
-                            "Merge reads first or submit a single file."
-                        )
-
                     logger.info(f"Found {len(files)} read file(s) in directory: {dirpath}")
 
                     for file in files:

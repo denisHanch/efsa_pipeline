@@ -1096,8 +1096,8 @@ class TestConfigValidatorSettings:
         for read_config in loaded_config.reads:
             assert read_config.global_options['validation_level'] == 'trust'
 
-    def test_directory_ont_multi_file_rejected(self, temp_dir):
-        """Multi-file ONT directory input must be rejected immediately."""
+    def test_directory_ont_multi_file_accepted(self, temp_dir):
+        """Multi-file ONT directory input must be accepted."""
         (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
 
         reads_dir = temp_dir / "ont_reads"
@@ -1112,11 +1112,12 @@ class TestConfigValidatorSettings:
         config_file = temp_dir / "config.json"
         config_file.write_text(json.dumps(config, indent=2))
 
-        with pytest.raises(Exception, match="Only one ONT or PacBio file"):
-            ConfigManager.load(str(config_file))
+        loaded_config = ConfigManager.load(str(config_file))
+        assert len(loaded_config.reads) == 2
+        assert all(r.ngs_type == "ont" for r in loaded_config.reads)
 
-    def test_directory_pacbio_multi_file_rejected(self, temp_dir):
-        """Multi-file PacBio directory input must be rejected immediately."""
+    def test_directory_pacbio_multi_file_accepted(self, temp_dir):
+        """Multi-file PacBio directory input must be accepted."""
         (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
 
         reads_dir = temp_dir / "pb_reads"
@@ -1131,8 +1132,9 @@ class TestConfigValidatorSettings:
         config_file = temp_dir / "config.json"
         config_file.write_text(json.dumps(config, indent=2))
 
-        with pytest.raises(Exception, match="Only one ONT or PacBio file"):
-            ConfigManager.load(str(config_file))
+        loaded_config = ConfigManager.load(str(config_file))
+        assert len(loaded_config.reads) == 2
+        assert all(r.ngs_type == "pacbio" for r in loaded_config.reads)
 
     def test_global_and_file_level_options_merge(self, temp_dir):
         """Test that global options and file-level options merge correctly."""
