@@ -101,7 +101,6 @@ class GenomeFormat(Enum):
             'fa': cls.FASTA,
             'fasta': cls.FASTA,
             'fna': cls.FASTA,
-            'faa': cls.FASTA,
             'genbank': cls.GENBANK,
             'gb': cls.GENBANK,
             'gbk': cls.GENBANK,

@@ -20,5 +20,5 @@ output of the validation is on `/EFSA_workspace/data/valid/`
 -   log: `/EFSA_workspace/data/valid/validation.log`
 -   report: `/EFSA_workspace/data/valid/report.txt`
 
-# Configuration File — Specification & Guide
-- **[validation-pkg/docs/CONFIG_GUIDE.md](validation-pkg/docs/CONFIG_GUIDE.md)**
+# Documentation
+- **[read here](validation-pkg/docs/INDEX.md)**
