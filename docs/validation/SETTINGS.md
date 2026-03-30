@@ -18,7 +18,7 @@ The validation module supports three validation levels to balance thoroughness a
 - Validates every record in the file
 - Performs comprehensive quality checks
 - Generates detailed statistics
-- Feature files: runs coordinate validation in parallel (when `threads > 1` and file has ≥ 1000 features); falls back to direct parsing if `gffread` produces no output
+- Feature files: runs coordinate validation in parallel (when `threads > 1` and file has ≥ 1000 features); falls back to direct parsing if `gffread` produces no output; fails validation if both paths return 0 features
 - Recommended for first-time data processing
 
 **Use when:**

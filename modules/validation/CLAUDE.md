@@ -575,8 +575,9 @@ sequence_ids  : List[str]    # unique seqnames referenced
 2. **gffread unavailable or exits non-zero** → falls back to `_parse_gff()` and records
    a `WARNING` validation issue (`category='feature'`) with the error detail.
 
-In both cases the validator no longer produces an empty output file.
-If the file is genuinely unparseable, both paths return 0 features.
+After both paths, if `self.features` is still empty, `FeatureValidationError` is raised.
+This causes `main.py` to leave `ref_feature_res = None`, which sets `gff = None` and
+`run_vcf_annotation = False` in `validated_params.json`. No output GFF file is created.
 
 ---
 
