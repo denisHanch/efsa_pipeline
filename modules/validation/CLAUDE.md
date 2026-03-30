@@ -332,7 +332,7 @@ FASTA, GENBANK
 .to_biopython()  → "fasta" / "genbank"
 .to_extension()  → ".fasta" / ".genbank"
 
-Aliases:  fa, fna, faa → FASTA
+Aliases:  fa, fna → FASTA
           gb, gbk, genbank → GENBANK
 ```
 

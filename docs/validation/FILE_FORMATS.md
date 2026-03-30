@@ -6,7 +6,7 @@ The EFSA Pipeline validation module supports various file formats for genomic da
 
 | Supported Input Formats | Final Output Format |
 |------------------------|---------------------|
-| FASTA: `.fasta`, `.fa`, `.fna`, `.faa` | `.fasta` |
+| FASTA: `.fasta`, `.fa`, `.fna` | `.fasta` |
 | GenBank: `.gb`, `.gbk`, `.genbank` | `.fasta` |
 | Compression: `.gz`, `.bz2`, `.gzip`, `.bzip2` | Uncompressed |
 

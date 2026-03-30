@@ -324,19 +324,28 @@ BED to GFF coordinate transformation.
 
 ### Automatic Conversion
 
-FeatureValidator automatically converts:
+BED-to-GFF3 conversion is delegated to `gffread`. Manual (fallback) parsing of BED
+is **not supported** — if `gffread` is unavailable, the validator falls back to a
+direct GFF3 parser that cannot read BED format and will silently produce 0 features
+without raising an error.
 
-```python
+The coordinate mapping applied by `gffread` is:
+
+```
 # Input BED:
 chr1  100  200  gene1  500  +
 
 # Conversion applied:
-# BED start (0-based): 100 → GFF start (1-based): 101
-# BED end (half-open): 200 → GFF end (closed): 200
+# BED start (0-based): 100 → GFF start (1-based): 101  (+1)
+# BED end (half-open): 200 → GFF end (closed): 200     (unchanged)
 
 # Output GFF3:
 chr1  .  .  101  200  500  +  .  ID=gene1
 ```
+
+The end coordinate stays the same because BED's exclusive end already identifies
+the same last base as GFF3's inclusive end (e.g. BED `100 200` and GFF3 `101 200`
+both cover positions 101–200 in 1-based coordinates).
 
 ### Manual Verification
 

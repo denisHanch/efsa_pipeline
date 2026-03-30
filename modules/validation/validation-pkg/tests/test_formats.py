@@ -103,7 +103,6 @@ class TestGenomeFormat:
         assert GenomeFormat('fa') == GenomeFormat.FASTA
         assert GenomeFormat('fasta') == GenomeFormat.FASTA
         assert GenomeFormat('fna') == GenomeFormat.FASTA
-        assert GenomeFormat('faa') == GenomeFormat.FASTA
         assert GenomeFormat('.fa') == GenomeFormat.FASTA
         assert GenomeFormat('.fasta') == GenomeFormat.FASTA
 

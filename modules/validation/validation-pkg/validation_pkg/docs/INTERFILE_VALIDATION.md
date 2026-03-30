@@ -241,7 +241,7 @@ The `metadata` dict contains detailed validation information:
 
 ## Read ↔ Read Validation
 
-Check paired-end read completeness (R1↔R2 matching).
+Check paired-end read completeness (R1↔R2 matching based on filename regex).
 
 ### Function: `readxread_validation()`
 
