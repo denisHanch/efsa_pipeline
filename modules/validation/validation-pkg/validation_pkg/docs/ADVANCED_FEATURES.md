@@ -326,8 +326,8 @@ BED to GFF coordinate transformation.
 
 BED-to-GFF3 conversion is delegated to `gffread`. Manual (fallback) parsing of BED
 is **not supported** — if `gffread` is unavailable, the validator falls back to a
-direct GFF3 parser that cannot read BED format and will silently produce 0 features
-without raising an error.
+direct GFF3 parser that cannot read BED format and produces 0 features, which causes
+`FeatureValidationError` to be raised.
 
 The coordinate mapping applied by `gffread` is:
 

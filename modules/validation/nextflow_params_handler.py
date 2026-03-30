@@ -179,7 +179,8 @@ def build_params(
         r for r in (validation_results.get("reads") or [])
         if r is not None and _path(r) is not None
     ]
-    gff_path = None if force_defragment_ref else _path(validation_results.get("ref_feature"))
+    ref_feature = validation_results.get("ref_feature")
+    gff_path    = None if force_defragment_ref else _path(ref_feature)
 
     # collect all validated paths per ngs_type, split by format (fastq vs bam)
     fastqs_by_type: dict = {}

@@ -103,7 +103,6 @@ class Config:
         self.ref_plasmid: Optional[GenomeConfig] = None
         self.mod_plasmid: Optional[GenomeConfig] = None
         self.ref_feature: Optional[FeatureConfig] = None
-        self.mod_feature: Optional[FeatureConfig] = None
         self.options: Dict[str, Any] = {}
 
         # Internal fields
@@ -151,8 +150,6 @@ class Config:
             parts.append(f"  mod_plasmid={self.mod_plasmid.filename}")
         if self.ref_feature:
             parts.append(f"  ref_feature={self.ref_feature.filename}")
-        if self.mod_feature:
-            parts.append(f"  mod_feature={self.mod_feature.filename}")
 
         # Options
         if self.options:
@@ -456,11 +453,6 @@ class ConfigManager:
         if 'ref_feature_filename' in data and data['ref_feature_filename']:
             config.ref_feature = ConfigManager._parse_feature_config(
                 data['ref_feature_filename'], 'ref_feature_filename', config.config_dir, config.output_dir, config.options
-            )
-
-        if 'mod_feature_filename' in data and data['mod_feature_filename']:
-            config.mod_feature = ConfigManager._parse_feature_config(
-                data['mod_feature_filename'], 'mod_feature_filename', config.config_dir, config.output_dir, config.options
             )
 
     @staticmethod

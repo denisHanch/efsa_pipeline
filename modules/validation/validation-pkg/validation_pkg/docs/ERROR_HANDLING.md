@@ -233,6 +233,7 @@ Raised when feature validation fails.
 **Common Causes:**
 - gffread tool not available
 - Invalid GFF/GTF/BED format that gffread cannot parse
+- Both gffread and the direct GFF3 fallback parser return 0 features
 
 **Example:**
 ```python
@@ -248,6 +249,7 @@ except FeatureValidationError as e:
 ```
 gffread tool required.
 gffread failed: <stderr from gffread>
+No features could be parsed from <filename>
 ```
 
 **Solutions:**
@@ -588,7 +590,8 @@ result = validate_with_fallback(config.ref_genome)
 
 **Error Type:** `FeatureValidationError`
 
-**Cause:** gffread cannot parse the input file (invalid format or missing tool).
+**Cause:** gffread cannot parse the input file (invalid format or missing tool), or both
+gffread and the direct GFF3 fallback parser return 0 features.
 
 **Solutions:**
 1. Install gffread: `conda install -c bioconda gffread`
