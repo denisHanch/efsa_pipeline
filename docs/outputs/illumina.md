@@ -2,7 +2,7 @@
 
 ## Pipeline Workflow
 
-The flowchart below summarizes the pipeline for processing short reads. VCF annotation is performed only when a GFF/GTF annotation file is provided. Delly and Freebayes are run exclusively for reference genome mapping; these steps are skipped when reads are mapped to a modified genome or a plasmid.
+The flowchart below summarizes the pipeline for processing short reads. VCF annotation is performed only when a GFF/GTF annotation file is provided. Delly and Freebayes are run exclusively for reference genome mapping; these steps are skipped when reads are mapped to a modified genome or a plasmid. For SV calls, `vcf_to_table_short`, `build_sv_flank_bed`, and `mosdepth` add 100 bp flank coverage metrics to the TSV output.
 
 ```mermaid
 %%{init: {
@@ -70,7 +70,12 @@ SORT --> BAM_IDX --> BAM_INDEX_OUT["BAM index"]:::output
 %% ===== SHORT REF SV PIPELINE (Delly) =====
 DELLY["Delly (SV calling)"]
 BCF2VCF["Convert BCF to VCF"]
+VCF2TABLE_SHORT["vcf_to_table_short"]
+BUILD_BED_SHORT["build_sv_flank_bed"]
+MOSDEPTH_SHORT["mosdepth (100 bp flanks)"]
+SV_TSV_SHORT["SV TSV + flank coverage"]:::output
 BAM_IDX --> DELLY --> BCF2VCF --> SV_VCF["SV VCF"]:::output
+SV_VCF --> VCF2TABLE_SHORT --> BUILD_BED_SHORT --> MOSDEPTH_SHORT --> SV_TSV_SHORT
 
 BAM_IDX --> GET_UNMAPPED --> UNMAPPED_OUT["Unmapped reads FASTQ"]:::output
 

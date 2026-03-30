@@ -20,9 +20,14 @@ Welcome to the EFSA Pipeline documentation. This pipeline provides comprehensive
 ### Nextflow Pipeline
 
 - [Running the Pipeline](nextflow/running-pipeline.md)
+- [Methods](nextflow/methods.md)
 - [Runtime Messages](nextflow/runtime-messages.md)
 - [Directory Structures](nextflow/directory-structures.md)
 - [Pipeline Visualization](nextflow/pipeline-visualization.md)
+
+### Project Compliance
+
+- [Third-Party Licenses](project/third-party-licenses.md)
 
 ### Output Documentation
 

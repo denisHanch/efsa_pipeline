@@ -51,7 +51,7 @@ This document defines the **JSON** configuration file that `ConfigManager` uses 
 
 | Format | Extensions | 
 |--------|-----------|
-| FASTA | `.fa`, `.fasta`, `.fna`, `.faa` |
+| FASTA | `.fa`, `.fasta`, `.fna` |
 | GenBank | `.gb`, `.gbk`, `.genbank` |
 
 ### Feature Files
@@ -199,7 +199,7 @@ Specifies feature annotation files (BED, GFF, GTF).
 ```json
 {
   "filename": "path/to/features.gff",
-  "validation_level": "strict",
+  "validation_level": "strict"
 }
 ```
 
