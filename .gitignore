@@ -90,12 +90,15 @@ data/outputs/*
 data/outputs/logs/*
 !data/outputs/logs/.gitkeep
 
+# Ignore everything
 data/outputs/*
+
+# Re-include the path step by step
 !data/outputs/
 !data/outputs/tables/
-data/outputs/tables/*
 !data/outputs/tables/csv_per_sv_summary/
-!data/outputs/tables/csv_per_sv_summary/*
+
+# Allow contents
 !data/outputs/tables/csv_per_sv_summary/.gitkeep
 
 data/valid/*
