@@ -12,7 +12,7 @@ Tests cover:
 import json
 import tempfile
 from pathlib import Path
-from types import SimpleNamespace
+from types import SimpleNamespace  # noqa: F401 — used in tests and helpers
 
 import pytest
 
@@ -31,16 +31,16 @@ def _meta(path: str, ngs_type: str = None) -> SimpleNamespace:
     return m
 
 
-def _gxg(contig_files: list, passed: bool = True) -> dict:
-    return {"metadata": {"contig_files": contig_files}, "passed": passed}
+def _gxg(contig_files: list, passed: bool = True, plasmid_file: str = None) -> dict:
+    return {"metadata": {"contig_files": contig_files, "plasmid_file": plasmid_file}, "passed": passed}
 
 
-def _base(contig_files=None, passed=True):
+def _base(contig_files=None, passed=True, plasmid_file=None):
     """Minimal validation_results with ref + mod genome and given contigs."""
     return {
         "ref_genome":    _meta("/ref/genome.fasta"),
         "mod_genome":    _meta("/mod/genome.fasta"),
-        "genomexgenome": _gxg(contig_files or [], passed=passed),
+        "genomexgenome": _gxg(contig_files or [], passed=passed, plasmid_file=plasmid_file),
         "reads":         [],
         "ref_feature":   None,
     }
@@ -209,6 +209,48 @@ class TestFeatureAnnotation:
         p = build_params(_base())
         assert p.run_vcf_annotation is False
         assert p.gff is None
+
+
+# ---------------------------------------------------------------------------
+# Plasmid paths
+# ---------------------------------------------------------------------------
+
+class TestPlasmidPaths:
+
+    def test_explicit_plasmid_config(self):
+        r = _base()
+        r["ref_plasmid"] = _meta("/valid/ref_plasmid.fasta")
+        r["mod_plasmid"] = _meta("/valid/mod_plasmid.fasta")
+        p = build_params(r)
+        assert p.ref_plasmid_fasta == "/valid/ref_plasmid.fasta"
+        assert p.mod_plasmid_fasta == "/valid/mod_plasmid.fasta"
+
+    def test_ref_plasmid_from_genome_validator_split(self):
+        """ref_plasmid_fasta falls back to plasmid_filenames on ref_genome when no explicit config."""
+        r = _base()
+        r["ref_genome"] = SimpleNamespace(
+            output_file="/valid/ref.fasta",
+            plasmid_filenames=["/valid/ref_plasmid.fasta"],
+        )
+        p = build_params(r)
+        assert p.ref_plasmid_fasta == "/valid/ref_plasmid.fasta"
+
+    def test_mod_plasmid_from_gxg_characterisation(self):
+        """mod_plasmid_fasta falls back to plasmid_file in GXG metadata when no explicit config."""
+        r = _base(plasmid_file="/valid/mod_plasmid.fasta")
+        p = build_params(r)
+        assert p.mod_plasmid_fasta == "/valid/mod_plasmid.fasta"
+
+    def test_explicit_config_takes_priority_over_fallback(self):
+        r = _base(plasmid_file="/gxg/mod_plasmid.fasta")
+        r["mod_plasmid"] = _meta("/explicit/mod_plasmid.fasta")
+        p = build_params(r)
+        assert p.mod_plasmid_fasta == "/explicit/mod_plasmid.fasta"
+
+    def test_no_plasmids(self):
+        p = build_params(_base())
+        assert p.ref_plasmid_fasta is None
+        assert p.mod_plasmid_fasta is None
 
 
 # ---------------------------------------------------------------------------

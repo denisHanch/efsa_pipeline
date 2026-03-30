@@ -45,7 +45,8 @@ class GenomeXGenomeSettings(BaseSettings):
 def genomexgenome_validation(
     ref_genome_result,  # OutputMetadata or Dict[str, Any]
     mod_genome_result,  # OutputMetadata or Dict[str, Any]
-    settings: Optional[GenomeXGenomeSettings] = None
+    settings: Optional[GenomeXGenomeSettings] = None,
+    mod_plasmid_result=None,  # OutputMetadata or None
 ) -> Dict[str, Any]:
     """Validate consistency between two genome files (reference vs modified).
 
@@ -155,7 +156,7 @@ def genomexgenome_validation(
     if settings.characterize:
         logger.info("Running genome characterization: contigs vs plasmids via minimap2")
         try:
-            _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, logger)
+            _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, logger, mod_plasmid_result)
         except Exception as e:
             error_msg = f"Genome characterization skipped: {e}"
             errors.append(error_msg)
@@ -210,24 +211,6 @@ def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
         except ValueError:
             continue
 
-        # pair_key = (query_name, ref_name)
-        # if pair_key in pair_starts:
-        #     seen_q_start, seen_r_start = pair_starts[pair_key]
-        #     if q_start != seen_q_start:
-        #         raise InterFileValidationError(
-        #             f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
-        #             f"reference '{ref_name}' with conflicting q_start values "
-        #             f"({seen_q_start} and {q_start})"
-        #         )
-        #     if r_start != seen_r_start:
-        #         raise InterFileValidationError(
-        #             f"Ambiguous minimap2 alignment: query '{query_name}' maps to "
-        #             f"reference '{ref_name}' with conflicting r_start values "
-        #             f"({seen_r_start} and {r_start})"
-        #         )
-        # else:
-        #     pair_starts[pair_key] = (q_start, r_start)
-
         current = best_hits.get(query_name)
         if current is None or alignment_block_len > current['alignment_len']:
             best_hits[query_name] = {
@@ -238,7 +221,7 @@ def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
     return best_hits
 
 
-def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, logger):
+def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, logger, mod_plasmid_result=None):
     """Run minimap2 alignment and populate characterization keys into metadata.
 
     Raises an exception on any failure so the caller can demote it to a warning.
@@ -310,12 +293,24 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
             f"→ {hit['ref_name']} [{hit['strand']}] → {contig_path.name}"
         )
 
-    # Write all plasmids to a single file
+    # Write all plasmids to a single file; prefer explicit mod_plasmid_result, then
+    # plasmids split from mod_genome during validation, then create a new file.
     plasmid_file: Optional[str] = None
     if plasmid_seqs:
-        plasmid_path = output_dir / f"{base_name}_plasmids.fasta"
-        with open_compressed_writer(plasmid_path, CodingType.NONE) as handle:
-            SeqIO.write(plasmid_seqs, handle, 'fasta')
+        explicit_plasmid_path = _get_metadata_field(mod_plasmid_result, "output_file")
+        existing_plasmid_filenames = _get_metadata_field(mod_genome_result, "plasmid_filenames") or []
+        if explicit_plasmid_path:
+            plasmid_path = Path(explicit_plasmid_path)
+            with open(plasmid_path, 'a') as handle:
+                SeqIO.write(plasmid_seqs, handle, 'fasta')
+        elif existing_plasmid_filenames:
+            plasmid_path = output_dir / existing_plasmid_filenames[0]
+            with open(plasmid_path, 'a') as handle:
+                SeqIO.write(plasmid_seqs, handle, 'fasta')
+        else:
+            plasmid_path = output_dir / f"{base_name}_plasmid.fasta"
+            with open_compressed_writer(plasmid_path, CodingType.NONE) as handle:
+                SeqIO.write(plasmid_seqs, handle, 'fasta')
         plasmid_file = str(plasmid_path)
         logger.debug(f"Plasmids ({len(plasmid_seqs)}) → {plasmid_path.name}")
 

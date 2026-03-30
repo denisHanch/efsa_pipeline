@@ -23,6 +23,8 @@ general_options (pipeline execution switches):
 input_output_options (file paths, null / empty list when absent):
   ref_fasta_validated  – absolute path to the validated reference FASTA
   mod_fasta_validated  – absolute path to the validated modified FASTA
+  ref_plasmid_fasta    – plasmid FASTA for reference (from explicit config or genome validator split)
+  mod_plasmid_fasta    – plasmid FASTA for modified (from explicit config or GXG characterisation)
   gff                  – path to the validated reference GFF/GFF3 file
   illumina_fastqs      – list of validated Illumina FASTQ paths
   ont_fastqs           – list of validated Nanopore (ONT) FASTQ paths
@@ -95,6 +97,8 @@ class NextflowParams:
 def build_params(
     validation_results: dict,
     force_defragment_ref: bool = False,
+    run_timestamp: str = None,
+    base_dir: Path = None,
 ) -> NextflowParams:
     """
     Build a Nextflow params dataclass from validation results.
@@ -126,13 +130,51 @@ def build_params(
         if value is None:
             return None
         value = str(value).strip()
-        return value if value and value != "None" else None
+        if not value or value == "None":
+            return None
+        if base_dir and Path(value).is_absolute():
+            try:
+                value = str(Path(value).relative_to(base_dir))
+            except ValueError:
+                pass
+        return value
+
+    def _relpath(value: str) -> Optional[str]:
+        """Relativize a raw string path against base_dir."""
+        if not value:
+            return None
+        if base_dir and Path(value).is_absolute():
+            try:
+                return str(Path(value).relative_to(base_dir))
+            except ValueError:
+                pass
+        return value
 
     ref_path         = _path(validation_results.get("ref_genome"))
     mod_path         = _path(validation_results.get("mod_genome"))
     ref_plasmid_path = _path(validation_results.get("ref_plasmid"))
     mod_plasmid_path = _path(validation_results.get("mod_plasmid"))
     gxg      = validation_results.get("genomexgenome") or {}
+    gxg_metadata = gxg.get("metadata") or {}
+
+    # Fall back to plasmids detected during genome validation when not explicitly configured
+    if ref_plasmid_path is None:
+        ref_genome_meta = validation_results.get("ref_genome")
+        plasmid_filenames = getattr(ref_genome_meta, "plasmid_filenames", None) or []
+        if plasmid_filenames and ref_genome_meta is not None:
+            run_dir = Path(ref_genome_meta.output_file).parent
+            ref_plasmid_path = _relpath(str(run_dir / plasmid_filenames[0]))
+
+    if mod_plasmid_path is None:
+        mod_genome_meta = validation_results.get("mod_genome")
+        plasmid_filenames = getattr(mod_genome_meta, "plasmid_filenames", None) or []
+        if plasmid_filenames and mod_genome_meta is not None:
+            run_dir = Path(mod_genome_meta.output_file).parent
+            mod_plasmid_path = _relpath(str(run_dir / plasmid_filenames[0]))
+
+    if mod_plasmid_path is None:
+        mod_plasmid_path = _relpath(gxg_metadata.get("plasmid_file") or None)
+
     reads    = [
         r for r in (validation_results.get("reads") or [])
         if r is not None and _path(r) is not None
@@ -152,8 +194,7 @@ def build_params(
         else:
             fastqs_by_type.setdefault(ngs, []).append(p)
 
-    gxg_metadata = gxg.get("metadata") or {}
-    contig_files = gxg_metadata.get("contig_files", [])
+    contig_files = [_relpath(p) for p in gxg_metadata.get("contig_files", []) if p]
 
     ref_fragmented = getattr(validation_results.get("ref_genome"), 'fragmented', False)
     mod_fragmented = getattr(validation_results.get("mod_genome"), 'fragmented', False)
@@ -169,7 +210,7 @@ def build_params(
         run_pacbio=("pacbio" in fastqs_by_type or "pacbio" in bams_by_type),
         contig_file_size=len(contig_files),
         run_vcf_annotation=gff_path is not None,
-        validation_timestamp=datetime.now().strftime("%Y%m%d_%H%M%S"),
+        validation_timestamp=run_timestamp or datetime.now().strftime("%Y%m%d_%H%M%S"),
         # input_output_options
         ref_fasta_validated=ref_path,
         mod_fasta_validated=mod_path,

@@ -4,8 +4,6 @@ from pathlib import Path
 from typing import Optional, List, Union, Dict, Any, Type
 from dataclasses import dataclass, asdict
 from Bio import SeqIO
-from Bio.Seq import Seq
-from Bio.SeqRecord import SeqRecord
 import shutil
 from multiprocessing import Pool
 from functools import partial
@@ -27,8 +25,6 @@ from validation_pkg.utils.file_handler import (
 from validation_pkg.utils.file_handler import copy_file
 from validation_pkg.utils.sequence_stats import calculate_n50
 from collections import Counter
-from io import StringIO
-import subprocess
 from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
 
 
@@ -205,7 +201,6 @@ class ReadValidator(BaseValidator):
         allow_duplicate_ids: bool = True
 
         # Editing specifications
-        keep_bam: bool = True
         ignore_bam: bool = True
 
         # Read-specific output options
@@ -412,30 +407,10 @@ class ReadValidator(BaseValidator):
 
     def _run_validation(self) -> Path:
         """Execute validation and processing workflow for trust/strict modes."""
-        # Special workflow for BAM files
+        # BAM files are always copied to output without conversion
         if self.read_config.detected_format == ReadFormat.BAM:
-            if self.settings.ignore_bam:
-                self.logger.info(
-                    "BAM file will be copied to output directory without FASTQ conversion "
-                    "(ignore_bam=True). Downstream tools must handle BAM directly."
-                )
-                return self._copy_bam_to_output()
-
-            # Step 1: Copy original BAM to output (if keep_bam is enabled)
-            if self.settings.keep_bam:
-                self._copy_bam_to_output()
-
-            # Step 2: Convert BAM to FASTQ (populates self.sequences)
-            self._convert_bam_to_fastq()
-
-            # Step 3: Validate sequences
-            self._validate_sequences()
-
-            # Step 4: Apply editing specifications
-            self._apply_edits()
-
-            # Step 5: Save FASTQ output
-            output_path = self._write_output()
+            self.logger.info("BAM file copied to output directory; downstream tools handle it directly.")
+            return self._copy_bam_to_output()
 
         else:
             # Standard FASTQ workflow
@@ -680,186 +655,6 @@ class ReadValidator(BaseValidator):
         # This is a placeholder for future functionality
 
         self.logger.debug(f"✓ Edits applied, {len(self.sequences)} sequence(s) remaining")
-    
-    def _convert_bam_to_fastq(self) -> None:
-        """Convert BAM file to FASTQ format using pysam or samtools (trust/strict modes only)."""
-
-        # Trust mode - validate header and first few reads only
-        if self.validation_level == 'trust':
-            self.logger.info("Trust mode - validating BAM header and first records only")
-            try:
-                import pysam  # type: ignore
-
-                with pysam.AlignmentFile(str(self.input_path), "rb") as bam_file:
-                    # Validate BAM header exists
-                    if not bam_file.header:
-                        raise BamFormatError("BAM file has no header")
-
-                    self.logger.debug(f"✓ BAM header validated: {len(bam_file.header.get('SQ', []))} sequences in reference")
-
-                    # Read and validate first few records (up to 10)
-                    first_records = []
-                    for i, read in enumerate(bam_file):
-                        if i >= 10:
-                            break
-
-                        # Skip unmapped or secondary/supplementary alignments
-                        if read.is_unmapped or read.is_secondary or read.is_supplementary:
-                            continue
-
-                        # Create SeqRecord from BAM read
-                        seq = Seq(read.query_sequence if read.query_sequence else "")
-                        qualities = read.query_qualities if read.query_qualities else []
-
-                        record = SeqRecord(
-                            seq,
-                            id=read.query_name,
-                            description="",
-                            letter_annotations={"phred_quality": list(qualities)} if qualities else {}
-                        )
-                        first_records.append(record)
-
-                    if not first_records:
-                        raise BamFormatError("No valid reads found in BAM file")
-
-                    self.logger.info(f"✓ Trust mode BAM validation passed - validated {len(first_records)} records")
-                    self.sequences = first_records
-                    return
-
-            except ImportError:
-                # If pysam not available, try samtools for header validation
-                try:
-                    result = subprocess.run(
-                        ["samtools", "view", "-H", str(self.input_path)],
-                        capture_output=True,
-                        text=True,
-                        timeout=30
-                    )
-
-                    if result.returncode != 0:
-                        raise BamFormatError(f"Failed to read BAM header: {result.stderr}")
-
-                    if not result.stdout.strip():
-                        raise BamFormatError("BAM file has no header")
-
-                    self.logger.info("✓ Trust mode BAM validation passed (header only, pysam not available)")
-                    self.sequences = []
-                    return
-
-                except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-                    raise ReadValidationError(
-                        "Trust mode BAM validation requires either 'pysam' or 'samtools'. "
-                        "Please install one of them."
-                    ) from e
-
-        # Strict mode - full conversion (original behavior)
-        # Try using pysam first (optional dependency)
-        try:
-            import pysam  # type: ignore
-
-            self.logger.debug("Using pysam for BAM to FASTQ conversion")
-            self.sequences = []
-
-            with pysam.AlignmentFile(str(self.input_path), "rb") as bam_file:
-                # Try to get total read count for progress reporting
-                try:
-                    total_reads = bam_file.count(until_eof=True)
-                    bam_file.reset()  # Reset file pointer after counting
-                    self.logger.info(f"Processing {total_reads:,} reads from BAM file...")
-                    progress_interval = max(1, total_reads // 20)  # Report every 5%
-                except Exception:
-                    # If counting fails (e.g., truncated file, permission issues),
-                    # just proceed without progress reporting
-                    total_reads = None
-                    progress_interval = 100000  # Report every 100k reads
-
-                processed = 0
-                for read in bam_file:
-                    # Skip unmapped or secondary/supplementary alignments
-                    if read.is_unmapped or read.is_secondary or read.is_supplementary:
-                        continue
-
-                    # Create SeqRecord from BAM read
-                    seq = Seq(read.query_sequence if read.query_sequence else "")
-                    qualities = read.query_qualities if read.query_qualities else []
-
-                    record = SeqRecord(
-                        seq,
-                        id=read.query_name,
-                        description="",
-                        letter_annotations={"phred_quality": list(qualities)} if qualities else {}
-                    )
-                    self.sequences.append(record)
-
-                    processed += 1
-                    # Progress reporting
-                    if processed % progress_interval == 0:
-                        if total_reads:
-                            percent = (processed / total_reads) * 100
-                            self.logger.info(f"Progress: {processed:,}/{total_reads:,} reads ({percent:.1f}%)")
-                        else:
-                            self.logger.info(f"Progress: {processed:,} reads processed...")
-
-            self.logger.info(f"✓ Converted {len(self.sequences):,} reads from BAM to FASTQ")
-            return
-
-        except ImportError:
-            self.logger.debug("pysam not available, trying samtools...")
-
-        # Fall back to samtools
-        try:
-            # Check if samtools is available
-            result = subprocess.run(
-                ["samtools", "--version"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-
-            if result.returncode != 0:
-                raise FileNotFoundError("samtools not found")
-
-            self.logger.debug("Using samtools for BAM to FASTQ conversion")
-
-            # Use samtools fastq to convert BAM to FASTQ
-            # samtools fastq writes to stdout by default
-            result = subprocess.run(
-                ["samtools", "fastq", str(self.input_path)],
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minutes timeout
-            )
-
-            if result.returncode != 0:
-                error_msg = f"samtools conversion failed: {result.stderr}"
-                self.logger.add_validation_issue(
-                    level='ERROR',
-                    category='read',
-                    message=error_msg,
-                    details={'file': self.read_config.filename, 'error': result.stderr}
-                )
-                raise ReadValidationError(error_msg)
-
-            # Parse FASTQ output from samtools
-            fastq_data = StringIO(result.stdout)
-            self.sequences = list(SeqIO.parse(fastq_data, "fastq"))
-
-            self.logger.info(f"Converted {len(self.sequences)} reads from BAM to FASTQ using samtools")
-
-        except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
-            error_msg = (
-                "BAM to FASTQ conversion requires either 'pysam' Python package or 'samtools' command-line tool. "
-                "Please install one of them:\n"
-                "  - pip install pysam\n"
-                "  - or install samtools (https://www.htslib.org/)"
-            )
-            self.logger.add_validation_issue(
-                level='ERROR',
-                category='read',
-                message=error_msg,
-                details={'error': str(e)}
-            )
-            raise ReadValidationError(error_msg) from e
     
     def _copy_bam_to_output(self) -> Path:
         """Copy BAM file to output directory without processing."""
