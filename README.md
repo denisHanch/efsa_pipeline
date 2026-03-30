@@ -433,15 +433,17 @@ For a detailed reference on all hardcoded tool parameters (freebayes, nucmer, cu
 ---
 ## Generation of per structural variation (SV) type CSV tables
 
-These utilities convert SV VCFs into compact TSV summaries and then merge available summaries into per-SV-type CSV tables.
+These utilities convert SV VCFs into compact TSV summaries, enrich short/long-read SV rows with flank coverage using `mosdepth`, and then merge available summaries into per-SV-type CSV tables.
 
 ```mermaid
 flowchart LR
   subgraph TSVs
     A[vcf_to_table / vcf_to_table_long]
+    M[build_sv_flank_bed + mosdepth]
     B[create_empty_tbl]
   end
-  A --> C[params.out_dir/tables/tsv]
+  A --> M
+  M --> C[params.out_dir/tables/tsv]
   B --> C
   C --> D[restructure_sv_tbl]
   D --> E[params.out_dir/tables/csv_per_sv_sumary]
@@ -451,6 +453,9 @@ flowchart LR
 
 - By default a nextflow pipeline is collecting the tables from pipelines and runs restructure_sv_tbl to create all summary  
 - Variants are extracted into a table format with processes `vcf_to_table` and `vcf_to_table_long`
+- For short-read and long-read SV tables, flank coverage is added by `build_sv_flank_bed` and `mosdepth`:
+  - `coverage_before_100bp`: mean depth in the 100 bp upstream flank
+  - `coverage_after_100bp`: mean depth in the 100 bp downstream flank
 - If one of the pipelines was not running (shourt/long/assembly) an empty tsv file is generated with a process create_empty_tbl
 - `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
@@ -500,6 +505,13 @@ The SV output processing pipeline has been enhanced to handle all structural var
 - **Interval variants:** DEL, DUP, INV, RPL are normalized to coordinate length (`end - start`) to keep interval length semantics consistent across callers
 - **Absolute-length normalization:** signed `svlen` values (for example negative deletions) are normalized with `abs(svlen)` for event-length comparisons, preventing negative event sizes
 - **Consistent derivation:** `svlen` is derived from coordinates based on variant type when absent, ensuring stable reporting across sources
+
+**Coverage handling with mosdepth:**
+- A dedicated step computes short/long-read local depth around each SV event using `mosdepth`
+- Two TSV columns are appended prior to final table merge:
+  - `coverage_before_100bp`
+  - `coverage_after_100bp`
+- Final CSVs expose source-specific coverage columns (`short_*`, `long_ont_*`, `long_pacbio_*`).
 
 **For comprehensive documentation** on variant type conventions, length calculations, and output table structure, see [docs/outputs/sv-tables.md](docs/outputs/sv-tables.md).
 
@@ -568,9 +580,13 @@ The examples below use simplified coordinates for clarity.
 |---|---|
 | **long_(ont\|pacbio)_supporting_reads** | Number of Oxford Nanopore or PacBio reads supporting the structural variant (VCF `FORMAT` field `DR`, when present). |
 | **long_(ont\|pacbio)_supporting_methods** | Number or label of long-read variant calling methods supporting the structural variant, derived from the TSV summary when available. |
+| **long_(ont\|pacbio)_coverage_before_100bp** | Mean depth in the 100 bp flank before the long-read SV event, computed by `mosdepth`. |
+| **long_(ont\|pacbio)_coverage_after_100bp** | Mean depth in the 100 bp flank after the long-read SV event, computed by `mosdepth`. |
 | **short_chr2** | Partner chromosome for short-read translocation/breakend calls (from short-read TSV `chr2`, extracted from VCF `INFO/CHR2`). Empty for non-translocation short-read events or when unavailable. |
 | **short_pos2** | Partner breakpoint position for short-read translocation/breakend calls (from short-read TSV `pos2`, extracted from VCF `INFO/POS2`). Empty for non-translocation short-read events or when unavailable. |
 | **short_reads_copy_number_estimate** | Estimated copy number derived from short-read depth information (VCF `FORMAT` field `RDCN`). |
+| **short_coverage_before_100bp** | Mean depth in the 100 bp flank before the short-read SV event, computed by `mosdepth`. |
+| **short_coverage_after_100bp** | Mean depth in the 100 bp flank after the short-read SV event, computed by `mosdepth`. |
 
 ### Source-specific length columns and calculation strategy
 
