@@ -97,6 +97,8 @@ class NextflowParams:
 def build_params(
     validation_results: dict,
     force_defragment_ref: bool = False,
+    run_timestamp: str = None,
+    base_dir: Path = None,
 ) -> NextflowParams:
     """
     Build a Nextflow params dataclass from validation results.
@@ -128,7 +130,25 @@ def build_params(
         if value is None:
             return None
         value = str(value).strip()
-        return value if value and value != "None" else None
+        if not value or value == "None":
+            return None
+        if base_dir and Path(value).is_absolute():
+            try:
+                value = str(Path(value).relative_to(base_dir))
+            except ValueError:
+                pass
+        return value
+
+    def _relpath(value: str) -> Optional[str]:
+        """Relativize a raw string path against base_dir."""
+        if not value:
+            return None
+        if base_dir and Path(value).is_absolute():
+            try:
+                return str(Path(value).relative_to(base_dir))
+            except ValueError:
+                pass
+        return value
 
     ref_path         = _path(validation_results.get("ref_genome"))
     mod_path         = _path(validation_results.get("mod_genome"))
@@ -139,12 +159,14 @@ def build_params(
 
     # Fall back to plasmids detected during genome validation when not explicitly configured
     if ref_plasmid_path is None:
-        plasmid_filenames = getattr(validation_results.get("ref_genome"), "plasmid_filenames", None) or []
-        if plasmid_filenames:
-            ref_plasmid_path = str(plasmid_filenames[0])
+        ref_genome_meta = validation_results.get("ref_genome")
+        plasmid_filenames = getattr(ref_genome_meta, "plasmid_filenames", None) or []
+        if plasmid_filenames and ref_genome_meta is not None:
+            run_dir = Path(ref_genome_meta.output_file).parent
+            ref_plasmid_path = _relpath(str(run_dir / plasmid_filenames[0]))
 
     if mod_plasmid_path is None:
-        mod_plasmid_path = gxg_metadata.get("plasmid_file") or None
+        mod_plasmid_path = _relpath(gxg_metadata.get("plasmid_file") or None)
 
     reads    = [
         r for r in (validation_results.get("reads") or [])
@@ -165,7 +187,7 @@ def build_params(
         else:
             fastqs_by_type.setdefault(ngs, []).append(p)
 
-    contig_files = gxg_metadata.get("contig_files", [])
+    contig_files = [_relpath(p) for p in gxg_metadata.get("contig_files", []) if p]
 
     ref_fragmented = getattr(validation_results.get("ref_genome"), 'fragmented', False)
     mod_fragmented = getattr(validation_results.get("mod_genome"), 'fragmented', False)
@@ -181,7 +203,7 @@ def build_params(
         run_pacbio=("pacbio" in fastqs_by_type or "pacbio" in bams_by_type),
         contig_file_size=len(contig_files),
         run_vcf_annotation=gff_path is not None,
-        validation_timestamp=datetime.now().strftime("%Y%m%d_%H%M%S"),
+        validation_timestamp=run_timestamp or datetime.now().strftime("%Y%m%d_%H%M%S"),
         # input_output_options
         ref_fasta_validated=ref_path,
         mod_fasta_validated=mod_path,

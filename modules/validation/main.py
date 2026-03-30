@@ -348,7 +348,11 @@ def main():
             "skipped. Feature coordinates are not meaningful on a defragmented "
             "reference — run_vcf_annotation will be disabled."
         )
-    params = nf_params.build_params(validation_results, force_defragment_ref=force_defragment)
+    # Extract timestamp from run directory name (run_YYYYMMDD_HHMMSS) so
+    # validation_timestamp matches the folder name exactly.
+    run_timestamp = output_dir.name.removeprefix("run_") if output_dir.name.startswith("run_") else None
+    repo_root = config_path.parent.parent.parent
+    params = nf_params.build_params(validation_results, force_defragment_ref=force_defragment, run_timestamp=run_timestamp, base_dir=repo_root)
     nf_params.write_params(params, base_valid_dir / "validated_params.json")
 
     return 0
