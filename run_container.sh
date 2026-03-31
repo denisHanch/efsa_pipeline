@@ -12,7 +12,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Check if data directories exist, create if they don't
-mkdir -p data/inputs data/outputs
+mkdir -p data/inputs data/outputs data/outputs/tables/csv_per_sv_summary
 
 # Use default input directory
 WORKSPACE_PATH=$(pwd)
