@@ -243,6 +243,32 @@ These settings customize validation behavior without modifying code.
 > `--force-defragment-ref` CLI flag. When set to `false` in `config.json`, the CLI flag is
 > **ignored** even if provided.
 
+#### Join-order TSV output
+
+When defragmentation runs, a TSV file is written alongside the merged FASTA:
+
+```
+data/outputs/tables/tsv/<basename>_defragmented_join_order.tsv
+```
+
+| Column | Description |
+|---|---|
+| `seq_id` | Original contig ID from the source FASTA |
+| `length` | Length of that contig in base pairs |
+| `start` | 1-based start position of that contig in the merged sequence |
+
+**Merge order** is determined by the order sequences appear in the input FASTA file — the first record becomes the first segment, the second becomes the second, and so on. No sorting or reordering is applied. The `start` column encodes this order unambiguously: each contig begins immediately after the previous one ends, with no gaps or separators inserted between them.
+
+This TSV is the only record of the original contig identities and their positions in the merged sequence. Keep it if you need to map coordinates back to the source contigs.
+
+**Example:**
+
+| seq_id | length | start |
+|---|---|---|
+| contig_1 | 450000 | 1 |
+| contig_2 | 320000 | 450001 |
+| contig_3 | 180000 | 770001 |
+
 **Example:**
 ```json
 {
