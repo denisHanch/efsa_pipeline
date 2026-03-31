@@ -8,7 +8,7 @@ After running the Nextflow pipeline, outputs are organized in the `data/outputs/
 
 ## Output Categories
 
-### whole-genome assemblies Comparison with SyRI
+### Whole-Genome Assembly Comparison with SyRI
 
 - **[Reference vs Modified FASTA](fasta-ref-mod.md)** - Results from comparing reference and modified genome assemblies using SyRI and other tools
 
@@ -33,11 +33,11 @@ After running the Nextflow pipeline, outputs are organized in the `data/outputs/
 
 ```
 data/outputs/
-├── fasta_ref_mod/      → Reference vs modified comparison (if run_ref_x_mod set to true in `data/validation/validated_params.json`)
+├── fasta_ref_mod/      → Reference vs modified comparison (if run_ref_x_mod is set to true in `data/valid/validated_params.json`)
 ├── illumina/           → Short-read mapping results
 ├── ont/                → Oxford Nanopore results
 ├── pacbio/             → PacBio results
-├── truvari/            → Variant comparison results (if run_truvari set to true in `data/validation/validated_params.json`)
+├── truvari/            → Variant comparison results (if run_truvari is set to true in `data/valid/validated_params.json`)
 ├── unmapped_stats/     → Unmapped read statistics
 └── logs/               → Execution logs, trace data, and process manifest
 ```

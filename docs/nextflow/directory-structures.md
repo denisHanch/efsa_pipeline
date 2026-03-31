@@ -55,13 +55,13 @@ After successful pipeline execution, the outputs are organized as follows:
 
 ```
 data/outputs
-├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod set to true in `data/validation/validated_params.json`)
+├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod is set to true in `data/valid/validated_params.json`)
 ├── illumina            → Short-read (Illumina) mapping results
 ├── logs/               → Pipeline logs, Nextflow reports, trace data, and process manifest
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
 ├── tables              → Per-SV csv tables
-├── truvari             → Variant comparison results from Truvari (if run_truvari set to true in `data/validation/validated_params.json`)
+├── truvari             → Variant comparison results from Truvari (if run_truvari is set to true in `data/valid/validated_params.json`)
 └── unmapped_stats      → Summary statistics of unmapped reads for each workflow
 ```
 

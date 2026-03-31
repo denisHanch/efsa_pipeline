@@ -5,7 +5,7 @@
 The main pipeline (`main.nf`) executes **all three workflows** in sequence:
 
 - Short-read processing for Illumina data
-- Long-read processing for Pacbio/Oxford Nanopore data
+- Long-read processing for PacBio/Oxford Nanopore data
 - Reference vs modified genome comparison using SyRI
 
 

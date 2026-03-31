@@ -17,7 +17,7 @@ git clone https://github.com/denisHanch/efsa_pipeline.git
 
 > **Important!**
 >
-> Make sure that the data for pipelines are in the folder `data/inputs`.
+> Make sure that the pipeline data is in the `data/inputs` folder.
 
 ### 2. Start the Docker Container
 
@@ -27,7 +27,7 @@ git clone https://github.com/denisHanch/efsa_pipeline.git
 
 > **Important!**
 >
-> Create configuration file `config.json` based on data in `data/inputs`.
+> Create a configuration file `config.json` based on data in `data/inputs`.
 
 ### 3. Run Input Validation
 

@@ -20,7 +20,7 @@
       - [`truvari/`](#truvari)
       - [`unmapped_stats/`](#unmapped_stats)
   - [Graphical Representation of the Pipeline](#graphical-representation-of-the-pipeline)
-  - [Generation of per structural variation (SV) type CSV tables](#generation-of-per-structral-variation-sv-type-csv-tables)
+  - [Generation of per structural variation (SV) type CSV tables](#generation-of-per-structural-variation-sv-type-csv-tables)
 - [Changelog](#changelog)
       
 
@@ -34,7 +34,7 @@
 
 > **Important!**
 > 
-> Make sure that the data for pipelines are in the folder `data/inputs`.
+> Make sure that the pipeline data is in the `data/inputs` folder.
 >
 
 2. **Start the Docker container**:
@@ -45,7 +45,7 @@
 
 > **Important!**
 > 
-> Create configuration file `config.json` on `data/inputs`.
+> Create a configuration file `config.json` in `data/inputs`.
 > 
 
 3. **Running QC** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder:
@@ -153,13 +153,13 @@ The following table summarizes all supported scenarios:
 
 > **Important!**
 > 
-> By default the limit (`n_sequence_limit`) mentioned in the table above set to 5 for both reference and assembly fasta files.
+> By default the limit (`n_sequence_limit`) mentioned in the table above is set to 5 for both reference and assembly fasta files.
 >
 
 
 > **Important!**
 > 
-> When container is build please follow the steps to preprocess the data with a validation package.
+> When the container is built please follow the steps to preprocess the data with a validation package.
 >
 
 The input validation module preprocesses and verifies all input data to ensure it meets the required format and structure before the Nextflow pipeline is executed.
@@ -191,7 +191,7 @@ The input validation module preprocesses and verifies all input data to ensure i
 
 ## Configuration
 
-To run validation, configuration file is expected in `json` format. This config specify which file corresponds to reference genome, assembled modified genome and reads. The detailed documentation of the configuration is described [here](/docs/validation/CONFIG_GUIDE.md).
+To run validation, a configuration file is expected in `json` format. This config specifies which file corresponds to reference genome, assembled modified genome and reads. The detailed documentation of the configuration is described [here](/docs/validation/CONFIG_GUIDE.md).
 
 Full configuration template is prepared in `data/inputs/config.json`.
 
@@ -258,13 +258,13 @@ The package supports three validation levels to balance thoroughness and perform
 
 | Level | Parsing | Validation | Edits | Output | Speed | Use Case |
 |-------|---------|------------|-------|--------|-------|----------|
-| **strict** (default) | All data | All data | All applied | BioPython write | Slowest | Structure validation sequence by sequence, statistics gathering |
-| **trust** | All data (genome)<br>First record only (reads) | First sequence only | All applied (genome)<br>None (reads) | BioPython write (genome)<br>File copy (reads) | Fast | Trust data, adapt file coding,name and location |
+| **strict** (default) | All data | All data | All applied | BioPython write | Slowest | Structural validation, sequence by sequence; statistics gathered |
+| **trust** | All data (genome)<br>First record only (reads) | First sequence only | All applied (genome)<br>None (reads) | BioPython write (genome)<br>File copy (reads) | Fast | Trust data, adapt file coding, name, and location |
 | **minimal** | None | None | None | File copy | Fastest | Rename and move files to meet the requirements |
 
 ## Logging
 
-Every validation run create a new **log** file on `./logs/validation_ID.log`. With option `logging_level` in configuration file you may specify the amount of information logged.
+Every validation run creates a new **log** file in `./logs/validation_ID.log`. With option `logging_level` in configuration file you may specify the amount of information logged.
 
 **Supported levels:**
 - `"DEBUG"`: Most verbose (all messages including debug info)
@@ -272,7 +272,7 @@ Every validation run create a new **log** file on `./logs/validation_ID.log`. Wi
 - `"WARNING"`: Warnings and errors only
 - `"ERROR"`: Errors only
 
-Every validation run create a new **report** file on `./logs/report_ID.txt`.
+Every validation run creates a new **report** file in `./logs/report_ID.txt`.
 A validation report contains three main sections:
 
 
@@ -407,7 +407,7 @@ This executes **short-read processing**, **long-read processing**, and **referen
 nextflow run main.nf --max_cpu $(nproc) -resume
 ```
 
-### Available Nextflow Option
+### Available Nextflow Options
 
 
 | Option           | Description                                                                                                                                                                         |
@@ -451,12 +451,12 @@ flowchart LR
 
 ### Key points
 
-- By default a nextflow pipeline is collecting the tables from pipelines and runs restructure_sv_tbl to create all summary  
+- By default a nextflow pipeline is collecting the tables from pipelines and runs restructure_sv_tbl to create all summary tables
 - Variants are extracted into a table format with processes `vcf_to_table` and `vcf_to_table_long`
 - For short-read and long-read SV tables, flank coverage is added by `build_sv_flank_bed` and `mosdepth`:
   - `coverage_before_100bp`: mean depth in the 100 bp upstream flank
   - `coverage_after_100bp`: mean depth in the 100 bp downstream flank
-- If one of the pipelines was not running (shourt/long/assembly) an empty tsv file is generated with a process create_empty_tbl
+- If one of the pipelines was not running (short/long/assembly) an empty tsv file is generated with a process create_empty_tbl
 - `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
 - Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
@@ -785,7 +785,7 @@ This directory contains all input data used by the Nextflow pipeline.
 data/valid/
 ├── assembled_genome.fasta
 ├── reference_genome.fasta
-├── mod_config_[0..4].fasta    # Presence of multiple contings incase of a fragmented assembly
+├── mod_config_[0..4].fasta    # Presence of multiple contigs in case of a fragmented assembly
 ├── ref_plasmid.fa             # Reference plasmid sequences (if used)
 ├── mod_plasmid.fa             # Modified/assembled plasmid sequences (if used)
 ├── ref_feature.gff            # Genome annotation file GTF/GFF (if used)
@@ -819,13 +819,13 @@ After successful pipeline execution, the outputs are organized as follows:
 
 ```
 data/outputs
-├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod set to true in `data/validation/validated_params.json`)
+├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod is set to true in `data/valid/validated_params.json`)
 ├── illumina            → Short-read (Illumina) mapping results
 ├── logs/               → Pipeline logs, Nextflow reports, trace data, and process manifest
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
 ├── tables              → Per-SV csv tables
-├── truvari             → Variant comparison results from Truvari (if run_truvari set to true in `data/validation/validated_params.json`)
+├── truvari             → Variant comparison results from Truvari (if run_truvari is set to true in `data/valid/validated_params.json`)
 └── unmapped_stats      → Summary statistics of unmapped reads for each workflow
 
 ```
