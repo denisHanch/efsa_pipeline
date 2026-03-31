@@ -1,4 +1,4 @@
-# Long-Read Peocessing Pipeline (PacBio & ONT)
+# Long-Read Processing Pipeline (PacBio & ONT)
 
 ## Pipeline Workflow
 
@@ -192,7 +192,7 @@ The table below summarises all tools used within the pipeline:
 | ------------ | ------------------------------------------------------ |
 | **samtools** | [samtools](https://www.htslib.org/doc/samtools.html)   |
 | **BCFtools** | [BCFtools](https://samtools.github.io/bcftools/)       |
-| **cuteCV**   | [cuteCV](https://github.com/tjiangHIT/cuteSV?tab=readme-ov-file)             |
+| **cuteSV**   | [cuteSV](https://github.com/tjiangHIT/cuteSV?tab=readme-ov-file)             |
 | **DeBreak**  | [DeBreak](https://github.com/Maggi-Chen/DeBreak)       |
 | **Sniffles** | [Sniffles](https://github.com/fritzsedlazeck/Sniffles) |
 | **SURVIVOR** | [SURVIVOR](https://github.com/fritzsedlazeck/SURVIVOR) |

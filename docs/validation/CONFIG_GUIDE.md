@@ -269,7 +269,7 @@ This TSV is the only record of the original contig identities and their position
 | contig_2 | 320000 | 450001 |
 | contig_3 | 180000 | 770001 |
 
-**Example:**
+**Example config:**
 ```json
 {
   "ref_genome_filename": {"filename": "genome.fasta"},

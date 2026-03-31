@@ -19,17 +19,17 @@ The following table summarizes all supported scenarios:
 | **2** | Fragmented assembly (below limit)            | `prokaryote`               | **ref.fa:** 1 sequence <br> **mod.fa:** multiple sequences (≤ limit)                           | In reference: <br> - In **ref.fa**: <br> - Longest sequence → chromosome <br> - Remaining → plasmids `*ref_plasmid.fasta` <br><br> In **mod.fa**: <br> - Unmapped sequences → plasmids <br> - Mapped sequences → contigs | True            | **Used** to split mod.fa into mapped contigs vs unmapped plasmids | - Split into individual contigs (`*_contig.fasta`) <br> - `mod.fa` becomes multifasta **without plasmids** | All modules          | `ref.fa`, `mod.fa` + contig set <br> `*_contig.fasta` <br> `*_plasmid.fasta` |
 | **3** | Fragmented assembly (above limit)             | `prokaryote`               | **ref.fa:** 1 sequence <br> **mod.fa:** multiple sequences (> limit)                           | In reference: <br> - In **ref.fa**: <br> - Longest sequence → chromosome <br> - Remaining → plasmids `*ref_plasmid.fasta` <br><br> In **mod.fa**: no plasmid detection                                       | False           | **Not used**                                                      | No processing (mod.fa copied as-is)                                                                        | Mapping-only modules | `ref.fa`, `mod.fa` (copied) <br> `*_plasmid.fasta`                           |
 | **4** | Multiple sequences in reference  | `prokaryote` / `eukaryote` | **ref.fa:** multiple sequences (non-plasmid) <br> **mod.fa:** one or more sequences            | No plasmids considered                                                                                                                                          | False           | **Not used**                                                      | No processing (files copied as-is)                                                                         | Mapping-only modules | `ref.fa`, `mod.fa` (copied)                                                  |
-| **5** | Fragmented reference + `force_defragment_ref` (**unsupported workaround**) | `prokaryote` / `eukaryote` | **ref.fa:** multiple sequences (fragmented, above limit) → merged to 1 before validation | In **ref.fa**: all contigs and plasmids merged into single chromosome (`*_defragmented.fasta`) | True | Not used | Same for scenarios above | GFF annotation disabled | `ref.fa` (joined), `*_defragmented_join_order.tsv`, `mod.fa` depends on scenario |
+| **5** | Fragmented reference + `force_defragment_ref` (**unsupported workaround**) | `prokaryote` / `eukaryote` | **ref.fa:** multiple sequences (fragmented, above limit) → merged to 1 before validation | In **ref.fa**: all contigs and plasmids merged into a single chromosome (`*_defragmented.fasta`) | True | Not used | Same for scenarios above | GFF annotation disabled | `ref.fa` (joined), `*_defragmented_join_order.tsv`, `mod.fa` depends on scenario |
 
 > **Important!**
 > 
-> By default the limit (`n_sequence_limit`) mentioned in the table above set to 5 for both reference and assembly fasta files. Please adjust the n_sequence_limit in `data/inputs/config.json`.
+> By default the limit (`n_sequence_limit`) mentioned in the table above is set to 5 for both reference and assembly fasta files. Please adjust the n_sequence_limit in `data/inputs/config.json`.
 >
 
 
 > **Important!**
 >
-> When container is built please follow the steps to preprocess the data with a validation package.
+> When the container is built please follow the steps to preprocess the data with a validation package.
 
 The input validation module preprocesses and verifies all input data to ensure it meets the required format and structure before the Nextflow pipeline is executed.
 

@@ -88,13 +88,13 @@ Cleaned and filtered delta file used for downstream structural comparison.
 ### `assemblysyri.vcf`
 Structural variants and genome rearrangements detected by **SyRI**, stored in VCF format.
 
-### mod_contig_[0..4]`
-The folder contains syri comparison from each contig when assembly is fragmented into more than one contig. mod_contig_0.
+### `mod_contig_[0..4]`
+The folder contains SyRI comparison results for each contig when the assembly is fragmented into more than one contig.
 
-### mod_contig_[0..4].vcf.gz`
-A bgzipped VCF files of structural variants per contig.
+### `mod_contig_[0..4].vcf.gz`
+Bgzipped VCF files of structural variants per contig.
 
-### mod_contig_[0..4].vcf.gz.tbi`
+### `mod_contig_[0..4].vcf.gz.tbi`
 Tabix index of a bgzipped VCF file used for efficient concatenation with bcftools.
 
 ## Tools Used

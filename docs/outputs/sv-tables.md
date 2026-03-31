@@ -18,12 +18,12 @@ flowchart LR
 
 ### Key points
 
-- By default a nextflow pipeline is collecting the tables from pipelines and runs restructure_sv_tbl to create all summary  
+- By default a nextflow pipeline is collecting the tables from pipelines and runs restructure_sv_tbl to create all summary tables
 - Variants are extracted into a table format with processes `vcf_to_table` and `vcf_to_table_long`
 - For short-read and long-read SV tables, flank coverage is added by `build_sv_flank_bed` and `mosdepth`:
   - `coverage_before_100bp`: mean depth in the 100 bp upstream flank
   - `coverage_after_100bp`: mean depth in the 100 bp downstream flank
-- If one of the pipelines was not running (shourt/long/assembly) an empty tsv file is generated with a process create_empty_tbl
+- If one of the pipelines was not running (short/long/assembly) an empty tsv file is generated with a process create_empty_tbl
 - `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
 - Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
