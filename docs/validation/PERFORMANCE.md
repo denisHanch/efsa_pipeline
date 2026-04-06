@@ -17,6 +17,7 @@ sudo apt-get install pigz pbzip2
 ```
 
 **Performance gains:**
+
 - `pigz` - parallel gzip 
 - `pbzip2` - parallel bzip2 
 
@@ -84,6 +85,7 @@ Or set globally for all files:
 ```
 
 **Thread performance:**
+
 - Strict mode: 3-7x faster with 8+ threads
 - Trust mode: Minimal benefit from threading
 - Recommended: Use 8-16 threads for strict mode

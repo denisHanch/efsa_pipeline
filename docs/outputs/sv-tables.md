@@ -5,7 +5,7 @@ These utilities convert SV VCFs into compact TSV summaries, enrich short/long-re
 ```mermaid
 flowchart LR
   subgraph TSVs
-    A[vcf_to_table / vcf_to_table_long]
+    A[vcf_to_table_asm / vcf_to_table_short / vcf_to_table_long]
     M[build_sv_flank_bed + mosdepth]
     B[create_empty_tbl]
   end
@@ -23,7 +23,7 @@ flowchart LR
 - For short-read and long-read SV tables, flank coverage is added by `build_sv_flank_bed` and `mosdepth`:
   - `coverage_before_100bp`: mean depth in the 100 bp upstream flank
   - `coverage_after_100bp`: mean depth in the 100 bp downstream flank
-- If one of the pipelines was not running (short/long/assembly) an empty tsv file is generated with a process create_empty_tbl
+- If one of the pipelines was not running (short/long/assembly) an empty tsv file is generated with a process `create_empty_tbl`
 - `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
 - Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
@@ -35,16 +35,19 @@ flowchart LR
 The pipeline extracts variants from VCF files using different fields depending on the source:
 
 **Assembly (syri) variants:**
+
 - **Variant type source:** VCF `ALT` field (e.g., DEL, DUP, INV, INS, TRANS, INVDP, CPG, CPL, SYN, etc.)
 - **Extraction command:** `bcftools query -f '%CHROM\t%POS\t%INFO/END\t%ALT\t%ID\t%INFO/StartB\t%INFO/EndB\n'`
 - **Columns extracted:** chrom, start (POS), end (INFO/END), svtype (ALT), info_svtype (ID), start_mod (InfoStartB), end_mod (EndB)
 
 **Short-read (delly) variants:**
+
 - **Variant type source:** VCF `INFO/SVTYPE` field (e.g., DEL, DUP, INV, INS, TRA)
 - **Extraction command:** `bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/CHR2\t%POS2\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%QUAL\t[%RDCN]\n'`
 - **Key feature:** Includes `svlen` directly from VCF for accurate insertion/translocation lengths
 
 **Long-read (cuteSV/sniffles/debreak/SURVIVOR) variants:**
+
 - **Variant type source:** VCF `ID` field or `SVTYPE` in INFO
 - **Extraction command:** `bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%ID\t%INFO/SVLEN\t[%DR{1}]\t%QUAL\t%INFO/SUPP\n'`
 - **Supporting reads:** Extracted from FORMAT/DR (`DR{1}`) for long-read evidence
@@ -72,6 +75,7 @@ All extracted variant types are standardized to one of six categories in `create
 - `RPL` (Replacement/Other) — includes SUB, SNV, SYN, HDR, and unrecognized types
 
 **Mapping strategy:**
+
 1. Direct lookup in `INFO_MAP` for exact type matches
 2. Token-based search for substring matches (e.g., "INVDP" contains "INV" → INV)
 3. Assembly-specific prefix patterns for syri-specific types (e.g., CPG→INS, CPL→DEL, SYN→RPL)
@@ -105,8 +109,10 @@ data/outputs/tables/
 The `extract_supp_reads` process extracts supporting reads information from structural variant (SV) VCF files. This provides detailed evidence for each SV call, showing how many reads support the variant.
 
 #### Process details
+
 - **Input**: SV VCF file, parameter name (e.g., `PE` for paired-end reads), method name (e.g., `delly`)
 - **Output**: TSV file in `data/outputs/tables/supporting_reads/` with columns:
+
   - `chrom`: Chromosome
   - `start`: Start position
   - `end`: End position
@@ -200,18 +206,21 @@ The examples below use simplified coordinates for clarity.
 #### Structural Variant Type Conventions by Data Source
 
 **Short-read variants (delly):**
+
 - `DEL`, `DUP`, `INV`: reported as real intervals with `start < end`
 - `INS`: reported as a single position (`start == end`) representing the insertion point
 - `TRA`: reported as a breakpoint (`start == end`) representing the breakpoint position
 - For `INS` and `TRA`, the inserted/translocated sequence length is provided in the `svlen` field, not from coordinate difference
 
 **Assembly variants (syri):**
+
 - Syri uses the VCF `ALT` field for variant types: `DEL`, `INS`, `INV`, `DUP`, `TRANS` (translocation), `CPG` (copy gain), `CPL` (copy loss), `SYN` (syntenic), and alignment/inverted variants
 - These are mapped to standardized types: `DEL`, `INS`, `INV`, `DUP`, `TRA`, `RPL` (replacements)
 - Coordinates extracted as real intervals from VCF `POS` and `INFO/END` fields
 - Breakpoint information available in `INFO/StartB` and `INFO/EndB` (stored as `asm_start_mod` and `asm_end_mod`)
 
 **Long-read variants (cuteSV, sniffles, debreak, SURVIVOR merged):**
+
 - Reported with `SVTYPE` in INFO field
 - Handled similarly to short-read variants with clustering and best-record selection
 
@@ -235,11 +244,13 @@ This ensures accurate length reporting regardless of variant type and source pip
 #### Event Length Calculation for Final Rows
 
 In the final CSV tables:
+
 - **event_length_bp** is computed as the minimum valid absolute `svlen` (`min(abs(svlen))`) across all source records in the clustered event
 - If no sources provide `svlen`, `event_length_bp` is `NaN`
 - This conservative approach ensures reported lengths represent the smallest source size estimate while handling signed caller conventions robustly
 
 Each source pipeline registers its own length in the table:
+
 - **asm_length** — Assembly pipeline svlen
 - **long_ont_length** — Oxford Nanopore long-read svlen
 - **long_pacbio_length** — PacBio long-read svlen

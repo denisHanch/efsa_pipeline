@@ -299,6 +299,7 @@ config.json "options"  →  CLI flags (validation.sh)  →  built-in defaults
 A value in `config.json` always takes priority over a CLI flag, and a CLI flag takes priority over the built-in default. This applies to all options including `force_defragment_ref`: if the config sets it to `false`, passing `--force-defragment-ref` on the command line has no effect.
 
 **Validation:**
+
 - Invalid option names → `ConfigurationError` (e.g., `"abc"` not allowed)
 - Invalid threads → `ConfigurationError` (e.g., negative numbers)
 - Invalid validation_level → `ConfigurationError` (e.g., `"invalid_level"`)
@@ -309,6 +310,7 @@ A value in `config.json` always takes priority over a CLI flag, and a CLI flag t
 ### File-Level Settings
 
 Override global options for specific files by adding settings to individual file entries:
+
 - `validation_level`: `"strict"`, `"trust"`, or `"minimal"` (overrides global)
 - `threads`: Number of threads for compression (int, overrides global)
 - `n_sequence_limit`: Maximum number of sequences allowed in a genome file (int, default: `5`). Applies to `ref_genome_filename` and `mod_genome_filename` only; ignored with a warning on plasmids.
