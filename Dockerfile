@@ -62,12 +62,17 @@ RUN chmod +x /usr/local/bin/nextflow
 COPY modules/validation/validation.sh /usr/local/bin/validation.sh
 RUN chmod +x /usr/local/bin/validation.sh
 
+# Copy the combined run script (validation + Nextflow)
+COPY run.sh /usr/local/bin/run.sh
+RUN chmod +x /usr/local/bin/run.sh
+
 WORKDIR /EFSA_workspace
 
 # Copy shell configuration for better user experience
 COPY .devcontainer/.inputrc /root/
 
 # Setup bash aliases
-RUN echo 'alias validate="validation.sh"' >> /root/.bashrc
+RUN echo 'alias validate="validation.sh"' >> /root/.bashrc \
+ && echo 'alias gmo-pipeline="run.sh"' >> /root/.bashrc
 
 ENV SHELL=/bin/bash
