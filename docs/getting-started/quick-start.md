@@ -31,20 +31,13 @@ git clone https://github.com/denisHanch/efsa_pipeline.git
 
 ### 3. Run Input Validation
 
-Running QC on the input data and processing data for the Nextflow pipeline to `data/valid` folder:
+Run QC on the input data and process data for the Nextflow pipeline to `data/valid` folder:
 
 ```bash
-validate                              # default config (./data/inputs/config.json)
-validate --config <path>              # custom config path
-
-# Optional global option flags (config.json takes priority when both are set):
-validate --threads <n|auto>           # number of threads, or 'auto'
-validate --validation-level <level>   # strict / trust / minimal
-validate --logging-level <level>      # DEBUG / INFO / WARNING / ERROR
-validate --type <type>                # prokaryote / eukaryote
-validate --force-defragment-ref       # unsupported workaround, at your own responsibility
-                                      # ignored if force_defragment_ref is set in config.json
+nextflow run validation.nf -resume
 ```
+
+This runs validation inside the `ecomolegmo/validation` Docker image as a Nextflow process. It reads `data/inputs/config.json` and publishes validated outputs to `data/valid/`.
 
 ### 4. Execute the Pipeline
 

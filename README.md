@@ -51,27 +51,10 @@
 3. **Running QC** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder:
 
    ```bash
-   validate                                      # default config path
-   validate --config path/to/config.json         # custom config
-
-   # Global options can be set via CLI flags (config.json takes priority if the same
-   # option is also set there):
-   validate --threads 8
-   validate --validation-level strict
-   validate --logging-level DEBUG
-   validate --type eukaryote
-   validate --force-defragment-ref               # unsupported workaround — at your own responsibility
-                                              # has no effect if force_defragment_ref is set in config.json
+   nextflow run validation.nf -resume
    ```
-> **Important!**
-> 
-> The validate command must be run from the container root folder.
->
 
-> **Important!**
-> 
-> Priority of configurations: config.json > cli_options > defaults.
->
+   This runs the validation inside the `ecomolegmo/validation` Docker image as a Nextflow process. It reads `data/inputs/config.json` and publishes validated outputs to `data/valid/`.
 
 4.  Start the pipeline with a command:
 
