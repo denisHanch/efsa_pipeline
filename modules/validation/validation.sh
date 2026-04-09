@@ -91,14 +91,7 @@ export VALIDATION_RUN_DIR="$STAGING_DIR"
 echo "Running validation with config: $CONFIG_PATH"
 echo "---"
 
-EXTRA_ARGS=()
-[ "$FORCE_DEFRAGMENT" = true ] && EXTRA_ARGS+=(--force-defragment-ref)
-[ -n "$THREADS" ] && EXTRA_ARGS+=(--threads "$THREADS")
-[ -n "$VALIDATION_LEVEL" ] && EXTRA_ARGS+=(--validation-level "$VALIDATION_LEVEL")
-[ -n "$LOGGING_LEVEL" ] && EXTRA_ARGS+=(--logging-level "$LOGGING_LEVEL")
-[ -n "$ORG_TYPE" ] && EXTRA_ARGS+=(--type "$ORG_TYPE")
-
-if "$VENV_PYTHON" ./modules/validation/main.py "$CONFIG_PATH" "${EXTRA_ARGS[@]}"; then
+if "$VENV_PYTHON" /opt/validation/main.py "$CONFIG_PATH"; then
     echo "---"
     echo "Validation completed successfully"
     exit 0
