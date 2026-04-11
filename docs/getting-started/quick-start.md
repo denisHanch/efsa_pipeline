@@ -29,25 +29,17 @@ git clone https://github.com/denisHanch/efsa_pipeline.git
 >
 > Create a configuration file `config.json` based on data in `data/inputs`.
 
-### 3. Run Input Validation
+### 3. Run the Pipeline
 
-Run QC on the input data and process data for the Nextflow pipeline to `data/valid` folder:
-
-```bash
-nextflow run validation.nf -c validation.config -resume
-```
-
-This runs validation inside the `ecomolegmo/validation` Docker image as a Nextflow process. It reads `data/inputs/config.json` and publishes validated outputs to `data/valid/`.
-
-> **Note:** The `-c validation.config` flag loads the dedicated validation configuration (`validation.config`). The validation workflow has its own trace, report, and timeline outputs written to `logs/`.
-
-### 4. Execute the Pipeline
-
-Start the pipeline:
+Run validation and processing in a single command:
 
 ```bash
-nextflow run main.nf --max_cpu $(nproc) -params-file data/valid/validated_params.json -resume
+nextflow run main.nf --max_cpu $(nproc)
 ```
+
+This first validates input data from `data/inputs/config.json`, then automatically runs the processing workflows (short-read, long-read, ref-vs-mod comparison) based on the validated inputs.
+
+> **Note:** Use `--config_json /path/to/config.json` to specify a custom configuration file.
 
 ## Next Steps
 

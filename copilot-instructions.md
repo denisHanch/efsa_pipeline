@@ -2,7 +2,7 @@
 
 - Big picture
   - The project is a Nextflow DSL2 pipeline orchestrating three main domains: short-read processing, long-read processing (PacBio/ONT) and reference-vs-modified genome comparison. Entry point: `main.nf` (DSL2). Workflows live under `workflows/` and reusable processes live under `modules/`.
-  - Validation and preprocessing are done by the Python validation package in `modules/validation/` which writes cleaned inputs to `data/valid/`. The Nextflow pipeline reads from `data/valid/` and writes to `data/outputs/`.
+  - Validation and preprocessing are done by the Python validation package in `modules/validation/`. Validation is integrated into `main.nf` and runs automatically before the processing workflows. Validated outputs are written to `data/valid/` and consumed at runtime via channels.
   - Containerization is central: developers run the pipeline inside the project's Docker image (see `Dockerfile`, `docker-compose.yml`, `run_container.sh`). Nextflow container images are configured in `nextflow.config` under `params.containers`.
 
 - Quick commands (real examples used in repo)

@@ -47,7 +47,7 @@ workflow short_read {
 
         // mapping reads to plasmid
         if (plasmid_fasta) {
-            Channel.from(plasmid_fasta) | set { plasmid_fasta }
+            plasmid_fasta.flatten() | set { plasmid_fasta }
 
             bwa_index_plasmid(plasmid_fasta, "${out_folder_name}-plasmid") | set { unmapped_fasta_index } 
             mapping_plasmid(plasmid_fasta, unmapped_fasta_index, unmapped_fastq, "${out_folder_name}-plasmid") | set { unmapped_bam }

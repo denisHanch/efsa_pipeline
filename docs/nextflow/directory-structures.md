@@ -6,7 +6,7 @@ Each validation run creates a timestamped subdirectory. Previous runs are preser
 
 ```
 data/valid/
-├── validated_params.json          # Fixed path — always here for Nextflow -params-file
+├── validated_params.json          # Fixed path — consumed by pipeline at runtime
 │
 └── run_YYYYMMDD_HHMMSS/           # Per-run output directory
     ├── SampleName_ref.fasta       # Validated reference genome FASTA
@@ -35,7 +35,7 @@ data/valid/
 
 | File / Folder              | Description                                                                   |
 | -------------------------- | ----------------------------------------------------------------------------- |
-| `validated_params.json`    | Produced by the validation step; loaded by Nextflow via `-params-file`. Contains all validated file paths and pipeline flags. Always written at `data/valid/` (top level) so the Nextflow command never needs updating between runs. |
+| `validated_params.json`    | Produced by the validation step; consumed by the pipeline workflow at runtime via channels. Contains all validated file paths and pipeline flags. Always written at `data/valid/` (top level) so the path is consistent between runs. |
 | `run_YYYYMMDD_HHMMSS/`     | Timestamped directory for one validation run. All validated files, the log, and the report go here. Previous runs are never overwritten. |
 | `*_ref.fasta`              | Validated reference genome FASTA.                                             |
 | `*_mod.fasta`              | Validated modified genome FASTA.                                              |
@@ -55,13 +55,13 @@ After successful pipeline execution, the outputs are organized as follows:
 
 ```
 data/outputs
-├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod is set to true in `data/valid/validated_params.json`)
+├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod is true)
 ├── illumina            → Short-read (Illumina) mapping results
 ├── logs/               → Pipeline logs, Nextflow reports, trace data, and process manifest
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
 ├── tables              → Per-SV csv tables
-├── truvari             → Variant comparison results from Truvari (if run_truvari is set to true in `data/valid/validated_params.json`)
+├── truvari             → Variant comparison results from Truvari (if run_truvari is true)
 └── unmapped_stats      → Summary statistics of unmapped reads for each workflow
 ```
 

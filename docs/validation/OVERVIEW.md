@@ -55,13 +55,13 @@ The validation process:
 
 ## Running Validation
 
-Run validation via Nextflow:
+Validation is integrated into the main pipeline and runs automatically:
 
 ```bash
-nextflow run validation.nf -resume
+nextflow run main.nf --max_cpu $(nproc)
 ```
 
-This runs the validation inside the `ecomolegmo/validation` Docker image as a Nextflow process. It reads `data/inputs/config.json` and publishes validated outputs to `data/valid/`.
+This runs the validation inside the `ecomolegmo/validation` Docker image as a Nextflow process, then proceeds to the processing workflows. It reads `data/inputs/config.json` (configurable via `--config_json`) and publishes validated outputs to `data/valid/`.
 
 ## Related Documentation
 
@@ -81,14 +81,14 @@ After successful validation:
 
 ### `validated_params.json`
 
-This file is produced by the validation step and consumed by Nextflow via `-params-file`. It overrides the defaults in `nextflow.config` and `nextflow_schema.json`. 
+This file is produced by the validation step and consumed by the pipeline workflow at runtime via channels. It contains all validated file paths and pipeline flags.
 
 #### Pipeline switches
 
 | Parameter               | Type    | Description                                                                                           |
 | ----------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
 | `run_ref_x_mod`         | boolean | `true` when both reference and modified genome validation succeeded and neither is fragmented; `false` when any genome exceeds `n_sequence_limit` or `type` is `"eukaryote"`. Gates all ref-vs-mod steps. |
-| `run_truvari`           | boolean | Always `false` by default; can be overridden manually in `data/valid/validated_params.json`.          |
+| `run_truvari`           | boolean | Always `false` by default; can be enabled via `--run_truvari true` on the command line.               |
 | `run_illumina`          | boolean | `true` when validated Illumina FASTQ reads are present.                                               |
 | `run_nanopore`          | boolean | `true` when validated Nanopore (ONT) reads are present (FASTQ or BAM).                               |
 | `run_pacbio`            | boolean | `true` when validated PacBio reads are present (FASTQ or BAM).                                       |

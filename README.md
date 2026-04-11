@@ -48,21 +48,15 @@
 > Create a configuration file `config.json` in `data/inputs`.
 > 
 
-3. **Running QC** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder:
+3. **Run the pipeline** (validation and processing in a single command):
 
    ```bash
-   nextflow run validation.nf -c validation.config -resume
+   nextflow run main.nf --max_cpu $(nproc)
    ```
 
-   This runs the validation inside the `ecomolegmo/validation` Docker image as a Nextflow process. It reads `data/inputs/config.json` and publishes validated outputs to `data/valid/`.
+   This first runs input validation inside the `ecomolegmo/validation` Docker image, reads `data/inputs/config.json`, then automatically proceeds to run the processing workflows (short-read, long-read, ref-vs-mod comparison) based on the validated inputs.
 
-   > **Note:** The `-c validation.config` flag loads the dedicated validation configuration. This config sets `nextflow.enable.configProcessNamesValidation = false` to suppress warnings about unmatched process selectors from the main pipeline config (`nextflow.config`).
-
-4.  Start the pipeline with a command:
-
-   ```bash
-   nextflow run main.nf --max_cpu $(nproc)  -params-file data/valid/validated_params.json  -resume
-   ```
+   > **Note:** Use `--config_json /path/to/config.json` to specify a custom configuration file (default: `data/inputs/config.json`).
 
 
 # Docker Container
@@ -389,7 +383,7 @@ The main pipeline (`main.nf`) executes **all three workflows** in sequence.
 This executes **short-read processing**, **long-read processing**, and **reference vs modified genome comparison** pipelines:
 
 ```bash
-nextflow run main.nf --max_cpu $(nproc) -resume
+nextflow run main.nf --max_cpu $(nproc)
 ```
 
 ### Available Nextflow Options
