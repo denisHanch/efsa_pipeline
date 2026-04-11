@@ -78,8 +78,10 @@ def main():
 
     config_path = Path(args[0]).resolve()
     base_valid_dir = Path.cwd()
-    # Use the run-specific dir exported by validation.sh; fall back to data/valid/
-    output_dir = base_valid_dir
+    # Use the run-specific dir exported by validation.sh; fall back to CWD.
+    run_dir = os.environ.get("VALIDATION_RUN_DIR")
+    output_dir = Path(run_dir).resolve() if run_dir else base_valid_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
     logger = None
     log_file = None
 
@@ -100,6 +102,20 @@ def main():
     except Exception as e:
         logger.error(f"Loading a config file failed: {e}")
         return 1
+
+    # Redirect all validator configs to write into the run-specific output_dir.
+    # ConfigManager sets config.output_dir from the config file's location on
+    # disk (e.g. the real data/valid/ in the project root), which is wrong when
+    # running inside a Nextflow work directory.  Override every sub-config here
+    # so genome, read, and feature outputs all land in the same run_* folder.
+    _all_sub_configs = [
+        config.ref_genome, config.mod_genome,
+        config.ref_plasmid, config.mod_plasmid,
+        config.ref_feature,
+    ] + list(config.reads or [])
+    for sub_cfg in _all_sub_configs:
+        if sub_cfg is not None:
+            sub_cfg.output_dir = output_dir
 
     # ========================================================================
     # Step 1.5 (optional): Defragment reference if force_defragment_ref is set

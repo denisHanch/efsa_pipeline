@@ -80,9 +80,8 @@ if [ ! -x "$VENV_PYTHON" ]; then
 fi
 
 # Create run-stamped staging directory instead of destructively clearing the output dir
-VALID_DIR="./data/valid"
 RUN_ID="$(date +%Y%m%d_%H%M%S)"
-STAGING_DIR="${VALID_DIR}/run_${RUN_ID}"
+STAGING_DIR="./run_${RUN_ID}"
 mkdir -p "$STAGING_DIR"
 echo "Validation outputs will be written under: $STAGING_DIR"
 export VALIDATION_RUN_DIR="$STAGING_DIR"
