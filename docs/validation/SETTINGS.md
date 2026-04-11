@@ -22,6 +22,7 @@ The validation module supports three validation levels to balance thoroughness a
 - Recommended for first-time data processing
 
 **Use when:**
+
 - Processing data for the first time
 - Data quality is uncertain
 
@@ -32,6 +33,7 @@ The validation module supports three validation levels to balance thoroughness a
 - Still performs format conversions
 
 **Use when:**
+
 - Data has been pre-validated
 - Files are from trusted sources
 - You need faster processing times
@@ -43,6 +45,7 @@ The validation module supports three validation levels to balance thoroughness a
 - Use with caution
 
 **Use when:**
+
 - Files are already in correct format
 - You're absolutely certain of data quality
 - Only file organization is needed
