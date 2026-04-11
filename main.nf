@@ -42,11 +42,8 @@ if (params.help) {
 }
 
 
-workflow pipeline {
-
-    take:
-        
-
+workflow {
+    
     main:
         def ref_fasta = Channel.fromPath(params.ref_fasta_validated, checkIfExists: true) 
         def mod_fasta = Channel.fromPath(params.mod_fasta_validated)
