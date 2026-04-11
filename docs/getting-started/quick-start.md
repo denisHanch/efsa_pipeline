@@ -34,10 +34,12 @@ git clone https://github.com/denisHanch/efsa_pipeline.git
 Run QC on the input data and process data for the Nextflow pipeline to `data/valid` folder:
 
 ```bash
-nextflow run validation.nf -resume
+nextflow run validation.nf -c validation.config -resume
 ```
 
 This runs validation inside the `ecomolegmo/validation` Docker image as a Nextflow process. It reads `data/inputs/config.json` and publishes validated outputs to `data/valid/`.
+
+> **Note:** The `-c validation.config` flag loads the dedicated validation configuration (`validation.config`). The validation workflow has its own trace, report, and timeline outputs written to `logs/`.
 
 ### 4. Execute the Pipeline
 

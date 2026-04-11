@@ -16,10 +16,12 @@ Running the pipeline is a **two-step process**: validate inputs first, then run 
 ### Step 1 — Validate inputs
 
 ```bash
-nextflow run validation.nf -resume
+nextflow run validation.nf -c validation.config -resume
 ```
 
 This runs the validation inside the `ecomolegmo/validation` Docker image as a Nextflow process. It reads `data/inputs/config.json` and publishes validated outputs to `data/valid/`.
+
+The `-c validation.config` flag loads the dedicated validation configuration (`validation.config`). The validation workflow has its own trace, report, and timeline outputs written to `logs/`.
 
 Validated files are written to `data/valid/run_YYYYMMDD_HHMMSS/` and `data/valid/validated_params.json` is produced at the top level (always at a fixed path). See the [Validation Overview](../validation/OVERVIEW.md) for details on what this file contains.
 

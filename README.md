@@ -51,10 +51,12 @@
 3. **Running QC** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder:
 
    ```bash
-   nextflow run validation.nf -resume
+   nextflow run validation.nf -c validation.config -resume
    ```
 
    This runs the validation inside the `ecomolegmo/validation` Docker image as a Nextflow process. It reads `data/inputs/config.json` and publishes validated outputs to `data/valid/`.
+
+   > **Note:** The `-c validation.config` flag loads the dedicated validation configuration. This config sets `nextflow.enable.configProcessNamesValidation = false` to suppress warnings about unmatched process selectors from the main pipeline config (`nextflow.config`).
 
 4.  Start the pipeline with a command:
 

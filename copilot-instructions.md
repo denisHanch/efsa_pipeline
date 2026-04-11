@@ -7,9 +7,9 @@
 
 - Quick commands (real examples used in repo)
   - Start developer container (recommended): `./run_container.sh`
-  - Validate inputs: `validate` (creates `data/valid/`)
+  - Validate inputs: `nextflow run validation.nf -c validation.config -resume` (creates `data/valid/`)
   - Run pipeline (resumable):
-    `nextflow run main.nf --max_cpu $(nproc) -resume -params-file data/valid/config.json`
+    `nextflow run main.nf --max_cpu $(nproc) -params-file data/valid/validated_params.json -resume`
 
 - Important file references (where to look/change behavior)
   - `main.nf` — orchestrates which workflows run, input detection, and final aggregation.
