@@ -1,4 +1,4 @@
-FROM docker:29.3.1-dind-alpine3.23@sha256:4d90f1f6c400315c2dba96d3ec93c01e64198395cbba04f79d12adce4f737029
+FROM docker:29.4.0-dind-alpine3.23@sha256:f80c26212befc1c1988b529495532c6b9180d9b1dab1611f4a1efbe9da8ec821
 
 RUN printf '%s\n' \
       'http://dl-cdn.alpinelinux.org/alpine/v3.23/main' \
@@ -10,7 +10,7 @@ RUN apk add --no-cache \
       bash=5.3.3-r1 \
       emacs-nox=30.2-r0 \
       mc=4.8.33-r2 \
-      python3=3.12.12-r0 \
+      python3=3.12.13-r0 \
       py3-pip=25.1.1-r1 \
       openssh-client-default=10.2_p1-r0 \
       git=2.52.0-r0 \
@@ -34,11 +34,11 @@ COPY modules/validation/ /tmp/validation/
 
 # Build deps only while creating an isolated venv for the validation package.
 RUN apk add --no-cache --virtual .build-deps \
-      gcc=15.2.0-r2 \
-      g++=15.2.0-r2 \
-      python3-dev=3.12.12-r0 \
-      musl-dev=1.2.5-r21 \
-      linux-headers=6.16.12-r0 \
+      gcc \
+      g++ \
+      python3-dev \
+      musl-dev \
+      linux-headers \
     && python3 -m venv /opt/validation-venv \
     && /opt/validation-venv/bin/pip install --upgrade pip setuptools wheel \
     && /opt/validation-venv/bin/pip install --no-cache-dir /tmp/validation/validation-pkg/ \
