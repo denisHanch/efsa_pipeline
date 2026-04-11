@@ -6,13 +6,6 @@ set -euo pipefail
 DEFAULT_CONFIG="./data/inputs/config.json"
 CONFIG_PATH="$DEFAULT_CONFIG"
 
-# Global options (all optional — config.json takes priority if set there)
-THREADS=""
-VALIDATION_LEVEL=""
-LOGGING_LEVEL=""
-ORG_TYPE=""
-FORCE_DEFRAGMENT=false
-
 VENV_PYTHON="/opt/validation-venv/bin/python"
 
 # Parse arguments
@@ -22,41 +15,11 @@ while [[ $# -gt 0 ]]; do
             CONFIG_PATH="$2"
             shift 2
             ;;
-        --threads)
-            THREADS="$2"
-            shift 2
-            ;;
-        --validation-level)
-            VALIDATION_LEVEL="$2"
-            shift 2
-            ;;
-        --logging-level)
-            LOGGING_LEVEL="$2"
-            shift 2
-            ;;
-        --type)
-            ORG_TYPE="$2"
-            shift 2
-            ;;
-        --force-defragment-ref)
-            FORCE_DEFRAGMENT=true
-            shift
-            ;;
         -h|--help)
             echo "Usage: validate [--config <path>] [OPTIONS]"
             echo ""
             echo "Options:"
             echo "  --config <path>              Path to config file (default: ./data/inputs/config.json)"
-            echo ""
-            echo "Global options (config.json takes priority if the same option is set there):"
-            echo "  --threads <n|auto>           Number of threads, or 'auto' for system default"
-            echo "  --validation-level <level>   Validation level: strict, trust, minimal (default: trust)"
-            echo "  --logging-level <level>      Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO)"
-            echo "  --type <type>                Organism type: prokaryote, eukaryote (default: prokaryote)"
-            echo "  --force-defragment-ref       UNSUPPORTED WORKAROUND: merge all reference contigs"
-            echo "                               into one sequence before validation. Use only when"
-            echo "                               the reference is too fragmented for any workflow."
-            echo "                               Results are NOT guaranteed to be meaningful."
             echo "  -h, --help                   Show this help message"
             exit 0
             ;;

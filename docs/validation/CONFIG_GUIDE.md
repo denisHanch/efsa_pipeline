@@ -288,24 +288,6 @@ This TSV is the only record of the original contig identities and their position
 
 **Result:** ALL files will use the specified options. Any option not set here falls back to its default.
 
-#### Option priority
-
-Options can be set from three sources. The first matching source wins:
-
-```
-config.json "options"  →  CLI flags (validation.sh)  →  built-in defaults
-```
-
-A value in `config.json` always takes priority over a CLI flag, and a CLI flag takes priority over the built-in default. This applies to all options including `force_defragment_ref`: if the config sets it to `false`, passing `--force-defragment-ref` on the command line has no effect.
-
-**Validation:**
-- Invalid option names → `ConfigurationError` (e.g., `"abc"` not allowed)
-- Invalid threads → `ConfigurationError` (e.g., negative numbers)
-- Invalid validation_level → `ConfigurationError` (e.g., `"invalid_level"`)
-- Invalid logging_level → `ConfigurationError` (e.g., `"verbose"`, must be DEBUG/INFO/WARNING/ERROR)
-- Invalid type → `ConfigurationError` (e.g., `"bacteria"`, must be `"prokaryote"` or `"eukaryote"`)
-- Invalid force_defragment_ref → `ConfigurationError` (must be `true` or `false`, not a string)
-
 ### File-Level Settings
 
 Override global options for specific files by adding settings to individual file entries:
