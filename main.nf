@@ -15,7 +15,6 @@ def helpMessage() {
 
     -resume          Run pipeline from the point where it was interrupted or failed (Nextflow built-in)
     --out_dir        Output directory                                               (default: ${params.out_dir})
-    --in_dir         Input directory                                                (default: ${params.in_dir})
     --max_cpu        Maximum CPUs per process                                       (default: ${params.max_cpu})
     --clean_work     Remove workdir after success                                   (default: ${params.clean_work})
     -with-report     Generate HTML execution report                                 (Nextflow built-in)
@@ -32,6 +31,9 @@ if (params.help) {
 }
 
 workflow {
+
+    file("${params.out_dir}/tables/csv_per_sv_summary").mkdirs()
+
     config_ch = Channel.fromPath(params.config_json, checkIfExists: true)
     validate(config_ch)
     analysis(validate.out.params_json)

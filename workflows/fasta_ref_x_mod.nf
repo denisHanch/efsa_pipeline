@@ -17,8 +17,7 @@
 */
 
 include { nucmer; delta_filter; show_coords; syri; bcftools_concat; bgzip_tabix } from "../modules/assembly.nf"
-include { logWorkflowCompletion } from "../modules/logs.nf"
-include { vcf_to_table_asm; create_empty_tbl } from "../modules/sv_calling.nf"
+include { vcf_to_table_asm } from "../modules/sv_calling.nf"
 
 def executed = false
 

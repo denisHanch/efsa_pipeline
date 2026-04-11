@@ -39,13 +39,7 @@ nextflow run main.nf --config_json /path/to/config.json --max_cpu $(nproc)
 
 ## Pipeline Options
 
-| Option         | Description                                                       | Default                 |
-|----------------|-------------------------------------------------------------------|-------------------------|
-| `--config_json`| Path to input configuration JSON                                  | `data/inputs/config.json` |
-| `--out_dir`    | Output directory                                                  | `data/outputs`          |
-| `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
-| `--clean_work` | Remove work directory after successful run                        | `true`                  |
-| `--help`       | Display help message                                              | –                       |
+The most commonly used options are `--config_json`, `--out_dir`, `--max_cpu`, `--clean_work`, and `--help`. For the full parameter list (including `run_truvari`, plasmid FASTAs, GFF, etc.), see [Configuration](configuration.md#parameters-params).
 
 
 ## Next Steps

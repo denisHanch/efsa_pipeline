@@ -283,6 +283,23 @@ For each validated file:
 
 # Nextflow
 
+## Pipeline Architecture
+
+The pipeline is organized into four layers:
+
+| Layer | Files | Purpose |
+|-------|-------|---------|
+| Entry point | `main.nf` | Runs validation, then dispatches to the analysis workflow |
+| Configuration | `nextflow.config` | Parameters, per-process containers & resources, profiles |
+| Workflows | `workflows/analysis.nf`, `short_read.nf`, `long_read.nf`, `fasta_ref_x_mod.nf`, `vcf_comparison.nf` | High-level data flow for each analysis domain |
+| Subworkflows | `workflows/subworkflows.nf` | Reusable building blocks (qc, mapping, sv calling) shared across workflows |
+| Processes | `modules/*.nf` | Individual tool invocations (BWA, minimap2, delly, etc.) |
+
+For detailed documentation see:
+- [Configuration reference](docs/nextflow/configuration.md)
+- [Validation process](docs/nextflow/validation-process.md)
+- [Subworkflows](docs/nextflow/subworkflows.md)
+
 ## Graphical Representation of the Pipeline
 
 ```mermaid
@@ -396,7 +413,7 @@ nextflow run main.nf --max_cpu $(nproc)
 
 | Option         | Description                                                       | Default                 |
 |----------------|-------------------------------------------------------------------|-------------------------|
-| `--in_dir`     | Input directory                                                   | `data/valid`            |
+| `--config_json`| Path to input configuration JSON                                  | `data/inputs/config.json` |
 | `--out_dir`    | Output directory                                                  | `data/outputs`          |
 | `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
 | `--clean_work` | Remove work directory after successful run                        | `true`                  |

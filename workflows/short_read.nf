@@ -19,9 +19,9 @@
 
 include { multiqc } from "../modules/qc.nf"
 include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid; build_sv_flank_bed; mosdepth } from "../modules/mapping.nf"
-include { freebayes; bcftools_stats; bcftools_stats as bcftools_stats_plasmid } from "../modules/variant_calling.nf"
-include { qc; mapping; sv; annotate_vcf; mapping as mapping_plasmid } from "../workflows/subworkflows.nf"
-include { logUnmapped; logUnmapped as logUnmapped_plasmid; logWorkflowCompletion; loadShortFastqFiles } from "../modules/logs.nf"
+include { freebayes; bcftools_stats } from "../modules/variant_calling.nf"
+include { mapping; sv; annotate_vcf; mapping as mapping_plasmid } from "../workflows/subworkflows.nf"
+include { logUnmapped; logUnmapped as logUnmapped_plasmid } from "../modules/logs.nf"
 include { vcf_to_table_short }  from "../modules/sv_calling.nf"
 
 def executed = false
@@ -32,6 +32,8 @@ workflow short_read {
         fasta
         out_folder_name
         plasmid_fasta
+        run_vcf_annotation
+        gff
 
     main:
         executed = true
@@ -63,8 +65,7 @@ workflow short_read {
             freebayes(fasta, indexed_bam, out_folder_name) | set { vcf }
             bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
             
-            if (params.run_vcf_annotation) {
-                Channel.fromPath(params.gff) | set { gff }
+            if (run_vcf_annotation) {
                 annotate_vcf(fasta, gff, vcf, "gff", "gff3", out_folder_name) | set {qc_vcf}
             
                 qc_vcf.mix(bcftools_out).collect() | set { qc_out }

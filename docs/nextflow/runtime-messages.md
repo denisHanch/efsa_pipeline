@@ -94,13 +94,7 @@ At the end of every run (success or failure), a **process execution manifest** i
 
 ## Error Handling
 
-The pipeline uses `errorStrategy = 'terminate'` globally. If any process fails, the pipeline stops immediately — no downstream tasks are started. This prevents partial or misleading results.
-
-When a failure occurs, the pipeline:
-
-1. **Copies all process logs** (`.command.*` files) from the `work/` directory to `data/outputs/logs/`
-2. **Generates a process manifest** (`process_manifest.txt`) listing which processes succeeded and which failed with exit codes
-3. **Logs a pointer** to the manifest file for quick diagnosis
+When a failure occurs, the pipeline stops immediately, copies all process logs to `data/outputs/logs/`, and generates a `process_manifest.txt` with exit codes. See [Logs](../outputs/logs.md) for details on log files and the process manifest format.
 
 ```text
 ❌ The execution of main.nf processing pipeline failed: ...

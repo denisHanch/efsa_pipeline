@@ -118,33 +118,3 @@ def generateProcessManifest(File logDir) {
 
     log.info "📋 Process execution manifest: ${manifestFile.path}\n"
 }
-
-def loadFastqFiles(input) {
-    return Channel.fromPath(input)
-        .map { f ->
-            def name = f.name.replaceFirst(/\.fastq\.gz$/, '')
-            tuple(name, f)
-        }
-}
-
-def loadShortFastqFiles(short_read_files) {
-    return Channel.from(short_read_files).map { f ->
-            def file = file(f)
-            def matcher = file.name =~ /^(.+?)(?:[_\.](S[0-9]+_L[0-9]+_)?(R[12]|[12]))?\.f(ast)?q\.gz$/
-            if (matcher.matches()) {
-                [matcher[0][1], file]
-            }
-        }
-        .groupTuple(sort: true)
-}
-
-def listFiles(String dirPath, String pattern = ".*\\.(fastq|fq)(\\.gz)?\$") {
-    def dir = file(dirPath)
-    if (!dir.exists() || !dir.isDirectory()) {
-        log.warn "Directory not found or not a directory: ${dirPath}"
-        return []
-    }
-    def files = dir.listFiles()?.findAll { it.name =~ pattern } ?: []
-    if (!files) log.info "No FASTQ files found in ${dirPath} matching pattern ${pattern}"
-    return files
-}
