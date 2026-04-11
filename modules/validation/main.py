@@ -77,7 +77,7 @@ def main():
         return 1
 
     config_path = Path(args[0]).resolve()
-    base_valid_dir = config_path.parent.parent / "valid"
+    base_valid_dir = Path.cwd()
     # Use the run-specific dir exported by validation.sh; fall back to data/valid/
     run_dir = os.environ.get("VALIDATION_RUN_DIR")
     output_dir = Path(run_dir) if run_dir else base_valid_dir

@@ -1,10 +1,13 @@
 #!/usr/bin/env nextflow
 
+include { pipeline } from "./main.nf"
+
+
 process validate {
 
     tag "validate"
     container "ecomolegmo/validation:v1.0.4"
-    publishDir "${projectDir}", mode: 'copy', overwrite: true
+    publishDir "${params.out_dir}/data/valid/", mode: 'copy', overwrite: true
 
     input:
     path config_json
@@ -14,7 +17,7 @@ process validate {
 
     script:
     """
-    validate --config ${config_json} 
+    validation.sh --config ${config_json} 
     """
 }
 
