@@ -30,48 +30,13 @@ from utils.ref_defragment import defragment_reference
 
 import nextflow_params_handler as nf_params
 
-def _parse_cli_args(argv):
-    """Parse CLI arguments and return (config_path, cli_options)."""
-    args = list(argv)
-    cli_options = {}
-
-    # Extract boolean flag
-    if '--force-defragment-ref' in args:
-        cli_options['force_defragment_ref'] = True
-        args.remove('--force-defragment-ref')
-
-    # Extract key-value options
-    i = 0
-    remaining = []
-    while i < len(args):
-        if args[i] == '--threads' and i + 1 < len(args):
-            val = args[i + 1]
-            cli_options['threads'] = None if val == 'auto' else int(val)
-            i += 2
-        elif args[i] == '--validation-level' and i + 1 < len(args):
-            cli_options['validation_level'] = args[i + 1]
-            i += 2
-        elif args[i] == '--logging-level' and i + 1 < len(args):
-            cli_options['logging_level'] = args[i + 1].upper()
-            i += 2
-        elif args[i] == '--type' and i + 1 < len(args):
-            cli_options['type'] = args[i + 1]
-            i += 2
-        else:
-            remaining.append(args[i])
-            i += 1
-
-    return remaining, cli_options
-
 
 def main():
     # Check command line arguments
-    args, cli_options = _parse_cli_args(sys.argv[1:])
+    args = sys.argv[1:]
 
     if not args:
-        print("Usage: python main.py <config_path> [--force-defragment-ref]")
-        print("       [--threads N|auto] [--validation-level LEVEL]")
-        print("       [--logging-level LEVEL] [--type TYPE]")
+        print("Usage: python main.py <config_path> ")
         print("\nExample:")
         print("  python main.py config.json")
         return 1
@@ -98,7 +63,7 @@ def main():
     # ========================================================================
     config = None
     try:
-        config = ConfigManager.load(config_path, cli_options=cli_options)
+        config = ConfigManager.load(config_path)
     except Exception as e:
         logger.error(f"Loading a config file failed: {e}")
         return 1
