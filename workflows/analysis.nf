@@ -18,71 +18,99 @@ workflow analysis {
         params_json
 
     main:
-        // Parse validated params JSON at runtime (value channel for multiple consumption)
-        pmap = params_json.map { json ->
-            new groovy.json.JsonSlurper().parse(json.toFile())
-        }.first()
 
-        // Core genome file channels (single-item value channels)
-        ref_fasta = pmap.map { file(it.ref_fasta_validated) }
-        mod_fasta = pmap.map { file(it.mod_fasta_validated) }
+        // Parse validated_params.json into a value channel (reusable across all branches)
+        pmap = params_json.map { f -> new groovy.json.JsonSlurper().parse(f) }.first()
 
-        ref_plasmid = pmap.map { it.ref_plasmid_fasta ? [file(it.ref_plasmid_fasta)] : [] }
-        mod_plasmid = pmap.map { it.mod_plasmid_fasta ? [file(it.mod_plasmid_fasta)] : [] }
-
-        // --- Assembly pipeline (run_ref_x_mod && contig_file_size >= 1) ---
-        contigs_ch = pmap
-            .filter { it.run_ref_x_mod && it.contig_file_size >= 1 }
-            .flatMap { it.contig_files.collect { f -> file(f) } }
-
-        ref_mod(ref_fasta, contigs_ch)
-
-        // Empty assembly table when ref_x_mod is not active
-        create_asm_tbl(pmap.filter { !it.run_ref_x_mod }.map { "assembly" })
-
-        // Helper: convert list of fastq paths to named tuple channel
-        def toNamedFastq = { f ->
-            def fobj = file(f)
-            def name = fobj.name.replaceFirst(/\.fastq\.gz$/, '')
-            tuple(name, fobj)
+        pmap | map { json ->
+            def lines = ["", "╔══════════════════════════════════════════════════════╗",
+                             "║           validated_params.json — loaded params      ║",
+                             "╚══════════════════════════════════════════════════════╝",
+                             "  [switches]",
+                             "  run_ref_x_mod:      ${json.run_ref_x_mod}",
+                             "  run_illumina:       ${json.run_illumina}",
+                             "  run_nanopore:       ${json.run_nanopore}",
+                             "  run_pacbio:         ${json.run_pacbio}",
+                             "  run_vcf_annotation: ${json.run_vcf_annotation}",
+                             "  contig_file_size:   ${json.contig_file_size}",
+                             "  validation_timestamp: ${json.validation_timestamp}",
+                             "  [files]",
+                             "  ref_fasta:    ${json.ref_fasta_validated   ?: 'null'}",
+                             "  mod_fasta:    ${json.mod_fasta_validated   ?: 'null'}",
+                             "  ref_plasmid:  ${json.ref_plasmid_fasta     ?: 'null'}",
+                             "  mod_plasmid:  ${json.mod_plasmid_fasta     ?: 'null'}",
+                             "  gff:          ${json.gff                   ?: 'null'}",
+                             "  [read lists]",
+                             "  illumina_fastqs: ${json.illumina_fastqs ?: []}",
+                             "  ont_fastqs:      ${json.ont_fastqs      ?: []}",
+                             "  ont_bams:        ${json.ont_bams        ?: []}",
+                             "  pacbio_fastqs:   ${json.pacbio_fastqs   ?: []}",
+                             "  pacbio_bams:     ${json.pacbio_bams     ?: []}",
+                             "  contig_files:    ${json.contig_files    ?: []}",
+                             ""]
+            log.info lines.join("\n")
         }
 
-        // --- PacBio long-read pipeline ---
-        pacbio_fastqs = pmap
-            .filter { it.run_pacbio }
-            .flatMap { it.pacbio_fastqs }
-            .map(toNamedFastq)
+        // Pipeline switches
+        run_ref_x_mod       = pmap.map { it.run_ref_x_mod }
+        run_illumina        = pmap.map { it.run_illumina }
+        run_nanopore        = pmap.map { it.run_nanopore }
+        run_pacbio          = pmap.map { it.run_pacbio }
+        run_vcf_annotation  = pmap.map { it.run_vcf_annotation }
+        contig_file_size    = pmap.map { it.contig_file_size }
+        validation_timestamp = pmap.map { it.validation_timestamp }
 
-        nanoplot_pacbio(pacbio_fastqs, "pacbio")
+        // Single-file paths — emits only when the path is present, empty channel otherwise
+        ref_fasta   = pmap.filter { it.ref_fasta_validated   }.map { file(it.ref_fasta_validated) }
+        mod_fasta   = pmap.filter { it.mod_fasta_validated   }.map { file(it.mod_fasta_validated) }
+        ref_plasmid = pmap.filter { it.ref_plasmid_fasta     }.map { file(it.ref_plasmid_fasta)   }
+        mod_plasmid = pmap.filter { it.mod_plasmid_fasta     }.map { file(it.mod_plasmid_fasta)   }
+        gff         = pmap.filter { it.gff                   }.map { file(it.gff)                 }
 
-        long_ref_pacbio(pacbio_fastqs, ref_fasta, "map-pb", ref_plasmid, "pacbio/long-ref")
-        long_mod_pacbio(pacbio_fastqs, mod_fasta, "map-pb", mod_plasmid, "pacbio/long-mod")
+        // Read file list channels (empty list when absent)
+        illumina_fastqs = pmap.flatMap { it.illumina_fastqs ?: [] }.map { file(it) }
+        ont_fastqs      = pmap.flatMap { it.ont_fastqs      ?: [] }.map { file(it) }
+        ont_bams        = pmap.flatMap { it.ont_bams        ?: [] }.map { file(it) }
+        pacbio_fastqs   = pmap.flatMap { it.pacbio_fastqs   ?: [] }.map { file(it) }
+        pacbio_bams     = pmap.flatMap { it.pacbio_bams     ?: [] }.map { file(it) }
+        contigs_ch    = pmap.flatMap { it.contig_files    ?: [] }.map { file(it) }
+
+        // --- Assembly pipeline — only when run_ref_x_mod = true ---
+        // Gate both inputs through the flag so processes never start when false
+        active_contigs  = run_ref_x_mod.combine(contigs_ch)
+            .filter { flag, f -> flag }.map { flag, f -> f }
+        active_ref_asm  = run_ref_x_mod.combine(ref_fasta)
+            .filter { flag, f -> flag }.map { flag, f -> f }
+
+        ref_mod(active_ref_asm, active_contigs)
+        create_asm_tbl(run_ref_x_mod.filter { !it }.map { "assembly" })
+
+        // --- PacBio long-read pipeline — only when run_pacbio = true ---
+        active_pacbio = run_pacbio.combine(pacbio_fastqs)
+            .filter { flag, f -> flag }.map { flag, f -> f }
+
+        nanoplot_pacbio(active_pacbio, "pacbio")
+        long_ref_pacbio(active_pacbio, ref_fasta, "map-pb", ref_plasmid, "pacbio/long-ref")
+        long_mod_pacbio(active_pacbio, mod_fasta, "map-pb", mod_plasmid, "pacbio/long-mod")
         compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
+        create_pacbio_tbl(run_pacbio.filter { !it }.map { "pb" })
 
-        // Empty pacbio table when not active
-        create_pacbio_tbl(pmap.filter { !it.run_pacbio }.map { "pb" })
+        // --- Nanopore long-read pipeline — only when run_nanopore = true ---
+        active_ont = run_nanopore.combine(ont_fastqs)
+            .filter { flag, f -> flag }.map { flag, f -> f }
 
-        // --- Nanopore long-read pipeline ---
-        ont_fastqs = pmap
-            .filter { it.run_nanopore }
-            .flatMap { it.ont_fastqs }
-            .map(toNamedFastq)
-
-        nanoplot_ont(ont_fastqs, "ont")
-
-        long_ref_ont(ont_fastqs, ref_fasta, "map-ont", ref_plasmid, "ont/long-ref")
-        long_mod_ont(ont_fastqs, mod_fasta, "map-ont", mod_plasmid, "ont/long-mod")
+        nanoplot_ont(active_ont, "ont")
+        long_ref_ont(active_ont, ref_fasta, "map-ont", ref_plasmid, "ont/long-ref")
+        long_mod_ont(active_ont, mod_fasta, "map-ont", mod_plasmid, "ont/long-mod")
         compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
+        create_ont_tbl(run_nanopore.filter { !it }.map { "ont" })
 
-        // Empty ont table when not active
-        create_ont_tbl(pmap.filter { !it.run_nanopore }.map { "ont" })
+        // --- Illumina short-read pipeline — only when run_illumina = true ---
+        active_illumina = run_illumina.combine(illumina_fastqs)
+            .filter { flag, f -> flag }.map { flag, f -> f }
 
-        // --- Illumina short-read pipeline ---
-        illumina_reads = pmap
-            .filter { it.run_illumina }
-            .flatMap { it.illumina_fastqs }
-            .map { f ->
-                def fobj = file(f)
+        illumina_reads = active_illumina
+            .map { fobj ->
                 def matcher = fobj.name =~ /^(.+?)(?:[_\.](S[0-9]+_L[0-9]+_)?(R[12]|[12]))?\.f(ast)?q\.gz$/
                 matcher.matches() ? [matcher[0][1], fobj] : null
             }
@@ -91,26 +119,22 @@ workflow analysis {
 
         qc(illumina_reads, "illumina/qc_trimming") | set { trimmed }
 
-        // VCF annotation flag and GFF from validated params
-        run_vcf_annotation = pmap.map { it.run_vcf_annotation }
-        gff = pmap.map { it.gff ? file(it.gff) : file('NO_GFF') }
-
         short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid, run_vcf_annotation, gff)
         short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid, run_vcf_annotation, gff)
         compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
+        create_short_tbl(run_illumina.filter { !it }.map { "short" })
 
-        // Empty short table when not active
-        create_short_tbl(pmap.filter { !it.run_illumina }.map { "short" })
-
-        // --- Collect SV tables from all branches (tagged with explicit labels) ---
-        sv_tbl = ref_mod.out.sv_tbl.map { tbl -> tuple('assembly', tbl) }
-            .mix(create_asm_tbl.out.map { tbl -> tuple('assembly', tbl) })
-            .mix(long_ref_pacbio.out.sv_tbl.map { tbl -> tuple('pb', tbl) })
-            .mix(create_pacbio_tbl.out.map { tbl -> tuple('pb', tbl) })
-            .mix(long_ref_ont.out.sv_tbl.map { tbl -> tuple('ont', tbl) })
-            .mix(create_ont_tbl.out.map { tbl -> tuple('ont', tbl) })
-            .mix(short_ref.out.sv_tbl.map { tbl -> tuple('short', tbl) })
-            .mix(create_short_tbl.out.map { tbl -> tuple('short', tbl) })
+        // --- Collect SV tables from all active branches ---
+        // Each branch contributes either real results OR an empty placeholder,
+        // so .out is always safe to reference (one of the two always ran).
+        sv_tbl = ref_mod.out.sv_tbl.map         { tbl -> tuple('assembly', tbl) }
+            .mix(create_asm_tbl.out.map          { tbl -> tuple('assembly', tbl) })
+            .mix(long_ref_pacbio.out.sv_tbl.map  { tbl -> tuple('pb',       tbl) })
+            .mix(create_pacbio_tbl.out.map        { tbl -> tuple('pb',       tbl) })
+            .mix(long_ref_ont.out.sv_tbl.map     { tbl -> tuple('ont',      tbl) })
+            .mix(create_ont_tbl.out.map           { tbl -> tuple('ont',      tbl) })
+            .mix(short_ref.out.sv_tbl.map        { tbl -> tuple('short',    tbl) })
+            .mix(create_short_tbl.out.map         { tbl -> tuple('short',    tbl) })
 
         supp_reads_ch = long_ref_pacbio.out.supp_reads
             .mix(long_ref_ont.out.supp_reads)
@@ -130,10 +154,10 @@ workflow analysis {
 
         def tbl_channel = sv_tbl.collect().map { list ->
             def tagged = list.collate(2)
-            def asm = tagged.find { it[0] == 'assembly' }[1]
-            def long_pb = tagged.find { it[0] == 'pb' }[1]
-            def long_ont = tagged.find { it[0] == 'ont' }[1]
-            def sht = tagged.find { it[0] == 'short' }[1]
+            def asm     = tagged.find { it[0] == 'assembly' }[1]
+            def long_pb = tagged.find { it[0] == 'pb'       }[1]
+            def long_ont = tagged.find { it[0] == 'ont'     }[1]
+            def sht     = tagged.find { it[0] == 'short'    }[1]
             tuple(asm, long_ont, long_pb, sht)
         }
 
