@@ -2,7 +2,7 @@ name: "CI: Nextflow Integration Test"
 
 on:
   push:
-    branches: [main, feature/EFSA-241_add_memory_cpu_req_to_processes]
+    branches: [main, feature/EFSA-268_nfx_integration_v2]
     paths:
       - "main.nf"
       - "nextflow.config"
@@ -11,7 +11,7 @@ on:
       - "modules/**"
       - ".github/workflows/auto_nextflow_run.yaml"
   pull_request:
-    branches: [main, feature/EFSA-241_add_memory_cpu_req_to_processes]
+    branches: [main, feature/EFSA-268_nfx_integration_v2]
     paths:
       - "main.nf"
       - "nextflow.config"
@@ -70,33 +70,45 @@ jobs:
         run: |
           cat > data/inputs/config.json << 'EOF'
           {
-            "ref_genome_filename": {
-              "filename": "test/ref.fa",
+          "ref_genome_filename": {
+            "filename": "data/inputs/ref.fa",
+            "validation_level": "strict",
+            "n_sequence_limit": 5,
+            "threads": 8
+          },
+          "mod_genome_filename": {
+            "filename": "data/inputs/mod.fa",
+            "validation_level": "strict",
+            "n_sequence_limit": 5,
+            "threads": 8
+          },
+          "reads": [
+            {
+              "directory": "data/inputs/illumina",
+              "ngs_type": "illumina",
               "validation_level": "minimal",
-              "n_sequence_limit": 5,
-              "threads": 2
+              "threads": 8
             },
-            "mod_genome_filename": {
-              "filename": "test/mod.fa",
+            {
+              "filename": "data/inputs/Bacillus_toyonensis_LE1_sequence.pacbio.fastq.gz",
+              "ngs_type": "pacbio",
               "validation_level": "minimal",
-              "n_sequence_limit": 5,
-              "threads": 2
-            },
-            "reads": [
-              {
-                "directory": "test/illumina",
-                "ngs_type": "illumina",
-                "validation_level": "minimal",
-                "threads": 2
-              }
-            ],
-            "options": {
-              "threads": 2,
-              "validation_level": "minimal",
-              "logging_level": "INFO",
-              "type": "prokaryote"
+              "threads": 8
             }
+          ],
+          "ref_feature_filename": {
+            "filename": "data/inputs/ref_feature.gff3",
+            "validation_level": "strict",
+            "threads": 8
+          },
+          "options": {
+            "threads": 8,
+            "validation_level": "strict",
+            "logging_level": "INFO",
+            "type": "prokaryote",
+            "force_defragment_ref": false
           }
+        }
           EOF
 
       - name: Run validation
