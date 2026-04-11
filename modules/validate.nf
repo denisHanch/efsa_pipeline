@@ -14,18 +14,6 @@ process validate {
 
     script:
     """
-    validation.sh --config ${config_json} 
+    validation.sh --config ${config_json} --threads ${params.max_cpu} 
     """
-}
-
-workflow validation {
-
-    take:
-    config_json
-
-    main:
-    validate(config_json)
-
-    emit:
-    params_json = validate.out.params_json
 }

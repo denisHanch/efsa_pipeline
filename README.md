@@ -136,12 +136,7 @@ The following table summarizes all supported scenarios:
 >
 
 
-> **Important!**
-> 
-> When the container is built please follow the steps to preprocess the data with a validation package.
->
-
-The input validation module preprocesses and verifies all input data to ensure it meets the required format and structure before the Nextflow pipeline is executed.
+The input validation module preprocesses and verifies all input data to ensure it meets the required format and structure. Validation runs automatically as the first step of the pipeline.
 
 ## Supported File Formats
 

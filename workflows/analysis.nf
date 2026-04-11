@@ -13,7 +13,7 @@ include { restructure_sv_tbl; create_empty_tbl as create_ont_tbl; create_empty_t
 include { describePipeline; loadFastqFiles; loadShortFastqFiles; listFiles } from "../modules/logs.nf"
 
 
-workflow pipeline {
+workflow analysis {
     
     take:
         params_json

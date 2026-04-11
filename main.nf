@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
-include { validation } from "./workflows/validation.nf"
-include { pipeline } from "./workflows/workflow.nf"
+include { validate } from "./modules/validate.nf"
+include { analysis } from "./workflows/analysis.nf"
 include { logWorkflowCompletion } from "./modules/logs.nf"
 
 // Help message
@@ -33,8 +33,8 @@ if (params.help) {
 
 workflow {
     config_ch = Channel.fromPath(params.config_json, checkIfExists: true)
-    validation(config_ch)
-    pipeline(validation.out.params_json)
+    validate(config_ch)
+    analysis(validate.out.params_json)
 }
 
 logWorkflowCompletion("execution of main.nf")
