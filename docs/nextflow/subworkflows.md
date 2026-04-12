@@ -8,11 +8,11 @@ The file `workflows/subworkflows.nf` contains **reusable sub-workflows** that ar
 
 Quality control and adapter trimming for Illumina short reads.
 
-| Step | Tool |
-|------|------|
-| Adapter trimming | TrimGalore |
-| Per-read QC | FastQC |
-| Aggregated QC report | MultiQC |
+| Step | Tool | Version | License |
+|------|------|---------|---------|
+| Adapter trimming | TrimGalore | 0.6.10 | GPL-3.0 |
+| Per-read QC | FastQC | 0.11.9 | GPL-3.0 |
+| Aggregated QC report | MultiQC | 1.33 | GPL-3.0 |
 
 **Takes:** `fastqs`, `out_folder_name`
 **Emits:** `trimmed` — trimmed FASTQ channel
@@ -23,14 +23,14 @@ Quality control and adapter trimming for Illumina short reads.
 
 Read alignment and post-alignment QC for short reads.
 
-| Step | Tool |
-|------|------|
-| Alignment | BWA |
-| Sort | samtools sort |
-| Alignment stats | samtools stats |
-| BAM indexing | samtools index |
-| Duplicate metrics | Picard MarkDuplicates |
-| Aggregated report | MultiQC |
+| Step | Tool | Version | License |
+|------|------|---------|---------|
+| Alignment | BWA | 0.7.17 | GPL-3.0 |
+| Sort | samtools sort | 1.23 | MIT |
+| Alignment stats | samtools stats | 1.23 | MIT |
+| BAM indexing | samtools index | 1.23 | MIT |
+| Duplicate metrics | Picard MarkDuplicates | 3.4.0 | MIT |
+| Aggregated report | MultiQC | 1.33 | GPL-3.0 |
 
 **Takes:** `fasta`, `fasta_index`, `trimmed`, `out_folder_name`
 **Emits:** `indexed_bam` — sorted + indexed BAM channel
@@ -59,11 +59,11 @@ Structural variant calling from short-read alignments.
 
 Read alignment for PacBio or ONT long reads.
 
-| Step | Tool |
-|------|------|
-| Alignment | minimap2 |
-| Sort | samtools sort |
-| BAM indexing | samtools index |
+| Step | Tool | Version | License |
+|------|------|---------|---------|
+| Alignment | minimap2 | 2.30 | MIT |
+| Sort | samtools sort | 1.23 | MIT |
+| BAM indexing | samtools index | 1.23 | MIT |
 
 **Takes:** `fastqs`, `fasta`, `mapping_tag`, `out_folder_name`
 **Emits:** `indexed_bam` — sorted + indexed BAM channel
@@ -74,12 +74,14 @@ Read alignment for PacBio or ONT long reads.
 
 Structural variant calling from long-read alignments using three callers, with consensus merging.
 
-| Step | Tool |
-|------|------|
-| SV calling | CuteSV, Debreak, Sniffles |
-| Supporting read extraction | extract_supp_reads (×3) |
-| Consensus merge | SURVIVOR |
-| VCF stats | bcftools stats |
+| Step | Tool | Version | License |
+|------|------|---------|---------|
+| SV calling | CuteSV | 2.1.3 | MIT |
+| SV calling | Debreak | 1.2 | MIT |
+| SV calling | Sniffles | 2.7.3 | MIT |
+| Supporting read extraction | bcftools | 1.23 | MIT |
+| Consensus merge | SURVIVOR | 1.0.7 | MIT |
+| VCF stats | bcftools stats | 1.23 | MIT |
 
 **Takes:** `fasta`, `fai`, `indexed_bam`, `mapping_tag`, `out_folder_name`
 **Emits:** `merged_vcf` — SURVIVOR-merged VCF channel, `supp_reads` — supporting reads TSV channel

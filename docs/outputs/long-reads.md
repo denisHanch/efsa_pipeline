@@ -75,6 +75,9 @@ DEBREAK["debreak"]
 SNIFFLES["sniffles"]
 SURVIVOR["survivor"]
 BCFTOOLS_STATS["bcftools stats"]
+VCF2TABLE_LONG["vcf_to_table_long"]
+BUILD_BED_LONG["build_sv_flank_bed"]
+MOSDEPTH_LONG["mosdepth (100 bp flanks)"]
 
 SV_TSV_LONG["SV TSV + flank coverage"]:::output
 LONG_VCF["Long-read VCF"]:::output

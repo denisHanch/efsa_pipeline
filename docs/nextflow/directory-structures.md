@@ -14,7 +14,6 @@ data/valid/
     ├── SampleName_ref_plasmid.fasta  # Reference plasmid (if identified)
     ├── SampleName_mod_plasmid.fasta  # Modified plasmid (if identified)
     ├── SampleName_contig_0.fasta  # Contig files from fragmented assembly (if applicable)
-    ├── SampleName_ref.gff         # Validated GFF annotation (if provided)
     ├── validation.log             # Structured JSON log for this run
     ├── report.txt                 # Human-readable validation statistics
     │

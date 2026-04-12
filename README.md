@@ -777,7 +777,6 @@ data/valid/
 | `assembled_genome.fasta` | Assembled or modified genome for comparison/analysis. |
 | `ref_plasmid.fa`         | Reference plasmid sequences.                          |
 | `mod_plasmid.fa`         | Modified or assembled plasmid sequences.              |
-| `ref_feature.gff`        | GFF feature file for annotations.                     |
 | `illumina/`              | Paired-end Illumina short reads.                      |
 | `ont/`                   | Oxford Nanopore long reads.                           |
 | `pacbio/`                | PacBio long reads.                                    |
@@ -1694,3 +1693,7 @@ A visual HTML report of the workflow execution, including task durations, resour
 ### timeline.html
 
 A timeline visualization showing when each pipeline process started and finished (see [nextflow documentation](https://docs.seqera.io/nextflow/reports#execution-timeline))
+
+## Attribution
+
+Portions of this codebase and documentation were written with the assistance of AI coding assistants, including Claude and GitHub Copilot.

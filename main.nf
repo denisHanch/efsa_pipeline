@@ -14,6 +14,7 @@ def helpMessage() {
     Options:
 
     -resume          Run pipeline from the point where it was interrupted or failed (Nextflow built-in)
+    --config_json    Path to the JSON file containing parameters for the pipeline   (default: ${params.config_json})
     --out_dir        Output directory                                               (default: ${params.out_dir})
     --max_cpu        Maximum CPUs per process                                       (default: ${params.max_cpu})
     --clean_work     Remove workdir after success                                   (default: ${params.clean_work})

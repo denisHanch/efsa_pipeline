@@ -39,7 +39,7 @@ nextflow run main.nf --config_json /path/to/config.json --max_cpu $(nproc)
 
 ## Pipeline Options
 
-The most commonly used options are `--config_json`, `--out_dir`, `--max_cpu`, `--clean_work`, and `--help`. For the full parameter list (including plasmid FASTAs, GFF, etc.), see [Configuration](configuration.md#parameters-params).
+The most commonly used options are `--config_json`, `--out_dir`, `--max_cpu`, `--clean_work`, and `--help`. For the full parameter list (including plasmid FASTAs, etc.), see [Configuration](configuration.md#parameters-params).
 
 
 ## Next Steps
