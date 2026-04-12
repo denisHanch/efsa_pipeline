@@ -2,9 +2,6 @@
 
 // Processes for  short-read pipeline
 
-/*
- * Trim adapters and low quality reads
- */
 process trimgalore {
 
     publishDir "${params.out_dir}/${out_folder_name}/trimmed_reads", mode: 'copy'

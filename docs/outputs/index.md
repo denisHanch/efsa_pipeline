@@ -20,9 +20,6 @@ After running the Nextflow pipeline, outputs are organized in the `data/outputs/
 
 - **[Long-Read Processing Pipeline Results (PacBio & Oxford Nanopore)](long-reads.md)** - Long-read mapping results from PacBio and Oxford Nanopore sequencing
 
-### Variant Analysis with Truvari
-
-- **[VCF Comparison with Truvari](truvari.md)** - Structural variant benchmarking and comparison results
 
 ### Quality Metrics
 
@@ -33,11 +30,10 @@ After running the Nextflow pipeline, outputs are organized in the `data/outputs/
 
 ```
 data/outputs/
-├── fasta_ref_mod/      → Reference vs modified comparison (if run_ref_x_mod is set to true in `data/valid/validated_params.json`)
+├── fasta_ref_mod/      → Reference vs modified comparison (if run_ref_x_mod is true)
 ├── illumina/           → Short-read mapping results
 ├── ont/                → Oxford Nanopore results
 ├── pacbio/             → PacBio results
-├── truvari/            → Variant comparison results (if run_truvari is set to true in `data/valid/validated_params.json`)
 ├── unmapped_stats/     → Unmapped read statistics
 └── logs/               → Execution logs, trace data, and process manifest
 ```
@@ -49,7 +45,6 @@ data/outputs/
 | Genome Comparison | SyRI structural variant analysis | [fasta-ref-mod.md](fasta-ref-mod.md) |
 | Short Reads | Illumina mapping and variants | [illumina.md](illumina.md) |
 | Long Reads | PacBio/ONT mapping | [long-reads.md](long-reads.md) |
-| SV Comparison | Truvari benchmarking | [truvari.md](truvari.md) |
 | QC Metrics | Unmapped read statistics | [unmapped-stats.md](unmapped-stats.md) |
 | Logs | Command logs and metadata | [logs.md](logs.md) |
 

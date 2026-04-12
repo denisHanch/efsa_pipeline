@@ -78,6 +78,7 @@ BCFTOOLS_STATS["bcftools stats"]
 VCF2TABLE_LONG["vcf_to_table_long"]
 BUILD_BED_LONG["build_sv_flank_bed"]
 MOSDEPTH_LONG["mosdepth (100 bp flanks)"]
+
 SV_TSV_LONG["SV TSV + flank coverage"]:::output
 LONG_VCF["Long-read VCF"]:::output
 
@@ -222,4 +223,3 @@ Nature communications, Vol. 8, 14061, 24.01.2017, p. 1-11. DOI:10.1038/NCOMMS140
 
 - [Short-Read Processing Pipeline Results (Illumina)](illumina.md) - Short-read results
 - [Unmapped Statistics](unmapped-stats.md) - Detailed unmapped read analysis
-- [Truvari Comparison](truvari.md) - Variant comparison results

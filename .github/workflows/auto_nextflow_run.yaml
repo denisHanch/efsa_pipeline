@@ -2,7 +2,7 @@ name: "CI: Nextflow Integration Test"
 
 on:
   push:
-    branches: [main, feature/EFSA-241_add_memory_cpu_req_to_processes]
+    branches: [main, feature/EFSA-268_nfx_integration_v2]
     paths:
       - "main.nf"
       - "nextflow.config"
@@ -11,7 +11,7 @@ on:
       - "modules/**"
       - ".github/workflows/auto_nextflow_run.yaml"
   pull_request:
-    branches: [main, feature/EFSA-241_add_memory_cpu_req_to_processes]
+    branches: [main, feature/EFSA-268_nfx_integration_v2]
     paths:
       - "main.nf"
       - "nextflow.config"
@@ -47,25 +47,6 @@ jobs:
         with:
           version: ">=24.09.0"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-validation-${{ hashFiles('modules/validation/validation-pkg/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-validation-
-
-      - name: Install validation package
-        run: pip install ./modules/validation/validation-pkg/
-
-      - name: Install pipeline Python dependencies
-        run: pip install pandas multiqc
-
       - name: Create test config (genomes + illumina reads)
         run: |
           cat > data/inputs/config.json << 'EOF'
@@ -99,23 +80,10 @@ jobs:
           }
           EOF
 
-      - name: Run validation
-        run: |
-          rm -rf data/valid/*
-          python3 ./modules/validation/main.py ./data/inputs/config.json
-
-      - name: Verify validation outputs
-        run: |
-          echo "--- Validated params ---"
-          cat data/valid/validated_params.json
-          echo ""
-          echo "--- Valid directory contents ---"
-          find data/valid/ -type f | sort
-
       - name: Pre-pull Docker images (with retry)
         run: |
           # Extract containers only for short-read and ref-x-mod processes
-          PROCESSES="trimgalore|fastqc|multiqc|bwa_index|bwa_mapping|samtools_sort|samtools_stats|samtools_index_bam|samtools_index|picard_dict|picard|delly|convert_bcf_to_vcf|get_unmapped_reads|calc_total_reads|freebayes|bcftools_stats|vcf_to_table_short|nucmer|delta_filter|show_coords|syri|bgzip_tabix|bcftools_concat|vcf_to_table_asm"
+          PROCESSES="trimgalore|fastqc|multiqc|bwa_index|bwa_mapping|samtools_sort|samtools_stats|samtools_index_bam|samtools_index|picard_dict|picard|delly|convert_bcf_to_vcf|get_unmapped_reads|calc_total_reads|freebayes|bcftools_stats|vcf_to_table_short|nucmer|delta_filter|show_coords|syri|bgzip_tabix|bcftools_concat|vcf_to_table_asm|multiqc|validation"
           images=$(grep -E "withName:\s*($PROCESSES)\s" nextflow.config | grep -oP "container\s*=\s*'\K[^']+" | sort -u)
           for image in $images; do
             for attempt in 1 2 3; do
@@ -131,9 +99,7 @@ jobs:
         run: |
           nextflow run main.nf \
             -profile test \
-            -params-file data/valid/validated_params.json \
-            --max_cpu 1 \
-            -resume
+            --max_cpu 1
         env:
           NXF_ANSI_LOG: "false"
 

@@ -8,12 +8,14 @@ This file documents explicit version pins used in custom tool images to improve 
 |---|---|---|
 | tools/cutesv/Dockerfile | cuteSV | 2.1.3 |
 | tools/sniffles/Dockerfile | sniffles | 2.7.3 |
-| tools/truvari/Dockerfile | truvari | 5.4.0 |
 | tools/debreak/Dockerfile | pysam | 0.23.3 |
 | tools/pbzip2/Dockerfile | pbzip2 | 1.1.13 |
 | tools/minimap2/Dockerfile | minimap2 | 2.30 |
 | tools/mosdepth/Dockerfile | mosdepth | 0.3.11 |
 | tools/trimgalore/Dockerfile | trimgalore | 0.6.10 |
+| tools/validation/Dockerfile | validation_pkg | 0.1.0 (local) |
+| tools/validation/Dockerfile | structlog | 25.5.0 |
+| tools/validation/Dockerfile | py3-pandas (Alpine) | 2.3.3-r0 |
 
 ## Git sources (pinned)
 

@@ -94,7 +94,7 @@ This file is the primary artifact for verifying which analysis steps ran and whi
 
 ## Error Handling Strategy
 
-The pipeline uses `errorStrategy = 'terminate'` globally (`nextflow.config`). If any process fails, the pipeline stops immediately — no downstream tasks are started. This prevents partial results from being mistaken for complete results.
+The pipeline uses `errorStrategy = 'terminate'` globally — see [Configuration](../nextflow/configuration.md#error-strategy) for details and alternatives.
 
 ## Log Copying Behavior
 
@@ -117,5 +117,6 @@ To quickly check which processes failed, inspect `data/outputs/logs/process_mani
 
 ## See Also
 
-- [Running the Pipeline](../nextflow/running-pipeline.md) - Pipeline execution options
+- [Running the Pipeline](../nextflow/running-pipeline.md) — pipeline execution options
+- [Runtime Messages](../nextflow/runtime-messages.md) — live console output during execution
 - [Runtime Messages](../nextflow/runtime-messages.md) - Understanding pipeline progress

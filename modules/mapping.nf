@@ -24,8 +24,8 @@ process bwa_mapping {
     tag "$pair_id"
 
     input:
-    each path(fasta_file)
-    each path(fasta_index)
+    path fasta_file
+    path fasta_index
     tuple val(pair_id), path(reads)
     val out_folder_name
 

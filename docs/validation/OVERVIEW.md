@@ -27,11 +27,7 @@ The following table summarizes all supported scenarios:
 >
 
 
-> **Important!**
->
-> When the container is built please follow the steps to preprocess the data with a validation package.
-
-The input validation module preprocesses and verifies all input data to ensure it meets the required format and structure before the Nextflow pipeline is executed.
+The input validation module preprocesses and verifies all input data to ensure it meets the required format and structure. Validation runs automatically as the first step of the pipeline.
 
 ## Purpose
 
@@ -55,23 +51,13 @@ The validation process:
 
 ## Running Validation
 
-Use the `validate` wrapper script (preferred):
+Validation is integrated into the main pipeline and runs automatically:
 
 ```bash
-validate                                      # default config path
-validate --config path/to/config.json         # custom config
-
-# Global options can be set via CLI flags (config.json takes priority if the same
-# option is also set there):
-validate --threads 8
-validate --validation-level strict
-validate --logging-level DEBUG
-validate --type eukaryote
-validate --force-defragment-ref               # unsupported workaround — at your own responsibility
-                                              # has no effect if force_defragment_ref is set in config.json
+nextflow run main.nf --max_cpu $(nproc)
 ```
 
-Priority of configurations: config.json > cli_options > defaults
+This runs the validation inside the `ecomolegmo/validation` Docker image as a Nextflow process, then proceeds to the processing workflows. It reads `data/inputs/config.json` (configurable via `--config_json`) and publishes validated outputs to `data/valid/`.
 
 ## Related Documentation
 
@@ -91,14 +77,13 @@ After successful validation:
 
 ### `validated_params.json`
 
-This file is produced by the validation step and consumed by Nextflow via `-params-file`. It overrides the defaults in `nextflow.config` and `nextflow_schema.json`. 
+This file is produced by the validation step and consumed by the pipeline workflow at runtime via channels. It contains all validated file paths and pipeline flags.
 
 #### Pipeline switches
 
 | Parameter               | Type    | Description                                                                                           |
 | ----------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
 | `run_ref_x_mod`         | boolean | `true` when both reference and modified genome validation succeeded and neither is fragmented; `false` when any genome exceeds `n_sequence_limit` or `type` is `"eukaryote"`. Gates all ref-vs-mod steps. |
-| `run_truvari`           | boolean | Always `false` by default; can be overridden manually in `data/valid/validated_params.json`.          |
 | `run_illumina`          | boolean | `true` when validated Illumina FASTQ reads are present.                                               |
 | `run_nanopore`          | boolean | `true` when validated Nanopore (ONT) reads are present (FASTQ or BAM).                               |
 | `run_pacbio`            | boolean | `true` when validated PacBio reads are present (FASTQ or BAM).                                       |

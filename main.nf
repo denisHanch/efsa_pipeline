@@ -1,33 +1,21 @@
 #!/usr/bin/env nextflow
 
-// Include workflows
-include { ref_mod } from "./workflows/fasta_ref_x_mod.nf"
-include { long_read as long_ref_pacbio; long_read as long_ref_ont; long_read as long_mod_pacbio; long_read as long_mod_ont} from "./workflows/long_read.nf"
-include { short_read as short_ref; short_read as short_mod } from "./workflows/short_read.nf"
-include { truvari_comparison } from "./workflows/vcf_comparison.nf"
-include { qc } from "./workflows/subworkflows.nf"
-
-include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_unmapped as compare_unmapped_pacbio } from "./modules/mapping.nf"
-include { nanoplot as nanoplot_pacbio; nanoplot as nanoplot_ont } from "./modules/qc.nf"
-include { restructure_sv_tbl; create_empty_tbl as create_ont_tbl; create_empty_tbl as create_asm_tbl; create_empty_tbl as create_pacbio_tbl; create_empty_tbl as create_short_tbl } from "./modules/sv_calling.nf"
-include { describePipeline; logWorkflowCompletion; loadFastqFiles; loadShortFastqFiles; listFiles } from "./modules/logs.nf"
-
-include { validateParameters } from 'plugin/nf-schema'
-
+include { validate } from "./modules/validate.nf"
+include { analysis } from "./workflows/analysis.nf"
+include { logWorkflowCompletion } from "./modules/logs.nf"
 
 // Help message
 def helpMessage() {
     log.info"""
     Usage:
 
-    nextflow run main.nf -resume
+    nextflow run main.nf
     
     Options:
 
-    -params-file     Path to JSON file containing parameter values                  (Nextflow built-in)
     -resume          Run pipeline from the point where it was interrupted or failed (Nextflow built-in)
+    --config_json    Path to the JSON file containing parameters for the pipeline   (default: ${params.config_json})
     --out_dir        Output directory                                               (default: ${params.out_dir})
-    --in_dir         Input directory                                                (default: ${params.in_dir})
     --max_cpu        Maximum CPUs per process                                       (default: ${params.max_cpu})
     --clean_work     Remove workdir after success                                   (default: ${params.clean_work})
     -with-report     Generate HTML execution report                                 (Nextflow built-in)
@@ -43,127 +31,13 @@ if (params.help) {
     exit 0
 }
 
-
 workflow {
-    validateParameters()
 
-    // inputs
-    def ref_fasta = Channel.fromPath(params.ref_fasta_validated, checkIfExists: true) 
-    def mod_fasta = Channel.fromPath(params.mod_fasta_validated)
+    file("${params.out_dir}/tables/csv_per_sv_summary").mkdirs()
 
-    def ref_plasmid = params.ref_plasmid_fasta ? [file(params.ref_plasmid_fasta)] : []
-    def mod_plasmid = params.mod_plasmid_fasta ? [file(params.mod_plasmid_fasta)] : []
-
-    def activePipelines = []
-    def sv_tbl = Channel.empty()
-    def supp_reads_ch = Channel.empty()
-
-    // reference to modified fasta comparison - assembly pipeline
-    if (params.run_ref_x_mod) {
-        if (params.contig_file_size >= 1) {
-                
-            def contigs_ch = Channel.fromPath(params.contig_files)
-            
-            ref_mod(ref_fasta, contigs_ch)
-
-            sv_tbl = sv_tbl.mix(ref_mod.out.sv_tbl) 
-            
-            activePipelines << ref_mod.out.sv_vcf
-
-        } else {
-            log.error "No contig FASTA files found in ${params.in_dir}. Please rerun the pipeline with run_ref_x_mod set to false in data/valid/validated_params.json"}
-    
-    } else {
-        sv_tbl = sv_tbl.mix(create_asm_tbl("assembly"))
-    }
-
-    // pacbio reads pipeline
-    if (params.run_pacbio) {
-        mapping_tag = "map-pb"
-            
-        pacbio_fastqs = loadFastqFiles(params.pacbio_fastqs)
-        
-        nanoplot_pacbio(pacbio_fastqs, "pacbio")
-        
-        long_ref_pacbio(pacbio_fastqs, ref_fasta, mapping_tag, ref_plasmid, "pacbio/long-ref")
-
-        sv_tbl = sv_tbl.mix(long_ref_pacbio.out.sv_tbl)
-        supp_reads_ch = supp_reads_ch.mix(long_ref_pacbio.out.supp_reads)
-        activePipelines << long_ref_pacbio.out.sv_vcf
-
-        describePipeline("long-pacbio", "reference & modified")
-        long_mod_pacbio(pacbio_fastqs, mod_fasta, mapping_tag, mod_plasmid, "pacbio/long-mod")       
-        compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
-    
-    } else {
-        sv_tbl = sv_tbl.mix(create_pacbio_tbl("pb"))
-    }
-
-    // nanopore reads pipeline
-    if (params.run_nanopore) {
-        mapping_tag = "map-ont"
-        
-        ont_fastqs = loadFastqFiles(params.ont_fastqs)
-
-        nanoplot_ont(ont_fastqs, "ont")
-        
-        long_ref_ont(ont_fastqs, ref_fasta, mapping_tag, ref_plasmid, "ont/long-ref")
-
-        sv_tbl = sv_tbl.mix(long_ref_ont.out.sv_tbl)
-        supp_reads_ch = supp_reads_ch.mix(long_ref_ont.out.supp_reads)
-        activePipelines << long_ref_ont.out.sv_vcf
-
-        describePipeline("long-ont", "reference & modified")
-        long_mod_ont(ont_fastqs, mod_fasta, mapping_tag, mod_plasmid, "ont/long-mod")
-        compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
-
-    } else {
-        sv_tbl = sv_tbl.mix(create_ont_tbl("ont"))
-    }
-
-    // illimina reads pipeline
-    if (params.run_illumina) {    
-        
-       fastqs = loadShortFastqFiles(params.illumina_fastqs)
-
-        qc(fastqs, "illumina/qc_trimming") | set { trimmed }
-
-        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid) 
-        
-        sv_tbl = sv_tbl.mix(short_ref.out.sv_tbl)
-        activePipelines << short_ref.out.sv_vcf
-
-        describePipeline("short", "reference & modified")
-        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
-        compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
-
-    
-    } else {
-        sv_tbl = sv_tbl.mix(create_short_tbl("short"))
-    }
-
-    if (params.run_truvari && activePipelines.size() >= 2) {
-        
-        int comparisons = activePipelines.size() - 1
-
-        log.info "ℹ️ Truvari: performing ${comparisons} comparison${comparisons == 1 ? "" : "s"}.\n"
-        
-        vcfs = activePipelines.inject(Channel.empty()) { acc, ch -> acc.mix(ch)}
-        
-        truvari_comparison(ref_fasta, vcfs)
-    }
-    
-    script = file("${workflow.projectDir}/modules/utils/create_sv_output.py")
-
-    def tbl_channel = sv_tbl.collect().map { list ->
-    def asm = list.find { it.name.contains("mod") || it.name.contains("assembly") }
-    def long_pb = list.find { it.name.contains("pb") }
-    def long_ont = list.find { it.name.contains("ont") }
-    def sht = list.find { it.name.contains("short") }
-        tuple(asm, long_ont, long_pb, sht)
-    }
-
-    restructure_sv_tbl(script, tbl_channel, supp_reads_ch.collect().ifEmpty(file('NO_FILE')))
+    config_ch = Channel.fromPath(params.config_json, checkIfExists: true)
+    validate(config_ch)
+    analysis(validate.out.params_json)
 }
 
 logWorkflowCompletion("execution of main.nf")

@@ -257,43 +257,6 @@
       ]
     },
     {
-      "SPDXID": "SPDXRef-snpeff",
-      "name": "snpEff",
-      "versionInfo": "4.1k",
-      "downloadLocation": "https://github.com/pcingola/SnpEff",
-      "filesAnalyzed": false,
-      "licenseConcluded": "LGPL-3.0-only",
-      "licenseDeclared": "LGPL-3.0-only",
-      "copyrightText": "NOASSERTION",
-      "supplier": "Person: Pablo Cingolani",
-      "comment": "LGPL-3.0 applies to the tool. SNPEff annotation databases are distributed under the terms of their original sources (ClinVar, dbSNP, Ensembl, etc.) and must be verified separately.",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceType": "purl",
-          "referenceLocator": "pkg:github/pcingola/SnpEff@v4.1k"
-        }
-      ]
-    },
-    {
-      "SPDXID": "SPDXRef-truvari",
-      "name": "truvari",
-      "versionInfo": "5.4.0",
-      "downloadLocation": "https://github.com/ACEnglish/truvari/releases/tag/v5.4.0",
-      "filesAnalyzed": false,
-      "licenseConcluded": "MIT",
-      "licenseDeclared": "MIT",
-      "copyrightText": "NOASSERTION",
-      "supplier": "Person: ACEnglish",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceType": "purl",
-          "referenceLocator": "pkg:pypi/truvari@5.4.0"
-        }
-      ]
-    },
-    {
       "SPDXID": "SPDXRef-syri",
       "name": "syri",
       "versionInfo": "1.7.1",
@@ -590,8 +553,6 @@
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-samtools"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-htslib"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-picard"},
-    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-snpeff"},
-    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-truvari"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-syri"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-gffread"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-fastqc"},

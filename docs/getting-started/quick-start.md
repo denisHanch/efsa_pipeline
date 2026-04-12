@@ -29,30 +29,17 @@ git clone https://github.com/denisHanch/efsa_pipeline.git
 >
 > Create a configuration file `config.json` based on data in `data/inputs`.
 
-### 3. Run Input Validation
+### 3. Run the Pipeline
 
-Running QC on the input data and processing data for the Nextflow pipeline to `data/valid` folder:
-
-```bash
-validate                              # default config (./data/inputs/config.json)
-validate --config <path>              # custom config path
-
-# Optional global option flags (config.json takes priority when both are set):
-validate --threads <n|auto>           # number of threads, or 'auto'
-validate --validation-level <level>   # strict / trust / minimal
-validate --logging-level <level>      # DEBUG / INFO / WARNING / ERROR
-validate --type <type>                # prokaryote / eukaryote
-validate --force-defragment-ref       # unsupported workaround, at your own responsibility
-                                      # ignored if force_defragment_ref is set in config.json
-```
-
-### 4. Execute the Pipeline
-
-Start the pipeline:
+Run validation and processing in a single command:
 
 ```bash
-nextflow run main.nf --max_cpu $(nproc) -params-file data/valid/validated_params.json -resume
+nextflow run main.nf --max_cpu $(nproc)
 ```
+
+This first validates input data from `data/inputs/config.json`, then automatically runs the processing workflows (short-read, long-read, ref-vs-mod comparison) based on the validated inputs.
+
+> **Note:** Use `--config_json /path/to/config.json` to specify a custom configuration file.
 
 ## Next Steps
 

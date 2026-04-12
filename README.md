@@ -17,7 +17,6 @@
       - [`fasta_ref_mod/`](#fasta_ref_mod)
       - [`illumina/`](#illumina)
       - [`pacbio/ and ont/`](#pacbio-and-ont)
-      - [`truvari/`](#truvari)
       - [`unmapped_stats/`](#unmapped_stats)
   - [Graphical Representation of the Pipeline](#graphical-representation-of-the-pipeline)
   - [Generation of per structural variation (SV) type CSV tables](#generation-of-per-structural-variation-sv-type-csv-tables)
@@ -48,36 +47,15 @@
 > Create a configuration file `config.json` in `data/inputs`.
 > 
 
-3. **Running QC** on the input data and **processing data for the Nextflow pipeline** to `data/valid` folder:
+3. **Run the pipeline** (validation and processing in a single command):
 
    ```bash
-   validate                                      # default config path
-   validate --config path/to/config.json         # custom config
-
-   # Global options can be set via CLI flags (config.json takes priority if the same
-   # option is also set there):
-   validate --threads 8
-   validate --validation-level strict
-   validate --logging-level DEBUG
-   validate --type eukaryote
-   validate --force-defragment-ref               # unsupported workaround — at your own responsibility
-                                              # has no effect if force_defragment_ref is set in config.json
+   nextflow run main.nf --max_cpu $(nproc)
    ```
-> **Important!**
-> 
-> The validate command must be run from the container root folder.
->
 
-> **Important!**
-> 
-> Priority of configurations: config.json > cli_options > defaults.
->
+   This first runs input validation inside the `ecomolegmo/validation` Docker image, reads `data/inputs/config.json`, then automatically proceeds to run the processing workflows (short-read, long-read, ref-vs-mod comparison) based on the validated inputs.
 
-4.  Start the pipeline with a command:
-
-   ```bash
-   nextflow run main.nf --max_cpu $(nproc)  -params-file data/valid/validated_params.json  -resume
-   ```
+   > **Note:** Use `--config_json /path/to/config.json` to specify a custom configuration file (default: `data/inputs/config.json`).
 
 
 # Docker Container
@@ -157,12 +135,7 @@ The following table summarizes all supported scenarios:
 >
 
 
-> **Important!**
-> 
-> When the container is built please follow the steps to preprocess the data with a validation package.
->
-
-The input validation module preprocesses and verifies all input data to ensure it meets the required format and structure before the Nextflow pipeline is executed.
+The input validation module preprocesses and verifies all input data to ensure it meets the required format and structure. Validation runs automatically as the first step of the pipeline.
 
 ## Supported File Formats
 
@@ -309,6 +282,23 @@ For each validated file:
 
 # Nextflow
 
+## Pipeline Architecture
+
+The pipeline is organized into four layers:
+
+| Layer | Files | Purpose |
+|-------|-------|---------|
+| Entry point | `main.nf` | Runs validation, then dispatches to the analysis workflow |
+| Configuration | `nextflow.config` | Parameters, per-process containers & resources, profiles |
+| Workflows | `workflows/analysis.nf`, `short_read.nf`, `long_read.nf`, `fasta_ref_x_mod.nf`, `vcf_comparison.nf` | High-level data flow for each analysis domain |
+| Subworkflows | `workflows/subworkflows.nf` | Reusable building blocks (qc, mapping, sv calling) shared across workflows |
+| Processes | `modules/*.nf` | Individual tool invocations (BWA, minimap2, delly, etc.) |
+
+For detailed documentation see:
+- [Configuration reference](docs/nextflow/configuration.md)
+- [Validation process](docs/nextflow/validation-process.md)
+- [Subworkflows](docs/nextflow/subworkflows.md)
+
 ## Graphical Representation of the Pipeline
 
 ```mermaid
@@ -376,22 +366,6 @@ flowchart TD
         agg_tbl["Mix SV Tables"] --> restructure["Restructure SV Table (create_sv_output.py)"]
     end
     style SVTable fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
-
-    %% Truvari comparison (central)
-    subgraph Truvari["Truvari Comparison (Conditional)"]
-        sr_vcf --> truvari_in["VCFs for Truvari"]
-        pb_vcf --> truvari_in
-        ont_vcf --> truvari_in
-        syri_vcf --> truvari_in
-        truvari_in --> check_truvari{"--run_truvari?"}
-        check_truvari -->|Yes| truvari["Compare SVs (Truvari)"]
-        check_truvari -->|No| skip_truvari["Skip Truvari"]
-        truvari --> final_report["Truvari Reports / Summary"]
-    end
-    style Truvari fill:#D0F0C0,stroke:#2E7D32,stroke-width:2px
-
-    %% Central alignment
-    restructure --> truvari_in
 ```
 
 
@@ -404,7 +378,7 @@ The main pipeline (`main.nf`) executes **all three workflows** in sequence.
 This executes **short-read processing**, **long-read processing**, and **reference vs modified genome comparison** pipelines:
 
 ```bash
-nextflow run main.nf --max_cpu $(nproc) -resume
+nextflow run main.nf --max_cpu $(nproc)
 ```
 
 ### Available Nextflow Options
@@ -422,7 +396,7 @@ nextflow run main.nf --max_cpu $(nproc) -resume
 
 | Option         | Description                                                       | Default                 |
 |----------------|-------------------------------------------------------------------|-------------------------|
-| `--in_dir`     | Input directory                                                   | `data/valid`            |
+| `--config_json`| Path to input configuration JSON                                  | `data/inputs/config.json` |
 | `--out_dir`    | Output directory                                                  | `data/outputs`          |
 | `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
 | `--clean_work` | Remove work directory after successful run                        | `true`                  |
@@ -665,8 +639,6 @@ When the pipeline is running, you will see real-time messages like:
 ℹ️  Running pipeline: processing long-ont reads → mapping to the reference & modified fasta.
 
 ℹ️  Running pipeline: processing short reads → mapping to the reference & modified fasta.
-
-ℹ️  Truvari: performing 3 comparisons.
 ```
 
 These messages help track the execution order and confirm that all three pipelines are being executed as expected.
@@ -739,8 +711,6 @@ The Nextflow pipelines ran successfully and produced the expected outputs. Each 
 
 ✅ The short-read processing pipeline completed successfully.
 
-✅ Truvari: the comparison of vcf files finished successfully.
-
 ✅ The execution of main.nf processing pipeline completed successfully.
 
 📋 Process execution manifest: data/outputs/logs/process_manifest.txt
@@ -788,7 +758,6 @@ data/valid/
 ├── mod_config_[0..4].fasta    # Presence of multiple contigs in case of a fragmented assembly
 ├── ref_plasmid.fa             # Reference plasmid sequences (if used)
 ├── mod_plasmid.fa             # Modified/assembled plasmid sequences (if used)
-├── ref_feature.gff            # Genome annotation file GTF/GFF (if used)
 │
 ├── illumina/                  
 │   ├── SampleName_1.fastq.gz  
@@ -808,7 +777,6 @@ data/valid/
 | `assembled_genome.fasta` | Assembled or modified genome for comparison/analysis. |
 | `ref_plasmid.fa`         | Reference plasmid sequences.                          |
 | `mod_plasmid.fa`         | Modified or assembled plasmid sequences.              |
-| `ref_feature.gff`        | GFF feature file for annotations.                     |
 | `illumina/`              | Paired-end Illumina short reads.                      |
 | `ont/`                   | Oxford Nanopore long reads.                           |
 | `pacbio/`                | PacBio long reads.                                    |
@@ -825,7 +793,6 @@ data/outputs
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
 ├── tables              → Per-SV csv tables
-├── truvari             → Variant comparison results from Truvari (if run_truvari is set to true in `data/valid/validated_params.json`)
 └── unmapped_stats      → Summary statistics of unmapped reads for each workflow
 
 ```
@@ -957,7 +924,7 @@ The table below summarises all tools used within the pipeline:
 
 ### `illumina/`
 
-The flowchart below summarizes the pipeline for processing short reads. VCF annotation is performed only when a GFF/GTF annotation file is provided. Delly and Freebayes are run exclusively for reference genome mapping; these steps are skipped when reads are mapped to a modified genome or a plasmid.
+The flowchart below summarizes the pipeline for processing short reads. Delly and Freebayes are run exclusively for reference genome mapping; these steps are skipped when reads are mapped to a modified genome or a plasmid.
 
 ```mermaid
 %%{init: {
@@ -978,14 +945,12 @@ flowchart TB
 RAW["Raw Illumina Reads"]
 REF["Reference FASTA"]
 PLASMID_REF["Plasmid FASTA"]
-GFF["GFF / GTF Annotation"]
-CONFIG["SnpEff Config"]
+
 
 style RAW fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
 style REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
 style PLASMID_REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
-style GFF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
-style CONFIG fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
+
 
 %% ===== QC =====
 TRIM["TrimGalore"]
@@ -1012,8 +977,6 @@ BAM_IDX["BAM index"]
 PICARD["Picard metrics"]
 FREEBAYES["Freebayes variant calling"]
 BCFTOOLS["BCFtools stats"]
-BUILD_CFG["Build snpEff config"]
-SNPEFF["snpEff annotation"]
 GET_UNMAPPED["Get unmapped reads"]
 
 REF --> BWA_INDEX --> BWA
@@ -1031,9 +994,6 @@ BAM_IDX --> GET_UNMAPPED --> UNMAPPED_OUT["Unmapped reads FASTQ"]:::output
 
 BAM_IDX --> FREEBAYES --> VCF_RAW["Raw VCF"]:::output
 VCF_RAW --> BCFTOOLS --> BCF_STATS["BCFtools stats"]:::output
-GFF --> BUILD_CFG --> SNPEFF
-CONFIG --> BUILD_CFG
-VCF_RAW --> SNPEFF --> VCF_ANNOT["Annotated VCF"]:::output
 
 BAM_IDX --> PICARD --> PICARD_OUT["Picard metrics"]:::output
 
@@ -1129,7 +1089,7 @@ Includes:
 * `samtools_stats/` — Alignment and coverage statistics
 * `picard/` — Alignment QC metrics
 * `bcftools_stats/` — Variant calling summary statistics
-* `vcf/` — Variant calls generated by Delly and (SVs) and FreeBayes (SNP and INDELs) and annotated VCF (SNP and INDELs), if gff or gtf files are present in `data/valid`
+* `vcf/` — Variant calls generated by Delly and (SVs) and FreeBayes (SNP and INDELs) and (SNP and INDELs)
 * `multiqc/` — Combined QC report from mapping and alignment metrics and variant calling metrics
 * `unmapped_fastq/` — fastq file with reads that failed to align to the reference genome
 
@@ -1172,7 +1132,6 @@ The table below summarises all tools used within the pipeline:
 | **Samtools**    | [Samtools](https://www.htslib.org/doc/samtools.html)                 |
 | **BCFtools**    | [BCFtools](https://samtools.github.io/bcftools/)                     |
 | **FreeBayes**   | [FreeBayes](https://github.com/freebayes/freebayes)                  |
-| **SnpEff**      | [SnpEff](http://snpeff.sourceforge.net/)                             |
 | **Delly**       | [Delly](https://github.com/dellytools/delly)                         |
 
 
@@ -1379,133 +1338,6 @@ The table below summarises all tools used within the pipeline:
 | **SURVIVOR** | [SURVIVOR](https://github.com/fritzsedlazeck/SURVIVOR) |
 | **NanoPlot** | [NanoPlot](https://github.com/wdecoster/NanoPlot)      |
 
-
----
-
-### `truvari/`
-
-The flowchart illustrates the Truvari comparison pipeline for structural variant (SV) analysis. The Reference vs Modified VCF (that is outputed by  pipeline where reference and modified fasta are compared) serves as the baseline or truth-set, against which VCFs from PacBio, Nanopore, and Illumina sequencing are compared. The pipeline begins with sorting the VCF files (sort_vcf), indexing them (index_vcf), and then performing the Truvari comparison to generate the final comparison results.
-
-> **Important!**
-> To allow the pipeline to run, set `--run_truvari` to `true` when launching the pipeline, or enable it in the `data/validation/validated_params.json` file:
->
-> By default, this parameter is set to `false`.
-
-
-```mermaid
-%%{init: {
-  "theme": "base",
-  "themeVariables": {
-    "primaryColor": "#B6ECE2",
-    "primaryTextColor": "#160F26",
-    "primaryBorderColor": "#065647",
-    "lineColor": "#545555",
-    "clusterBkg": "#BABCBD22",
-    "clusterBorder": "#DDDEDE",
-    "fontFamily": "arial"
-  }
-}}%%
-flowchart TB
-
-%% ===== TRUVARI COMPARISON PIPELINE =====
-subgraph Truvari_Comparision_Pipeline["Truvari Comparison Pipeline"]
-    %% Inputs
-    REF_MOD_VCF["Reference vs Modified VCF (Baseline / Truth-set)"]:::truthset
-    PB_VCF["PacBio VCF"]:::input
-    ONT_VCF["Nanopore VCF"]:::input
-    IL_VCF["Illumina VCF"]:::input
-
-    %% Processes
-    SORT_VCF["sort_vcf"]:::process
-    INDEX_VCF["index_vcf"]:::process
-    TRUVARI["truvari"]:::process
-
-    %% Output
-    TRUVARI_OUT["Truvari comparison results"]:::output
-
-    %% Connections
-    PB_VCF --> SORT_VCF
-    ONT_VCF --> SORT_VCF
-    IL_VCF --> SORT_VCF
-    REF_MOD_VCF --> SORT_VCF
-
-    SORT_VCF --> INDEX_VCF --> TRUVARI --> TRUVARI_OUT
-end
-
-%% ===== STYLING =====
-classDef input fill:#E3F2FD,stroke:#1565C0
-classDef truthset fill:#FFF3B0,stroke:#FFB300,stroke-width:2px
-classDef process fill:#B6ECE2,stroke:#065647
-classDef output fill:#E8F5E9,stroke:#2E7D32
-```
-
-#### Folder Structure
-
-```
-truvari
-├── SampleName_sv_short_read.vcf.gz
-├── SampleName_sv_short_read.vcf.gz.csi
-├── SampleName.pacbio_sv_long_read.vcf.gz
-├── SampleName.pacbio_sv_long_read.vcf.gz.csi
-├── SampleName.ont_sv_long_read.vcf.gz
-├── SampleName.ont_sv_long_read.vcf.gz.csi
-├── assemblysyri.vcf.gz
-├── assemblysyri.vcf.gz.csi
-├── assemblysyri_SampleName_sv_short_read_truvari       → folder comparing the short-read SV pipeline with the reference-to-modified fasta pipeline
-├── assemblysyri_SampleName.pacbio_sv_long_read_truvari  → folder comparing Pacbio long-read SV pipeline to reference-to-modified fasta pipeline
-└── assemblysyri_SampleName.ont_sv_long_read_truvari   → folder comparing Nanopore long-read SV pipeline to reference-to-modified fasta pipeline
-```
-
-#### Description
-
-This folder contains all structural variant (SV) callsets and their **Truvari benchmarking results** comparing SVs detected from sequencing data with the structural variants derived from the **reference vs modified genome comparison (SyRI)**.
-
-
-#### Reference SV Callsets
-
-* `assembly.vcf.gz`
-  Structural variants derived from comparing the **reference genome** and the **modified genome** using **SyRI**.
-
-* `SampleName_sv_short_read.vcf.gz`
-  Structural variants detected from **Illumina short reads**.
-
-* `SampleName.pacbio_sv_long_read.vcf.gz`
-  Structural variants detected from **PacBio long reads**.
-
-* `SampleName.ont_sv_long_read.vcf.gz`
-  Structural variants detected from **Oxford Nanopore long reads**.
-
-All `.csi` files represent index files for fast querying of VCF contents.
-
-
-### Truvari Comparison Result Folders
-
-Each Truvari output directory contains benchmarking results comparing the **SyRI structural variants** against sequencing-based SV calls:
-
-* `assemblysyri_SampleName_sv_short_read_truvari/`
-  Comparison between SyRI SVs and SVs called from **Illumina short reads**.
-
-* `assemblysyri_SampleName.pacbio_sv_long_read_truvari/`
-  Comparison between SyRI SVs and SVs called from **PacBio long reads**.
-
-* `assemblysyri_SampleName.ont_sv_long_read_truvari/`
-  Comparison between SyRI SVs and SVs called from **Oxford Nanopore long reads**.
-
-Each Truvari output folder usually contains:
-
-* Matched SV calls
-* Unmatched (false negative / false positive) calls
-* Precision, recall, and F1 scores
-* Comparison summary statistics
-
-The table below summarises all tools used within the pipeline:
-
-| **Tool**     | **Link for Further Information**                      |
-| ------------ | ----------------------------------------------------- |
-| **Truvari**  | [Truvari GitHub](https://github.com/ACEnglish/truvari)|
-| **BCFtools** | [BCFtools](https://samtools.github.io/bcftools/)      |
-
----
 
 ### `unmapped_stats/`
 
@@ -1861,3 +1693,7 @@ A visual HTML report of the workflow execution, including task durations, resour
 ### timeline.html
 
 A timeline visualization showing when each pipeline process started and finished (see [nextflow documentation](https://docs.seqera.io/nextflow/reports#execution-timeline))
+
+## Attribution
+
+Portions of this codebase and documentation were written with the assistance of AI coding assistants, including Claude and GitHub Copilot.

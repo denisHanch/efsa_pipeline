@@ -30,57 +30,23 @@ from utils.ref_defragment import defragment_reference
 
 import nextflow_params_handler as nf_params
 
-def _parse_cli_args(argv):
-    """Parse CLI arguments and return (config_path, cli_options)."""
-    args = list(argv)
-    cli_options = {}
-
-    # Extract boolean flag
-    if '--force-defragment-ref' in args:
-        cli_options['force_defragment_ref'] = True
-        args.remove('--force-defragment-ref')
-
-    # Extract key-value options
-    i = 0
-    remaining = []
-    while i < len(args):
-        if args[i] == '--threads' and i + 1 < len(args):
-            val = args[i + 1]
-            cli_options['threads'] = None if val == 'auto' else int(val)
-            i += 2
-        elif args[i] == '--validation-level' and i + 1 < len(args):
-            cli_options['validation_level'] = args[i + 1]
-            i += 2
-        elif args[i] == '--logging-level' and i + 1 < len(args):
-            cli_options['logging_level'] = args[i + 1].upper()
-            i += 2
-        elif args[i] == '--type' and i + 1 < len(args):
-            cli_options['type'] = args[i + 1]
-            i += 2
-        else:
-            remaining.append(args[i])
-            i += 1
-
-    return remaining, cli_options
-
 
 def main():
     # Check command line arguments
-    args, cli_options = _parse_cli_args(sys.argv[1:])
+    args = sys.argv[1:]
 
     if not args:
-        print("Usage: python main.py <config_path> [--force-defragment-ref]")
-        print("       [--threads N|auto] [--validation-level LEVEL]")
-        print("       [--logging-level LEVEL] [--type TYPE]")
+        print("Usage: python main.py <config_path> ")
         print("\nExample:")
         print("  python main.py config.json")
         return 1
 
     config_path = Path(args[0]).resolve()
-    base_valid_dir = config_path.parent.parent / "valid"
-    # Use the run-specific dir exported by validation.sh; fall back to data/valid/
+    base_valid_dir = Path.cwd()
+    # Use the run-specific dir exported by validation.sh; fall back to CWD.
     run_dir = os.environ.get("VALIDATION_RUN_DIR")
-    output_dir = Path(run_dir) if run_dir else base_valid_dir
+    output_dir = Path(run_dir).resolve() if run_dir else base_valid_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
     logger = None
     log_file = None
 
@@ -97,10 +63,24 @@ def main():
     # ========================================================================
     config = None
     try:
-        config = ConfigManager.load(config_path, cli_options=cli_options)
+        config = ConfigManager.load(config_path)
     except Exception as e:
         logger.error(f"Loading a config file failed: {e}")
         return 1
+
+    # Redirect all validator configs to write into the run-specific output_dir.
+    # ConfigManager sets config.output_dir from the config file's location on
+    # disk (e.g. the real data/valid/ in the project root), which is wrong when
+    # running inside a Nextflow work directory.  Override every sub-config here
+    # so genome, read, and feature outputs all land in the same run_* folder.
+    _all_sub_configs = [
+        config.ref_genome, config.mod_genome,
+        config.ref_plasmid, config.mod_plasmid,
+        config.ref_feature,
+    ] + list(config.reads or [])
+    for sub_cfg in _all_sub_configs:
+        if sub_cfg is not None:
+            sub_cfg.output_dir = output_dir
 
     # ========================================================================
     # Step 1.5 (optional): Defragment reference if force_defragment_ref is set
@@ -344,7 +324,7 @@ def main():
     # validation_timestamp matches the folder name exactly.
     run_timestamp = output_dir.name.removeprefix("run_") if output_dir.name.startswith("run_") else None
     repo_root = config_path.parent.parent.parent
-    params = nf_params.build_params(validation_results, force_defragment_ref=force_defragment, run_timestamp=run_timestamp, base_dir=repo_root)
+    params = nf_params.build_params(validation_results, run_timestamp=run_timestamp, base_dir=repo_root)
     nf_params.write_params(params, base_valid_dir / "validated_params.json")
 
     return 0

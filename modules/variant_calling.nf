@@ -20,67 +20,6 @@ process freebayes {
     """
 }
 
-
-process build_config {
-    
-    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
-
-    input:
-    each path(fasta_file)
-    each path(feature_file)
-    val feature_tag
-    val build_setting
-    val out_folder_name
-
-    output:
-    tuple path("genome_id.txt"), path("snpEff.config")
-
-    script:
-    """
-    fasta_path='${fasta_file}'
-    feature_path='${feature_file}'
-
-    # Extract genome ID from first header line
-    genome_id=\$(grep '^>' \$fasta_path | head -n 1 | cut -d ' ' -f2 | sed 's/^>//' | tr -cd '[:alnum:]_')
-    echo "Using genome ID: \$genome_id"
-
-    mkdir -p data/\$genome_id
-    cp \$fasta_path data/\$genome_id/sequences.fa
-    cp \$feature_path data/\$genome_id/genes.${feature_tag}
-
-    echo "\$genome_id.genome : Custom Genome" > snpEff.config
-
-    snpEff build -${build_setting} -v \$genome_id -c snpEff.config
-
-    echo \$genome_id > genome_id.txt
-    """
-}
-
-
-process snpeff {
-    tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
-
-    input:
-    tuple val(pair_id), path(vcf_file)
-    each path(genome_id_file)
-    each path(snpeff_config)
-    val out_folder_name
-
-
-    output:
-    tuple val(pair_id), path("${pair_id}_annotated.vcf"), path("${pair_id}_summary.csv")
-
-
-    script:
-    """
-    genome_id=\$(cat ${genome_id_file})
-
-    snpEff -v -c ${snpeff_config} \$genome_id ${vcf_file} > ${pair_id}_annotated.vcf -csvStats "${pair_id}_summary.csv"
-    """
-}
-
-
 process bcftools_stats {
 
     publishDir "${params.out_dir}/${out_folder_name}/bcftools_stats", mode: 'copy'
@@ -95,60 +34,5 @@ process bcftools_stats {
     script:
     """
     bcftools stats ${vcf_file} > ${pair_id}.bcftools_stats.txt
-    """
-}
-
-// Processes related to truvari pipeline
-
-process sort_vcf {
-    tag "$pair_id"
-    publishDir "${params.out_dir}/truvari", mode: 'copy'
-
-    input:
-    tuple val(pair_id),  path(vcf_file)
-
-    output:
-    tuple val(pair_id),  path("${pair_id}.vcf.gz")
-
-    script:
-    """
-    bcftools sort $vcf_file -Oz -o ${pair_id}.vcf.gz
-    """
-}
-
-
-process index_vcf {
-    tag "$pair_id"
-    publishDir "${params.out_dir}/truvari", mode: 'copy'
-
-    input:
-    tuple val(pair_id), path(vcf_file)
-
-    output:
-    tuple val(pair_id), path(vcf_file), path("${vcf_file}.csi")
-
-
-    script:
-    """
-    bcftools index --threads ${task.cpus} $vcf_file
-    """
-}
-
-
-process truvari {
-    tag "$pair_id1 & $pair_id2"
-    publishDir "${params.out_dir}/truvari", mode: 'copy'
-
-    input:
-    each path(fasta_file)
-    tuple val(pair_id1), path(vcf1), path(index1), val(pair_id2), path(vcf2), path(index2)
-
-    output:
-    path("${pair_id1}_${pair_id2}_truvari")
-
-
-    script:
-    """
-    truvari bench -b $vcf1 -c $vcf2 -f $fasta_file -o ${pair_id1}_${pair_id2}_truvari --passonly
     """
 }

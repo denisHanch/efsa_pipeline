@@ -1,8 +1,8 @@
 
 include { fastqc; multiqc; trimgalore } from "../modules/qc.nf"
-include { bwa_mapping; samtools_index_bam; samtools_sort; samtools_stats; picard; calc_unmapped; minimap2 } from "../modules/mapping.nf"
-include { convert_bcf_to_vcf; delly; samtools_index; picard_dict; sniffles; debreak; cute_sv; survivor; vcf_to_table_short; vcf_to_table_long; extract_supp_reads as extract_supp_reads_1; extract_supp_reads as extract_supp_reads_2; extract_supp_reads as extract_supp_reads_3 } from "../modules/sv_calling.nf"
-include { snpeff; build_config; bcftools_stats } from "../modules/variant_calling.nf"
+include { bwa_mapping; samtools_index_bam; samtools_sort; samtools_stats; picard; minimap2 } from "../modules/mapping.nf"
+include { convert_bcf_to_vcf; delly; samtools_index; picard_dict; sniffles; debreak; cute_sv; survivor; extract_supp_reads as extract_supp_reads_1; extract_supp_reads as extract_supp_reads_2; extract_supp_reads as extract_supp_reads_3 } from "../modules/sv_calling.nf"
+include { bcftools_stats } from "../modules/variant_calling.nf"
 
 
 // short-reads pipeline
@@ -60,29 +60,6 @@ workflow sv {
 
     emit:
         sv_vcf
-}
-
-
-workflow annotate_vcf {
-    take:
-        fasta
-        gtf
-        vcf
-        feature_tag
-        build_setting
-        out_folder_name
-
-
-    main:
-        build_config(fasta, gtf, feature_tag, build_setting, out_folder_name) | set { snpeff_out }
-        genome_id = snpeff_out.map { genome_id, snpeff_config -> genome_id }
-        snpeff_config = snpeff_out.map { genome_id, snpeff_config -> snpeff_config }
-        snpeff(vcf, genome_id, snpeff_config, out_folder_name) | set { snpeff_output }
-        annotated_vcfs = snpeff_output.map { id, vcf, html -> tuple(id, vcf) }
-        qc_vcf = snpeff_output.map { id, vcf, html -> html }
-
-    emit:
-        qc_vcf
 }
 
 // long-reads pipeline
