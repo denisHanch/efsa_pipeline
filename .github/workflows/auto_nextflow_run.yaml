@@ -2,7 +2,7 @@ name: "CI: Nextflow Integration Test"
 
 on:
   push:
-    branches: [main, feature/EFSA-241_add_memory_cpu_req_to_processes]
+    branches: [main, feature/EFSA-268_nfx_integration]
     paths:
       - "main.nf"
       - "nextflow.config"
@@ -11,11 +11,11 @@ on:
       - "modules/**"
       - ".github/workflows/auto_nextflow_run.yaml"
   pull_request:
-    branches: [main, feature/EFSA-241_add_memory_cpu_req_to_processes]
+    branches: [main, feature/EFSA-268_nfx_integration]
     paths:
+      - "validation.nf"
       - "main.nf"
       - "nextflow.config"
-      - "nextflow_schema.json"
       - "workflows/**"
       - "modules/**"
       - ".github/workflows/auto_nextflow_run.yaml"
@@ -60,12 +60,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-validation-
 
-      - name: Install validation package
-        run: pip install ./modules/validation/validation-pkg/
-
-      - name: Install pipeline Python dependencies
-        run: pip install pandas multiqc
-
       - name: Create test config (genomes + illumina reads)
         run: |
           cat > data/inputs/config.json << 'EOF'
@@ -99,10 +93,10 @@ jobs:
           }
           EOF
 
-      - name: Run validation
+      - name: Run Nextflow validation
         run: |
-          rm -rf data/valid/*
-          python3 ./modules/validation/main.py ./data/inputs/config.json
+          docker pull ecomolegmo/validation:v1.0.4@sha256:8e7560bcf3e6b831b385f9d8d7734bb2ac61040879a35a99f3c80fb1ab6edc16
+          nextflow run validation.nf --config data/inputs/config.json
 
       - name: Verify validation outputs
         run: |

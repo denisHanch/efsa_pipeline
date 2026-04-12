@@ -24,6 +24,7 @@ process validate {
 workflow {
 
     main:
+    new File("data/outputs/tables/csv_per_summary").mkdirs()
     config_ch = Channel.fromPath("${projectDir}/data/inputs/config.json")
     validate(config_ch)
 }
