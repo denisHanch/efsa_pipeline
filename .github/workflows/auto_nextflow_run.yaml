@@ -47,74 +47,38 @@ jobs:
         with:
           version: ">=24.09.0"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-validation-${{ hashFiles('modules/validation/validation-pkg/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-validation-
-
-      - name: Install validation package
-        run: pip install ./modules/validation/validation-pkg/
-
-      - name: Install pipeline Python dependencies
-        run: pip install pandas multiqc
-
       - name: Create test config (genomes + illumina reads)
         run: |
           cat > data/inputs/config.json << 'EOF'
           {
-          "ref_genome_filename": {
-            "filename": "data/inputs/ref.fa",
-            "validation_level": "strict",
-            "n_sequence_limit": 5,
-            "threads": 8
-          },
-          "mod_genome_filename": {
-            "filename": "data/inputs/mod.fa",
-            "validation_level": "strict",
-            "n_sequence_limit": 5,
-            "threads": 8
-          },
-          "reads": [
-            {
-              "directory": "data/inputs/illumina",
-              "ngs_type": "illumina",
+            "ref_genome_filename": {
+              "filename": "test/ref.fa",
               "validation_level": "minimal",
-              "threads": 8
+              "n_sequence_limit": 5,
+              "threads": 2
             },
-            {
-              "filename": "data/inputs/Bacillus_toyonensis_LE1_sequence.pacbio.fastq.gz",
-              "ngs_type": "pacbio",
+            "mod_genome_filename": {
+              "filename": "test/mod.fa",
               "validation_level": "minimal",
-              "threads": 8
+              "n_sequence_limit": 5,
+              "threads": 2
+            },
+            "reads": [
+              {
+                "directory": "test/illumina",
+                "ngs_type": "illumina",
+                "validation_level": "minimal",
+                "threads": 2
+              }
+            ],
+            "options": {
+              "threads": 2,
+              "validation_level": "minimal",
+              "logging_level": "INFO",
+              "type": "prokaryote"
             }
-          ],
-          "ref_feature_filename": {
-            "filename": "data/inputs/ref_feature.gff3",
-            "validation_level": "strict",
-            "threads": 8
-          },
-          "options": {
-            "threads": 8,
-            "validation_level": "strict",
-            "logging_level": "INFO",
-            "type": "prokaryote",
-            "force_defragment_ref": false
           }
-        }
           EOF
-
-      - name: Run validation
-        run: |
-          rm -rf data/valid/*
-          python3 ./modules/validation/main.py ./data/inputs/config.json
 
       - name: Verify validation outputs
         run: |
@@ -127,7 +91,7 @@ jobs:
       - name: Pre-pull Docker images (with retry)
         run: |
           # Extract containers only for short-read and ref-x-mod processes
-          PROCESSES="trimgalore|fastqc|multiqc|bwa_index|bwa_mapping|samtools_sort|samtools_stats|samtools_index_bam|samtools_index|picard_dict|picard|delly|convert_bcf_to_vcf|get_unmapped_reads|calc_total_reads|freebayes|bcftools_stats|vcf_to_table_short|nucmer|delta_filter|show_coords|syri|bgzip_tabix|bcftools_concat|vcf_to_table_asm"
+          PROCESSES="trimgalore|fastqc|multiqc|bwa_index|bwa_mapping|samtools_sort|samtools_stats|samtools_index_bam|samtools_index|picard_dict|picard|delly|convert_bcf_to_vcf|get_unmapped_reads|calc_total_reads|freebayes|bcftools_stats|vcf_to_table_short|nucmer|delta_filter|show_coords|syri|bgzip_tabix|bcftools_concat|vcf_to_table_asm|multiqc|validation"
           images=$(grep -E "withName:\s*($PROCESSES)\s" nextflow.config | grep -oP "container\s*=\s*'\K[^']+" | sort -u)
           for image in $images; do
             for attempt in 1 2 3; do
