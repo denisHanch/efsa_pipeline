@@ -80,14 +80,6 @@ jobs:
           }
           EOF
 
-      - name: Verify validation outputs
-        run: |
-          echo "--- Validated params ---"
-          cat data/valid/validated_params.json
-          echo ""
-          echo "--- Valid directory contents ---"
-          find data/valid/ -type f | sort
-
       - name: Pre-pull Docker images (with retry)
         run: |
           # Extract containers only for short-read and ref-x-mod processes
