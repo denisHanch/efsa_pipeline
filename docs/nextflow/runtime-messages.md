@@ -13,7 +13,6 @@ When the pipeline is running, you will see real-time messages like:
 
 ℹ️  Running pipeline: processing short reads → mapping to the reference & modified fasta.
 
-ℹ️  Truvari: performing 3 comparisons.
 ```
 
 These messages help track the execution order and confirm that all three pipelines are being executed as expected.
@@ -82,8 +81,6 @@ The Nextflow pipelines ran successfully and produced the expected outputs. Each 
 ✅ The long-read processing pipeline completed successfully.
 
 ✅ The short-read processing pipeline completed successfully.
-
-✅ Truvari: the comparison of vcf files finished successfully.
 
 ✅ The execution of main.nf processing pipeline completed successfully.
 

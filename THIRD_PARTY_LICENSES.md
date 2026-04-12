@@ -15,12 +15,10 @@ EUPL-1.2 is a copyleft license. Its Appendix explicitly lists compatible license
 | Permissive (no restrictions) | MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, Artistic-2.0, PSF-2.0 | Compatible |
 | Weak copyleft | LGPL-2.1, LGPL-3.0 | Compatible (EUPL-1.2 Appendix) |
 | Strong copyleft | GPL-2.0, GPL-3.0 | Compatible (EUPL-1.2 Appendix) |
-| Database / data licenses | Varies by SNPEff database source | Verify per database |
 
 > **Important:** The pipeline invokes all bioinformatics tools as separate processes inside isolated Docker containers. No tool code is statically or dynamically linked into the pipeline source. This limits copyleft obligations to distribution of the containers themselves, not the pipeline scripts.
 
-> **Governmental / Commercial Use:** All tools listed below use OSI-approved open-source licenses. None impose academic-only or non-commercial restrictions at the license level. However, some tools' **databases** (e.g., ClinVar, dbSNP used by SNPEff) may carry additional terms — verify before distribution.
-
+> **Governmental / Commercial Use:** All tools listed below use OSI-approved open-source licenses. None impose academic-only or non-commercial restrictions at the license level. 
 ---
 
 ## 1. Bioinformatics Tools (Containerized)
@@ -52,8 +50,6 @@ EUPL-1.2 is a copyleft license. Its Appendix explicitly lists compatible license
 | SAMtools | 1.23 | MIT | https://github.com/samtools/samtools |
 | HTSlib (bgzip, tabix) | 1.23 | MIT | https://github.com/samtools/htslib |
 | Picard | 3.4.0 | MIT | https://github.com/broadinstitute/picard |
-| SnpEff | 4.1k | LGPL-3.0-only | https://github.com/pcingola/SnpEff |
-| Truvari | 5.4.0 | MIT | https://github.com/ACEnglish/truvari |
 
 ### Genome Comparison
 
@@ -143,7 +139,6 @@ EUPL-1.2 is a copyleft license. Its Appendix explicitly lists compatible license
 | biocontainers/bwa | v0.7.17_cv1@sha256:9479b73e... | https://biocontainers.pro |
 | biocontainers/fastqc | v0.11.9_cv8@sha256:82e5fa41... | https://biocontainers.pro |
 | biocontainers/freebayes | v1.2.0-2-deb_cv1@sha256:1ce0e08e... | https://biocontainers.pro |
-| biocontainers/snpeff | v4.1k_cv3@sha256:200e8122... | https://biocontainers.pro |
 | broadinstitute/picard | 3.4.0@sha256:dda3ad26... | https://hub.docker.com/r/broadinstitute/picard |
 | dellytools/delly | v1.7.3@sha256:045aba10... | https://github.com/dellytools/delly |
 | ecomolegmo/cutesv | v1.0.4@sha256:9c29e67b... | Internal build (based on cuteSV MIT) |
@@ -154,7 +149,6 @@ EUPL-1.2 is a copyleft license. Its Appendix explicitly lists compatible license
 | ecomolegmo/syri | v1.0.4@sha256:789d5cdf... | Internal build (based on SyRI MIT) |
 | ecomolegmo/mosdepth | v1.0.1@sha256:802cc917... | Internal build (based on Mosdepth GPL-3.0) |
 | ecomolegmo/trimgalore | v1.0.1@sha256:802cc917... | Internal build (based on TrimGalore GPL-3.0) |
-| ecomolegmo/truvari | v1.0.3@sha256:ae346a3b... | Internal build (based on Truvari MIT) |
 
 ---
 

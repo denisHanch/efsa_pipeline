@@ -53,20 +53,6 @@ Structural variant calling from short-read alignments.
 
 ---
 
-### `annotate_vcf`
-
-VCF annotation with gene-level functional effects.
-
-| Step | Tool |
-|------|------|
-| Build SnpEff database | build_config |
-| Annotate VCF | SnpEff |
-
-**Takes:** `fasta`, `gtf`, `vcf`, `feature_tag`, `build_setting`, `out_folder_name`
-**Emits:** `qc_vcf` — SnpEff HTML report channel
-
----
-
 ## Long-Read Subworkflows
 
 ### `mapping_long`

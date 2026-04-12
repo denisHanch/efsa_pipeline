@@ -117,5 +117,4 @@ The table below summarises all tools used within the pipeline:
 
 ## See Also
 
-- [Truvari Comparison](truvari.md) - How these variants are compared with sequencing-based calls
 - [Directory Structures](../nextflow/directory-structures.md) - Complete output organization

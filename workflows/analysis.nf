@@ -4,7 +4,6 @@
 include { ref_mod } from "./fasta_ref_x_mod.nf"
 include { long_read as long_ref_pacbio; long_read as long_ref_ont; long_read as long_mod_pacbio; long_read as long_mod_ont} from "./long_read.nf"
 include { short_read as short_ref; short_read as short_mod } from "./short_read.nf"
-include { truvari_comparison } from "./vcf_comparison.nf"
 include { qc } from "./subworkflows.nf"
 
 include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_unmapped as compare_unmapped_pacbio } from "../modules/mapping.nf"
@@ -91,12 +90,11 @@ workflow analysis {
 
         qc(illumina_reads, "illumina/qc_trimming") | set { trimmed }
 
-        // VCF annotation flag and GFF from validated params
+        // VCF annotation flag (GFF removed)
         run_vcf_annotation = pmap.map { it.run_vcf_annotation }
-        gff = pmap.map { it.gff ? file(it.gff) : file('NO_GFF') }
 
-        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid, run_vcf_annotation, gff)
-        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid, run_vcf_annotation, gff)
+        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid, run_vcf_annotation)
+        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid, run_vcf_annotation)
         compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
 
         // Empty short table when not active
@@ -114,16 +112,6 @@ workflow analysis {
 
         supp_reads_ch = long_ref_pacbio.out.supp_reads
             .mix(long_ref_ont.out.supp_reads)
-
-        // --- Truvari comparison (when enabled and multiple VCF sources available) ---
-        if (params.run_truvari) {
-            active_vcfs = ref_mod.out.sv_vcf
-                .mix(long_ref_pacbio.out.sv_vcf)
-                .mix(long_ref_ont.out.sv_vcf)
-                .mix(short_ref.out.sv_vcf)
-
-            truvari_comparison(ref_fasta, active_vcfs)
-        }
 
         // --- Final SV table aggregation ---
         script = file("${workflow.projectDir}/modules/utils/create_sv_output.py")

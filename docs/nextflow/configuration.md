@@ -11,10 +11,7 @@ The file `nextflow.config` is the central configuration for the pipeline. It def
 | `log_dir` | `data/outputs/logs` | Directory for pipeline logs and reports |
 | `max_cpu` | `1` | Maximum CPUs available per process (override with `--max_cpu`) |
 | `clean_work` | `true` | Remove Nextflow `work/` directory after a successful run |
-| `run_truvari` | `false` | Enable cross-caller VCF comparison with Truvari |
 | `ref_plasmid_fasta` | `null` | Optional reference plasmid FASTA |
-| `mod_plasmid_fasta` | `null` | Optional modified plasmid FASTA |
-| `gff` | `null` | GFF3 feature file (overridden by validated params at runtime) |
 | `help` | `false` | Print help message and exit |
 
 ## Per-Process Configuration

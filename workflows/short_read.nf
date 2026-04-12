@@ -1,26 +1,16 @@
 #!/usr/bin/env nextflow
 /*
-  workflow: short_read.nf
-  Purpose: Process short-read (Illumina) sequencing data: run QC and trimming,
-           map reads to reference and optional plasmid sequences, call SNPs and
-           structural variants (SVs) where applicable, collect unmapped reads,
-           perform basic VCF QC, and convert SV VCFs to TSV summary tables.
-
-  - Inputs:
-      - Channel of trimmed short-read FASTQ files (produced by QC/trimming step)
-      - Channel of reference FASTA to map against
-      - out_folder_name: output prefix / label (controls which analyses run)
-      - Optional plasmid FASTA (used to remap unmapped reads)
-  - Outputs:
-      - Channel of variant VCFs (SNP / SV) or Channel.empty() when skipped
-      - Channel of unmapped FASTQ reads (after reference and optional plasmid mapping)
-      - Channel of SV summary TSVs (per-run) or Channel.empty() when skipped
+    workflow: short_read.nf
+    Purpose: Process short-read (Illumina) sequencing data: run QC and trimming,
+             map reads to reference and optional plasmid sequences, call SNPs and
+             structural variants (SVs) where applicable, collect unmapped reads,
+             perform basic VCF QC, and convert SV VCFs to TSV summary tables.
 */
 
 include { multiqc } from "../modules/qc.nf"
 include { calc_unmapped; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads; bwa_index; bwa_index as bwa_index_plasmid; get_unmapped_reads as get_unmapped_reads_plasmid; build_sv_flank_bed; mosdepth } from "../modules/mapping.nf"
 include { freebayes; bcftools_stats } from "../modules/variant_calling.nf"
-include { mapping; sv; annotate_vcf; mapping as mapping_plasmid } from "../workflows/subworkflows.nf"
+include { mapping; sv; mapping as mapping_plasmid } from "../workflows/subworkflows.nf"
 include { logUnmapped; logUnmapped as logUnmapped_plasmid } from "../modules/logs.nf"
 include { vcf_to_table_short }  from "../modules/sv_calling.nf"
 
@@ -33,7 +23,6 @@ workflow short_read {
         out_folder_name
         plasmid_fasta
         run_vcf_annotation
-        gff
 
     main:
         executed = true
@@ -65,14 +54,8 @@ workflow short_read {
             freebayes(fasta, indexed_bam, out_folder_name) | set { vcf }
             bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
             
-            if (run_vcf_annotation) {
-                annotate_vcf(fasta, gff, vcf, "gff", "gff3", out_folder_name) | set {qc_vcf}
-            
-                qc_vcf.mix(bcftools_out).collect() | set { qc_out }
-                multiqc(qc_out, out_folder_name, "varint_calling")
-            } else {
-                multiqc(bcftools_out, out_folder_name, "varint_calling")
-            }
+            // Annotation module disabled
+            multiqc(bcftools_out, out_folder_name, "varint_calling")
         
             // SVs variant calling
             sv(fasta, indexed_bam, out_folder_name) | set { sv_vcf }

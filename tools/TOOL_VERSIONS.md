@@ -8,7 +8,6 @@ This file documents explicit version pins used in custom tool images to improve 
 |---|---|---|
 | tools/cutesv/Dockerfile | cuteSV | 2.1.3 |
 | tools/sniffles/Dockerfile | sniffles | 2.7.3 |
-| tools/truvari/Dockerfile | truvari | 5.4.0 |
 | tools/debreak/Dockerfile | pysam | 0.23.3 |
 | tools/pbzip2/Dockerfile | pbzip2 | 1.1.13 |
 | tools/minimap2/Dockerfile | minimap2 | 2.30 |

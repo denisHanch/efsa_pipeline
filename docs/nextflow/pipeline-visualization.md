@@ -67,22 +67,6 @@ flowchart TD
         agg_tbl["Mix SV Tables"] --> restructure["Restructure SV Table (create_sv_output.py)"]
     end
     style SVTable fill:#FFF3E0,stroke:#F57C00,stroke-width:2px
-
-    %% Truvari comparison (central)
-    subgraph Truvari["Truvari Comparison (Conditional)"]
-        sr_vcf --> truvari_in["VCFs for Truvari"]
-        pb_vcf --> truvari_in
-        ont_vcf --> truvari_in
-        syri_vcf --> truvari_in
-        truvari_in --> check_truvari{"--run_truvari?"}
-        check_truvari -->|Yes| truvari["Compare SVs (Truvari)"]
-        check_truvari -->|No| skip_truvari["Skip Truvari"]
-        truvari --> final_report["Truvari Reports / Summary"]
-    end
-    style Truvari fill:#D0F0C0,stroke:#2E7D32,stroke-width:2px
-
-    %% Central alignment
-    restructure --> truvari_in
 ```
 
 ## Detailed Workflow Diagrams
@@ -92,7 +76,6 @@ For detailed workflow diagrams of specific pipeline components, see the **[Outpu
 - [Reference vs Modified FASTA Comparison with SyRI](../outputs/fasta-ref-mod.md)
 - [Short-Read Processing Pipeline (Illumina)](../outputs/illumina.md)
 - [Long-Read Processing Pipeline (PacBio & Oxford Nanopore)](../outputs/long-reads.md)
-- [VCF Comparison Pipeline with SyRI](../outputs/truvari.md)
 
 ## See Also
 

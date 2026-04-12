@@ -84,7 +84,6 @@ This file is produced by the validation step and consumed by the pipeline workfl
 | Parameter               | Type    | Description                                                                                           |
 | ----------------------- | ------- | ----------------------------------------------------------------------------------------------------- |
 | `run_ref_x_mod`         | boolean | `true` when both reference and modified genome validation succeeded and neither is fragmented; `false` when any genome exceeds `n_sequence_limit` or `type` is `"eukaryote"`. Gates all ref-vs-mod steps. |
-| `run_truvari`           | boolean | Always `false` by default; can be enabled via `--run_truvari true` on the command line.               |
 | `run_illumina`          | boolean | `true` when validated Illumina FASTQ reads are present.                                               |
 | `run_nanopore`          | boolean | `true` when validated Nanopore (ONT) reads are present (FASTQ or BAM).                               |
 | `run_pacbio`            | boolean | `true` when validated PacBio reads are present (FASTQ or BAM).                                       |

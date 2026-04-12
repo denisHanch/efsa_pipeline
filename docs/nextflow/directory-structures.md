@@ -42,7 +42,6 @@ data/valid/
 | `*_ref_plasmid.fasta`      | Reference plasmid sequences (if identified).                                  |
 | `*_mod_plasmid.fasta`      | Modified plasmid sequences (if identified).                                   |
 | `*_contig_N.fasta`         | Individual contig files from a fragmented modified assembly.                  |
-| `*_ref.gff`                | Validated GFF/GTF feature annotation (if provided).                          |
 | `validation.log`           | Structured JSON log for the run (auto-incremented if re-run in same second).  |
 | `report.txt`               | Human-readable statistics for all validated files.                            |
 | `illumina/`                | Paired-end Illumina FASTQ reads.                                              |
@@ -61,7 +60,6 @@ data/outputs
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
 ├── pacbio              → Long-read (PacBio) mapping results
 ├── tables              → Per-SV csv tables
-├── truvari             → Variant comparison results from Truvari (if run_truvari is true)
 └── unmapped_stats      → Summary statistics of unmapped reads for each workflow
 ```
 
@@ -72,7 +70,6 @@ A detailed description of each output subfolder is available in the **[Output Do
 - [Reference vs Modified FASTA Pipeline](../outputs/fasta-ref-mod.md)
 - [Short-Read Processing Pipeline (Illumina)](../outputs/illumina.md)
 - [Long-Read Processing Pipeline (PacBio & Oxford Nanopore)](../outputs/long-reads.md)
-- [VCF Comparison Pipeline with Truvari Output](../outputs/truvari.md)
 - [Unmapped Reads Statistics](../outputs/unmapped-stats.md)
 - [Logs](../outputs/logs.md)
 
