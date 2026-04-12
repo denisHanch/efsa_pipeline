@@ -193,39 +193,6 @@ class TestReads:
 
 
 # ---------------------------------------------------------------------------
-# GFF / feature annotation
-# ---------------------------------------------------------------------------
-
-class TestFeatureAnnotation:
-
-    def test_gff_present(self):
-        r = _base()
-        r["ref_feature"] = _meta("/features/ref.gff")
-        p = build_params(r)
-        assert p.run_vcf_annotation is True
-        assert p.gff == "/features/ref.gff"
-
-    def test_no_gff(self):
-        p = build_params(_base())
-        assert p.run_vcf_annotation is False
-        assert p.gff is None
-
-    def test_force_defragment_disables_annotation(self):
-        r = _base()
-        r["ref_feature"] = _meta("/features/ref.gff")
-        p = build_params(r, force_defragment_ref=True)
-        assert p.run_vcf_annotation is False
-        assert p.gff is None
-
-    def test_gff_validation_failed_keeps_false(self):
-        r = _base()
-        r["ref_feature"] = None  # validation raised, ref_feature stays None
-        p = build_params(r)
-        assert p.run_vcf_annotation is False
-        assert p.gff is None
-
-
-# ---------------------------------------------------------------------------
 # Plasmid paths
 # ---------------------------------------------------------------------------
 

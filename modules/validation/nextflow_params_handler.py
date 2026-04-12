@@ -12,12 +12,10 @@ Produced parameters
 general_options (pipeline execution switches):
   run_ref_x_mod        – True when both ref_genome and mod_genome and inter-genome validation succeeded;
                          False when any genome is too fragmented (eukaryote type or n_sequences > limit)
-  run_truvari          – always False (reserved for future use / manual override)
   run_illumina         – True when validated Illumina reads are present
   run_nanopore         – True when validated Nanopore (ONT) reads are present
   run_pacbio           – True when validated PacBio reads are present
   contig_file_size     – number of contig files from inter-genome characterisation
-  run_vcf_annotation   – True when a validated GFF feature file is present
   validation_timestamp – timestamp of the validation run (YYYYMMDD_HHMMSS)
 
 input_output_options (file paths, null / empty list when absent):
@@ -25,7 +23,6 @@ input_output_options (file paths, null / empty list when absent):
   mod_fasta_validated  – absolute path to the validated modified FASTA
   ref_plasmid_fasta    – plasmid FASTA for reference (from explicit config or genome validator split)
   mod_plasmid_fasta    – plasmid FASTA for modified (from explicit config or GXG characterisation)
-  gff                  – path to the validated reference GFF/GFF3 file
   illumina_fastqs      – list of validated Illumina FASTQ paths
   ont_fastqs           – list of validated Nanopore (ONT) FASTQ paths
   ont_bams             – list of validated Nanopore (ONT) BAM paths
@@ -40,26 +37,23 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-_OPTIONAL_PATHS = {"ref_fasta_validated", "mod_fasta_validated", "gff", "ref_plasmid_fasta", "mod_plasmid_fasta"}
+_OPTIONAL_PATHS = {"ref_fasta_validated", "mod_fasta_validated", "ref_plasmid_fasta", "mod_plasmid_fasta"}
 
 
 @dataclass
 class NextflowParams:
     # general_options
     run_ref_x_mod: bool = False
-    run_truvari: bool = False
     run_illumina: bool = False
     run_nanopore: bool = False
     run_pacbio: bool = False
     contig_file_size: int = 0
-    run_vcf_annotation: bool = False
     validation_timestamp: str = ""
     # input_output_options — omitted from JSON when None
     ref_fasta_validated: Optional[str] = None
     mod_fasta_validated: Optional[str] = None
     ref_plasmid_fasta: Optional[str] = None
     mod_plasmid_fasta: Optional[str] = None
-    gff: Optional[str] = None
     # input_output_options — lists, always present (may be empty)
     illumina_fastqs: List[str] = field(default_factory=list)
     ont_fastqs: List[str] = field(default_factory=list)
@@ -73,12 +67,10 @@ class NextflowParams:
         Optional single-path fields are excluded when None; list fields are always included."""
         result = {
             "run_ref_x_mod": self.run_ref_x_mod,
-            "run_truvari": self.run_truvari,
             "run_illumina": self.run_illumina,
             "run_nanopore": self.run_nanopore,
             "run_pacbio": self.run_pacbio,
             "contig_file_size": self.contig_file_size,
-            "run_vcf_annotation": self.run_vcf_annotation,
             "validation_timestamp": self.validation_timestamp,
             "illumina_fastqs": self.illumina_fastqs,
             "ont_fastqs": self.ont_fastqs,
@@ -96,7 +88,6 @@ class NextflowParams:
 
 def build_params(
     validation_results: dict,
-    force_defragment_ref: bool = False,
     run_timestamp: str = None,
     base_dir: Path = None,
 ) -> NextflowParams:
@@ -112,11 +103,6 @@ def build_params(
           genomexgenome – dict with 'contig_files' key (from genomexgenome_validation), or None
           reads         – List[ReadOutputMetadata], each with a .ngs_type attribute
           ref_feature   – FeatureOutputMetadata or None
-    force_defragment_ref : bool
-        When True, GFF validation for the reference is skipped: ``gff`` is set to
-        None and ``run_vcf_annotation`` is forced to False, because feature
-        coordinates are no longer meaningful on a defragmented reference.
-
     Returns
     -------
     NextflowParams
@@ -179,8 +165,6 @@ def build_params(
         r for r in (validation_results.get("reads") or [])
         if r is not None and _path(r) is not None
     ]
-    ref_feature = validation_results.get("ref_feature")
-    gff_path    = None if force_defragment_ref else _path(ref_feature)
 
     # collect all validated paths per ngs_type, split by format (fastq vs bam)
     fastqs_by_type: dict = {}
@@ -205,19 +189,16 @@ def build_params(
         run_ref_x_mod=(ref_path is not None and mod_path is not None
                        and not ref_fragmented and not mod_fragmented
                        and gxg.get("passed", False)),
-        run_truvari=False,
         run_illumina="illumina" in fastqs_by_type,
         run_nanopore=("ont" in fastqs_by_type or "ont" in bams_by_type),
         run_pacbio=("pacbio" in fastqs_by_type or "pacbio" in bams_by_type),
         contig_file_size=len(contig_files),
-        run_vcf_annotation=gff_path is not None,
         validation_timestamp=run_timestamp or datetime.now().strftime("%Y%m%d_%H%M%S"),
         # input_output_options
         ref_fasta_validated=ref_path,
         mod_fasta_validated=mod_path,
         ref_plasmid_fasta=ref_plasmid_path,
         mod_plasmid_fasta=mod_plasmid_path,
-        gff=gff_path,
         illumina_fastqs=fastqs_by_type.get("illumina", []),
         ont_fastqs=fastqs_by_type.get("ont", []),
         ont_bams=bams_by_type.get("ont", []),
