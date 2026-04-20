@@ -47,12 +47,16 @@ def main():
     run_dir = os.environ.get("VALIDATION_RUN_DIR")
     output_dir = Path(run_dir).resolve() if run_dir else base_valid_dir
     output_dir.mkdir(parents=True, exist_ok=True)
+    run_id = output_dir.name.removeprefix("run_") if output_dir.name.startswith("run_") else None
+    logs_dir = config_path.parent.parent / "outputs" / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
     logger = None
     log_file = None
 
     # Setup logging
+    log_filename = f"validation_{run_id}.log" if run_id else "validation.log"
     try:
-        logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
+        logger = setup_logging(console_level='DEBUG', log_file=logs_dir / log_filename)
     except (PermissionError, OSError) as e:
         logger = setup_logging(console_level='DEBUG')
         logger.warning(f"Could not write log file ({e}); logging to console only")
@@ -202,7 +206,8 @@ def main():
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
-    report = ValidationReport(output_dir / "report.txt")
+    report_filename = f"report_{run_id}.txt" if run_id else "report.txt"
+    report = ValidationReport(logs_dir / report_filename)
     fatal_errors: list[str] = []
 
     def register_required_failure(label: str, exc: Exception) -> None:
@@ -320,11 +325,8 @@ def main():
             "skipped. Feature coordinates are not meaningful on a defragmented "
             "reference — run_vcf_annotation will be disabled."
         )
-    # Extract timestamp from run directory name (run_YYYYMMDD_HHMMSS) so
-    # validation_timestamp matches the folder name exactly.
-    run_timestamp = output_dir.name.removeprefix("run_") if output_dir.name.startswith("run_") else None
     repo_root = config_path.parent.parent.parent
-    params = nf_params.build_params(validation_results, run_timestamp=run_timestamp, base_dir=repo_root)
+    params = nf_params.build_params(validation_results, run_timestamp=run_id, base_dir=repo_root)
     nf_params.write_params(params, base_valid_dir / "validated_params.json")
 
     return 0
