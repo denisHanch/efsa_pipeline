@@ -315,7 +315,7 @@ result = validator.run()  # Output: reads.fastq.gz
 settings = ReadValidator.Settings(ignore_bam=False, keep_bam=True)
 ```
 
-**Requirements:** `pysam` installed or `samtools` in PATH. BAM must contain sequence and quality scores.
+**Requirements:** `samtools` in PATH. BAM must contain sequence and quality scores.
 
 **Limitations:** Secondary/supplementary alignments are skipped; paired-end info may be lost.
 

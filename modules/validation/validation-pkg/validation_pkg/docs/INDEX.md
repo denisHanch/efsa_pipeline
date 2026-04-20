@@ -391,7 +391,6 @@ This technical documentation (located in `docs/validation/validation_pkg/`):
 - Python 3.10+
 - BioPython
 - structlog
-- pysam (optional, for BAM support)
 
 **External Tools (optional):**
 - pigz - Parallel gzip (2-4x faster compression)
