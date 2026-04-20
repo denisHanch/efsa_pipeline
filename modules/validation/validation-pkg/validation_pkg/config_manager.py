@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, FeatureFormat
+from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, FeatureFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType
 from validation_pkg.utils import file_handler, path_utils
 from validation_pkg.logger import get_logger
 from validation_pkg.exceptions import (
@@ -74,7 +74,9 @@ class ReadConfig(BaseValidatorConfig):
     detected_format: ReadFormat = None
 
     def __post_init__(self):
-        if self.ngs_type not in ["illumina", "ont", "pacbio"]:
+        try:
+            self.ngs_type = NgsType.normalize(self.ngs_type).value
+        except (ValueError, AttributeError):
             raise ValueError(f"Invalid ngs_type: {self.ngs_type}")
         self._initialize_defaults()
         self._extract_basename()
@@ -529,60 +531,52 @@ class ConfigManager:
         if 'validation_level' in options:
             validation_level = options['validation_level']
 
-            VALID_LEVELS = {'strict', 'trust', 'minimal'}
-
             if not isinstance(validation_level, str):
                 raise ConfigurationError(
                     f"'validation_level' must be a string, got {type(validation_level).__name__}: {validation_level}"
                 )
 
-            if validation_level not in VALID_LEVELS:
+            try:
+                config.options['validation_level'] = ValidationLevel.normalize(validation_level).value
+            except ValueError:
                 raise ConfigurationError(
                     f"Invalid validation_level '{validation_level}'. "
-                    f"Must be one of: {', '.join(sorted(VALID_LEVELS))}"
+                    f"Must be one of: {', '.join(v.value for v in ValidationLevel)}"
                 )
-
-            config.options['validation_level'] = validation_level
 
         # Parse logging_level option
         if 'logging_level' in options:
             logging_level = options['logging_level']
-
-            VALID_LOGGING_LEVELS = {'DEBUG', 'INFO', 'WARNING', 'ERROR'}
 
             if not isinstance(logging_level, str):
                 raise ConfigurationError(
                     f"'logging_level' must be a string, got {type(logging_level).__name__}: {logging_level}"
                 )
 
-            logging_level = logging_level.upper()
-
-            if logging_level not in VALID_LOGGING_LEVELS:
+            try:
+                config.options['logging_level'] = LoggingLevel.normalize(logging_level).value
+            except ValueError:
                 raise ConfigurationError(
                     f"Invalid logging_level '{logging_level}'. "
-                    f"Must be one of: {', '.join(sorted(VALID_LOGGING_LEVELS))}"
+                    f"Must be one of: {', '.join(v.value for v in LoggingLevel)}"
                 )
-
-            config.options['logging_level'] = logging_level
 
         # Parse type option
         if 'type' in options:
             organism_type = options['type']
-
-            VALID_TYPES = {'prokaryote', 'eukaryote'}
 
             if not isinstance(organism_type, str):
                 raise ConfigurationError(
                     f"'type' must be a string, got {type(organism_type).__name__}: {organism_type}"
                 )
 
-            if organism_type not in VALID_TYPES:
+            try:
+                config.options['type'] = OrganismType.normalize(organism_type).value
+            except ValueError:
                 raise ConfigurationError(
                     f"Invalid type '{organism_type}'. "
-                    f"Must be one of: {', '.join(sorted(VALID_TYPES))}"
+                    f"Must be one of: {', '.join(t.value for t in OrganismType)}"
                 )
-
-            config.options['type'] = organism_type
 
         # Parse force_defragment_ref option
         if 'force_defragment_ref' in options:

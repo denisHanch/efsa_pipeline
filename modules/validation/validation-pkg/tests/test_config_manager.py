@@ -1614,17 +1614,17 @@ class TestConfigOptionsType:
         config.options["type"] = "eukaryote"
         assert config.type == "eukaryote"
 
-    def test_type_uppercase_raises_error(self, temp_dir):
-        """Type value is case-sensitive; 'PROKARYOTE' is not valid."""
+    def test_type_uppercase_accepted(self, temp_dir):
+        """Type value is case-insensitive; 'PROKARYOTE' normalises to 'prokaryote'."""
         config_file = self._create_config(temp_dir, "PROKARYOTE")
-        with pytest.raises(ConfigurationError, match="Invalid type"):
-            ConfigManager.load(str(config_file))
+        config = ConfigManager.load(str(config_file))
+        assert config.type == "prokaryote"
 
-    def test_type_mixed_case_raises_error(self, temp_dir):
-        """Mixed-case type value is not accepted."""
+    def test_type_mixed_case_accepted(self, temp_dir):
+        """Mixed-case type value normalises correctly."""
         config_file = self._create_config(temp_dir, "Eukaryote")
-        with pytest.raises(ConfigurationError, match="Invalid type"):
-            ConfigManager.load(str(config_file))
+        config = ConfigManager.load(str(config_file))
+        assert config.type == "eukaryote"
 
     def test_type_empty_string_raises_error(self, temp_dir):
         """Empty string is not a valid type value."""

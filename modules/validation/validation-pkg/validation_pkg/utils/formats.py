@@ -8,6 +8,10 @@ __all__ = [
     'GenomeFormat',
     'ReadFormat',
     'FeatureFormat',
+    'OrganismType',
+    'ValidationLevel',
+    'LoggingLevel',
+    'NgsType',
 ]
 
 
@@ -177,11 +181,11 @@ class FeatureFormat(Enum):
     def _missing_(cls, value):
         """Handle flexible input formats for FeatureFormat."""
         value_lower = str(value).lower().strip()
-        
+
         # Remove leading dot
         if value_lower.startswith('.'):
             value_lower = value_lower[1:]
-        
+
         # Extension mapping
         extension_map = {
             'gff': cls.GFF,
@@ -190,15 +194,135 @@ class FeatureFormat(Enum):
             'gff2': cls.GTF,
             'bed': cls.BED,
         }
-        
+
         # Direct match
         if value_lower in extension_map:
             return extension_map[value_lower]
-        
+
         # If it looks like a filename, extract extension
         if '.' in value_lower:
             ext = Path(value).suffix.lower()[1:]  # Remove dot
             if ext in extension_map:
                 return extension_map[ext]
-        
-        raise ValueError(f"'{value}' is not a valid {cls.__name__}")   
+
+        raise ValueError(f"'{value}' is not a valid {cls.__name__}")
+
+
+class OrganismType(Enum):
+    """Supported organism types for genomic validation."""
+    PROKARYOTE = "prokaryote"
+    EUKARYOTE = "eukaryote"
+
+    @classmethod
+    def normalize(cls, value):
+        """Convert various input formats to OrganismType enum."""
+        if isinstance(value, cls):
+            return value
+        if value is None:
+            return cls.PROKARYOTE
+        value_lower = str(value).lower().strip()
+        mapping = {
+            'prokaryote': cls.PROKARYOTE,
+            'eukaryote': cls.EUKARYOTE,
+        }
+        if value_lower in mapping:
+            return mapping[value_lower]
+        raise ValueError(
+            f"'{value}' is not a valid OrganismType. Must be one of: prokaryote, eukaryote"
+        )
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls.normalize(value)
+
+
+class ValidationLevel(Enum):
+    """Supported validation depth levels."""
+    STRICT = "strict"
+    TRUST = "trust"
+    MINIMAL = "minimal"
+
+    @classmethod
+    def normalize(cls, value):
+        """Convert various input formats to ValidationLevel enum."""
+        if isinstance(value, cls):
+            return value
+        if value is None:
+            return cls.TRUST
+        value_lower = str(value).lower().strip()
+        mapping = {
+            'strict': cls.STRICT,
+            'trust': cls.TRUST,
+            'minimal': cls.MINIMAL,
+        }
+        if value_lower in mapping:
+            return mapping[value_lower]
+        raise ValueError(
+            f"'{value}' is not a valid ValidationLevel. Must be one of: strict, trust, minimal"
+        )
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls.normalize(value)
+
+
+class LoggingLevel(Enum):
+    """Supported logging verbosity levels."""
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+
+    @classmethod
+    def normalize(cls, value):
+        """Convert various input formats to LoggingLevel enum."""
+        if isinstance(value, cls):
+            return value
+        if value is None:
+            return cls.INFO
+        value_upper = str(value).upper().strip()
+        mapping = {
+            'DEBUG': cls.DEBUG,
+            'INFO': cls.INFO,
+            'WARNING': cls.WARNING,
+            'ERROR': cls.ERROR,
+        }
+        if value_upper in mapping:
+            return mapping[value_upper]
+        raise ValueError(
+            f"'{value}' is not a valid LoggingLevel. Must be one of: DEBUG, INFO, WARNING, ERROR"
+        )
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls.normalize(value)
+
+
+class NgsType(Enum):
+    """Supported next-generation sequencing technology types."""
+    ILLUMINA = "illumina"
+    ONT = "ont"
+    PACBIO = "pacbio"
+
+    @classmethod
+    def normalize(cls, value):
+        """Convert various input formats to NgsType enum."""
+        if isinstance(value, cls):
+            return value
+        if value is None:
+            return None
+        value_lower = str(value).lower().strip()
+        mapping = {
+            'illumina': cls.ILLUMINA,
+            'ont': cls.ONT,
+            'pacbio': cls.PACBIO,
+        }
+        if value_lower in mapping:
+            return mapping[value_lower]
+        raise ValueError(
+            f"'{value}' is not a valid NgsType. Must be one of: illumina, ont, pacbio"
+        )
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls.normalize(value)
