@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, FeatureFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType
 from validation_pkg.utils import file_handler, path_utils
-from validation_pkg.logger import get_logger
+from validation_pkg.utils.logger import get_logger
 from validation_pkg.exceptions import (
     ConfigurationError,
     FileNotFoundError as ValidationFileNotFoundError

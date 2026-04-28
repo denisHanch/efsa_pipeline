@@ -47,7 +47,6 @@ RUN apk add --no-cache --virtual .build-deps \
 # Keep the validation entry script and helpers at a fixed path
 RUN mkdir -p /opt/validation && \
     cp /tmp/validation/main.py /opt/validation/main.py && \
-    cp /tmp/validation/nextflow_params_handler.py /opt/validation/nextflow_params_handler.py && \
     cp -r /tmp/validation/utils /opt/validation/utils && \
     rm -rf /tmp/validation
 

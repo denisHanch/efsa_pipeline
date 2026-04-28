@@ -292,7 +292,7 @@ class TestConfigManager:
     def test_missing_file_is_logged(self, temp_dir):
         """Test that a missing file error is logged via logger.error and add_validation_issue."""
         from unittest.mock import patch, call
-        from validation_pkg.logger import get_logger
+        from validation_pkg.utils.logger import get_logger
 
         (temp_dir / "reads.fastq").write_text("@read1\nATCG\n+\nIIII\n")
 

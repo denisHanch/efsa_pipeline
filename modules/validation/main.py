@@ -28,7 +28,7 @@ from validation_pkg.exceptions import ValidationError
 from validation_pkg.utils.formats import CodingType, GenomeFormat
 from utils.ref_defragment import defragment_reference
 
-import nextflow_params_handler as nf_params
+import utils.nextflow_params_handler as nf_params
 
 
 def main():

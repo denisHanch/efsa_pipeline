@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import IO, Any, Type, Optional
 
-from validation_pkg.logger import get_logger
+from validation_pkg.utils.logger import get_logger
 from validation_pkg.utils.base_settings import BaseSettings
 from validation_pkg.exceptions import ValidationError, CompressionError
 from validation_pkg.utils.file_handler import open_file_with_coding_type

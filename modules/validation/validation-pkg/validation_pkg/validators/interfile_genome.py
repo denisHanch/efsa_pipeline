@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Any
 from Bio import SeqIO
 from ..utils.base_settings import BaseSettings
 from ..exceptions import InterFileValidationError, ValidationError
-from ..logger import get_logger
+from ..utils.logger import get_logger
 from ..utils.file_handler import check_tool_available, open_compressed_writer
 from ..utils.path_utils import strip_all_extensions
 from ..utils.formats import CodingType

@@ -1209,7 +1209,7 @@ class TestParallelValidationLogging:
 
     def test_sequential_validation_no_parallel_logging(self, temp_dir, output_dir):
         """Test that sequential validation (threads=1) does NOT enable parallel logging."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_pkg.utils.logger import setup_logging, get_logger
 
         fastq_file = temp_dir / "test.fastq"
         self._create_fastq(fastq_file, num_reads=100)
@@ -1242,7 +1242,7 @@ class TestParallelValidationLogging:
         assert '"process_id"' not in log_content
     def test_parallel_validation_enables_parallel_logging(self, temp_dir, output_dir):
         """Test that parallel validation (threads>1) logs parallel-related messages."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_pkg.utils.logger import setup_logging, get_logger
 
         fastq_file = temp_dir / "test.fastq"
         self._create_fastq(fastq_file, num_reads=5000)
@@ -1275,7 +1275,7 @@ class TestParallelValidationLogging:
         assert '"parallel_mode": true' in log_content or 'Parallel validation enabled' in log_content
     def test_trust_mode_no_parallel_logging(self, temp_dir, output_dir):
         """Test that trust mode never enables parallel logging (always sequential)."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_pkg.utils.logger import setup_logging, get_logger
 
         fastq_file = temp_dir / "test.fastq"
         self._create_fastq(fastq_file, num_reads=1000)
@@ -1308,7 +1308,7 @@ class TestParallelValidationLogging:
         assert '"process_id"' not in log_content
     def test_parallel_logging_cleanup_on_error(self, temp_dir, output_dir):
         """Test that parallel logging is disabled even if validation fails."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_pkg.utils.logger import setup_logging, get_logger
 
         # Create FASTQ with invalid characters (properly formatted for BioPython)
         fastq_file = temp_dir / "invalid.fastq"
@@ -1351,7 +1351,7 @@ class TestParallelValidationLogging:
 
     def test_full_validation_with_parallel_logging(self, temp_dir, output_dir):
         """Integration test: Full validation run with parallel logging."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_pkg.utils.logger import setup_logging, get_logger
 
         fastq_file = temp_dir / "test.fastq"
         self._create_fastq(fastq_file, num_reads=10000)
@@ -1389,7 +1389,7 @@ class TestParallelValidationLogging:
 
     def test_multiple_validations_cleanup(self, temp_dir, output_dir):
         """Test that parallel logging cleanup works across multiple validation runs."""
-        from validation_pkg.logger import setup_logging, get_logger
+        from validation_pkg.utils.logger import setup_logging, get_logger
 
         fastq_file1 = temp_dir / "test1.fastq"
         fastq_file2 = temp_dir / "test2.fastq"
