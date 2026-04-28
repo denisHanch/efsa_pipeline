@@ -13,9 +13,13 @@ it emits `validated_params.json`, which Nextflow consumes via `-params-file`.
 modules/validation/
 ├── main.py                        # CLI entry point — orchestrates full workflow
 ├── validation.sh                  # Bash wrapper with default paths and safety clears
-├── nextflow_params_handler.py     # Builds and serialises validated_params.json
-├── test_nextflow_params.py        # Tests for nextflow_params_handler
 ├── README.md                      # User-facing how-to and config guide pointer
+├── utils/
+│   ├── nextflow_params_handler.py # Builds and serialises validated_params.json
+│   ├── ref_defragment.py          # Unsupported workaround: merge fragmented reference
+│   └── tests/
+│       ├── test_nextflow_params.py
+│       └── test_ref_defragment.py
 └── validation-pkg/
     ├── setup.py
     ├── requirements.txt           # biopython, numpy, pysam, structlog, typing_extensions
@@ -24,13 +28,13 @@ modules/validation/
     │   ├── __init__.py            # Functional API (validate_genome, validate_reads, …); __all__ exports ValidationReport and __version__ individually
     │   ├── config_manager.py      # JSON config loader → Config / *Config dataclasses
     │   ├── exceptions.py          # Exception hierarchy rooted at ValidationError
-    │   ├── logger.py              # ValidationLogger singleton (structlog-based)
     │   ├── report.py              # ValidationReport — collects results, writes report.txt
     │   ├── utils/
     │   │   ├── base_settings.py   # BaseSettings, BaseOutputMetadata, BaseValidatorSettings
     │   │   ├── base_validator.py  # BaseValidator abstract class
     │   │   ├── file_handler.py    # Compression, format detection, file I/O utilities
-    │   │   ├── formats.py         # Enums: CodingType, GenomeFormat, ReadFormat, FeatureFormat
+    │   │   ├── formats.py         # Enums: CodingType, GenomeFormat, ReadFormat, FeatureFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType
+    │   │   ├── logger.py          # ValidationLogger singleton (structlog-based)
     │   │   ├── path_utils.py      # Path resolution + path-traversal security
     │   │   └── sequence_stats.py  # N50 calculation
     │   └── validators/
@@ -90,14 +94,14 @@ pytest tests/
 
 ---
 
-## Outputs (written to `data/valid/run_YYYYMMDD_HHMMSS/`)
+## Outputs
 
-| File | Description |
-|---|---|
-| `validation.log` | Structured JSON log (structlog). Auto-incremented if exists. |
-| `report.txt` | Human-readable validation report with per-file statistics. |
-| Validated genome/reads/feature files | Standardised copies of every input file. |
-| `validated_params.json` | Nextflow `-params-file`; consumed by the main pipeline. |
+| File | Location | Description |
+|---|---|---|
+| `validation_<run_id>.log` | `data/outputs/logs/` | Structured JSON log (structlog). Falls back to `validation.log` when no run ID. Auto-incremented if exists. |
+| `report_<run_id>.txt` | `data/outputs/logs/` | Human-readable validation report. Falls back to `report.txt` when no run ID. Auto-incremented if exists. |
+| Validated genome/reads/feature files | `data/valid/run_YYYYMMDD_HHMMSS/` | Standardised copies of every input file. |
+| `validated_params.json` | `data/valid/` | Nextflow `-params-file`; consumed by the main pipeline. |
 
 ---
 
@@ -105,7 +109,7 @@ pytest tests/
 
 ```
 1.  Parse sys.argv → config_path
-2.  setup_logging() → data/valid/validation.log
+2.  setup_logging() → data/outputs/logs/validation_<run_id>.log
 3.  ConfigManager.load(config_path) → Config   # returns 1 on failure
 4.  Instantiate per-validator Settings objects
 5.  Initialise fatal_errors list + register_required_failure / register_missing_output helpers
@@ -299,6 +303,8 @@ All exceptions live in `validation_pkg.exceptions` and are importable from
 
 ## Format & compression enums (`utils/formats.py`)
 
+All enums expose a `normalize(value)` classmethod that accepts strings (case-insensitive), the enum itself, or `None` (returns the default).
+
 ### `CodingType`
 ```
 GZIP, BZIP2, NONE
@@ -337,6 +343,38 @@ GFF, GTF, BED
 
 Aliases:  gff3 → GFF
           gff2 → GTF
+```
+
+### `OrganismType`
+```
+PROKARYOTE, EUKARYOTE
+
+.normalize(val)  → OrganismType (default: PROKARYOTE)
+.value           → "prokaryote" / "eukaryote"
+```
+
+### `ValidationLevel`
+```
+STRICT, TRUST, MINIMAL
+
+.normalize(val)  → ValidationLevel (default: TRUST)
+.value           → "strict" / "trust" / "minimal"
+```
+
+### `LoggingLevel`
+```
+DEBUG, INFO, WARNING, ERROR
+
+.normalize(val)  → LoggingLevel (default: INFO)
+.value           → "DEBUG" / "INFO" / "WARNING" / "ERROR"
+```
+
+### `NgsType`
+```
+ILLUMINA, ONT, PACBIO
+
+.normalize(val)  → NgsType (no default — raises ValueError if None)
+.value           → "illumina" / "ont" / "pacbio"
 ```
 
 ---
@@ -650,7 +688,7 @@ readxread_validation(
 
 ---
 
-## Logger (`logger.py`)
+## Logger (`utils/logger.py`)
 
 Singleton pattern. There is exactly one `ValidationLogger` instance throughout a run.
 
@@ -658,7 +696,7 @@ Singleton pattern. There is exactly one `ValidationLogger` instance throughout a
 ```python
 from validation_pkg import setup_logging, get_logger
 
-logger = setup_logging(console_level='DEBUG', log_file=Path('data/valid/validation.log'))
+logger = setup_logging(console_level='DEBUG', log_file=Path('data/outputs/logs/validation_<run_id>.log'))
 logger = get_logger()   # retrieve singleton anywhere
 ```
 
@@ -787,7 +825,7 @@ calculate_n50(lengths: List[int]) → int
 
 ---
 
-## `nextflow_params_handler.py`
+## `utils/nextflow_params_handler.py`
 
 ### `NextflowParams` dataclass
 ```
