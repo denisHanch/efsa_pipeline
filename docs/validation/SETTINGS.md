@@ -8,9 +8,9 @@ The validation module supports three validation levels to balance thoroughness a
 
 | Level | Parsing | Validation | Edits | Output | Speed | Use Case |
 |-------|---------|------------|-------|--------|-------|----------|
-| **strict** | All data | All data | All applied | BioPython write | Slowest | Structural validation, sequence by sequence; statistics gathered |
-| **trust** (default) | All data (genome)<br>First record only (reads) | First sequence only | All applied (genome, features)<br>None (reads) | BioPython write (genome)<br>File copy (reads) | Fast | Trust data, adapt file coding, name and location |
-| **minimal** | None | None | None | File copy | Fastest | Rename and move files to meet the requirements |
+| **STRICT** | All data | All data | All applied | BioPython write | Slowest | Structural validation, sequence by sequence; statistics gathered |
+| **TRUST** (default) | All data (genome)<br>First record only (reads) | First sequence only | All applied (genome, features)<br>None (reads) | BioPython write (genome)<br>File copy (reads) | Fast | Trust data, adapt file coding, name and location |
+| **MINIMAL** | None | None | None | File copy | Fastest | Rename and move files to meet the requirements |
 
 ## Level Details
 
@@ -55,7 +55,7 @@ Set the validation level in your `config.json`:
 {
   "ref_genome_filename": {
     "filename": "reference.fasta",
-    "validation_level": "strict",
+    "validation_level": "STRICT",
     "threads": 8
   }
 }
@@ -66,7 +66,7 @@ Or set globally in options:
 ```json
 {
   "options": {
-    "validation_level": "trust",
+    "validation_level": "TRUST",
     "threads": 8
   }
 }
@@ -74,13 +74,13 @@ Or set globally in options:
 
 ## Performance Impact
 
-Relative speed uses `strict` as the baseline (slowest).
+Relative speed uses `STRICT` as the baseline (slowest).
 
 | Mode | Relative Speed | Resource Usage |
 |------|---------------|----------------|
-| strict | 1x (baseline) | High |
-| trust | 10-15x faster | Moderate |
-| minimal | 100x+ faster | Minimal |
+| STRICT | 1x (baseline) | High |
+| TRUST | 10-15x faster | Moderate |
+| MINIMAL | 100x+ faster | Minimal |
 
 ## See Also
 

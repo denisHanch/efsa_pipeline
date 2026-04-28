@@ -92,8 +92,8 @@ Or set globally for all files:
 
 | Optimization | Performance Gain | Effort |
 |--------------|-----------------|--------|
-| validation_level='trust' | 10-15x faster | Low (config change) |
-| validation_level='minimal' | 100x+ faster | Low (config change) |
+| validation_level='TRUST' | 10-15x faster | Low (config change) |
+| validation_level='MINIMAL' | 100x+ faster | Low (config change) |
 | threads=16 (strict mode) | 3-7x faster | Low (config change) |
 | parallel compression tools | 2-6x faster | Medium (installation) |
 

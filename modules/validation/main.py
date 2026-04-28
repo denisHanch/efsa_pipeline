@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import sys
 import traceback
@@ -32,16 +33,24 @@ import utils.nextflow_params_handler as nf_params
 
 
 def main():
-    # Check command line arguments
-    args = sys.argv[1:]
+    parser = argparse.ArgumentParser(description="Validation pipeline for genomic input files")
+    parser.add_argument("config_path", help="Path to config.json")
+    parser.add_argument("--threads",          type=int,  help="Number of threads (overrides config.json)")
+    parser.add_argument("--validation-level", choices=["strict", "trust", "minimal"], help="Validation depth (overrides config.json)")
+    parser.add_argument("--logging-level",    choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Log verbosity (overrides config.json)")
+    parser.add_argument("--type",             dest="organism_type", choices=["prokaryote", "eukaryote"], help="Organism type (overrides config.json)")
+    parser.add_argument("--force-defragment-ref", action="store_true", default=False, help="Merge fragmented reference contigs (unsupported workaround)")
+    parsed = parser.parse_args()
 
-    if not args:
-        print("Usage: python main.py <config_path> ")
-        print("\nExample:")
-        print("  python main.py config.json")
-        return 1
+    config_path = Path(parsed.config_path).resolve()
 
-    config_path = Path(args[0]).resolve()
+    cli_options = {}
+    if parsed.threads            is not None: cli_options["threads"]             = parsed.threads
+    if parsed.validation_level   is not None: cli_options["validation_level"]    = parsed.validation_level
+    if parsed.logging_level      is not None: cli_options["logging_level"]       = parsed.logging_level
+    if parsed.organism_type      is not None: cli_options["type"]                = parsed.organism_type
+    if parsed.force_defragment_ref:           cli_options["force_defragment_ref"] = True
+
     base_valid_dir = Path.cwd()
     # Use the run-specific dir exported by validation.sh; fall back to CWD.
     run_dir = os.environ.get("VALIDATION_RUN_DIR")
@@ -67,7 +76,7 @@ def main():
     # ========================================================================
     config = None
     try:
-        config = ConfigManager.load(config_path)
+        config = ConfigManager.load(config_path, cli_options=cli_options or None)
     except Exception as e:
         logger.error(f"Loading a config file failed: {e}")
         return 1
