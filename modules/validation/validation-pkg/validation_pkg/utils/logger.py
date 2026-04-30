@@ -11,6 +11,8 @@ import structlog
 import logging
 import time
 
+from validation_pkg.utils.path_utils import get_incremented_path
+
 
 @dataclass
 class FileTimingSummary:
@@ -141,8 +143,6 @@ class ValidationLogger:
 
         # Setup stdlib logging first (if file logging is requested)
         if log_file:
-            from validation_pkg.utils.path_utils import get_incremented_path
-
             log_file = Path(log_file)
             log_file.parent.mkdir(parents=True, exist_ok=True)
 

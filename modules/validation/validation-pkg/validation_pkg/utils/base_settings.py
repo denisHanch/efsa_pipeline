@@ -46,8 +46,6 @@ class BaseSettings(ABC):
                 field_type = field_info.type
                 # Handle Optional[CodingType] or CodingType annotations
                 if 'CodingType' in str(field_type):
-                    # Import here to avoid circular imports
-                    from validation_pkg.utils.formats import CodingType
                     value = CodingType.normalize(value)
 
             setattr(new_settings, key, value)
@@ -79,8 +77,6 @@ class BaseSettings(ABC):
         for key, value in data.items():
             field_info = next((f for f in fields(cls) if f.name == key), None)
             if field_info and 'CodingType' in str(field_info.type):
-                # Import here to avoid circular imports
-                from validation_pkg.utils.formats import CodingType
                 value = CodingType.normalize(value)
             normalized_data[key] = value
 

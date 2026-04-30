@@ -6,9 +6,10 @@ from typing import IO, Any, Type, Optional
 
 from validation_pkg.utils.logger import get_logger
 from validation_pkg.utils.base_settings import BaseSettings
+from validation_pkg.utils.formats import ValidationLevel
 from validation_pkg.exceptions import ValidationError, CompressionError
-from validation_pkg.utils.file_handler import open_file_with_coding_type
-from validation_pkg.utils.path_utils import strip_all_extensions
+from validation_pkg.utils.file_handler import open_file_with_coding_type, copy_file
+from validation_pkg.utils.path_utils import strip_all_extensions, build_safe_output_dir
 
 
 class BaseValidator(ABC):
@@ -24,7 +25,7 @@ class BaseValidator(ABC):
 
         # Extract common attributes from config
         self.output_dir = config.output_dir
-        self.validation_level = config.global_options.get("validation_level")
+        self.validation_level = ValidationLevel.normalize(config.global_options.get("validation_level"))
         self.threads = config.global_options.get("threads")
         self.input_path = config.filepath
         
@@ -41,7 +42,7 @@ class BaseValidator(ABC):
     def _initialize_defaults(self) -> None:
         """Set default values for validation_level and threads."""
         if self.validation_level is None:
-            self.validation_level = 'trust'
+            self.validation_level = ValidationLevel.TRUST
         # threads=None means auto-detect; leave as-is
 
     def run(self) -> Any:
@@ -59,7 +60,7 @@ class BaseValidator(ABC):
 
         try:
             # Handle minimal mode separately
-            if self.validation_level == 'minimal':
+            if self.validation_level == ValidationLevel.MINIMAL:
                 output_path = self._handle_minimal_mode()
             else:
                 # Trust/Strict modes - call subclass implementation
@@ -113,7 +114,7 @@ class BaseValidator(ABC):
         self.output_metadata.input_file = self.config.filename
         self.output_metadata.output_file = str(output_path) if output_path else None
         self.output_metadata.output_filename = output_path.name if output_path else None
-        self.output_metadata.validation_level = self.validation_level
+        self.output_metadata.validation_level = self.validation_level.value
 
     def _build_output_filename(
         self,
@@ -141,8 +142,6 @@ class BaseValidator(ABC):
 
     def _build_output_path(self) -> Path:
         """Build complete output path with consistent naming and directory structure."""
-        from validation_pkg.utils.path_utils import build_safe_output_dir
-
         # Build safe output directory (with path traversal protection)
         output_dir = build_safe_output_dir(self.output_dir, self.settings.output_subdir_name)
 
@@ -204,8 +203,6 @@ class BaseValidator(ABC):
             # Re-raise as validator-specific exception
             raise self._get_validator_exception()(str(e)) from e
 
-        # Use file_handler copy utility
-        from validation_pkg.utils.file_handler import copy_file
         return copy_file(self.input_path, self.output_path, self.logger)
 
     # ===== Abstract Properties and Methods =====

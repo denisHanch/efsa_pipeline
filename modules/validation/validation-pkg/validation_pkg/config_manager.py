@@ -3,7 +3,7 @@
 import json
 import os
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Type, TypeVar
 from dataclasses import dataclass
 
 from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, FeatureFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType
@@ -13,7 +13,6 @@ from validation_pkg.exceptions import (
     ConfigurationError,
     FileNotFoundError as ValidationFileNotFoundError
 )
-from typing import Type, TypeVar
 
 # Type variable for config classes
 T = TypeVar('T', bound='BaseValidatorConfig')
@@ -70,14 +69,17 @@ class GenomeConfig(BaseValidatorConfig):
 @dataclass
 class ReadConfig(BaseValidatorConfig):
     """Configuration for sequencing read files."""
-    ngs_type: str = None
+    ngs_type: Optional[NgsType] = None
     detected_format: ReadFormat = None
 
     def __post_init__(self):
         try:
-            self.ngs_type = NgsType.normalize(self.ngs_type).value
-        except (ValueError, AttributeError):
-            raise ValueError(f"Invalid ngs_type: {self.ngs_type}")
+            normalized = NgsType.normalize(self.ngs_type)
+        except ValueError:
+            raise ValueError(f"Invalid ngs_type: {self.ngs_type!r}")
+        if normalized is None:
+            raise ValueError("ngs_type is required")
+        self.ngs_type = normalized
         self._initialize_defaults()
         self._extract_basename()
 
@@ -117,19 +119,19 @@ class Config:
         return self.options.get('threads')
 
     @property
-    def logging_level(self) -> str:
-        """Get logging level from options, or default to 'INFO'."""
-        return self.options.get('logging_level', 'INFO')
+    def logging_level(self) -> LoggingLevel:
+        """Get logging level from options, or default to INFO."""
+        return self.options.get('logging_level', LoggingLevel.INFO)
 
     @property
-    def validation_level(self) -> str:
-        """Get validation level from options, or default to 'trust'."""
-        return self.options.get('validation_level', 'trust')
+    def validation_level(self) -> ValidationLevel:
+        """Get validation level from options, or default to TRUST."""
+        return self.options.get('validation_level', ValidationLevel.TRUST)
 
     @property
-    def type(self) -> str:
-        """Get organism type from options ('prokaryote' or 'eukaryote'), default 'prokaryote'."""
-        return self.options.get('type', 'prokaryote')
+    def type(self) -> OrganismType:
+        """Get organism type from options, default PROKARYOTE."""
+        return self.options.get('type', OrganismType.PROKARYOTE)
 
     @property
     def force_defragment_ref(self) -> Optional[bool]:
@@ -208,8 +210,8 @@ class ConfigManager:
             # Reconfigure logging level based on config options (if specified)
             if config.options and 'logging_level' in config.options:
                 logging_level = config.options['logging_level']
-                logger.info(f"Applying logging level from config: {logging_level}")
-                logger.reconfigure_level(console_level=logging_level)
+                logger.info(f"Applying logging level from config: {logging_level.value}")
+                logger.reconfigure_level(console_level=logging_level.value)
 
             logger.debug("Setup base for outputs")
             ConfigManager._setup_output_directory(config)
@@ -537,7 +539,7 @@ class ConfigManager:
                 )
 
             try:
-                config.options['validation_level'] = ValidationLevel.normalize(validation_level).value
+                config.options['validation_level'] = ValidationLevel.normalize(validation_level)
             except ValueError:
                 raise ConfigurationError(
                     f"Invalid validation_level '{validation_level}'. "
@@ -554,7 +556,7 @@ class ConfigManager:
                 )
 
             try:
-                config.options['logging_level'] = LoggingLevel.normalize(logging_level).value
+                config.options['logging_level'] = LoggingLevel.normalize(logging_level)
             except ValueError:
                 raise ConfigurationError(
                     f"Invalid logging_level '{logging_level}'. "
@@ -571,7 +573,7 @@ class ConfigManager:
                 )
 
             try:
-                config.options['type'] = OrganismType.normalize(organism_type).value
+                config.options['type'] = OrganismType.normalize(organism_type)
             except ValueError:
                 raise ConfigurationError(
                     f"Invalid type '{organism_type}'. "
@@ -592,19 +594,26 @@ class ConfigManager:
         json_keys = set(config.options.keys())
 
         # Apply CLI options as fallback for keys not explicitly set in config.json
+        _cli_normalizers = {
+            'validation_level': ValidationLevel.normalize,
+            'logging_level': LoggingLevel.normalize,
+            'type': OrganismType.normalize,
+        }
         cli_keys = set()
         if cli_options:
             for key, value in cli_options.items():
                 if key not in config.options:
+                    if key in _cli_normalizers and value is not None:
+                        value = _cli_normalizers[key](value)
                     config.options[key] = value
                     cli_keys.add(key)
 
         # Apply defaults for any options not explicitly set
         DEFAULTS = {
             'threads': None,
-            'validation_level': 'trust',
-            'logging_level': 'INFO',
-            'type': 'prokaryote',
+            'validation_level': ValidationLevel.TRUST,
+            'logging_level': LoggingLevel.INFO,
+            'type': OrganismType.PROKARYOTE,
             'force_defragment_ref': False,
         }
         for key, default in DEFAULTS.items():
@@ -613,7 +622,7 @@ class ConfigManager:
         # Log all resolved options in one line
         def _fmt(key):
             value = config.options[key]
-            display = 'auto-detect' if value is None else value
+            display = 'auto-detect' if value is None else (value.value if hasattr(value, 'value') else value)
             if key in json_keys:
                 source = "config"
             elif key in cli_keys:
@@ -624,8 +633,14 @@ class ConfigManager:
 
         logger.info("Global options: " + ", ".join(_fmt(k) for k in DEFAULTS))
 
+    # Normalizers applied when a file-level allowed option is a raw string.
+    # Add an entry here whenever a new enum-typed option is added to ALLOWED_FILE_OPTIONS.
+    _FILE_OPTION_NORMALIZERS = {
+        'validation_level': ValidationLevel.normalize,
+    }
+
     @staticmethod
-    def _merge_options(field_name: str, global_options: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:        
+    def _merge_options(field_name: str, global_options: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:
         logger = get_logger()
 
         # Extract file-level global options (threads, validation_level only)
@@ -635,6 +650,10 @@ class ConfigManager:
         filelvl_options.update(global_options)
         for key, value_item in extra.items():
             if key in ALLOWED_FILE_OPTIONS:
+                # Normalize enum-typed options to their enum type
+                normalizer = ConfigManager._FILE_OPTION_NORMALIZERS.get(key)
+                if normalizer and isinstance(value_item, str):
+                    value_item = normalizer(value_item)
                 # Only log override if the key existed in global_options
                 if key in filelvl_options:
                     logger.warning(

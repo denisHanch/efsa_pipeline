@@ -74,7 +74,7 @@ class TestConfigManager:
         assert config.ref_genome is not None
         assert config.mod_genome is not None
         assert len(config.reads) == 1
-        assert config.reads[0].ngs_type == "illumina"
+        assert config.reads[0].ngs_type.value == "illumina"
         assert config.ref_plasmid is None
         assert config.mod_plasmid is None
 
@@ -93,7 +93,7 @@ class TestConfigManager:
         assert len(config.reads) == 2
         assert config.ref_feature is not None
         assert config.options["threads"] == 8
-        assert config.options["validation_level"] == "trust"
+        assert config.options["validation_level"].value == "trust"
 
         # Check all absolute paths are set
         assert config.ref_genome.filepath.is_absolute()
@@ -347,7 +347,7 @@ class TestConfigManager:
 
         # Verify all reads have correct properties (order-independent)
         assert all(r.detected_format == ReadFormat.FASTQ for r in loaded_config.reads)
-        assert all(r.ngs_type == "illumina" for r in loaded_config.reads)
+        assert all(r.ngs_type.value == "illumina" for r in loaded_config.reads)
 
         # Verify each file individually by looking it up by name
         r1_config = next((r for r in loaded_config.reads if r.filename == "R1.fastq"), None)
@@ -356,12 +356,12 @@ class TestConfigManager:
         assert r1_config is not None
         assert r1_config.filepath == (reads_dir / "R1.fastq")
         assert r1_config.detected_format == ReadFormat.FASTQ
-        assert r1_config.ngs_type == "illumina"
+        assert r1_config.ngs_type.value == "illumina"
 
         assert r2_config is not None
         assert r2_config.filepath == (reads_dir / "R2.fastq")
         assert r2_config.detected_format == ReadFormat.FASTQ
-        assert r2_config.ngs_type == "illumina"
+        assert r2_config.ngs_type.value == "illumina"
     
     def test_missing_directory_reads(self, temp_dir):
         """Test error when reads directory doesn't exist."""
@@ -473,9 +473,9 @@ class TestConfigManager:
         
         loaded_config = ConfigManager.load(str(config_file))
         assert len(loaded_config.reads) == 3
-        assert loaded_config.reads[0].ngs_type == "illumina"
-        assert loaded_config.reads[1].ngs_type == "ont"
-        assert loaded_config.reads[2].ngs_type == "pacbio"
+        assert loaded_config.reads[0].ngs_type.value == "illumina"
+        assert loaded_config.reads[1].ngs_type.value == "ont"
+        assert loaded_config.reads[2].ngs_type.value == "pacbio"
         
         # Check all paths are absolute
         assert all(read.filepath.is_absolute() for read in loaded_config.reads)
@@ -630,7 +630,7 @@ class TestConfigManager:
         loaded = ConfigManager.load(str(cfg_file))
         assert len(loaded.reads) == 1
         assert loaded.reads[0].filepath.is_absolute()
-        assert loaded.reads[0].ngs_type == "illumina"
+        assert loaded.reads[0].ngs_type.value == "illumina"
         assert loaded.reads[0].coding_type == CodingType.GZIP
 
 
@@ -949,9 +949,9 @@ class TestConfigValidatorSettings:
         loaded_config = ConfigManager.load(str(config_file))
 
         # File-level validation_level overrides the default in global_options
-        assert loaded_config.ref_genome.global_options['validation_level'] == 'trust'
+        assert loaded_config.ref_genome.global_options['validation_level'].value == 'trust'
         # mod_genome gets the default validation_level
-        assert loaded_config.mod_genome.global_options['validation_level'] == 'trust'
+        assert loaded_config.mod_genome.global_options['validation_level'].value == 'trust'
 
     def test_read_config_file_level_validation_level(self, temp_dir):
         """Test that file-level validation_level is stored in global_options for reads."""
@@ -976,8 +976,8 @@ class TestConfigValidatorSettings:
 
         loaded_config = ConfigManager.load(str(config_file))
 
-        assert loaded_config.reads[0].global_options['validation_level'] == 'trust'
-        assert loaded_config.reads[0].ngs_type == "illumina"
+        assert loaded_config.reads[0].global_options['validation_level'].value == 'trust'
+        assert loaded_config.reads[0].ngs_type.value == "illumina"
 
     def test_feature_config_file_level_validation_level(self, temp_dir):
         """Test that file-level validation_level is stored in global_options for features."""
@@ -1001,7 +1001,7 @@ class TestConfigValidatorSettings:
 
         loaded_config = ConfigManager.load(str(config_file))
 
-        assert loaded_config.ref_feature.global_options['validation_level'] == 'minimal'
+        assert loaded_config.ref_feature.global_options['validation_level'].value == 'minimal'
 
     def test_non_global_options_logged_as_warnings(self, temp_dir):
         """Test that non-global options (like plasmid_split) are logged as warnings and ignored."""
@@ -1028,7 +1028,7 @@ class TestConfigValidatorSettings:
 
         # Only allowed file-level options end up in global_options; non-global fields are ignored.
         # All defaults are present; the file-level validation_level overrides the default.
-        assert loaded_config.ref_genome.global_options['validation_level'] == 'trust'
+        assert loaded_config.ref_genome.global_options['validation_level'].value == 'trust'
         assert 'plasmid_split' not in loaded_config.ref_genome.global_options
         assert 'min_sequence_length' not in loaded_config.ref_genome.global_options
 
@@ -1063,7 +1063,7 @@ class TestConfigValidatorSettings:
         # Both files from directory should inherit validation_level
         assert len(loaded_config.reads) == 2
         for read_config in loaded_config.reads:
-            assert read_config.global_options['validation_level'] == 'trust'
+            assert read_config.global_options['validation_level'].value == 'trust'
 
     def test_directory_ont_multi_file_accepted(self, temp_dir):
         """Multi-file ONT directory input must be accepted."""
@@ -1083,7 +1083,7 @@ class TestConfigValidatorSettings:
 
         loaded_config = ConfigManager.load(str(config_file))
         assert len(loaded_config.reads) == 2
-        assert all(r.ngs_type == "ont" for r in loaded_config.reads)
+        assert all(r.ngs_type.value == "ont" for r in loaded_config.reads)
 
     def test_directory_pacbio_multi_file_accepted(self, temp_dir):
         """Multi-file PacBio directory input must be accepted."""
@@ -1103,7 +1103,7 @@ class TestConfigValidatorSettings:
 
         loaded_config = ConfigManager.load(str(config_file))
         assert len(loaded_config.reads) == 2
-        assert all(r.ngs_type == "pacbio" for r in loaded_config.reads)
+        assert all(r.ngs_type.value == "pacbio" for r in loaded_config.reads)
 
     def test_global_and_file_level_options_merge(self, temp_dir):
         """Test that global options and file-level options merge correctly."""
@@ -1130,11 +1130,11 @@ class TestConfigValidatorSettings:
         loaded_config = ConfigManager.load(str(config_file))
 
         # ref_genome overrides global validation_level but keeps threads
-        assert loaded_config.ref_genome.global_options["validation_level"] == "minimal"
+        assert loaded_config.ref_genome.global_options["validation_level"].value == "minimal"
         assert loaded_config.ref_genome.global_options["threads"] == 8
 
         # mod_genome uses global options
-        assert loaded_config.mod_genome.global_options["validation_level"] == "trust"
+        assert loaded_config.mod_genome.global_options["validation_level"].value == "trust"
         assert loaded_config.mod_genome.global_options["threads"] == 8
 
     def test_global_options_contain_defaults_when_no_settings(self, temp_dir):
@@ -1155,16 +1155,16 @@ class TestConfigValidatorSettings:
         loaded_config = ConfigManager.load(str(config_file))
 
         # global_options should contain all defaults when no options specified
-        expected_defaults = {
-            'threads': None,
-            'validation_level': 'trust',
-            'logging_level': 'INFO',
-            'type': 'prokaryote',
-            'force_defragment_ref': False,
-        }
-        assert loaded_config.ref_genome.global_options == expected_defaults
-        assert loaded_config.mod_genome.global_options == expected_defaults
-        assert loaded_config.reads[0].global_options == expected_defaults
+        for gopt in [
+            loaded_config.ref_genome.global_options,
+            loaded_config.mod_genome.global_options,
+            loaded_config.reads[0].global_options,
+        ]:
+            assert gopt['threads'] is None
+            assert gopt['validation_level'].value == 'trust'
+            assert gopt['logging_level'].value == 'INFO'
+            assert gopt['type'].value == 'prokaryote'
+            assert gopt['force_defragment_ref'] is False
 
 
 class TestSecurityPathTraversal:
@@ -1575,21 +1575,21 @@ class TestConfigOptionsType:
         """'prokaryote' is a valid type value."""
         config_file = self._create_config(temp_dir, "prokaryote")
         config = ConfigManager.load(str(config_file))
-        assert config.options["type"] == "prokaryote"
-        assert config.type == "prokaryote"
+        assert config.options["type"].value == "prokaryote"
+        assert config.type.value == "prokaryote"
 
     def test_type_eukaryote(self, temp_dir):
         """'eukaryote' is a valid type value."""
         config_file = self._create_config(temp_dir, "eukaryote")
         config = ConfigManager.load(str(config_file))
-        assert config.options["type"] == "eukaryote"
-        assert config.type == "eukaryote"
+        assert config.options["type"].value == "eukaryote"
+        assert config.type.value == "eukaryote"
 
     def test_type_omitted_defaults_to_prokaryote(self, temp_dir):
         """When type is not specified, Config.type defaults to 'prokaryote'."""
         config_file = self._create_config(temp_dir, include_type=False)
         config = ConfigManager.load(str(config_file))
-        assert config.type == "prokaryote"
+        assert config.type.value == "prokaryote"
 
     def test_type_invalid_raises_error(self, temp_dir):
         """An unrecognised type value raises ConfigurationError."""
@@ -1604,27 +1604,28 @@ class TestConfigOptionsType:
             ConfigManager.load(str(config_file))
 
     def test_config_type_property(self):
-        """Config.type property defaults to 'prokaryote' and reflects explicit values."""
+        """Config.type property defaults to OrganismType.PROKARYOTE and reflects explicit values."""
+        from validation_pkg.utils.formats import OrganismType
         config = Config()
-        assert config.type == "prokaryote"  # default
+        assert config.type.value == "prokaryote"  # default is OrganismType.PROKARYOTE
 
-        config.options["type"] = "prokaryote"
-        assert config.type == "prokaryote"
+        config.options["type"] = OrganismType.PROKARYOTE
+        assert config.type.value == "prokaryote"
 
-        config.options["type"] = "eukaryote"
-        assert config.type == "eukaryote"
+        config.options["type"] = OrganismType.EUKARYOTE
+        assert config.type.value == "eukaryote"
 
     def test_type_uppercase_accepted(self, temp_dir):
         """Type value is case-insensitive; 'PROKARYOTE' normalises to 'prokaryote'."""
         config_file = self._create_config(temp_dir, "PROKARYOTE")
         config = ConfigManager.load(str(config_file))
-        assert config.type == "prokaryote"
+        assert config.type.value == "prokaryote"
 
     def test_type_mixed_case_accepted(self, temp_dir):
         """Mixed-case type value normalises correctly."""
         config_file = self._create_config(temp_dir, "Eukaryote")
         config = ConfigManager.load(str(config_file))
-        assert config.type == "eukaryote"
+        assert config.type.value == "eukaryote"
 
     def test_type_empty_string_raises_error(self, temp_dir):
         """Empty string is not a valid type value."""
@@ -1650,9 +1651,9 @@ class TestConfigOptionsType:
         config_file.write_text(json.dumps(config, indent=2))
 
         loaded = ConfigManager.load(str(config_file))
-        assert loaded.type == "eukaryote"
+        assert loaded.type.value == "eukaryote"
         assert loaded.threads == 4
-        assert loaded.validation_level == "strict"
+        assert loaded.validation_level.value == "strict"
 
     def test_type_as_file_level_option_is_ignored(self, temp_dir):
         """type specified at file level (not in options) is logged as warning and ignored."""
@@ -1671,9 +1672,9 @@ class TestConfigOptionsType:
 
         loaded = ConfigManager.load(str(config_file))
         # Global type is not set (only file-level was given, which gets ignored) - falls back to default
-        assert loaded.type == 'prokaryote'
+        assert loaded.type.value == 'prokaryote'
         # file-level type is ignored (not in ALLOWED_FILE_OPTIONS); global default applies
-        assert loaded.ref_genome.global_options['type'] == 'prokaryote'
+        assert loaded.ref_genome.global_options['type'].value == 'prokaryote'
 
 
 if __name__ == "__main__":
