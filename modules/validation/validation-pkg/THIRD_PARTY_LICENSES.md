@@ -20,19 +20,3 @@ This document lists all third-party Python packages used by `validation-pkg`, al
 | pytest | 8.4.2 | MIT | https://github.com/pytest-dev/pytest |
 
 ---
-
-## License Texts
-
-### Biopython License Agreement
-
-Biopython is released under the Biopython License Agreement, a permissive open-source license similar to the BSD license. Full text: https://github.com/biopython/biopython/blob/master/LICENSE.rst
-
-### structlog — Apache-2.0 OR MIT
-
-structlog is dual-licensed. Users may choose either the Apache License 2.0 or the MIT License. Full texts:
-- Apache-2.0: https://github.com/hynek/structlog/blob/main/LICENSE-APACHE
-- MIT: https://github.com/hynek/structlog/blob/main/LICENSE-MIT
-
-### pytest — MIT
-
-Full text: https://github.com/pytest-dev/pytest/blob/main/LICENSE
