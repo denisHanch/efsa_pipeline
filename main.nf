@@ -31,12 +31,19 @@ def helpMessage() {
     )
 }
 
+<<<<<<< HEAD
 
 workflow {
     // Show help
     if (params.help) {
         helpMessage()
         exit(0)
+=======
+workflow {
+    if (params.help) {
+        helpMessage()
+        exit 0
+>>>>>>> 637366e (EFSA-272: add new line at the end of file)
     }
 
     file("${params.out_dir}/tables/csv_per_sv_summary").mkdirs()
@@ -68,3 +75,13 @@ workflow {
         logToNextflowFile("Check the process execution manifest in ${logDirPath}/process_manifest.txt for details on which processes failed.")
     }
 }
+<<<<<<< HEAD
+=======
+
+logWorkflowCompletion("execution of main.nf")
+
+workflow.onError {
+    log.error "Pipeline execution stopped with the following message: ${workflow.errorMessage}"
+    log.error "Check the process execution manifest in ${params.log_dir}/process_manifest.txt for details on which processes failed."
+}
+>>>>>>> 637366e (EFSA-272: add new line at the end of file)
