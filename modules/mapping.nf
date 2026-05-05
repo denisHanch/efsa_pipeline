@@ -131,6 +131,10 @@ process build_sv_flank_bed {
         b1=start-1
         if (b1 > b0) print chrom, b0, b1, (NR-1)"|before"
 
+        s0=start-1; if (s0 < 0) s0=0
+        s1=end
+        if (s1 > s0) print chrom, s0, s1, (NR-1)"|sv_span"
+
         a0=end; if (a0 < 0) a0=0
         a1=end+100
         if (a1 > a0) print chrom, a0, a1, (NR-1)"|after"
@@ -169,7 +173,7 @@ process mosdepth {
     awk '
       BEGIN{FS=OFS="\\t"}
       NR==FNR { cov[\$1 "|" \$2] = \$3; next }
-      FNR==1 { print \$0, "coverage_before_100bp", "coverage_after_100bp"; next }
+      FNR==1 { print \$0, "coverage_before_100bp", "coverage_sv_span", "coverage_after_100bp"; next }
       function get_cov(id, side, key, value) {
         key = id "|" side
         value = cov[key]
@@ -177,7 +181,7 @@ process mosdepth {
       }
       {
         id = FNR - 1
-        print \$0, get_cov(id, "before"), get_cov(id, "after")
+        print \$0, get_cov(id, "before"), get_cov(id, "sv_span"), get_cov(id, "after")
       }
     ' "\${coverage_tsv}" "${input_sv_tsv}" > "${outfile}"
     """
