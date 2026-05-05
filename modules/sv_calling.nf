@@ -45,9 +45,9 @@ process delly {
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index)
-    path fasta_file
-    path fai
-    path dict
+    each path(fasta_file)
+    each path(fai)
+    each path(dict)
     val out_folder_name
 
     output:
@@ -87,8 +87,8 @@ process cute_sv {
     publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
 
     input:
-    path fasta_file
-    path fai
+    each path(fasta_file)
+    each path(fai)
     tuple val(pair_id), path(bam_file), path(bam_index) 
     val out_folder_name
 
@@ -110,7 +110,7 @@ process debreak {
     publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
 
     input:
-    path fasta_file
+    each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index)
     val out_folder_name
 
