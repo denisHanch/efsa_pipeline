@@ -19,8 +19,6 @@
 include { nucmer; delta_filter; show_coords; syri; bcftools_concat; bgzip_tabix } from "../modules/assembly.nf"
 include { vcf_to_table_asm } from "../modules/sv_calling.nf"
 
-def executed = false
-
 workflow ref_mod {
     take:
         ref_fasta
@@ -56,15 +54,4 @@ workflow ref_mod {
     emit: 
         sv_vcf
         sv_tbl
-}
-
-
-workflow.onComplete {
-    if (executed) {
-        if (workflow.success) {
-            log.info "✅ The ref_mod processing pipeline completed successfully.\n"
-        } else {
-            log.error "❌ The ref_mod processing pipeline failed: ${workflow.errorReport}"
-        }
-    }
 }

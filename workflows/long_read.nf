@@ -25,8 +25,6 @@ include { logUnmapped; logUnmapped as logUnmapped_plasmid } from "../modules/log
 include { calc_unmapped as calc_unmapped_long; calc_unmapped as calc_unmapped_plasmid; calc_total_reads; get_unmapped_reads;get_unmapped_reads as get_unmapped_reads_plasmid; build_sv_flank_bed; mosdepth } from "../modules/mapping.nf"
 include { samtools_index; vcf_to_table_long }  from "../modules/sv_calling.nf"
 
-def executed = false
-
 workflow long_read {
 
     take:
@@ -38,17 +36,14 @@ workflow long_read {
 
     main:
         // mapping to the reference
-
-        executed = true
-
         samtools_index(fasta, out_folder_name) | set { fai }
         mapping_long(fastqs, fasta, mapping_tag, out_folder_name) | set { indexed_bam }
 
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
         
         // printout % unmapped reads
-        calc_total_reads(indexed_bam) | set { total_reads }
-        calc_unmapped_long(unmapped_fastq) | set { nreads }
+        calc_total_reads(indexed_bam) | map { pair_id, total -> total } | set { total_reads }
+        calc_unmapped_long(unmapped_fastq) | map { pair_id, reads -> reads } | set { nreads }
         logUnmapped(nreads, total_reads, out_folder_name, "")
 
         // mapping reads to plasmid & variant calling
@@ -58,7 +53,7 @@ workflow long_read {
             mapping_long_plasmid(unmapped_fastq, plasmid_fasta, mapping_tag, "${out_folder_name}-plasmid") | set { unmapped_bam }
             get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq }
 
-            calc_unmapped_plasmid(unmapped_fastq) | set { nreads }
+            calc_unmapped_plasmid(unmapped_fastq) | map { pair_id, reads -> reads } | set { nreads }
             logUnmapped_plasmid(nreads, total_reads, "${out_folder_name}-plasmid", " against plasmid")
         }
 
@@ -78,9 +73,9 @@ workflow long_read {
             supp_reads = sv_long.out.supp_reads
 
         } else {
-            sv_vcf     = Channel.empty()
-            sv_tbl     = Channel.empty()
-            supp_reads = Channel.empty()
+            sv_vcf     = channel.empty()
+            sv_tbl     = channel.empty()
+            supp_reads = channel.empty()
         }
 
 
@@ -89,14 +84,4 @@ workflow long_read {
         unmapped_fastq
         sv_tbl
         supp_reads
-}
-
-workflow.onComplete {
-    if (executed) {
-        if (workflow.success) {
-            log.info "✅ The long-read processing pipeline completed successfully.\n"
-        } else {
-            log.error "❌ The long-read processing pipeline failed: ${workflow.errorReport}"
-        }
-    }
 }

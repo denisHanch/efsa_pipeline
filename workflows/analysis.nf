@@ -90,11 +90,8 @@ workflow analysis {
 
         qc(illumina_reads, "illumina/qc_trimming") | set { trimmed }
 
-        // VCF annotation flag (GFF removed)
-        run_vcf_annotation = pmap.map { it.run_vcf_annotation }
-
-        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid, run_vcf_annotation)
-        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid, run_vcf_annotation)
+        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid)
+        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
         compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
 
         // Empty short table when not active

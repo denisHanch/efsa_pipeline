@@ -6,7 +6,8 @@ include { logWorkflowCompletion } from "./modules/logs.nf"
 
 // Help message
 def helpMessage() {
-    log.info"""
+    log.info(
+        """
     Usage:
 
     nextflow run main.nf
@@ -27,6 +28,7 @@ def helpMessage() {
     -with-dag        Produce DAG of workflow                                        (Nextflow built-in)
     --help           Show this help message
     """.stripIndent()
+    )
 }
 
 // Show help
@@ -36,13 +38,21 @@ if (params.help) {
 }
 
 workflow {
+<<<<<<< HEAD
+=======
+    if (params.help) {
+        helpMessage()
+        exit(0)
+    }
+>>>>>>> a514c80 (no-issue: fixing lint errors)
 
     file("${params.out_dir}/tables/csv_per_sv_summary").mkdirs()
 
-    config_ch = Channel.fromPath(params.config_json, checkIfExists: true)
+    config_ch = channel.fromPath(params.config_json, checkIfExists: true)
     validate(config_ch)
     analysis(validate.out.params_json)
 }
+<<<<<<< HEAD
 
 logWorkflowCompletion("execution of main.nf")
 
@@ -50,3 +60,5 @@ workflow.onError {
     log.error "Pipeline execution stopped with the following message: ${workflow.errorMessage}"
     log.error "Check the process execution manifest in ${params.log_dir}/process_manifest.txt for details on which processes failed."
 }
+=======
+>>>>>>> a514c80 (no-issue: fixing lint errors)

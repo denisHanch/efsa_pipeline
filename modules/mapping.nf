@@ -230,15 +230,11 @@ process calc_total_reads {
     tuple val(pair_id), path(bam), path(bam_index)
 
     output:
-    env total
+    tuple val(pair_id), stdout
 
     script:
     """
-    #!/usr/bin/env bash
-
-    total=\$(samtools view -c "$bam")
-
-    export total
+    samtools view -c "$bam"
     """
 }
 
@@ -250,11 +246,10 @@ process calc_unmapped {
     tuple val(pair_id), path(fastq)
 
     output:
-    env reads 
+    tuple val(pair_id), stdout
 
     script:
     """
-    #!/usr/bin/env bash
     if [[ "$fastq" == *.gz ]]; then
         total_lines=\$(zcat "$fastq" | wc -l)
     else
@@ -262,8 +257,7 @@ process calc_unmapped {
     fi
     
     reads=\$((total_lines / 4))
-
-    export reads
+    echo \$reads
     """
 }
 

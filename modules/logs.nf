@@ -1,11 +1,6 @@
 
-import java.time.format.DateTimeFormatter
-import java.time.ZoneId
-
 def logUnmapped(reads, total_reads, out_folder_name, reference) {
-
     reads.combine(total_reads).subscribe { r, total ->
-
         long unmapped = r as long
         long totalInput = total as long
 
@@ -20,16 +15,9 @@ def logUnmapped(reads, total_reads, out_folder_name, reference) {
     }
 }
 
-
-def describePipeline(read_type, fasta_type) {
-    log.info "ℹ️  Running pipeline: processing ${read_type} reads → mapping to the ${fasta_type} fasta.\n"
-}
-
-
-
 def logWorkflowCompletion(out_folder_name) {
     workflow.onComplete {
-        def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault())
+        def formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(java.time.ZoneId.systemDefault())
         def readableTime = formatter.format(workflow.complete)
 
         def workDir = new File("${workflow.workDir}")
