@@ -25,13 +25,11 @@ def helpMessage() {
     """.stripIndent()
 }
 
-// Show help
-if (params.help) {
-    helpMessage()
-    exit 0
-}
-
 workflow {
+    if (params.help) {
+        helpMessage()
+        exit 0
+    }
 
     file("${params.out_dir}/tables/csv_per_sv_summary").mkdirs()
 
