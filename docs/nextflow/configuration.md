@@ -12,7 +12,26 @@ The file `nextflow.config` is the central configuration for the pipeline. It def
 | `max_cpu` | `1` | Maximum CPUs available per process (override with `--max_cpu`) |
 | `clean_work` | `true` | Remove Nextflow `work/` directory after a successful run |
 | `ref_plasmid_fasta` | `null` | Optional reference plasmid FASTA |
+| `validation_level` | `null` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — `null` means not forwarded; `config.json` governs |
+| `logging_level` | `null` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — `null` means not forwarded; `config.json` governs |
+| `organism_type` | `null` | Organism type: `PROKARYOTE` or `EUKARYOTE` — `null` means not forwarded; `config.json` governs |
+| `force_defragment_ref` | `false` | Force reference defragmentation — unsupported workaround, use with caution |
 | `help` | `false` | Print help message and exit |
+
+### Parameter priority
+
+For options shared between Nextflow and `config.json` (`validation_level`, `logging_level`, `organism_type`), the following priority applies — higher entries win:
+
+```
+1. Per-file setting in config.json    {"filename": "ref.fa", "validation_level": "STRICT"}
+2. Global options block in config.json  "options": {"validation_level": "TRUST"}
+3. CLI flag                           nextflow run main.nf --validation_level MINIMAL
+4. nextflow.config default            validation_level = null  (no override)
+```
+
+When a param is `null` in `nextflow.config`, the flag is not forwarded to the validation script at all, so `config.json` has full control. A `WARNING` is logged whenever a per-file setting overrides a global `config.json` option.
+
+> `threads` follows the same hierarchy but is not exposed as a Nextflow CLI flag — set it only inside `config.json`.
 
 ## Per-Process Configuration
 

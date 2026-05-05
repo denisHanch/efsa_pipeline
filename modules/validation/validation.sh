@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --config <path>              Path to config file (default: ./data/inputs/config.json)"
             echo "  --threads <int>              Number of threads"
-            echo "  --validation-level <level>   'STRICTER', 'TRUST', or 'MINIMAL'"
+            echo "  --validation-level <level>   'STRICT', 'TRUST', or 'MINIMAL'"
             echo "  --logging-level <level>      'DEBUG', 'INFO', 'WARNING', or 'ERROR'"
             echo "  --type <type>                'PROKARYOTE' or 'EUKARYOTE'"
             echo "  --force-defragment-ref       Merge fragmented reference contigs (unsupported workaround)"
