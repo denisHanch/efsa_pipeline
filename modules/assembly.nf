@@ -1,7 +1,8 @@
 params.workflow_id = "fasta_ref_mod"
 
 process nucmer {
-    publishDir "${params.out_dir}/${params.workflow_id}/${prefix}", mode: "copy"
+    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy", saveAs: { filename -> "${prefix}/${filename}" }
+
 
     input:
     tuple val(prefix), path(ref), path(mod)
@@ -20,7 +21,7 @@ process nucmer {
 }
 
 process delta_filter {
-    publishDir "${params.out_dir}/${params.workflow_id}/${prefix}", mode: "copy"
+    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy", saveAs: { filename -> "${prefix}/${filename}" }
 
     input:
     tuple val(prefix), path(delta)
@@ -36,7 +37,7 @@ process delta_filter {
 
 
 process show_coords {
-    publishDir "${params.out_dir}/${params.workflow_id}/${prefix}", mode: "copy"
+    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy", saveAs: { filename -> "${prefix}/${filename}" }
 
     input:
     tuple val(prefix), path(filtered_delta)
@@ -72,7 +73,7 @@ process syri {
 }
 
 process bgzip_tabix {
-    publishDir "${params.out_dir}/${params.workflow_id}/${prefix}", mode: "copy"
+    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy", saveAs: { filename -> "${prefix}/${filename}" }
 
     input:
     tuple val(prefix), path(vcf)
@@ -89,7 +90,7 @@ process bgzip_tabix {
 
 
 process bcftools_concat {
-    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
+    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy", saveAs: { filename -> "${prefix}/${filename}" }
 
     input:
     path(sv_vcf)
