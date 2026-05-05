@@ -120,7 +120,7 @@ Specifies a genome or plasmid file.
 ```json
 {
   "filename": "path/to/genome.fasta.gz",
-  "validation_level": "trust",
+  "validation_level": "TRUST",
   "n_sequence_limit": 10
 }
 ```
@@ -128,7 +128,7 @@ Specifies a genome or plasmid file.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `filename` | string | — | Path to genome file (relative to config) |
-| `validation_level` | string | global / `"trust"` | Per-file validation level override |
+| `validation_level` | string | global / `"TRUST"` | Per-file validation level override |
 | `threads` | integer | global / auto | Per-file thread count override |
 | `n_sequence_limit` | integer | `5` | Maximum allowed number of sequences. Applies to `ref_genome_filename` and `mod_genome_filename` only — **ignored with a warning on plasmids**. When the genome contains more sequences than this limit, the assembly is considered too fragmented: a warning is logged, the file is copied to `data/valid/` as-is, and the pipeline will not run SyRI or ref-vs-mod comparison. Set higher for highly fragmented assemblies. |
 
@@ -225,9 +225,9 @@ These settings customize validation behavior without modifying code.
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `threads` | integer / `null` | auto-detect | Number of threads. `null` or omit = auto-detect from CPU cores. System warns if value exceeds available cores. |
-| `validation_level` | string | `"trust"` | `"strict"`, `"trust"`, or `"minimal"` |
+| `validation_level` | string | `"TRUST"` | `"STRICT"`, `"TRUST"`, or `"MINIMAL"` |
 | `logging_level` | string | `"INFO"` | `"DEBUG"`, `"INFO"`, `"WARNING"`, or `"ERROR"` |
-| `type` | string | `"prokaryote"` | `"prokaryote"` or `"eukaryote"`. Eukaryote skips inter-genome comparison. |
+| `type` | string | `"PROKARYOTE"` | `"PROKARYOTE"` or `"EUKARYOTE"`. Eukaryote skips inter-genome comparison. |
 | `force_defragment_ref` | boolean | `false` | **Unsupported workaround — use at your own risk.** Merges all reference contigs into one sequence before validation. Use only when the reference is too fragmented for any workflow. All downstream results (alignment, variant calling, feature mapping) may be incorrect or meaningless. See warning below. |
 
 > **⚠ Warning: `force_defragment_ref`**
@@ -278,9 +278,9 @@ This TSV is the only record of the original contig identities and their position
   ],
   "options": {
     "threads": 8,
-    "validation_level": "trust",
+    "validation_level": "TRUST",
     "logging_level": "DEBUG",
-    "type": "prokaryote",
+    "type": "PROKARYOTE",
     "force_defragment_ref": false
   }
 }
@@ -325,56 +325,56 @@ Complete example with all optional fields and global options:
 {
   "ref_genome_filename": {
     "filename": "ref.gbk",
-    "validation_level": "strict",
+    "validation_level": "STRICT",
     "threads": 8,
     "n_sequence_limit": 5
   },
   "mod_genome_filename": {
     "filename": "mod.fasta.gz",
-    "validation_level": "strict",
+    "validation_level": "STRICT",
     "threads": 8,
     "n_sequence_limit": 5
   },
   "ref_plasmid_filename": {
     "filename": "plasmid_ref.gbk",
-    "validation_level": "strict",
+    "validation_level": "STRICT",
     "threads": 8
     },
   "mod_plasmid_filename": {
     "filename": "plasmid_mod.fasta",
-    "validation_level": "strict",
+    "validation_level": "STRICT",
     "threads": 8
     },
   "reads": [
     {
       "filename": "illumina_R1.fastq.gz",
       "ngs_type": "illumina",
-      "validation_level": "strict",
+      "validation_level": "STRICT",
       "threads": 8
     },
     {
       "filename": "illumina_R2.fastq.gz",
       "ngs_type": "illumina",
-      "validation_level": "strict",
+      "validation_level": "STRICT",
       "threads": 8
     },
     {
       "directory": "ont_reads/",
       "ngs_type": "ont",
-      "validation_level": "strict",
+      "validation_level": "STRICT",
       "threads": 8
     }
   ],
   "ref_feature_filename": {
     "filename": "features_ref.gff3",
-    "validation_level": "strict",
+    "validation_level": "STRICT",
     "threads": 8
   },
   "options": {
     "threads": 8,
-    "validation_level": "strict",
+    "validation_level": "STRICT",
     "logging_level": "INFO",
-    "type": "prokaryote"
+    "type": "PROKARYOTE"
   }
 }
 ```

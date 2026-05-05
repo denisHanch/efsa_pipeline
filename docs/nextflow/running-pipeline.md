@@ -39,7 +39,19 @@ nextflow run main.nf --config_json /path/to/config.json --max_cpu $(nproc)
 
 ## Pipeline Options
 
-The most commonly used options are `--config_json`, `--out_dir`, `--max_cpu`, `--clean_work`, and `--help`. For the full parameter list (including plasmid FASTAs, etc.), see [Configuration](configuration.md#parameters-params).
+| Option | Description |
+|--------|-------------|
+| `--config_json <path>` | Path to the input `config.json` (default: `data/inputs/config.json`) |
+| `--out_dir <path>` | Output directory (default: `data/outputs`) |
+| `--max_cpu <n>` | Maximum CPUs per process (default: `1`) |
+| `--clean_work` | Remove Nextflow `work/` directory after a successful run |
+| `--validation_level <level>` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — overridden by `config.json` when set there |
+| `--logging_level <level>` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — overridden by `config.json` when set there |
+| `--organism_type <type>` | Organism type: `PROKARYOTE` or `EUKARYOTE` — overridden by `config.json` when set there |
+| `--force_defragment_ref` | Force reference defragmentation — unsupported workaround |
+| `--help` | Print help message and exit |
+
+For the full parameter list and priority rules, see [Configuration](configuration.md#parameters-params).
 
 
 ## Next Steps

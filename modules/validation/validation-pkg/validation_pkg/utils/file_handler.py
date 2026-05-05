@@ -3,15 +3,15 @@
 import gzip
 import bz2
 import re
+import shutil
+import subprocess
 import threading
 from pathlib import Path
 from typing import Union, TextIO, Type, Tuple, Any, Dict, Optional
 
 from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, FeatureFormat
+from validation_pkg.utils.logger import get_logger
 from validation_pkg.exceptions import CompressionError
-
-import subprocess
-import shutil
 
 __all__ = [
     # Tool availability and compression commands
@@ -105,7 +105,6 @@ def _log_compression_tool(tool_name: str, threads: int, is_parallel: bool, insta
         return
 
     try:
-        from validation_pkg.logger import get_logger
         logger = get_logger()
 
         if is_parallel:
@@ -470,7 +469,6 @@ def convert_file_compression(
 
     # If coding types match, just copy the file
     if input_coding == output_coding:
-        import shutil
         shutil.copy2(input_path, output_path)
         return
 

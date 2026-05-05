@@ -3,7 +3,7 @@
 import pytest
 import tempfile
 from pathlib import Path
-from validation_pkg.logger import ValidationLogger, setup_logging, get_logger
+from validation_pkg.utils.logger import ValidationLogger, setup_logging, get_logger
 
 
 class TestLogger:

@@ -16,6 +16,13 @@ from types import SimpleNamespace  # noqa: F401 — used in tests and helpers
 
 import pytest
 
+import sys
+from pathlib import Path
+
+_VALIDATION_ROOT = Path(__file__).parent.parent.parent  # modules/validation/
+if str(_VALIDATION_ROOT) not in sys.path:
+    sys.path.insert(0, str(_VALIDATION_ROOT))
+
 from nextflow_params_handler import build_params, write_params
 
 

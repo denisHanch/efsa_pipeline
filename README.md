@@ -172,52 +172,54 @@ Full configuration template is prepared in `data/inputs/config.json`.
 {
   "ref_genome_filename": {
     "filename": "TBA",
-    "validation_level": "strict/trust/minimal",
+    "validation_level": "STRICT/TRUST/MINIMAL",
     "threads": 8
   },
   "mod_genome_filename": {
     "filename": "TBA",
-    "validation_level": "strict/trust/minimal",
+    "validation_level": "STRICT/TRUST/MINIMAL",
     "threads": 8
   },
   "ref_plasmid_filename": {
     "filename": "TBA",
-    "validation_level": "strict/trust/minimal",
+    "validation_level": "STRICT/TRUST/MINIMAL",
     "threads": 8
     },
   "mod_plasmid_filename": {
     "filename": "TBA",
-    "validation_level": "strict/trust/minimal",
+    "validation_level": "STRICT/TRUST/MINIMAL",
     "threads": 8
     },
   "reads": [
     {
       "filename": "TBA",
       "ngs_type": "illumina/pacbio/ont",
-      "validation_level": "strict/trust/minimal",
+      "validation_level": "STRICT/TRUST/MINIMAL",
       "threads": 8
     },
     {
       "directory": "TBA",
       "ngs_type": "illumina/pacbio/ont",
-      "validation_level": "strict/trust/minimal",
+      "validation_level": "STRICT/TRUST/MINIMAL",
       "threads": 8
     }
   ],
   "ref_feature_filename": {
     "filename": "TBA",
-    "validation_level": "strict/trust/minimal",
+    "validation_level": "STRICT/TRUST/MINIMAL",
     "threads": 8
   },
   "mod_feature_filename": {
     "filename": "TBA",
-    "validation_level": "strict/trust/minimal",
+    "validation_level": "STRICT/TRUST/MINIMAL",
     "threads": 8
     },
   "options": {
     "threads": 8,
-    "validation_level": "strict/trust/minimal",
-    "logging_level":"DEBUG/INFO/WARNING/ERROR"
+    "validation_level": "STRICT/TRUST/MINIMAL",
+    "logging_level": "DEBUG/INFO/WARNING/ERROR",
+    "type": "PROKARYOTE/EUKARYOTE",
+    "force_defragment_ref": false
   }
 }
 ```
@@ -237,7 +239,7 @@ The package supports three validation levels to balance thoroughness and perform
 
 ## Logging
 
-Every validation run creates a new **log** file in `./logs/validation_ID.log`. With option `logging_level` in configuration file you may specify the amount of information logged.
+Every validation run creates a new **log** file in `data/outputs/logs/validation_ID.log`. With option `logging_level` in configuration file you may specify the amount of information logged.
 
 **Supported levels:**
 - `"DEBUG"`: Most verbose (all messages including debug info)
@@ -245,7 +247,7 @@ Every validation run creates a new **log** file in `./logs/validation_ID.log`. W
 - `"WARNING"`: Warnings and errors only
 - `"ERROR"`: Errors only
 
-Every validation run creates a new **report** file in `./logs/report_ID.txt`.
+Every validation run creates a new **report** file in `data/outputs/logs/report_ID.txt`.
 A validation report contains three main sections:
 
 
@@ -275,10 +277,17 @@ For each validated file:
 
 **To adapt validation performance:**
 
-1. Install parallel compression tools: `sudo apt-get install pigz pbzip2`
-2. Use `validation_level='trust'` for pre-validated data (10-15x faster)
-3. Use `threads` option in config (default 8) for record-level parallelization (3-7x faster in strict mode)
+1. Use `validation_level='trust'` for pre-validated data (10-15x faster)
+2. Use `threads` option in config (default 8) for record-level parallelization (3-7x faster in strict mode)
 
+## Nextflow integration
+
+Validation runs as the first part of nextflow pipeline and global options can be configured via **config.json** or **nextflow.config**.
+
+> **Important!**
+> 
+> config.json parameters have always higher priority. Nextflow.config parameters will be overrides by config.json when exists.
+>
 
 # Nextflow
 

@@ -9,7 +9,7 @@ import subprocess
 
 from validation_pkg.utils.base_settings import BaseOutputMetadata, BaseValidatorSettings
 from validation_pkg.exceptions import FeatureValidationError
-from validation_pkg.utils.formats import CodingType as CT, FeatureFormat
+from validation_pkg.utils.formats import CodingType as CT, FeatureFormat, ValidationLevel
 from validation_pkg.utils.file_handler import open_compressed_writer, check_tool_available
 from validation_pkg.utils.base_validator import BaseValidator
 
@@ -194,11 +194,11 @@ class FeatureValidator(BaseValidator):
         if not self.settings.check_coordinates or not self.features:
             return
 
-        validate_count = TRUST_MODE_SAMPLE_SIZE if self.validation_level == 'trust' else len(self.features)
+        validate_count = TRUST_MODE_SAMPLE_SIZE if self.validation_level == ValidationLevel.TRUST else len(self.features)
         features_to_validate = self.features[:validate_count]
 
         use_parallel = (
-            self.validation_level != 'trust'
+            self.validation_level != ValidationLevel.TRUST
             and self.threads and self.threads > 1
             and len(self.features) >= MIN_PARALLEL_FEATURES
         )
@@ -317,7 +317,7 @@ class FeatureValidator(BaseValidator):
         """Apply feature edits (sorting, ID replacement) in trust and strict modes."""
         
         # Minimal mode - skip edits, file will be copied as-is
-        if self.validation_level == 'minimal':
+        if self.validation_level == ValidationLevel.MINIMAL:
             self.logger.debug("Minimal mode - skipping edits")
             return
         

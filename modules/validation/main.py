@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
 import sys
 import traceback
@@ -28,31 +29,43 @@ from validation_pkg.exceptions import ValidationError
 from validation_pkg.utils.formats import CodingType, GenomeFormat
 from utils.ref_defragment import defragment_reference
 
-import nextflow_params_handler as nf_params
+import utils.nextflow_params_handler as nf_params
 
 
 def main():
-    # Check command line arguments
-    args = sys.argv[1:]
+    parser = argparse.ArgumentParser(description="Validation pipeline for genomic input files")
+    parser.add_argument("config_path", help="Path to config.json")
+    parser.add_argument("--threads",          type=int,  help="Number of threads (overrides config.json)")
+    parser.add_argument("--validation-level", choices=["strict", "trust", "minimal"], help="Validation depth (overrides config.json)")
+    parser.add_argument("--logging-level",    choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Log verbosity (overrides config.json)")
+    parser.add_argument("--type",             dest="organism_type", choices=["prokaryote", "eukaryote"], help="Organism type (overrides config.json)")
+    parser.add_argument("--force-defragment-ref", action="store_true", default=False, help="Merge fragmented reference contigs (unsupported workaround)")
+    parsed = parser.parse_args()
 
-    if not args:
-        print("Usage: python main.py <config_path> ")
-        print("\nExample:")
-        print("  python main.py config.json")
-        return 1
+    config_path = Path(parsed.config_path).resolve()
 
-    config_path = Path(args[0]).resolve()
+    cli_options = {}
+    if parsed.threads            is not None: cli_options["threads"]             = parsed.threads
+    if parsed.validation_level   is not None: cli_options["validation_level"]    = parsed.validation_level
+    if parsed.logging_level      is not None: cli_options["logging_level"]       = parsed.logging_level
+    if parsed.organism_type      is not None: cli_options["type"]                = parsed.organism_type
+    if parsed.force_defragment_ref:           cli_options["force_defragment_ref"] = True
+
     base_valid_dir = Path.cwd()
     # Use the run-specific dir exported by validation.sh; fall back to CWD.
     run_dir = os.environ.get("VALIDATION_RUN_DIR")
     output_dir = Path(run_dir).resolve() if run_dir else base_valid_dir
     output_dir.mkdir(parents=True, exist_ok=True)
+    run_id = output_dir.name.removeprefix("run_") if output_dir.name.startswith("run_") else None
+    logs_dir = config_path.parent.parent / "outputs" / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
     logger = None
     log_file = None
 
     # Setup logging
+    log_filename = f"validation_{run_id}.log" if run_id else "validation.log"
     try:
-        logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
+        logger = setup_logging(console_level='DEBUG', log_file=logs_dir / log_filename)
     except (PermissionError, OSError) as e:
         logger = setup_logging(console_level='DEBUG')
         logger.warning(f"Could not write log file ({e}); logging to console only")
@@ -63,7 +76,7 @@ def main():
     # ========================================================================
     config = None
     try:
-        config = ConfigManager.load(config_path)
+        config = ConfigManager.load(config_path, cli_options=cli_options or None)
     except Exception as e:
         logger.error(f"Loading a config file failed: {e}")
         return 1
@@ -202,7 +215,8 @@ def main():
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
-    report = ValidationReport(output_dir / "report.txt")
+    report_filename = f"report_{run_id}.txt" if run_id else "report.txt"
+    report = ValidationReport(logs_dir / report_filename)
     fatal_errors: list[str] = []
 
     def register_required_failure(label: str, exc: Exception) -> None:
@@ -320,11 +334,8 @@ def main():
             "skipped. Feature coordinates are not meaningful on a defragmented "
             "reference — run_vcf_annotation will be disabled."
         )
-    # Extract timestamp from run directory name (run_YYYYMMDD_HHMMSS) so
-    # validation_timestamp matches the folder name exactly.
-    run_timestamp = output_dir.name.removeprefix("run_") if output_dir.name.startswith("run_") else None
     repo_root = config_path.parent.parent.parent
-    params = nf_params.build_params(validation_results, run_timestamp=run_timestamp, base_dir=repo_root)
+    params = nf_params.build_params(validation_results, run_timestamp=run_id, base_dir=repo_root)
     nf_params.write_params(params, base_valid_dir / "validated_params.json")
 
     return 0

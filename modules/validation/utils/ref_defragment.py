@@ -7,7 +7,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 from validation_pkg.config_manager import GenomeConfig
-from validation_pkg.logger import get_logger
+from validation_pkg.utils.logger import get_logger
 from validation_pkg.utils import file_handler
 
 

@@ -28,7 +28,7 @@ pip install -r /path/to/validation-pkg/requirements-dev.txt
 pip install -e "/path/to/validation-pkg[dev]"
 ```
 
-**Note:** As of the latest optimization, test dependencies (pytest, etc.) have been moved to `requirements-dev.txt` to reduce container initialization time. Production installations only require the core dependencies: biopython, numpy, pysam, structlog, and typing_extensions.
+**Note:** Test dependencies (pytest, etc.) are in `requirements-dev.txt`. Production installations only require the core dependencies: biopython, structlog.
 
 ### Basic Usage
 

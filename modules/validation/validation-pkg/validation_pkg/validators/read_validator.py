@@ -16,7 +16,7 @@ from validation_pkg.exceptions import (
     FastqFormatError,
     BamFormatError
 )
-from validation_pkg.utils.formats import ReadFormat
+from validation_pkg.utils.formats import ReadFormat, NgsType, ValidationLevel
 from validation_pkg.utils.base_validator import BaseValidator
 from validation_pkg.utils.file_handler import (
     convert_file_compression,
@@ -224,8 +224,8 @@ class ReadValidator(BaseValidator):
         # Apply outdir_by_ngs_type if enabled
         if self.settings.outdir_by_ngs_type:
             # Override output_subdir_name with ngs_type
-            self.settings = self.settings.update(output_subdir_name=self.read_config.ngs_type)
-            self.logger.debug(f"Applied outdir_by_ngs_type: output_subdir_name set to '{self.read_config.ngs_type}'")
+            self.settings = self.settings.update(output_subdir_name=self.read_config.ngs_type.value)
+            self.logger.debug(f"Applied outdir_by_ngs_type: output_subdir_name set to '{self.read_config.ngs_type.value}'")
 
     # Required abstract properties and methods from BaseValidator
 
@@ -335,7 +335,7 @@ class ReadValidator(BaseValidator):
     ) -> str:
         """Build output filename with Illumina pattern detection for reads."""
         # Detect Illumina pattern if ngs_type is illumina
-        if self.read_config.ngs_type == 'illumina':
+        if self.read_config.ngs_type == NgsType.ILLUMINA:
             self._detect_illumina_pattern(input_filename)
 
         # Generate base name based on detected pattern
@@ -393,11 +393,11 @@ class ReadValidator(BaseValidator):
         self.output_metadata.num_reads = len(self.sequences)
 
         # Store configured NGS type and detected input format
-        self.output_metadata.ngs_type = self.read_config.ngs_type
+        self.output_metadata.ngs_type = self.read_config.ngs_type.value
         self.output_metadata.input_format = self.read_config.detected_format.to_biopython()
 
         # Calculate read statistics in strict mode only
-        if self.validation_level == 'strict' and self.sequences:
+        if self.validation_level == ValidationLevel.STRICT and self.sequences:
             stats = self._calculate_read_statistics()
             self.output_metadata.n50 = stats['n50']
             self.output_metadata.total_bases = stats['total_bases']
@@ -442,7 +442,7 @@ class ReadValidator(BaseValidator):
 
         # Trust mode: Parse only first TRUST_MODE_SAMPLE_SIZE sequences for validation
         # Strict mode: Parse all sequences
-        if self.validation_level == 'trust':
+        if self.validation_level == ValidationLevel.TRUST:
             self.logger.info(f"Trust mode - parsing first {TRUST_MODE_SAMPLE_SIZE} sequences only for validation")
             parse_limit = TRUST_MODE_SAMPLE_SIZE
         else:
@@ -451,7 +451,7 @@ class ReadValidator(BaseValidator):
 
         try:
             # Get total line count for progress reporting (strict mode only)
-            if self.validation_level == 'strict':
+            if self.validation_level == ValidationLevel.STRICT:
                 try:
                     line_count = self._count_lines_fast()
                     estimated_sequences = line_count // 4  # FASTQ has 4 lines per sequence
@@ -533,7 +533,7 @@ class ReadValidator(BaseValidator):
     def _validate_sequences(self) -> None:
         """Validate parsed sequences with optional parallelization."""
         # Determine how many sequences to validate
-        if self.validation_level == 'trust':
+        if self.validation_level == ValidationLevel.TRUST:
             validate_count = min(10, len(self.sequences))
             self.logger.info(f"Trust mode - validating first {validate_count} of {len(self.sequences):,} sequences (sequential)")
             use_parallel = False
@@ -694,7 +694,7 @@ class ReadValidator(BaseValidator):
 
         # Trust mode - copy original file with coding conversion
         # Trust mode parsed only first 10 sequences for validation, so we copy the original file
-        if self.validation_level == 'trust':
+        if self.validation_level == ValidationLevel.TRUST:
             self.logger.debug("Trust mode - copying original file with coding conversion")
 
             # Convert coding using unified file_handler utility

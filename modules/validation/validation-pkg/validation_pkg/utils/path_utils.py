@@ -1,9 +1,11 @@
 """Path resolution and security utilities for file operations."""
 
+import platform
+import re
 from pathlib import Path
 from typing import Optional
+
 from validation_pkg.exceptions import ConfigurationError
-import re
 
 __all__ = [
     'resolve_filepath',
@@ -61,7 +63,6 @@ def sanitize_path_component(component: str, allow_slashes: bool = False) -> str:
         raise ValueError("Invalid path component: contains null byte")
 
     # Platform-specific checks
-    import platform
     if platform.system() == 'Windows':
         # Block Windows reserved characters
         invalid_chars = ['<', '>', '"', '|', '?', '*']
