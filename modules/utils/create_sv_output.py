@@ -70,6 +70,21 @@ TAB_BY_TYPE = {
     "TRA": "Translocations",
 }
 
+_OUTPUT_SCHEMA = (
+    "event_id", "chrom", "std_svtype", "event_start", "event_end", "event_length_bp",
+    "asm_start", "asm_end", "asm_start_mod", "asm_end_mod", "asm_length", "asm_svtype_raw", "asm_score",
+    "long_ont_start", "long_ont_end", "long_ont_length", "long_ont_info_svtype", "long_ont_score",
+    "long_ont_supporting_reads", "long_ont_supporting_methods",
+    "long_ont_coverage_before_100bp", "long_ont_coverage_sv_span", "long_ont_coverage_after_100bp",
+    "long_pacbio_start", "long_pacbio_end", "long_pacbio_length", "long_pacbio_info_svtype", "long_pacbio_score",
+    "long_pacbio_supporting_reads", "long_pacbio_supporting_methods",
+    "long_pacbio_coverage_before_100bp", "long_pacbio_coverage_sv_span", "long_pacbio_coverage_after_100bp",
+    "short_start", "short_end", "short_length", "short_svtype_raw", "short_info_svtype",
+    "short_chr2", "short_pos2", "short_score", "short_supporting_reads", "short_reads_copy_number_estimate",
+    "short_coverage_before_100bp", "short_coverage_sv_span", "short_coverage_after_100bp",
+    "percentage_overlap", "support_score", "linked_event",
+)
+
 INFO_MAP = {
     "INS": "INS",
     "DEL": "DEL",
@@ -1034,15 +1049,19 @@ def annotate_linked_events(df: pd.DataFrame, coord_tol: int = 0) -> pd.DataFrame
 def write_csv_tables(df: pd.DataFrame, outdir: Union[str, Path]) -> None:
     os.makedirs(outdir, exist_ok=True)
 
+    if "std_svtype" not in df.columns:
+        df = pd.DataFrame(columns=list(_OUTPUT_SCHEMA))
+
     for std_type, name in TAB_BY_TYPE.items():
         sub = df[df["std_svtype"] == std_type].copy()
-        if not sub.empty:
-            # Drop type-specific columns
-            cols_to_drop = ["std_svtype"]
-            if std_type != "TRA":
-                cols_to_drop.extend(["asm_start_mod", "asm_end_mod"])
-            sub = sub.drop(columns=cols_to_drop, errors="ignore")
-            path = os.path.join(outdir, f"{name}.csv")
+        cols_to_drop = ["std_svtype"]
+        if std_type != "TRA":
+            cols_to_drop.extend(["asm_start_mod", "asm_end_mod"])
+        sub = sub.drop(columns=cols_to_drop, errors="ignore")
+        path = os.path.join(outdir, f"{name}.csv")
+        if sub.empty:
+            sub.to_csv(path, index=False)
+        else:
             sub.sort_values(["chrom", "event_start", "event_end"]).to_csv(path, index=False)
 
     other = df[~df["std_svtype"].isin(TAB_BY_TYPE)].copy()
@@ -1107,12 +1126,12 @@ def main() -> None:
         logger.info("resolve_supporting_reads_completed", total_records=len(records))
 
     if not records:
-        os.makedirs(args.out, exist_ok=True)
+        write_csv_tables(pd.DataFrame(), args.out)
         logger.warning(
             "create_sv_output_no_valid_records",
             output_dir=str(args.out),
         )
-        print("No valid input records found; created output directory and exiting.")
+        print("No valid input records found; wrote empty output tables and exiting.")
         print(f"Load-record audit log: {log_path}")
         return
 
