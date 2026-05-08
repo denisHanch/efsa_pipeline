@@ -193,6 +193,8 @@ The examples below use simplified coordinates for clarity.
 | **long_(ont\|pacbio)_coverage_after_100bp** | Mean depth in the 100 bp flank after the long-read SV event, computed by `mosdepth`. |
 | **short_chr2** | Partner chromosome for short-read translocation/breakend calls (from short-read TSV `chr2`, extracted from VCF `INFO/CHR2`). Empty for non-translocation short-read events or when unavailable. |
 | **short_pos2** | Partner breakpoint position for short-read translocation/breakend calls (from short-read TSV `pos2`, extracted from VCF `INFO/POS2`). Empty for non-translocation short-read events or when unavailable. |
+| **short_supporting_reads** | Number of short-read reads supporting the structural variant. Delly emits this as `PE` (paired-end reads). When the value is absent or zero (an unreliable sentinel), `coverage_sv_span` is used as a depth proxy (rounded to the nearest integer). See `short_supporting_reads_note`. |
+| **short_supporting_reads_note** | Indicates how `short_supporting_reads` was derived. `"depth_proxy"` means the value was substituted from `short_coverage_sv_span` because the caller did not report a count or reported 0. Empty when the count was reported directly by the caller. `NaN` when no short-read call is present for the event. |
 | **short_reads_copy_number_estimate** | Estimated copy number derived from short-read depth information (VCF `FORMAT` field `RDCN`). |
 | **short_coverage_before_100bp** | Mean depth in the 100 bp flank before the short-read SV event, computed by `mosdepth`. |
 | **short_coverage_sv_span** | Mean depth across the full short-read SV event span (`start..end`), computed by `mosdepth`. |
@@ -207,6 +209,7 @@ The examples below use simplified coordinates for clarity.
 - `INS`: reported as a single position (`start == end`) representing the insertion point
 - `TRA`: reported as a breakpoint (`start == end`) representing the breakpoint position
 - For `INS` and `TRA`, the inserted/translocated sequence length is provided in the `svlen` field, not from coordinate difference
+- Supporting reads (`PE`) are not always emitted; when absent or zero, `coverage_sv_span` is used as a depth proxy (see `short_supporting_reads_note`). The proxy over-estimates true supporting reads because it counts all reads spanning the region, not only those supporting the variant allele.
 
 **Assembly variants (syri):**
 - Syri uses the VCF `ALT` field for variant types: `DEL`, `INS`, `INV`, `DUP`, `TRANS` (translocation), `CPG` (copy gain), `CPL` (copy loss), `SYN` (syntenic), and alignment/inverted variants

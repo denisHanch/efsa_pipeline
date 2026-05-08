@@ -80,7 +80,7 @@ _OUTPUT_SCHEMA = (
     "long_pacbio_supporting_reads", "long_pacbio_supporting_methods",
     "long_pacbio_coverage_before_100bp", "long_pacbio_coverage_sv_span", "long_pacbio_coverage_after_100bp",
     "short_start", "short_end", "short_length", "short_svtype_raw", "short_info_svtype",
-    "short_chr2", "short_pos2", "short_score", "short_supporting_reads", "short_reads_copy_number_estimate",
+    "short_chr2", "short_pos2", "short_score", "short_supporting_reads", "short_supporting_reads_note", "short_reads_copy_number_estimate",
     "short_coverage_before_100bp", "short_coverage_sv_span", "short_coverage_after_100bp",
     "percentage_overlap", "support_score", "linked_event",
 )
@@ -323,6 +323,7 @@ class Record:
     coverage_before_100bp: Optional[float] = None
     coverage_sv_span: Optional[float] = None
     coverage_after_100bp: Optional[float] = None
+    supporting_reads_is_depth_proxy: bool = False
 
 @dataclass
 class EventCluster:
@@ -633,6 +634,19 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
         coverage_before_100bp = _to_float(row.get("coverage_before_100bp"))
         coverage_sv_span = _to_float(row.get("coverage_sv_span"))
         coverage_after_100bp = _to_float(row.get("coverage_after_100bp"))
+
+        # Short-read supporting reads: use coverage_sv_span as a depth proxy when
+        # the caller did not report a count (None) or reported 0 (unreliable sentinel).
+        sr = _to_int(row.get("supporting_reads"))
+        sr_is_depth_proxy = False
+        if source == "short":
+            if sr is None or sr == 0:
+                if coverage_sv_span is not None and coverage_sv_span > 0:
+                    sr = int(round(coverage_sv_span))
+                    sr_is_depth_proxy = True
+                else:
+                    sr = None  # normalise 0 → NaN when no proxy is available
+
         svlen_input = _to_int(row.get("svlen"))
         svlen = abs(svlen_input) if svlen_input is not None else None
         coord_len = (end - start) if (start is not None and end is not None and end >= start) else None
@@ -730,7 +744,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 std,
                 raw_svtype,
                 row.get("info_svtype"),
-                _to_int(row.get("supporting_reads")),
+                sr,
                 _to_float(row.get("score")),
                 copy_number,
                 chr2,
@@ -742,6 +756,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 coverage_before_100bp,
                 coverage_sv_span,
                 coverage_after_100bp,
+                sr_is_depth_proxy,
             )
         )
 
@@ -906,6 +921,7 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "short_pos2": sht.pos2 if sht else np.nan,
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
+            "short_supporting_reads_note": ("depth_proxy" if (sht and sht.supporting_reads_is_depth_proxy) else ""),
             "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
             "short_coverage_before_100bp": sht.coverage_before_100bp if sht else np.nan,
             "short_coverage_sv_span": sht.coverage_sv_span if sht else np.nan,
