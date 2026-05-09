@@ -118,6 +118,7 @@ ROW_LOG_FIELDS = (
     "start_mod",
     "end_mod",
     "coverage_before_100bp",
+    "coverage_sv_span",
     "coverage_after_100bp",
 )
 
@@ -305,6 +306,7 @@ class Record:
     start_mod: Optional[int] = None
     end_mod: Optional[int] = None
     coverage_before_100bp: Optional[float] = None
+    coverage_sv_span: Optional[float] = None
     coverage_after_100bp: Optional[float] = None
 
 @dataclass
@@ -614,6 +616,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
         start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
         end_mod = _to_int(row.get("end_mod")) if source == "asm" else None
         coverage_before_100bp = _to_float(row.get("coverage_before_100bp"))
+        coverage_sv_span = _to_float(row.get("coverage_sv_span"))
         coverage_after_100bp = _to_float(row.get("coverage_after_100bp"))
         svlen_input = _to_int(row.get("svlen"))
         svlen = abs(svlen_input) if svlen_input is not None else None
@@ -722,6 +725,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 start_mod,
                 end_mod,
                 coverage_before_100bp,
+                coverage_sv_span,
                 coverage_after_100bp,
             )
         )
@@ -864,6 +868,7 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "long_ont_supporting_reads": long_ont.supporting_reads if long_ont else np.nan,
             "long_ont_supporting_methods": long_ont.supporting_methods if long_ont else np.nan,
             "long_ont_coverage_before_100bp": long_ont.coverage_before_100bp if long_ont else np.nan,
+            "long_ont_coverage_sv_span": long_ont.coverage_sv_span if long_ont else np.nan,
             "long_ont_coverage_after_100bp": long_ont.coverage_after_100bp if long_ont else np.nan,
 
             "long_pacbio_start": long_pacbio.start if long_pacbio else np.nan,
@@ -874,6 +879,7 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "long_pacbio_supporting_reads": long_pacbio.supporting_reads if long_pacbio else np.nan,
             "long_pacbio_supporting_methods": long_pacbio.supporting_methods if long_pacbio else np.nan,
             "long_pacbio_coverage_before_100bp": long_pacbio.coverage_before_100bp if long_pacbio else np.nan,
+            "long_pacbio_coverage_sv_span": long_pacbio.coverage_sv_span if long_pacbio else np.nan,
             "long_pacbio_coverage_after_100bp": long_pacbio.coverage_after_100bp if long_pacbio else np.nan,
 
             "short_start": sht.start if sht else np.nan,
@@ -887,6 +893,7 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
             "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
             "short_coverage_before_100bp": sht.coverage_before_100bp if sht else np.nan,
+            "short_coverage_sv_span": sht.coverage_sv_span if sht else np.nan,
             "short_coverage_after_100bp": sht.coverage_after_100bp if sht else np.nan,
 
             "percentage_overlap": pct_str,

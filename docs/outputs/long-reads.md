@@ -2,7 +2,7 @@
 
 ## Pipeline Workflow
 
-This workflow shows the processing of raw long-read sequencing data (PacBio or Nanopore) from quality control to mapping. Reads undergo NanoPlot QC, then mapped to the reference or modified genome with minimap2, followed by sorting, indexing, and calculation of unmapped reads. Structural variant calling using cute_sv, debreak, and sniffles is performed only for reads mapped to the reference genome, and results are merged with SURVIVOR and summarized with bcftools stats, producing the final long-read VCF. Reads mapped to modified or plasmid sequences skip structural variant calling. For SV calls, `vcf_to_table_long`, `build_sv_flank_bed`, and `mosdepth` add 100 bp flank coverage metrics to the TSV output.
+This workflow shows the processing of raw long-read sequencing data (PacBio or Nanopore) from quality control to mapping. Reads undergo NanoPlot QC, then mapped to the reference or modified genome with minimap2, followed by sorting, indexing, and calculation of unmapped reads. Structural variant calling using cute_sv, debreak, and sniffles is performed only for reads mapped to the reference genome, and results are merged with SURVIVOR and summarized with bcftools stats, producing the final long-read VCF. Reads mapped to modified or plasmid sequences skip structural variant calling. For SV calls, `vcf_to_table_long`, `build_sv_flank_bed`, and `mosdepth` add local coverage metrics (100 bp flanks and SV span) to the TSV output.
 
 ```mermaid
 %%{init: {
@@ -77,7 +77,7 @@ SURVIVOR["survivor"]
 BCFTOOLS_STATS["bcftools stats"]
 VCF2TABLE_LONG["vcf_to_table_long"]
 BUILD_BED_LONG["build_sv_flank_bed"]
-MOSDEPTH_LONG["mosdepth (100 bp flanks)"]
+MOSDEPTH_LONG["mosdepth (100 bp flanks + SV span)"]
 
 SV_TSV_LONG["SV TSV + flank coverage"]:::output
 LONG_VCF["Long-read VCF"]:::output
