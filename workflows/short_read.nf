@@ -28,8 +28,8 @@ workflow short_read {
 
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
         
-        calc_total_reads(indexed_bam) | map { pair_id, total -> total } | set { total_reads }
-        calc_unmapped(unmapped_fastq) | map { pair_id, reads -> reads } | set { nreads }
+        calc_total_reads(indexed_bam) | map { _pair_id, total -> total } | set { total_reads }
+        calc_unmapped(unmapped_fastq) | map { _pair_id, reads -> reads } | set { nreads }
         logUnmapped(nreads, total_reads, out_folder_name, "")
 
         // mapping reads to plasmid
@@ -40,7 +40,7 @@ workflow short_read {
             mapping_plasmid(plasmid_fasta, unmapped_fasta_index, unmapped_fastq, "${out_folder_name}-plasmid") | set { unmapped_bam }
             get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq }
 
-            calc_unmapped_plasmid(unmapped_fastq) | map { pair_id, reads -> reads } | set { nreads }
+            calc_unmapped_plasmid(unmapped_fastq) | map { _pair_id, reads -> reads } | set { nreads }
             logUnmapped_plasmid(nreads, total_reads, "${out_folder_name}-plasmid", " against plasmid")
         }
 

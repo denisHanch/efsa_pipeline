@@ -103,7 +103,7 @@ workflow sv_long {
             .mix(extract_supp_reads_3.out)
 
         survivor(cute_vcf.join(debreak_vcf).join(sniffles_vcf), mapping_tag, out_folder_name) | set { merged_vcf }
-        bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
+        bcftools_stats(merged_vcf, out_folder_name)
     emit:
         merged_vcf
         supp_reads

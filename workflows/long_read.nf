@@ -42,8 +42,8 @@ workflow long_read {
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
         
         // printout % unmapped reads
-        calc_total_reads(indexed_bam) | map { pair_id, total -> total } | set { total_reads }
-        calc_unmapped_long(unmapped_fastq) | map { pair_id, reads -> reads } | set { nreads }
+        calc_total_reads(indexed_bam) | map { _pair_id, total -> total } | set { total_reads }
+        calc_unmapped_long(unmapped_fastq) | map { _pair_id, reads -> reads } | set { nreads }
         logUnmapped(nreads, total_reads, out_folder_name, "")
 
         // mapping reads to plasmid & variant calling
@@ -53,7 +53,7 @@ workflow long_read {
             mapping_long_plasmid(unmapped_fastq, plasmid_fasta, mapping_tag, "${out_folder_name}-plasmid") | set { unmapped_bam }
             get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq }
 
-            calc_unmapped_plasmid(unmapped_fastq) | map { pair_id, reads -> reads } | set { nreads }
+            calc_unmapped_plasmid(unmapped_fastq) | map { _pair_id, reads -> reads } | set { nreads }
             logUnmapped_plasmid(nreads, total_reads, "${out_folder_name}-plasmid", " against plasmid")
         }
 

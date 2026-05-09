@@ -2,6 +2,16 @@
 
 The file `nextflow.config` is the central configuration for the pipeline. It defines default parameters, per-process resource limits and container images, execution profiles, and reporting options.
 
+## Runtime Logging Environment
+
+The pipeline sets the following runtime logging environment variables in `nextflow.config`:
+
+- `NXF_LOG_FILE=${projectDir}/data/outputs/logs/nextflow.log` — writes Nextflow runtime logs to file
+- `NXF_ANSI_LOG=false` — disables ANSI live console rendering
+- `NXF_QUIET=true` — keeps console output quiet by default
+
+As a result, operational runtime messages are primarily captured in `data/outputs/logs/nextflow.log` rather than printed to screen.
+
 ## Parameters (`params`)
 
 | Parameter | Default | Description |
@@ -88,7 +98,7 @@ Containers run as the current user to avoid root-owned output files.
 | Profile | Description |
 |---------|-------------|
 | `standard` | Default — uses parameters as defined above |
-| `test` | Sets `config_json` to `data/inputs/test/config.json` for the bundled test dataset |
+| `test` | Keeps the same input paths but enforces low resource caps (`cpus=1`, `memory=2 GB`, `time=1h`) for all processes |
 
 Run with a profile:
 

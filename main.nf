@@ -2,7 +2,7 @@
 
 include { validate } from "./modules/validate.nf"
 include { analysis } from "./workflows/analysis.nf"
-include { logWorkflowCompletion } from "./modules/logs.nf"
+include { generateProcessManifest ; logToNextflowFile ; logCompletionSummary ; getLogDir ; copyCommandLogs ; resolveWorkDir } from "./modules/logs.nf"
 
 // Help message
 def helpMessage() {
@@ -31,34 +31,40 @@ def helpMessage() {
     )
 }
 
-// Show help
-if (params.help) {
-    helpMessage()
-    exit 0
-}
 
 workflow {
-<<<<<<< HEAD
-=======
+    // Show help
     if (params.help) {
         helpMessage()
         exit(0)
     }
->>>>>>> a514c80 (no-issue: fixing lint errors)
 
     file("${params.out_dir}/tables/csv_per_sv_summary").mkdirs()
 
     config_ch = channel.fromPath(params.config_json, checkIfExists: true)
     validate(config_ch)
     analysis(validate.out.params_json)
-}
-<<<<<<< HEAD
 
-logWorkflowCompletion("execution of main.nf")
+    workflow.onComplete { wf ->
+        def workDir = resolveWorkDir(wf)
+        def logDir = getLogDir()
 
-workflow.onError {
-    log.error "Pipeline execution stopped with the following message: ${workflow.errorMessage}"
-    log.error "Check the process execution manifest in ${params.log_dir}/process_manifest.txt for details on which processes failed."
+        copyCommandLogs(workDir, logDir)
+        generateProcessManifest(logDir, wf)
+        logCompletionSummary(wf, workDir)
+
+        if (workDir.deleteDir()) {
+            logToNextflowFile("🧹 Removed work directory: ${workDir.absolutePath}\n")
+        }
+        else {
+            logToNextflowFile("⚠️ Failed to remove work directory: ${workDir.absolutePath}\n")
+        }
+    }
+
+    workflow.onError {
+        def errorDetails = workflow?.errorMessage ?: workflow?.errorReport ?: 'No error details available (pipeline may have been interrupted)'
+        def logDirPath = (params?.log_dir ?: 'data/outputs/logs')
+        logToNextflowFile("Pipeline execution stopped with the following message: ${errorDetails}")
+        logToNextflowFile("Check the process execution manifest in ${logDirPath}/process_manifest.txt for details on which processes failed.")
+    }
 }
-=======
->>>>>>> a514c80 (no-issue: fixing lint errors)

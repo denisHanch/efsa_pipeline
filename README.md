@@ -390,6 +390,8 @@ This executes **short-read processing**, **long-read processing**, and **referen
 nextflow run main.nf --max_cpu $(nproc)
 ```
 
+By default, runtime logs are written to `data/outputs/logs/nextflow.log` and console output is kept quiet.
+
 ### Available Nextflow Options
 
 
@@ -636,11 +638,11 @@ The `create_sv_output.py` script processes SV records through the following step
 
 ## 🔄 Pipeline Runtime Messages & Mapping Summary
 
-During execution, the pipeline prints progress messages indicating which workflow is currently running and what type of reads are being processed.
+During execution, the pipeline writes progress messages indicating which workflow is currently running and what type of reads are being processed to `data/outputs/logs/nextflow.log`.
 
 ### Runtime Status Messages
 
-When the pipeline is running, you will see real-time messages like:
+When the pipeline is running, `nextflow.log` contains messages like:
 
 ```text
 ℹ️  Running pipeline: processing long-pacbio reads → mapping to the reference & modified fasta.

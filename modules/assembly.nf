@@ -90,7 +90,7 @@ process bgzip_tabix {
 
 
 process bcftools_concat {
-    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy", saveAs: { filename -> "${prefix}/${filename}" }
+    publishDir "${params.out_dir}/${params.workflow_id}", mode: "copy"
 
     input:
     path(sv_vcf)

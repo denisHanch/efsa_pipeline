@@ -23,6 +23,7 @@ logs/
 ## Description
 
 The `logs/` folder contains **detailed logs and command scripts** for each Nextflow process.
+Runtime pipeline messages are recorded in `nextflow.log` (default quiet-console mode).
 
 ## File Descriptions
 
@@ -118,5 +119,4 @@ To quickly check which processes failed, inspect `data/outputs/logs/process_mani
 ## See Also
 
 - [Running the Pipeline](../nextflow/running-pipeline.md) — pipeline execution options
-- [Runtime Messages](../nextflow/runtime-messages.md) — live console output during execution
-- [Runtime Messages](../nextflow/runtime-messages.md) - Understanding pipeline progress
+- [Runtime Messages](../nextflow/runtime-messages.md) — understanding runtime progress in `nextflow.log`

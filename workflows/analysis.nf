@@ -115,10 +115,10 @@ workflow analysis {
 
         def tbl_channel = sv_tbl.collect().map { list ->
             def tagged = list.collate(2)
-            def asm = tagged.find { it[0] == 'assembly' }[1]
-            def long_pb = tagged.find { it[0] == 'pb' }[1]
-            def long_ont = tagged.find { it[0] == 'ont' }[1]
-            def sht = tagged.find { it[0] == 'short' }[1]
+            def asm = tagged.find { entry -> entry[0] == 'assembly' }[1]
+            def long_pb = tagged.find { entry -> entry[0] == 'pb' }[1]
+            def long_ont = tagged.find { entry -> entry[0] == 'ont' }[1]
+            def sht = tagged.find { entry -> entry[0] == 'short' }[1]
             tuple(asm, long_ont, long_pb, sht)
         }
 
