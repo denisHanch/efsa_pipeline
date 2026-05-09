@@ -328,24 +328,7 @@
         }
       ]
     },
-    {
-      "SPDXID": "SPDXRef-nanoplot",
-      "name": "NanoPlot",
-      "versionInfo": "1.46.2",
-      "downloadLocation": "https://github.com/wdecoster/NanoPlot/releases/tag/v1.46.2",
-      "filesAnalyzed": false,
-      "licenseConcluded": "MIT",
-      "licenseDeclared": "MIT",
-      "copyrightText": "NOASSERTION",
-      "supplier": "Person: Wouter De Coster",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceType": "purl",
-          "referenceLocator": "pkg:pypi/NanoPlot@1.46.2"
-        }
-      ]
-    },
+
     {
       "SPDXID": "SPDXRef-trimgalore",
       "name": "TrimGalore",
@@ -557,7 +540,6 @@
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-gffread"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-fastqc"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-multiqc"},
-    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-nanoplot"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-trimgalore"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-cutadapt"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "RUNTIME_DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-pbzip2"},

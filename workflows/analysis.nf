@@ -7,7 +7,6 @@ include { short_read as short_ref; short_read as short_mod } from "./short_read.
 include { qc } from "./subworkflows.nf"
 
 include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_unmapped as compare_unmapped_pacbio } from "../modules/mapping.nf"
-include { nanoplot as nanoplot_pacbio; nanoplot as nanoplot_ont } from "../modules/qc.nf"
 include { restructure_sv_tbl; create_empty_tbl as create_ont_tbl; create_empty_tbl as create_asm_tbl; create_empty_tbl as create_pacbio_tbl; create_empty_tbl as create_short_tbl } from "../modules/sv_calling.nf"
 
 
@@ -52,8 +51,6 @@ workflow analysis {
             .flatMap { it.pacbio_fastqs }
             .map(toNamedFastq)
 
-        nanoplot_pacbio(pacbio_fastqs, "pacbio")
-
         long_ref_pacbio(pacbio_fastqs, ref_fasta, "map-pb", ref_plasmid, "pacbio/long-ref")
         long_mod_pacbio(pacbio_fastqs, mod_fasta, "map-pb", mod_plasmid, "pacbio/long-mod")
         compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
@@ -66,8 +63,6 @@ workflow analysis {
             .filter { it.run_nanopore }
             .flatMap { it.ont_fastqs }
             .map(toNamedFastq)
-
-        nanoplot_ont(ont_fastqs, "ont")
 
         long_ref_ont(ont_fastqs, ref_fasta, "map-ont", ref_plasmid, "ont/long-ref")
         long_mod_ont(ont_fastqs, mod_fasta, "map-ont", mod_plasmid, "ont/long-mod")

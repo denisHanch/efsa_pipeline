@@ -61,23 +61,3 @@ process multiqc {
     multiqc --filename ${filename} .
     """
 }
-
-
-// Processes for long-read pipeline
-
-process nanoplot {
-
-    publishDir "${params.out_dir}/${out_folder_name}/nanoplot", mode: "copy"
-
-    input:
-    tuple val(pair_id), path(reads)
-    val out_folder_name
-    
-    output:
-    path("${pair_id}_report")
-    
-    script:
-    """
-    NanoPlot --huge --fastq $reads --outdir ${pair_id}_report --threads ${task.cpus}
-    """
-}
