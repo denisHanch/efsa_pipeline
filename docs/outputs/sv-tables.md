@@ -213,6 +213,7 @@ The examples below use simplified coordinates for clarity.
 - These are mapped to standardized types: `DEL`, `INS`, `INV`, `DUP`, `TRA`, `RPL` (replacements)
 - Coordinates extracted as real intervals from VCF `POS` and `INFO/END` fields
 - Breakpoint information available in `INFO/StartB` and `INFO/EndB` (stored as `asm_start_mod` and `asm_end_mod`)
+- In SyRI output, some `TRA` records can legitimately have `svlen = 0`. This reflects translocation breakpoint notation (a junction between loci) rather than a contiguous sequence interval with its own span on one chromosome.
 
 **Long-read variants (cuteSV, sniffles, debreak, SURVIVOR merged):**
 - Reported with `SVTYPE` in INFO field
@@ -228,6 +229,7 @@ The `create_sv_output.py` script handles `svlen` consistently across all sources
    - **For TRA:** Set `svlen = 0` (breakpoint semantics)
    - **For INS:** Keep as missing (`None`/`NaN`) unless explicitly provided by caller
    - **For unknown types**: Attempt coordinate-based derivation, fallback to `None`
+
 
 3. **If `svlen` is present but signed or inconsistent (interval variants):**
    - Normalize sign first: `svlen = abs(svlen)`
