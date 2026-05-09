@@ -410,7 +410,6 @@ By default, runtime logs are written to `data/outputs/logs/nextflow.log` and con
 | `--config_json`| Path to input configuration JSON                                  | `data/inputs/config.json` |
 | `--out_dir`    | Output directory                                                  | `data/outputs`          |
 | `--max_cpu`    | Maximum CPUs per process                                          | `1`                     |
-| `--clean_work` | Remove work directory after successful run                        | `true`                  |
 | `--help`       | Display help message                                              | –                       |
 
 For a detailed reference on all hardcoded tool parameters (freebayes, nucmer, cuteSV, etc.), including the scientific rationale and trade-offs, see [Tool Parameter Reference](docs/nextflow/tool-parameters.md).
@@ -744,13 +743,7 @@ The pipeline uses `errorStrategy = 'terminate'` globally. If any process fails, 
 
 ### Removal of Nextflow Work Directory
 
-When the pipeline is executed with the parameter:
-
-```text
-params.clean_work = true
-```
-
-Nextflow automatically deletes the temporary `work/` directory upon successful completion and logs a message to confirm this.
+At pipeline completion, the workflow attempts to remove the temporary `work/` directory and logs a message to confirm whether removal succeeded.
 
 ```text
 ℹ️ Nextflow `work/` directory was removed.
@@ -760,7 +753,6 @@ Nextflow automatically deletes the temporary `work/` directory upon successful c
 
 * The `work/` directory contains intermediate files and temporary outputs generated during pipeline execution.
 * Removing it saves disk space while retaining all final results in the `out_dir`.
-* If you want to keep intermediate files for debugging or inspection, set: `params.clean_work = false` in nextflow.config or use `--clean_work false` when running the pipeline.
 
 
 ## 📁 `data/valid` Directory Structure

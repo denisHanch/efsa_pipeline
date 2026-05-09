@@ -18,7 +18,6 @@ def helpMessage() {
     --config_json    Path to the JSON file containing parameters for the pipeline   (default: ${params.config_json})
     --out_dir        Output directory                                               (default: ${params.out_dir})
     --max_cpu        Maximum CPUs per process                                       (default: ${params.max_cpu})
-    --clean_work     Remove workdir after success                                   (default: ${params.clean_work})
     --validation-level <level> Validation strictness: STRICT, TRUST, or MINIMAL     (default: ${params.validation_level}, overridden by config.json)
     --logging-level <level>    Log verbosity: DEBUG, INFO, WARNING, or ERROR        (default: ${params.logging_level}, overridden by config.json)
     --organism_type <type>     Organism type: PROKARYOTE or EUKARYOTE               (default: ${params.organism_type}, overridden by config.json)
