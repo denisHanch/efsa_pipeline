@@ -64,7 +64,6 @@ EUPL-1.2 is a copyleft license. Its Appendix explicitly lists compatible license
 |---|---|---|---|
 | FastQC | 0.11.9 | GPL-3.0-or-later | https://github.com/s-andrews/FastQC |
 | MultiQC | 1.33 | GPL-3.0-or-later | https://github.com/MultiQC/MultiQC |
-| NanoPlot | 1.46.2 | MIT | https://github.com/wdecoster/NanoPlot |
 | mosdepth | 0.3.12 | MIT | https://github.com/brentp/mosdepth |
 
 ### Read Processing
@@ -134,7 +133,6 @@ EUPL-1.2 is a copyleft license. Its Appendix explicitly lists compatible license
 | staphb/samtools | 1.23@sha256:ed378537... | https://github.com/StaPH-B/docker-builds |
 | staphb/htslib | 1.23@sha256:400e7c4e... | https://github.com/StaPH-B/docker-builds |
 | staphb/mummer | 4.0.1@sha256:f4106644... | https://github.com/StaPH-B/docker-builds |
-| staphb/nanoplot | 1.46.2@sha256:824dbbe1... | https://github.com/StaPH-B/docker-builds |
 | staphb/multiqc | 1.33@sha256:4dbb26ba... | https://github.com/StaPH-B/docker-builds |
 | biocontainers/bwa | v0.7.17_cv1@sha256:9479b73e... | https://biocontainers.pro |
 | biocontainers/fastqc | v0.11.9_cv8@sha256:82e5fa41... | https://biocontainers.pro |
