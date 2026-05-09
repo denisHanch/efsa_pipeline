@@ -77,13 +77,10 @@ style MOD_REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
 style PLASMID_REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
 
 %% ===== QC =====
-NANO_PLOT["NanoPlot QC"]
 MULTIQC_QC["MultiQC (QC)"]
-NANO_PLOT_OUT["NanoPlot QC report"]:::output
 MULTIQC_QC_OUT["MultiQC QC report"]:::output
 
-LONG_READS --> NANO_PLOT --> MULTIQC_QC
-NANO_PLOT --> NANO_PLOT_OUT
+LONG_READS --> MULTIQC_QC
 MULTIQC_QC --> MULTIQC_QC_OUT
 
 %% ===============================

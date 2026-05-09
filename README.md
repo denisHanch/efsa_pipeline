@@ -1152,7 +1152,7 @@ The table below summarises all tools used within the pipeline:
 
 ### `pacbio/` and `ont/`
 
-This workflow shows the processing of raw long-read sequencing data (PacBio or Nanopore) from quality control to mapping. Reads undergo NanoPlot QC, then mapped to the reference or modified genome with minimap2, followed by sorting, indexing, and calculation of unmapped reads. Structural variant calling using cute_sv, debreak, and sniffles is performed only for reads mapped to the reference genome, and results are merged with SURVIVOR and summarized with bcftools stats, producing the final long-read VCF. Reads mapped to modified or plasmid sequences skip structural variant calling.
+This workflow shows the processing of raw long-read sequencing data (PacBio or Nanopore) from quality control to mapping. Reads are mapped to the reference or modified genome with minimap2, followed by sorting, indexing, and calculation of unmapped reads. Structural variant calling using cute_sv, debreak, and sniffles is performed only for reads mapped to the reference genome, and results are merged with SURVIVOR and summarized with bcftools stats, producing the final long-read VCF. Reads mapped to modified or plasmid sequences skip structural variant calling.
 
 ```mermaid
 %%{init: {
@@ -1179,13 +1179,10 @@ style REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
 style PLASMID_REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
 
 %% ===== QC =====
-NANO_PLOT["NanoPlot QC"]
 MULTIQC_QC["MultiQC (QC)"]
-NANO_PLOT_OUT["NanoPlot QC report"]:::output
 MULTIQC_QC_OUT["MultiQC QC report"]:::output
 
-LONG_READS --> NANO_PLOT --> MULTIQC_QC
-NANO_PLOT --> NANO_PLOT_OUT
+LONG_READS --> MULTIQC_QC
 MULTIQC_QC --> MULTIQC_QC_OUT
 
 %% ===== LONG REF MAPPING PIPELINE =====
@@ -1269,8 +1266,6 @@ data/outputs/pacbio/
 ├── long-ref-plasmid
 │   ├── bam
 │   └── unmapped_fastq
-└── nanoplot
-    └── SampleName_report
 ```
 
 #### `long-ref/`
@@ -1323,22 +1318,6 @@ Includes:
 
 This enables comparison between mapping reads on reference vs modified assemblies.
 
-#### `nanoplot/`
-
-Contains long-read quality control and summary statistics generated using **NanoPlot**.
-
-Example content:
-
-* `SampleName_report/`
-
-Inside this folder you typically find:
-
-* Read length distributions
-* N50 / N90 statistics
-* Quality score profiles
-* Read length vs quality plots
-* Summary statistics of long-read sequencing quality
-
 The table below summarises all tools used within the pipeline:
 
 | **Tool**     | **Link for Further Information**                       |
@@ -1349,7 +1328,6 @@ The table below summarises all tools used within the pipeline:
 | **DeBreak**  | [DeBreak](https://github.com/Maggi-Chen/DeBreak)       |
 | **Sniffles** | [Sniffles](https://github.com/fritzsedlazeck/Sniffles) |
 | **SURVIVOR** | [SURVIVOR](https://github.com/fritzsedlazeck/SURVIVOR) |
-| **NanoPlot** | [NanoPlot](https://github.com/wdecoster/NanoPlot)      |
 
 
 ### `unmapped_stats/`
@@ -1429,13 +1407,10 @@ style MOD_REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
 style PLASMID_REF fill:#E3F2FD,stroke:#1565C0,stroke-width:2px
 
 %% ===== QC =====
-NANO_PLOT["NanoPlot QC"]
 MULTIQC_QC["MultiQC (QC)"]
-NANO_PLOT_OUT["NanoPlot QC report"]:::output
 MULTIQC_QC_OUT["MultiQC QC report"]:::output
 
-LONG_READS --> NANO_PLOT --> MULTIQC_QC
-NANO_PLOT --> NANO_PLOT_OUT
+LONG_READS --> MULTIQC_QC
 MULTIQC_QC --> MULTIQC_QC_OUT
 
 %% ===============================
