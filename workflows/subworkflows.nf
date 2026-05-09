@@ -36,7 +36,7 @@ workflow mapping {
         samtools_index_bam(bam, out_folder_name) | set { indexed_bam }
         picard(fasta, indexed_bam, out_folder_name) | set { picard_out }
         
-        picard_out.collect() | set { qc_out }
+        stats_out.mix(picard_out).collect() | set { qc_out }
         multiqc(qc_out, out_folder_name, "mapping")
 
 
@@ -102,8 +102,8 @@ workflow sv_long {
             .mix(extract_supp_reads_2.out)
             .mix(extract_supp_reads_3.out)
 
-        survivor(cute_vcf, debreak_vcf, sniffles_vcf, mapping_tag, out_folder_name) | set { merged_vcf }
-        bcftools_stats(merged_vcf, out_folder_name) | set { bcftools_out }
+        survivor(cute_vcf.join(debreak_vcf).join(sniffles_vcf), mapping_tag, out_folder_name) | set { merged_vcf }
+        bcftools_stats(merged_vcf, out_folder_name)
     emit:
         merged_vcf
         supp_reads

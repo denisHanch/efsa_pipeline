@@ -23,6 +23,7 @@ logs/
 ## Description
 
 The `logs/` folder contains **detailed logs and command scripts** for each Nextflow process.
+Runtime pipeline messages are recorded in `nextflow.log` (default quiet-console mode).
 
 ## File Descriptions
 
@@ -111,12 +112,11 @@ These log files are useful for:
 
 ## Accessing Logs
 
-During execution, logs reside in the Nextflow `work/` directory under each process-specific subdirectory. At pipeline completion (success or failure), all `.command.*` files are automatically copied to `data/outputs/logs/`. After a successful run with `--clean_work true`, the `work/` directory is removed, but all logs are preserved in the output directory.
+During execution, logs reside in the Nextflow `work/` directory under each process-specific subdirectory. At pipeline completion (success or failure), all `.command.*` files are automatically copied to `data/outputs/logs/`. The pipeline then attempts to remove the `work/` directory, while preserving copied logs in the output directory.
 
 To quickly check which processes failed, inspect `data/outputs/logs/process_manifest.txt`.
 
 ## See Also
 
 - [Running the Pipeline](../nextflow/running-pipeline.md) — pipeline execution options
-- [Runtime Messages](../nextflow/runtime-messages.md) — live console output during execution
-- [Runtime Messages](../nextflow/runtime-messages.md) - Understanding pipeline progress
+- [Runtime Messages](../nextflow/runtime-messages.md) — understanding runtime progress in `nextflow.log`

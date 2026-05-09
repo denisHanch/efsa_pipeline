@@ -1,11 +1,14 @@
 
-import java.time.format.DateTimeFormatter
-import java.time.ZoneId
+def logToNextflowFile(String message) {
+    def logDirPath = (params?.log_dir ?: 'data/outputs/logs').toString()
+    def logDir = new File(logDirPath)
+    logDir.mkdirs()
+    def nfLog = new File(logDir, "nextflow.log")
+    nfLog << "${message}${message.endsWith('\n') ? '' : '\n'}"
+}
 
 def logUnmapped(reads, total_reads, out_folder_name, reference) {
-
     reads.combine(total_reads).subscribe { r, total ->
-
         long unmapped = r as long
         long totalInput = total as long
 
@@ -16,54 +19,7 @@ def logUnmapped(reads, total_reads, out_folder_name, reference) {
                      "    Unmapped reads: ${String.format("%,d", unmapped)} (${pctStr}%)\n" +
                      "    Total input reads: ${String.format("%,d", totalInput)}\n"
 
-        log.info(msg)
-    }
-}
-
-
-def describePipeline(read_type, fasta_type) {
-    log.info "ℹ️  Running pipeline: processing ${read_type} reads → mapping to the ${fasta_type} fasta.\n"
-}
-
-
-
-def logWorkflowCompletion(out_folder_name) {
-    workflow.onComplete {
-        def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault())
-        def readableTime = formatter.format(workflow.complete)
-
-        def workDir = new File("${workflow.workDir}")
-        def launchDir = new File("${workflow.launchDir}")
-        def logDir = new File("${params.log_dir}")
-        logDir.mkdirs()
-
-        // Always copy process logs to output directory (both on success and failure)
-        if (workDir.exists()) {
-            workDir.eachFileRecurse(groovy.io.FileType.ANY) { f ->
-                if( f.name ==~ /^(\.command).*/ ) {
-                    def relPath = workDir.toPath().relativize(f.toPath()).toString()
-                    def dest = new File(logDir, relPath)
-                    dest.parentFile.mkdirs()
-                    f.withInputStream { ins -> dest.withOutputStream { out -> out << ins } }
-                }
-            }
-        }
-
-        // Generate process execution manifest with success/failure status and exit codes
-        generateProcessManifest(logDir)
-
-        if (workflow.success) {
-            log.info "✅ The ${out_folder_name} processing pipeline completed successfully.\n"
-
-            if (params.clean_work && out_folder_name == "execution of main.nf") {
-                if ( workDir.exists() ) {
-                    workDir.deleteDir()
-                    log.info "ℹ️  Nextflow work/ directory was removed.\n"
-                }
-            }
-        } else {
-            log.error "❌ The ${out_folder_name} processing pipeline failed: ${workflow.errorReport}"
-        }
+        logToNextflowFile(msg)
     }
 }
 
@@ -71,16 +27,16 @@ def logWorkflowCompletion(out_folder_name) {
  * Parse the Nextflow trace file and produce a human-readable manifest
  * listing every process execution with its status and exit code.
  */
-def generateProcessManifest(File logDir) {
+def generateProcessManifest(File logDir, wfMeta) {
     def traceFile = new File(logDir, "trace.tsv")
     def manifestFile = new File(logDir, "process_manifest.txt")
 
     manifestFile.text  = "# Pipeline Execution Manifest\n"
     manifestFile.append("# Generated: ${new Date()}\n")
-    manifestFile.append("# Pipeline status: ${workflow.success ? 'SUCCESS' : 'FAILED'}\n")
-    manifestFile.append("# Duration: ${workflow.duration}\n")
-    if (workflow.errorMessage) {
-        manifestFile.append("# Error: ${workflow.errorMessage}\n")
+    manifestFile.append("# Pipeline status: ${wfMeta?.success ? 'SUCCESS' : 'FAILED'}\n")
+    manifestFile.append("# Duration: ${wfMeta?.duration ?: 'N/A'}\n")
+    if (wfMeta?.errorMessage) {
+        manifestFile.append("# Error: ${wfMeta.errorMessage}\n")
     }
     manifestFile.append("#\n")
 
@@ -116,5 +72,41 @@ def generateProcessManifest(File logDir) {
         manifestFile.append("# Note: Trace file not found. Enable trace in nextflow.config for process-level details.\n")
     }
 
-    log.info "📋 Process execution manifest: ${manifestFile.path}\n"
+    logToNextflowFile("📋 Process execution manifest: ${manifestFile.path}\n")
+}
+
+def getLogDir() {
+    def logDirPath = (params?.log_dir ?: 'data/outputs/logs').toString()
+    def logDir = new File(logDirPath)
+    logDir.mkdirs()
+    return logDir
+}
+
+def resolveWorkDir(wfMeta) {
+    def wfWorkDir = wfMeta?.workDir?.toString()
+    if (wfWorkDir) {
+        return new File(wfWorkDir)
+    }
+
+    def launchDirPath = wfMeta?.launchDir?.toString() ?: System.getProperty('user.dir')
+    return new File(launchDirPath, "work")
+}
+
+def copyCommandLogs(File workDir, File logDir) {
+    if (!workDir?.exists()) return
+
+    workDir.eachFileRecurse(groovy.io.FileType.ANY) { f ->
+        if (f.name ==~ /^(\.command).*/) {
+            def relPath = workDir.toPath().relativize(f.toPath()).toString()
+            def dest = new File(logDir, relPath)
+            dest.parentFile.mkdirs()
+            f.withInputStream { ins -> dest.withOutputStream { out -> out << ins } }
+        }
+    }
+}
+
+def logCompletionSummary(wf, File workDir) {
+    if (wf?.success) {
+        logToNextflowFile("✅ The execution of main.nf processing pipeline completed successfully.\n")
+    }
 }

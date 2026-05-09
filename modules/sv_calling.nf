@@ -149,9 +149,7 @@ process survivor {
     publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: "copy"
 
     input:
-    tuple val(pair_id), path(cute_vcf)
-    tuple val(pair_id), path(debreak_vcf)
-    tuple val(pair_id), path(sniffles_vcf)
+    tuple val(pair_id), path(cute_vcf), path(debreak_vcf), path(sniffles_vcf)
     val mapping_tag
     val out_folder_name
 

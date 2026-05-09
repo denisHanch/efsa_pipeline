@@ -21,10 +21,18 @@ This first validates input data from `data/inputs/config.json`, then automatical
 
 Validated files are written to `data/valid/run_YYYYMMDD_HHMMSS/` and `data/valid/validated_params.json` is produced for runtime consumption. See the [Validation Overview](../validation/OVERVIEW.md) for details on what this file contains.
 
+By default, runtime logs are written to `data/outputs/logs/nextflow.log` and console output is kept quiet.
+
 To use a custom configuration file:
 
 ```bash
 nextflow run main.nf --config_json /path/to/config.json --max_cpu $(nproc)
+```
+
+If you want verbose console output for debugging, override quiet mode at launch time:
+
+```bash
+NXF_QUIET=false nextflow run main.nf --max_cpu $(nproc)
 ```
 
 ## Nextflow Options
@@ -44,7 +52,6 @@ nextflow run main.nf --config_json /path/to/config.json --max_cpu $(nproc)
 | `--config_json <path>` | Path to the input `config.json` (default: `data/inputs/config.json`) |
 | `--out_dir <path>` | Output directory (default: `data/outputs`) |
 | `--max_cpu <n>` | Maximum CPUs per process (default: `1`) |
-| `--clean_work` | Remove Nextflow `work/` directory after a successful run |
 | `--validation_level <level>` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — overridden by `config.json` when set there |
 | `--logging_level <level>` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — overridden by `config.json` when set there |
 | `--organism_type <type>` | Organism type: `PROKARYOTE` or `EUKARYOTE` — overridden by `config.json` when set there |

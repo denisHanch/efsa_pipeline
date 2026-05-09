@@ -3,7 +3,7 @@
 process validate {
 
     tag "validate"
-    publishDir "${projectDir}/data/valid/", mode: 'copy', overwrite: true
+    publishDir "${params.valid_dir}", mode: 'copy', overwrite: true
 
     input:
     path config_json
