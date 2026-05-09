@@ -100,15 +100,7 @@ Check the process execution manifest in data/outputs/logs/process_manifest.txt f
 
 ## Removal of Nextflow Work Directory
 
-When the pipeline is executed with the option `--clean_work true` or when the parameter clean_work is set to true in the nextflow.config:
-
-```text
-params {
-    clean_work = true
-}
-```
-
-Nextflow automatically removes the temporary `work/` directory after successful completion and logs a message to confirm this.
+At pipeline completion, the workflow attempts to remove the temporary `work/` directory and logs a message to confirm whether removal succeeded.
 
 ```text
 ℹ️ Nextflow `work/` directory was removed.
@@ -118,7 +110,6 @@ Nextflow automatically removes the temporary `work/` directory after successful 
 
 - The `work/` directory contains intermediate files and temporary outputs generated during pipeline execution.
 - Removing it saves disk space while retaining all final results in the `out_dir`.
-- If you want to keep intermediate files for debugging or inspection, set: `clean_work = false` in the params section of the nextflow.config or use `--clean_work false` when running the pipeline.
 
 ## See Also
 

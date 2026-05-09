@@ -112,7 +112,7 @@ These log files are useful for:
 
 ## Accessing Logs
 
-During execution, logs reside in the Nextflow `work/` directory under each process-specific subdirectory. At pipeline completion (success or failure), all `.command.*` files are automatically copied to `data/outputs/logs/`. After a successful run with `--clean_work true`, the `work/` directory is removed, but all logs are preserved in the output directory.
+During execution, logs reside in the Nextflow `work/` directory under each process-specific subdirectory. At pipeline completion (success or failure), all `.command.*` files are automatically copied to `data/outputs/logs/`. The pipeline then attempts to remove the `work/` directory, while preserving copied logs in the output directory.
 
 To quickly check which processes failed, inspect `data/outputs/logs/process_manifest.txt`.
 

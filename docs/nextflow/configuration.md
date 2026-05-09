@@ -20,7 +20,6 @@ As a result, operational runtime messages are primarily captured in `data/output
 | `out_dir` | `data/outputs` | Output directory for results |
 | `log_dir` | `data/outputs/logs` | Directory for pipeline logs and reports |
 | `max_cpu` | `1` | Maximum CPUs available per process (override with `--max_cpu`) |
-| `clean_work` | `true` | Remove Nextflow `work/` directory after a successful run |
 | `ref_plasmid_fasta` | `null` | Optional reference plasmid FASTA |
 | `validation_level` | `null` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — `null` means not forwarded; `config.json` governs |
 | `logging_level` | `null` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — `null` means not forwarded; `config.json` governs |
