@@ -20,6 +20,7 @@ Welcome to the EFSA Pipeline documentation. This pipeline provides comprehensive
 ### Nextflow Pipeline
 
 - [Running the Pipeline](nextflow/running-pipeline.md)
+- [Validation Integration To the Pipeline](nextflow/validation-nextflow-integration.md)
 - [Methods](nextflow/methods.md)
 - [Runtime Messages](nextflow/runtime-messages.md)
 - [Directory Structures](nextflow/directory-structures.md)
