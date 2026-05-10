@@ -14,35 +14,28 @@ def helpMessage() {
     
     Options:
 
-    -resume          Run pipeline from the point where it was interrupted or failed (Nextflow built-in)
-    --config_json    Path to the JSON file containing parameters for the pipeline   (default: ${params.config_json})
-    --out_dir        Output directory                                               (default: ${params.out_dir})
-    --max_cpu        Maximum CPUs per process                                       (default: ${params.max_cpu})
-    --validation-level <level> Validation strictness: STRICT, TRUST, or MINIMAL     (default: ${params.validation_level}, overridden by config.json)
-    --logging-level <level>    Log verbosity: DEBUG, INFO, WARNING, or ERROR        (default: ${params.logging_level}, overridden by config.json)
-    --organism_type <type>     Organism type: PROKARYOTE or EUKARYOTE               (default: ${params.organism_type}, overridden by config.json)
-    --force-defragment-ref     Force reference defragmentation [UNSUPPORTED]        (overridden by config.json)
-    -with-report     Generate HTML execution report                                 (Nextflow built-in)
-    -with-timeline   Produce timeline visualization                                 (Nextflow built-in)
-    -with-dag        Produce DAG of workflow                                        (Nextflow built-in)
-    --help           Show this help message
+    -resume                    Run pipeline from the point where it was interrupted or failed (Nextflow built-in)
+    --config_json              Path to the JSON file containing parameters for the pipeline   (default: ${params.config_json})
+    --out_dir                  Output directory                                               (default: ${params.out_dir})
+    --max_cpu                  Maximum CPUs per process                                       (default: ${params.max_cpu})
+    --validation-level <level> Validation strictness: STRICT, TRUST, or MINIMAL               (default: ${params.validation_level}, overridden by config.json)
+    --logging-level <level>    Log verbosity: DEBUG, INFO, WARNING, or ERROR                  (default: ${params.logging_level}, overridden by config.json)
+    --organism_type <type>     Organism type: PROKARYOTE or EUKARYOTE                         (default: ${params.organism_type}, overridden by config.json)
+    --force-defragment-ref     Force reference defragmentation [UNSUPPORTED]                  (overridden by config.json)
+    -with-report               Generate HTML execution report                                 (run by default and stored in ${params.log_dir}/report.html)
+    -with-timeline             Produce timeline visualization                                 (run by default and stored in ${params.log_dir}/timeline.html)
+    -with-dag                  Produce DAG of workflow                                        (run by default and stored in ${params.log_dir}/dag.png)
+    --help                     Show this help message
     """.stripIndent()
     )
 }
 
-<<<<<<< HEAD
 
 workflow {
     // Show help
     if (params.help) {
         helpMessage()
         exit(0)
-=======
-workflow {
-    if (params.help) {
-        helpMessage()
-        exit 0
->>>>>>> 637366e (EFSA-272: add new line at the end of file)
     }
 
     file("${params.out_dir}/tables/csv_per_sv_summary").mkdirs()
@@ -74,13 +67,3 @@ workflow {
         logToNextflowFile("Check the process execution manifest in ${logDirPath}/process_manifest.txt for details on which processes failed.")
     }
 }
-<<<<<<< HEAD
-=======
-
-logWorkflowCompletion("execution of main.nf")
-
-workflow.onError {
-    log.error "Pipeline execution stopped with the following message: ${workflow.errorMessage}"
-    log.error "Check the process execution manifest in ${params.log_dir}/process_manifest.txt for details on which processes failed."
-}
->>>>>>> 637366e (EFSA-272: add new line at the end of file)

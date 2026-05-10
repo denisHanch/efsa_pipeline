@@ -30,6 +30,9 @@ echo "You will be dropped into the container shell."
 echo ""
 echo "Type 'exit' when you're done to return to your host system."
 echo ""
+echo "Inside the container, run Nextflow with:"
+echo "nextflow run main.nf --max_cpu \$(nproc)"
+echo ""
 
 docker run --privileged --init -d --rm \
     -v /etc/ssl/certs:/etc/ssl/certs:ro \

@@ -1,36 +1,107 @@
-# Workflow Structure and Guidelines
+# GitHub Workflows Guide
 
-This document outlines the GitHub Actions workflows used within the repository, differentiating between validation checks and automation tasks, along with their intended purpose and rules.
+This document describes all workflows currently present in `.github/workflows` and what each one does.
 
 ## Repository Variables
 
-The workflows rely on repository variables configured in:
+Several workflows rely on repository-level variables:
 
-Settings → Secrets and variables → Actions → Variables
+Settings -> Secrets and variables -> Actions -> Variables
 
-Current values used in this repository:
+| Variable | Purpose |
+|---|---|
+| `PROJECT_PREFIX` | Issue/branch/commit prefix (for example `EFSA`). |
+| `IGNORE_PREFIX` | Escape hatch prefix (for example `no-issue`) that skips some naming/notification checks. |
 
-| Variable | Value |
-|---------|------|
-| PROJECT_PREFIX | EFSA |
-| IGNORE_PREFIX | no-issue |
+## Workflow Overview
 
-## Validation Checks
-Files are prefixed with **check**. Validation workflows enforce repository conventions and standards. They run on every Pull Request targeting the `main` branch.
+| File | Workflow Name | Category | Trigger |
+|---|---|---|---|
+| `check-branch-name.yaml` | `CHECK: Branch Naming` | Validation | PRs targeting `main` |
+| `check-commit-message.yaml` | `CHECK: Commit Message` | Validation | PRs targeting `main` |
+| `auto-issue-prefix.yaml` | `AUTOMATION: Issue Prefixer` | Automation | Issue opened |
+| `auto-branch-issue-tracking.yaml` | `AUTOMATION: Branch Issue Linker` | Automation | Push to `feature/**`, `bugfix/**`, `docs/**` |
+| `auto-pr-open-notify.yml` | `AUTOMATION: PR Open Notification` | Automation | PR opened |
+| `auto-pr-merged-notify.yaml` | `AUTOMATION: PR Merged Notification` | Automation | PR closed (merged only) |
+| `auto_nextflow_run.yaml` | `CI: Nextflow Integration Test` | CI | Push/PR (scoped branches + scoped paths), manual dispatch |
+| `deploy-docs.yml` | `Deploy Documentation to GitHub Pages` | Deployment | Push to `main`, manual dispatch |
+| `static.yml` | `Deploy static content to Pages` | Deployment | Push to `main`, manual dispatch |
 
-**Important:** These workflows block merging PRs if checks fail.
+## Validation Workflows (Merge Blocking)
 
-| Workflow                 | Trigger                             | Rules Enforced / Purpose |
-|--------------------------|-------------------------------------|--------------------------|
-| **Branch Naming Check**  | `on: pull_request (branches: main)` | Branch names must follow `feature/PROJECT_PREFIX-#_branch_name`, `bugfix/...`, or `docs/...`; branches starting with `IGNORE_PREFIX` are allowed and skipped. |
-| **Commit Message Check** | `on: pull_request (branches: main)` | Commit messages must follow `PROJECT_PREFIX-#ISSUE: Your commit message`, or start with `IGNORE_PREFIX`. |
+These workflows are intended to enforce standards on PRs into `main`.
 
-## Automation Workflows
-Files are prefixed with **auto**. Automation workflows handle routine tasks like notifications, issue linking, and repository organization. They are not intended to enforce merge-blocking validation rules.
+### `check-branch-name.yaml`
 
-| Workflow                   | Trigger                                 | Automated Task / Purpose |
-|---------------------------|------------------------------------------|--------------------------|
-| **Issue Prefixer**         | `issues [opened]`                        | Automatically prefixes issue titles with `PROJECT_PREFIX-#ISSUE`. |
-| **Branch-Issue Linking**   | `push [feature/**, bugfix/**, docs/**]`  | Comments on the related issue when an associated branch is created or pushed. |
-| **PR Opened Notification** | `pull_request [opened]`                  | Comments on the related issue when a PR is opened. |
-| **PR Merged Notification** | `pull_request [closed]`                  | Comments on the related issue when a PR is merged. |
+- Valid branch patterns:
+  - `feature/PROJECT_PREFIX-<number>_<description>`
+  - `bugfix/PROJECT_PREFIX-<number>_<description>`
+  - `docs/PROJECT_PREFIX-<number>_<description>`
+- Branches starting with `IGNORE_PREFIX` are explicitly allowed.
+- Fails the check if branch name does not match allowed formats.
+
+### `check-commit-message.yaml`
+
+- Inspects non-merge commits in `main..HEAD`.
+- Valid subject formats:
+  - `PROJECT_PREFIX-<number>: <message>`
+  - or starting with `IGNORE_PREFIX`
+- Fails the check if any commit subject is invalid.
+
+## Automation Workflows (Non-Blocking Helpers)
+
+These workflows automate issue/PR communication and naming consistency.
+
+### `auto-issue-prefix.yaml`
+
+- On issue creation, updates title to:
+  - `PROJECT_PREFIX-<issue_number>: <original title>`
+- Skips update if title already has the expected prefix.
+
+### `auto-branch-issue-tracking.yaml`
+
+- On push to `feature/**`, `bugfix/**`, or `docs/**`, parses branch name for issue ID.
+- If matched, comments once on the related issue that the branch was created/pushed.
+- Avoids duplicate comments by checking existing issue comments.
+
+### `auto-pr-open-notify.yml`
+
+- On PR opened, comments on linked issue with PR URL and source branch.
+- Skips branches that start with `IGNORE_PREFIX`.
+- Expects PR title to contain `<WORD>-<number>` token (for example `EFSA-123`).
+
+### `auto-pr-merged-notify.yaml`
+
+- On PR closed, runs only when PR is merged.
+- Comments on linked issue that PR was merged.
+- Skips branches that start with `IGNORE_PREFIX`.
+- Expects PR title to contain `<WORD>-<number>` token.
+
+## CI Workflow
+
+### `auto_nextflow_run.yaml` (`CI: Nextflow Integration Test`)
+
+- Purpose: run an integration test of the Nextflow pipeline.
+- Triggers:
+  - Push to `main` and `feature/EFSA-268_nfx_integration_v2` with path filters.
+  - PRs targeting those branches with same path filters.
+  - Manual dispatch.
+- Key behavior:
+  - Sets up Java 17 and Nextflow.
+  - Generates `data/inputs/config.json` for test run.
+  - Pre-pulls Docker images inferred from selected process names in `nextflow.config`.
+  - Runs `nextflow run main.nf -profile test --max_cpu 1`.
+  - Verifies expected outputs and report presence.
+  - Uploads artifacts (`report.html`, `.nextflow.log`) for 14 days.
+
+## Deployment Workflows (GitHub Pages)
+
+### `deploy-docs.yml`
+
+- Builds MkDocs site (`mkdocs build`) and deploys `./site` to GitHub Pages.
+- Two-job pipeline: `build` then `deploy`.
+
+### `static.yml`
+
+- Deploys the repository root (`.`) as a static Pages artifact.
+- Single deploy job with `actions/configure-pages`.
