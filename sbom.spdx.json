@@ -501,24 +501,6 @@
           "referenceLocator": "pkg:github/brentp/mosdepth@v0.3.12"
         }
       ]
-    },
-    {
-      "SPDXID": "SPDXRef-nf-schema",
-      "name": "nf-schema",
-      "versionInfo": "2.4.2",
-      "downloadLocation": "https://github.com/nextflow-io/nf-schema/releases/tag/2.4.2",
-      "filesAnalyzed": false,
-      "licenseConcluded": "Apache-2.0",
-      "licenseDeclared": "Apache-2.0",
-      "copyrightText": "NOASSERTION",
-      "supplier": "Organization: Seqera Labs",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceType": "purl",
-          "referenceLocator": "pkg:github/nextflow-io/nf-schema@2.4.2"
-        }
-      ]
     }
   ],
   "relationships": [
@@ -549,7 +531,6 @@
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "DYNAMIC_LINK", "relatedSpdxElement": "SPDXRef-pysam"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "DYNAMIC_LINK", "relatedSpdxElement": "SPDXRef-structlog"},
     {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "DYNAMIC_LINK", "relatedSpdxElement": "SPDXRef-typing-extensions"},
-    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-nextflow"},
-    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-nf-schema"}
+    {"spdxElementId": "SPDXRef-efsa-pipeline", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-nextflow"}
   ]
 }
