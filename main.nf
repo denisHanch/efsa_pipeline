@@ -24,7 +24,8 @@ def helpMessage() {
     --force-defragment-ref     Force reference defragmentation [UNSUPPORTED]                  (overridden by config.json)
     -with-report               Generate HTML execution report                                 (run by default and stored in ${params.log_dir}/report.html)
     -with-timeline             Produce timeline visualization                                 (run by default and stored in ${params.log_dir}/timeline.html)
-    -with-dag                  Produce DAG of workflow                                        (run by default and stored in ${params.log_dir}/dag.png)
+    -with-trace                Produce execution trace file                                   (run by default and stored in ${params.log_dir}/trace.tsv)
+    -with-dag                  Produce DAG of workflow                                        (Nextflow built-in)
     --help                     Show this help message
     """.stripIndent()
     )
