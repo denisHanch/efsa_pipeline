@@ -32,6 +32,8 @@ This guide shows you how to run the EFSA Pipeline in a Docker container with acc
    ```
 
 2. Run interactively:
+   > **Compliance note:** `--privileged` grants the container elevated host-level access. A better option is to use Sysbox for safer Docker-in-Docker isolation, but Sysbox is not installed in the EFSA environment at this time. Explore additional DinD options here: [Docker-in-Docker methods](https://devopscube.com/run-docker-in-docker/#method-2-docker-in-docker-using-dind).
+
    ```bash
    docker run --privileged -d --rm \
     --network=host \
