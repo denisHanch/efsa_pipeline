@@ -44,6 +44,8 @@ NXF_QUIET=false nextflow run main.nf --max_cpu $(nproc)
 | `-with-timeline` | Generate a timeline visualization showing when each pipeline process started and finished. The timeline is saved by default to `data/outputs/logs/timeline.html`.                   |
 | `-with-dag`      | Generate a directed acyclic graph (DAG) illustrating task dependencies in the workflow.                                                                                             |
 
+> **Note:** `-resume` is not supported in this pipeline. The `work/` directory is automatically deleted at the end of every run — including failed runs — so Nextflow has no cached task outputs to resume from.
+
 
 ## Pipeline Options
 
