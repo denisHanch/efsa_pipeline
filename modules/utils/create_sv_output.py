@@ -120,6 +120,14 @@ ROW_LOG_FIELDS = (
     "coverage_before_100bp",
     "coverage_sv_span",
     "coverage_after_100bp",
+    # Delly raw fields (short-read)
+    "PE",   # paired-end support (reference pairs)
+    "DV",   # high-quality variant pairs
+    "SR",   # split-read support (reference junction reads)
+    "RV",   # high-quality variant junction reads
+    # Long-read caller raw fields (sniffles / cuteSV use DR+DV; debreak uses RE)
+    "DR",   # reference-supporting reads (sniffles / cuteSV)
+    "RE",   # supporting reads (debreak)
 )
 
 
@@ -257,6 +265,64 @@ def _to_float(x: Any) -> Optional[float]:
         return float(x)
     except Exception:
         return None
+
+
+def _resolve_delly_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
+    """Compute supporting reads for a Delly short-read VCF row.
+
+    Delly reports four FORMAT fields relevant to read support:
+      PE - paired-end reads supporting the *reference* allele
+      DV - high-quality paired-end reads supporting the *variant* allele
+      SR - split-reads supporting the reference allele
+      RV - high-quality split-reads supporting the variant allele
+
+    We sum the variant-supporting counts (DV + RV) because those directly
+    measure evidence for the called SV.  If neither DV nor RV is present in
+    the row we fall back to the pre-computed ``supporting_reads`` column; if
+    that is also absent the result is ``None`` (serialised as NaN in the CSV).
+
+    Note: PE and SR (reference-supporting reads) are intentionally excluded
+    from the sum - they represent reads that do NOT support the variant.
+    """
+    dv = _to_int(row.get("DV"))
+    rv = _to_int(row.get("RV"))
+
+    if dv is not None or rv is not None:
+        return (dv or 0) + (rv or 0)
+
+    # Fall back to whatever was already computed upstream (e.g. from a
+    # pre-processed TSV that already merged these fields).
+    return _to_int(row.get("supporting_reads"))
+
+
+def _resolve_long_read_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
+    """Compute supporting reads for a long-read SV caller row.
+
+    Sniffles and cuteSV both emit FORMAT fields:
+      DR - reference-supporting reads
+      DV - variant-supporting reads
+
+    DeBreak emits:
+      RE - supporting reads for the variant
+
+    We use the variant-supporting count (DV for sniffles/cuteSV, RE for
+    debreak).  If none of these caller-specific fields are present we fall
+    back to the ``supporting_reads`` column that may have been set by an
+    upstream VCF parser.  Returns ``None`` (NaN) only when no read-count
+    information can be found at all.
+    """
+    # sniffles / cuteSV: DV = variant-supporting reads
+    dv = _to_int(row.get("DV"))
+    if dv is not None:
+        return dv
+
+    # debreak: RE = supporting reads
+    re_val = _to_int(row.get("RE"))
+    if re_val is not None:
+        return re_val
+
+    # Generic fallback
+    return _to_int(row.get("supporting_reads"))
 
 def standardize_type_details(
     raw_svtype: str,
@@ -428,7 +494,7 @@ def _load_supp_reads_files(paths: List[str]) -> pd.DataFrame:
             continue
         df = df.rename(columns={"supporting_reads": "reads"})
         df["start"] = pd.to_numeric(df["start"], errors="coerce")
-        df["reads"] = pd.to_numeric(df["reads"], errors="coerce").fillna(0).astype(int)
+        df["reads"] = pd.to_numeric(df["reads"], errors="coerce")
         df = df.dropna(subset=["chrom", "start"])
         df["start"] = df["start"].astype(int)
         # Standardise caller svtype so it matches the record's std_type
@@ -492,7 +558,7 @@ def resolve_supporting_reads(records: List[Record], supp_files: List[str], tol: 
     # Write resolved values back into the Record objects
     for _, row in merged.iterrows():
         reads = row.get("reads")
-        if pd.notna(reads) and int(reads) > 0:
+        if pd.notna(reads):
             records[int(row["_idx"])].supporting_reads = int(reads)
 
     return records
@@ -709,6 +775,17 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                     std_type_match=std_match,
                 )
 
+        # Resolve supporting reads using caller-specific FORMAT fields where
+        # available, falling back to the generic `supporting_reads` column.
+        # This prevents false zeros when a caller (e.g. Delly) only populates
+        # split-read fields (RV) but not paired-end fields (DV), or vice-versa.
+        if source == "short":
+            resolved_supporting_reads = _resolve_delly_supporting_reads(row)
+        elif str(source).startswith("long"):
+            resolved_supporting_reads = _resolve_long_read_supporting_reads(row)
+        else:
+            resolved_supporting_reads = _to_int(row.get("supporting_reads"))
+
         out.append(
             Record(
                 source,
@@ -718,7 +795,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 std,
                 raw_svtype,
                 row.get("info_svtype"),
-                _to_int(row.get("supporting_reads")),
+                resolved_supporting_reads,
                 _to_float(row.get("score")),
                 copy_number,
                 chr2,
