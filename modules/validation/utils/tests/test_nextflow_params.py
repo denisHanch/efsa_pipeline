@@ -4,8 +4,7 @@ Tests for nextflow_params.py
 Tests cover:
 - run_ref_x_mod conditions
 - Read type detection (illumina, ont, pacbio)
-- GFF / run_vcf_annotation
-- Conditional keys (ref_fasta_validated, mod_fasta_validated, pacbio_fastq, gff)
+- Conditional keys (ref_fasta_validated, mod_fasta_validated, pacbio_fastq)
 - write_params serialises valid JSON
 """
 
