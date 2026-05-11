@@ -331,8 +331,7 @@ def main():
     if force_defragment:
         logger.warning(
             "force_defragment_ref is active: GFF validation for the reference is "
-            "skipped. Feature coordinates are not meaningful on a defragmented "
-            "reference — run_vcf_annotation will be disabled."
+            "skipped. Feature coordinates are not meaningful on a defragmented reference."
         )
     repo_root = config_path.parent.parent.parent
     params = nf_params.build_params(validation_results, run_timestamp=run_id, base_dir=repo_root)

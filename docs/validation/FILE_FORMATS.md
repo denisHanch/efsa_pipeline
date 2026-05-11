@@ -41,7 +41,7 @@ The EFSA Pipeline validation module supports various file formats for genomic da
 - BED files are automatically converted to GFF3 format
 - Output is always uncompressed
 - If `gffread` fails or returns 0 features, the validator falls back to direct GFF3 parsing
-- If both `gffread` and the fallback parser return 0 features, validation fails: no output file is created and `run_vcf_annotation` is set to `false` in `validated_params.json`
+- If both `gffread` and the fallback parser return 0 features, validation fails: no output file is created
 - Coordinate validation (`start >= 1`, `start <= end`) runs in strict mode; issues are reported as warnings
 
 ## File Organization
