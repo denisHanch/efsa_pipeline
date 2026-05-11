@@ -263,21 +263,24 @@ def standardize_type_details(
     info_svtype: Optional[str],
     source: str,
 ) -> Tuple[str, str, Optional[str]]:
-    if info_svtype is not None:
+
+    if info_svtype is not None and not _is_missing(info_svtype):
         key = str(info_svtype).strip().upper()
         if key in INFO_MAP:
             return INFO_MAP[key], "info_svtype", key
 
-    raw_u = str(raw_svtype).upper()
-
-    for token, mapped in INFO_MAP.items():
-        if token in raw_u:
-            return mapped, "raw_svtype", token
-
-    if source == "asm":
         for pat, mapped in ASM_PREFIX_MAP:
-            if re.search(pat, raw_u):
-                return mapped, "asm_prefix", pat
+            if re.search(pat, key):
+                return mapped, "info_svtype_prefix", pat
+
+    raw_u = str(raw_svtype).strip().upper()
+
+    if raw_u in INFO_MAP:
+        return INFO_MAP[raw_u], "raw_svtype", raw_u
+
+    for pat, mapped in ASM_PREFIX_MAP:
+        if re.search(pat, raw_u):
+            return mapped, "raw_svtype_prefix", pat
 
     return "RPL", "fallback_default", None
 
@@ -1031,23 +1034,68 @@ def annotate_linked_events(df: pd.DataFrame, coord_tol: int = 0) -> pd.DataFrame
     ]
     return df
 
-def write_csv_tables(df: pd.DataFrame, outdir: Union[str, Path]) -> None:
+def write_csv_tables(df: pd.DataFrame, outdir: str | os.PathLike[str]) -> None:
     os.makedirs(outdir, exist_ok=True)
 
-    for std_type, name in TAB_BY_TYPE.items():
-        sub = df[df["std_svtype"] == std_type].copy()
-        if not sub.empty:
-            # Drop type-specific columns
+    # When all inputs are empty, build_output_table returns a DataFrame with no
+    # columns. Subsetting on "std_svtype" would raise a KeyError, so write
+    # header-only CSVs for every SV type and return early.
+    if df.empty or "std_svtype" not in df.columns:
+        for std_type, name in TAB_BY_TYPE.items():
+            skeleton = build_output_table(
+                [
+                    EventCluster(
+                        chrom="placeholder",
+                        std_type=std_type,
+                        start=0,
+                        end=0,
+                        members=[
+                            Record(
+                                source="asm",
+                                chrom="placeholder",
+                                start=0,
+                                end=0,
+                                std_type=std_type,
+                                raw_svtype=std_type,
+                            )
+                        ],
+                    )
+                ]
+            )
+
             cols_to_drop = ["std_svtype"]
             if std_type != "TRA":
                 cols_to_drop.extend(["asm_start_mod", "asm_end_mod"])
-            sub = sub.drop(columns=cols_to_drop, errors="ignore")
-            path = os.path.join(outdir, f"{name}.csv")
-            sub.sort_values(["chrom", "event_start", "event_end"]).to_csv(path, index=False)
+
+            header_df = skeleton.drop(
+                columns=cols_to_drop,
+                errors="ignore",
+            ).iloc[0:0]
+
+            header_df.to_csv(os.path.join(outdir, f"{name}.csv"), index=False)
+
+        return
+
+    for std_type, name in TAB_BY_TYPE.items():
+        sub = df[df["std_svtype"] == std_type].copy()
+
+        cols_to_drop = ["std_svtype"]
+        if std_type != "TRA":
+            cols_to_drop.extend(["asm_start_mod", "asm_end_mod"])
+
+        sub = sub.drop(columns=cols_to_drop, errors="ignore")
+
+        if not sub.empty:
+            sub = sub.sort_values(["chrom", "event_start", "event_end"])
+
+        sub.to_csv(os.path.join(outdir, f"{name}.csv"), index=False)
 
     other = df[~df["std_svtype"].isin(TAB_BY_TYPE)].copy()
     if not other.empty:
-        other = other.drop(columns=["std_svtype", "asm_start_mod", "asm_end_mod"], errors="ignore")
+        other = other.drop(
+            columns=["std_svtype", "asm_start_mod", "asm_end_mod"],
+            errors="ignore",
+        )
         other.to_csv(os.path.join(outdir, "Other.csv"), index=False)
 
 # Main
@@ -1112,7 +1160,8 @@ def main() -> None:
             "create_sv_output_no_valid_records",
             output_dir=str(args.out),
         )
-        print("No valid input records found; created output directory and exiting.")
+        write_csv_tables(pd.DataFrame(), args.out)
+        print("No valid input records found; wrote empty header-only CSV tables.")
         print(f"Load-record audit log: {log_path}")
         return
 
