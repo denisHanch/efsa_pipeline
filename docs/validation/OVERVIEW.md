@@ -88,7 +88,6 @@ This file is produced by the validation step and consumed by the pipeline workfl
 | `run_nanopore`          | boolean | `true` when validated Nanopore (ONT) reads are present (FASTQ or BAM).                               |
 | `run_pacbio`            | boolean | `true` when validated PacBio reads are present (FASTQ or BAM).                                       |
 | `contig_file_size`      | integer | Number of contig files produced by inter-genome characterisation.                                     |
-| `run_vcf_annotation`    | boolean | `true` when a validated GFF feature file is available.                                                |
 | `validation_timestamp`  | string  | Timestamp of the validation run (`YYYYMMDD_HHMMSS`).                                                  |
 
 #### File paths (null or empty list when absent)

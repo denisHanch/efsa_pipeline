@@ -404,6 +404,8 @@ By default, runtime logs are written to `data/outputs/logs/nextflow.log` and con
 | `-with-timeline` | Generate a timeline visualization showing when each pipeline process started and finished. The timeline is saved by default to `data/outputs/logs/timeline.html`.                   |
 | `-with-dag`      | Generate a directed acyclic graph (DAG) illustrating task dependencies in the workflow.                                                                                             |
 
+> **Note:** `-resume` is not supported in this pipeline. The `work/` directory is automatically deleted at the end of every run — including failed runs — so Nextflow has no cached task outputs to resume from.
+
 
 ### Available Options
 
@@ -755,6 +757,7 @@ At pipeline completion, the workflow attempts to remove the temporary `work/` di
 
 * The `work/` directory contains intermediate files and temporary outputs generated during pipeline execution.
 * Removing it saves disk space while retaining all final results in the `out_dir`.
+* Because the `work/` directory is removed even on failure, `-resume` is not supported — every run starts fresh.
 
 
 ## 📁 `data/valid` Directory Structure

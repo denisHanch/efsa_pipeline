@@ -10,7 +10,7 @@ process validate {
 
     output:
     path 'validated_params.json', emit: params_json
-    path 'run_*/**', emit: run_dir
+    path '{*.fasta,*.fasta.gz,*.gff,*.gff3,*.tsv,*/*.fastq.gz,*/*.bam}', optional: true, emit: validated_files
 
     script:
     def val_level_arg  = params.validation_level     ? "--validation-level ${params.validation_level}"  : ""

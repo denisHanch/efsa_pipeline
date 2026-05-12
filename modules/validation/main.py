@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import os
 import sys
 import traceback
 from pathlib import Path
@@ -51,19 +50,15 @@ def main():
     if parsed.organism_type      is not None: cli_options["type"]                = parsed.organism_type
     if parsed.force_defragment_ref:           cli_options["force_defragment_ref"] = True
 
-    base_valid_dir = Path.cwd()
-    # Use the run-specific dir exported by validation.sh; fall back to CWD.
-    run_dir = os.environ.get("VALIDATION_RUN_DIR")
-    output_dir = Path(run_dir).resolve() if run_dir else base_valid_dir
+    output_dir = Path.cwd()
     output_dir.mkdir(parents=True, exist_ok=True)
-    run_id = output_dir.name.removeprefix("run_") if output_dir.name.startswith("run_") else None
     logs_dir = config_path.parent.parent / "outputs" / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     logger = None
     log_file = None
 
     # Setup logging
-    log_filename = f"validation_{run_id}.log" if run_id else "validation.log"
+    log_filename = "validation.log"
     try:
         logger = setup_logging(console_level='DEBUG', log_file=logs_dir / log_filename)
     except (PermissionError, OSError) as e:
@@ -81,11 +76,8 @@ def main():
         logger.error(f"Loading a config file failed: {e}")
         return 1
 
-    # Redirect all validator configs to write into the run-specific output_dir.
-    # ConfigManager sets config.output_dir from the config file's location on
-    # disk (e.g. the real data/valid/ in the project root), which is wrong when
-    # running inside a Nextflow work directory.  Override every sub-config here
-    # so genome, read, and feature outputs all land in the same run_* folder.
+    # Override sub-config output dirs to CWD. ConfigManager sets output_dir from
+    # the config file location, which is wrong inside a Nextflow work directory.
     _all_sub_configs = [
         config.ref_genome, config.mod_genome,
         config.ref_plasmid, config.mod_plasmid,
@@ -215,7 +207,7 @@ def main():
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
-    report_filename = f"report_{run_id}.txt" if run_id else "report.txt"
+    report_filename = "report.txt"
     report = ValidationReport(logs_dir / report_filename)
     fatal_errors: list[str] = []
 
@@ -331,12 +323,11 @@ def main():
     if force_defragment:
         logger.warning(
             "force_defragment_ref is active: GFF validation for the reference is "
-            "skipped. Feature coordinates are not meaningful on a defragmented "
-            "reference — run_vcf_annotation will be disabled."
+            "skipped. Feature coordinates are not meaningful on a defragmented reference."
         )
     repo_root = config_path.parent.parent.parent
-    params = nf_params.build_params(validation_results, run_timestamp=run_id, base_dir=repo_root)
-    nf_params.write_params(params, base_valid_dir / "validated_params.json")
+    params = nf_params.build_params(validation_results, base_dir=repo_root)
+    nf_params.write_params(params, output_dir / "validated_params.json")
 
     return 0
 

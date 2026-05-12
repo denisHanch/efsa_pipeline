@@ -74,13 +74,6 @@ if [ ! -x "$VENV_PYTHON" ]; then
     exit 1
 fi
 
-# Create run-stamped staging directory instead of destructively clearing the output dir
-RUN_ID="$(date +%Y%m%d_%H%M%S)"
-STAGING_DIR="./run_${RUN_ID}"
-mkdir -p "$STAGING_DIR"
-echo "Validation outputs will be written under: $STAGING_DIR"
-export VALIDATION_RUN_DIR="$STAGING_DIR"
-
 # Build extra args array (only include options that were explicitly set)
 EXTRA_ARGS=()
 [[ -n "$THREADS"           ]] && EXTRA_ARGS+=(--threads "$THREADS")
