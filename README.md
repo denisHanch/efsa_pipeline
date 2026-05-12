@@ -512,7 +512,9 @@ python3 modules/utils/create_sv_output.py --asm assembly_sv_summary.tsv \
   --long_ont sample1_ont_sv_summary.tsv \
   --long_pacbio sample1_pacbio_sv_summary.tsv \
   --short sample1_short_sv_summary.tsv \
-  --out csv_per_sv_sumary
+  --out csv_per_sv_sumary \
+  --ref_size 4.8Mbp \
+  --mod_size 4.9Mbp
 ```
 
 ### All supported processing script options
@@ -526,6 +528,8 @@ python3 modules/utils/create_sv_output.py --asm assembly_sv_summary.tsv \
 | `--out` | Output directory for the per-SV CSV files. Required. |
 | `--tol` | Within-type clustering tolerance in base pairs. Determines whether raw SV calls get merged into the same event. Default: `10`. |
 | `--cross_type_tol` | Tolerance in base pairs for linking final events with near-identical coordinates in `linked_event`. Default: `0`, which keeps overlap-only linking. |
+| `--ref_size` | Reference genome size used to calculate `pct_of_ref_genome` as `event_length_bp / ref_size * 100`. Optional. Accepts plain bp values or suffixes such as `kb`, `kbp`, `Mb`, `Mbp`, `Gb`, or `Gbp`. |
+| `--mod_size` | Modified genome or assembly size used to calculate `pct_of_mod_genome` as `event_length_bp / mod_size * 100`. Optional. Accepts plain bp values or suffixes such as `kb`, `kbp`, `Mb`, `Mbp`, `Gb`, or `Gbp`. |
 
 ### Explanation of `csv_per_sv_summary` CSV columns
 
@@ -548,6 +552,8 @@ The final table in each CSV file contains one row per final structural variant (
 | **event_start** | Start coordinate of the selected representative call used to anchor the final event. By design, this is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
 | **event_end** | End coordinate of the selected representative call used to anchor the final event. By design, this is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
 | **event_length_bp** | Representative event size in base pairs, computed as the minimum available **absolute** `svlen` (`min(abs(svlen))`) across assembly, long ONT, long PacBio, and short source representatives. If no source provides `svlen`, this field is `NaN` and coordinates fall back to type-aware cluster coordinate logic. |
+| **pct_of_ref_genome** | Percentage of the reference genome covered by the representative event length, calculated as `event_length_bp / --ref_size * 100`. Empty/`NaN` unless `--ref_size` is provided and `event_length_bp` is available. |
+| **pct_of_mod_genome** | Percentage of the modified genome or assembly covered by the representative event length, calculated as `event_length_bp / --mod_size * 100`. Empty/`NaN` unless `--mod_size` is provided and `event_length_bp` is available. |
 | **support_score** | Number of input sources contributing to the final event row. In the current implementation this is the count of non-empty calls among `asm`, `long_ont`, `long_pacbio`, and `short`. |
 | **percentage_overlap** | Comma-separated overlap percentages collected during same-type event clustering. Each value is calculated during one clustering merge step as `(intersection length / longer interval length) × 100`. This field is empty when the final event was built from a single record only. |
 | **linked_event** | Semicolon-separated list of overlapping final SV events on the same chromosome. This single column includes both same-type and cross-type links. Each linked entry has the format `<event_id> (<std_svtype>, <chrom>:<start>-<end>, <relation>)`. Standard relation values are `exact_coordinates`, `overlap`, `nested_in`, and `contains`, always from the point of view of the current row. If `--cross_type_tol` is set above `0`, near-identical boundaries may also be reported as `same_coordinates_within_<N>bp`. Leave empty when no linked events are found. |
