@@ -33,7 +33,14 @@ events for both same-type and cross-type SV rows. Set --cross_type_tol to a smal
 integer to also link near-identical final coordinates.
 
 Usage:
-    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10 --cross_type_tol 0
+    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10 --cross_type_tol 0 [--ref_size 4Gbp] [--mod_size 4.5Gbp]
+
+Optional genome-size arguments:
+    --ref_size SIZE   Size of the reference genome (e.g. 4Gbp, 2.7G, 500Mb, 3000000000).
+                      Adds a pct_of_ref_genome column: event_length_bp / ref_size * 100.
+    --mod_size SIZE   Size of the modified genome or assembly (e.g. 4.5Gbp).
+                      Adds a pct_of_mod_genome column: event_length_bp / mod_size * 100.
+                      Both columns are NaN when the genome size or event length is unavailable.
 
 Any of the inputs may be omitted; the script will process whichever of the assembly, long_ont,
 long_pacbio or short tables are provided. Long-read inputs (ONT and PacBio) are treated
@@ -249,6 +256,48 @@ def _is_missing(value: Any) -> bool:
         return bool(pd.isna(value))
     except Exception:
         return False
+
+def _parse_genome_size(value: Optional[str]) -> Optional[int]:
+    """Parse a genome size string into an integer number of base pairs.
+
+    Accepts plain integers or values with SI/genomics suffixes (case-insensitive):
+      k / kb / kbp  → × 1 000
+      m / mb / mbp  → × 1 000 000
+      g / gb / gbp  → × 1 000 000 000
+
+    Examples:
+      "4Gbp"  → 4_000_000_000
+      "4.5G"  → 4_500_000_000
+      "500Mb" → 500_000_000
+      "3000"  → 3000
+      None    → None
+    """
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    multipliers = [
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Gg][Bb][Pp]?$", 1_000_000_000),
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Gg][Bb]?$",      1_000_000_000),
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Mm][Bb][Pp]?$",  1_000_000),
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Mm][Bb]?$",       1_000_000),
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Kk][Bb][Pp]?$",  1_000),
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Kk][Bb]?$",       1_000),
+    ]
+    for pat, mult in multipliers:
+        m = re.fullmatch(pat, s)
+        if m:
+            return int(float(m.group(1)) * mult)
+    # Plain integer or float (treated as bp)
+    try:
+        return int(float(s))
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"Cannot parse genome size {s!r}. "
+            "Use a plain integer (bp) or a value with suffix k/kb/kbp, m/mb/mbp, g/gb/gbp."
+        )
+
 
 def _to_int(x: Any) -> Optional[int]:
     try:
@@ -823,7 +872,11 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
 
     return out
 
-def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
+def build_output_table(
+    clusters: List[EventCluster],
+    ref_size_bp: Optional[int] = None,
+    mod_size_bp: Optional[int] = None,
+) -> pd.DataFrame:
     rows = []
     counters = {k: 0 for k in TAB_BY_TYPE}
 
@@ -924,6 +977,17 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
                 overlap_end = min(member_ends) if member_ends else c.end
 
             event_length_bp = np.nan
+        # Percentage of genome columns (NaN when genome size or event length is unknown)
+        if ref_size_bp and pd.notna(event_length_bp) and ref_size_bp > 0:
+            pct_of_ref = (event_length_bp / ref_size_bp) * 100
+        else:
+            pct_of_ref = np.nan
+
+        if mod_size_bp and pd.notna(event_length_bp) and mod_size_bp > 0:
+            pct_of_mod = (event_length_bp / mod_size_bp) * 100
+        else:
+            pct_of_mod = np.nan
+
         row = {
             "event_id": eid,
             "chrom": c.chrom,
@@ -931,6 +995,8 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "event_start": overlap_start,
             "event_end": overlap_end,
             "event_length_bp": event_length_bp,
+            "pct_of_ref_genome": pct_of_ref,
+            "pct_of_mod_genome": pct_of_mod,
 
             "asm_start": asm.start if asm else np.nan,
             "asm_end": asm.end if asm else np.nan,
@@ -1191,7 +1257,31 @@ def main() -> None:
         default=0,
         help="Tolerance in bp for linking near-identical final event coordinates in linked_event. Default 0 keeps overlap-only linking.",
     )
+    p.add_argument(
+        "--ref_size",
+        default=None,
+        metavar="SIZE",
+        help=(
+            "Size of the reference genome (e.g. 4Gbp, 2.7G, 500Mb, 3000000000). "
+            "When provided, a pct_of_ref_genome column is added to each output CSV "
+            "showing event_length_bp as a percentage of this value."
+        ),
+    )
+    p.add_argument(
+        "--mod_size",
+        default=None,
+        metavar="SIZE",
+        help=(
+            "Size of the modified genome or assembly (e.g. 4.5Gbp, 2.8G, 510Mb). "
+            "When provided, a pct_of_mod_genome column is added to each output CSV "
+            "showing event_length_bp as a percentage of this value."
+        ),
+    )
+
     args = p.parse_args()
+
+    ref_size_bp = _parse_genome_size(args.ref_size)
+    mod_size_bp = _parse_genome_size(args.mod_size)
 
     logger, log_path = setup_logging()
     logger.info(
@@ -1199,6 +1289,8 @@ def main() -> None:
         output_dir=str(args.out),
         tol=args.tol,
         cross_type_tol=args.cross_type_tol,
+        ref_size_bp=ref_size_bp,
+        mod_size_bp=mod_size_bp,
         inputs=_clean_dict(
             {
                 "asm": args.asm,
@@ -1252,7 +1344,7 @@ def main() -> None:
     if not clusters:
         df = pd.DataFrame()
     else:
-        df = build_output_table(clusters)
+        df = build_output_table(clusters, ref_size_bp=ref_size_bp, mod_size_bp=mod_size_bp)
 
     if "long_ont_info_svtype" in df.columns:
         mask = df["long_ont_info_svtype"].notna() & (df["long_ont_info_svtype"] != "")
