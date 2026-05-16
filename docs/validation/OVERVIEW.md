@@ -88,6 +88,8 @@ This file is produced by the validation step and consumed by the pipeline workfl
 | `run_nanopore`          | boolean | `true` when validated Nanopore (ONT) reads are present (FASTQ or BAM).                               |
 | `run_pacbio`            | boolean | `true` when validated PacBio reads are present (FASTQ or BAM).                                       |
 | `contig_file_size`      | integer | Number of contig files produced by inter-genome characterisation.                                     |
+| `ref_genome_size_bp`    | integer | Validated reference genome size in base pairs, used by `restructure_sv_tbl` to calculate `pct_of_ref_genome`. Omitted when unavailable. |
+| `mod_genome_size_bp`    | integer | Validated modified genome size in base pairs, used by `restructure_sv_tbl` to calculate `pct_of_mod_genome`. Omitted when unavailable. |
 | `validation_timestamp`  | string  | Timestamp of the validation run (`YYYYMMDD_HHMMSS`).                                                  |
 
 #### File paths (null or empty list when absent)

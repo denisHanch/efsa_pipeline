@@ -36,6 +36,17 @@ Because the integration is JSON parsing based:
 - Any schema change on the validation side must be reflected in the Nextflow parsing/consumption logic.
 - Backward compatibility depends on keeping that JSON contract stable or versioned.
 
+## Genome-size handoff for SV percentage columns
+
+Validation now writes two optional internal parameters when genome sizes are available:
+
+| Parameter | Consumer | Purpose |
+|---|---|---|
+| `ref_genome_size_bp` | `workflows/analysis.nf` → `restructure_sv_tbl` | Calculates `pct_of_ref_genome` in the final SV CSV tables. |
+| `mod_genome_size_bp` | `workflows/analysis.nf` → `restructure_sv_tbl` | Calculates `pct_of_mod_genome` in the final SV CSV tables. |
+
+These values are derived from validation metadata and passed through the workflow automatically. `restructure_sv_tbl` also receives the validated FASTA files and computes genome sizes as a fallback when the optional params are absent. Users do not pass genome sizes to `modules/utils/create_sv_output.py` manually.
+
 ## Related Documentation
 
 - [Validation Process](validation-process.md)

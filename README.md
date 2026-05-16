@@ -447,6 +447,7 @@ flowchart LR
   - `coverage_after_100bp`: mean depth in the 100 bp downstream flank
 - If one of the pipelines was not running (short/long/assembly) an empty tsv file is generated with a process create_empty_tbl
 - `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
+- Validation writes `ref_genome_size_bp` and `mod_genome_size_bp` into `data/valid/validated_params.json` when available; `restructure_sv_tbl` also receives the validated FASTA files and computes the sizes as a fallback. Genome-percentage columns are therefore populated during normal pipeline runs without manual script arguments.
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
 - Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
 - `linked_event` is the only relationship column in the final CSVs. It includes both same-type and cross-type overlaps.
@@ -512,10 +513,10 @@ python3 modules/utils/create_sv_output.py --asm assembly_sv_summary.tsv \
   --long_ont sample1_ont_sv_summary.tsv \
   --long_pacbio sample1_pacbio_sv_summary.tsv \
   --short sample1_short_sv_summary.tsv \
-  --out csv_per_sv_sumary \
-  --ref_size 4.8Mbp \
-  --mod_size 4.9Mbp
+  --out csv_per_sv_sumary
 ```
+
+During normal Nextflow runs, `restructure_sv_tbl` sets genome-size context from validated parameters when present, or by counting bases in the validated FASTA files. Direct script runs do not expose manual genome-size arguments; the percentage columns are left empty/`NaN` unless the internal pipeline environment variables are set.
 
 ### All supported processing script options
 
@@ -528,8 +529,6 @@ python3 modules/utils/create_sv_output.py --asm assembly_sv_summary.tsv \
 | `--out` | Output directory for the per-SV CSV files. Required. |
 | `--tol` | Within-type clustering tolerance in base pairs. Determines whether raw SV calls get merged into the same event. Default: `10`. |
 | `--cross_type_tol` | Tolerance in base pairs for linking final events with near-identical coordinates in `linked_event`. Default: `0`, which keeps overlap-only linking. |
-| `--ref_size` | Reference genome size used to calculate `pct_of_ref_genome` as `event_length_bp / ref_size * 100`. Optional. Accepts plain bp values or suffixes such as `kb`, `kbp`, `Mb`, `Mbp`, `Gb`, or `Gbp`. |
-| `--mod_size` | Modified genome or assembly size used to calculate `pct_of_mod_genome` as `event_length_bp / mod_size * 100`. Optional. Accepts plain bp values or suffixes such as `kb`, `kbp`, `Mb`, `Mbp`, `Gb`, or `Gbp`. |
 
 ### Explanation of `csv_per_sv_summary` CSV columns
 
@@ -552,8 +551,8 @@ The final table in each CSV file contains one row per final structural variant (
 | **event_start** | Start coordinate of the selected representative call used to anchor the final event. By design, this is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
 | **event_end** | End coordinate of the selected representative call used to anchor the final event. By design, this is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
 | **event_length_bp** | Representative event size in base pairs, computed as the minimum available **absolute** `svlen` (`min(abs(svlen))`) across assembly, long ONT, long PacBio, and short source representatives. If no source provides `svlen`, this field is `NaN` and coordinates fall back to type-aware cluster coordinate logic. |
-| **pct_of_ref_genome** | Percentage of the reference genome covered by the representative event length, calculated as `event_length_bp / --ref_size * 100`. Empty/`NaN` unless `--ref_size` is provided and `event_length_bp` is available. |
-| **pct_of_mod_genome** | Percentage of the modified genome or assembly covered by the representative event length, calculated as `event_length_bp / --mod_size * 100`. Empty/`NaN` unless `--mod_size` is provided and `event_length_bp` is available. |
+| **pct_of_ref_genome** | Percentage of the reference genome covered by the representative event length, calculated as `event_length_bp / ref_genome_size_bp * 100`. `ref_genome_size_bp` comes from `data/valid/validated_params.json` when available, otherwise `restructure_sv_tbl` derives it from the validated reference FASTA. Empty/`NaN` when the genome size or `event_length_bp` is unavailable. |
+| **pct_of_mod_genome** | Percentage of the modified genome or assembly covered by the representative event length, calculated as `event_length_bp / mod_genome_size_bp * 100`. `mod_genome_size_bp` comes from `data/valid/validated_params.json` when available, otherwise `restructure_sv_tbl` derives it from the validated modified FASTA. Empty/`NaN` when the genome size or `event_length_bp` is unavailable. |
 | **support_score** | Number of input sources contributing to the final event row. In the current implementation this is the count of non-empty calls among `asm`, `long_ont`, `long_pacbio`, and `short`. |
 | **percentage_overlap** | Comma-separated overlap percentages collected during same-type event clustering. Each value is calculated during one clustering merge step as `(intersection length / longer interval length) × 100`. This field is empty when the final event was built from a single record only. |
 | **linked_event** | Semicolon-separated list of overlapping final SV events on the same chromosome. This single column includes both same-type and cross-type links. Each linked entry has the format `<event_id> (<std_svtype>, <chrom>:<start>-<end>, <relation>)`. Standard relation values are `exact_coordinates`, `overlap`, `nested_in`, and `contains`, always from the point of view of the current row. If `--cross_type_tol` is set above `0`, near-identical boundaries may also be reported as `same_coordinates_within_<N>bp`. Leave empty when no linked events are found. |
