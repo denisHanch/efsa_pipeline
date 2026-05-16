@@ -36,7 +36,7 @@ workflow long_read {
 
     main:
         // mapping to the reference
-        samtools_index(fasta, out_folder_name) | set { fai }
+        samtools_index(fasta) | set { fai }
         mapping_long(fastqs, fasta, mapping_tag, out_folder_name) | set { indexed_bam }
 
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }

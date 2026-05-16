@@ -7,7 +7,6 @@ process samtools_index {
 
     input:
     path fasta_file
-    val out_folder_name
 
     output:
     path("${fasta_file}.fai")
@@ -24,7 +23,6 @@ process picard_dict {
     
     input:
     path fasta_file
-    val out_folder_name
 
     output:
     path("*.dict")

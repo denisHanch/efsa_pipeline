@@ -53,8 +53,8 @@ workflow sv {
 
 
     main:
-        samtools_index(fasta, out_folder_name) | set { fai }
-        picard_dict(fasta, out_folder_name) | set { dict }
+        samtools_index(fasta) | set { fai }
+        picard_dict(fasta) | set { dict }
         delly(indexed_bam, fasta, fai, dict, out_folder_name) | set { bcf }
         convert_bcf_to_vcf(bcf, out_folder_name) | set { sv_vcf }
 
