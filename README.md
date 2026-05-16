@@ -12,7 +12,6 @@
       - [📊 Unmapped Reads Statistics](#-unmapped-reads-statistics)
       - [✅ Pipeline Execution Summary](#-pipeline-execution-summary)
       - [Removal of Nextflow Work Directory](#removal-of-nextflow-work-directory)
-   - [📁 `data/valid` Directory Structure](#-datavalid-directory-structure)
    - [📁 `data/outputs` Directory Structure](#-dataoutputs-directory-structure)
       - [`fasta_ref_mod/`](#fasta_ref_mod)
       - [`illumina/`](#illumina)
@@ -120,11 +119,11 @@ Depending on the structure of `ref.fa` and `mod.fa`, different strategies are ap
 - chromosome and plasmid separation
 - contig handling
 - usage of minimap2 for sequence mapping
-- preparation of files in `data/valid/`
+- preparation of validated files for downstream workflows
 
 The following table summarizes all supported scenarios:
 
-| #     | Scenario                                                  | Type (`config.json`)       | Input Structure                                                                                | Plasmids Handling                                                                                                                                               | `run_ref_x_mod` | **minimap2 Mapping**                                              | mod.fa Processing                                                                                          | Modules Run          | Output in `data/valid/`                                                      |
+| #     | Scenario                                                  | Type (`config.json`)       | Input Structure                                                                                | Plasmids Handling                                                                                                                                               | `run_ref_x_mod` | **minimap2 Mapping**                                              | mod.fa Processing                                                                                          | Modules Run          | Validated outputs                                                      |
 | ----- | --------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------- |
 | **1** | Single contig + plasmids                      | `prokaryote`               | **ref.fa:** 1 sequence (+ optional plasmids) <br> **mod.fa:** 1 sequence (+ optional plasmids) | In **ref.fa**: <br> - Longest sequence → chromosome <br> - Remaining → plasmids <br><br> In **mod.fa**: plasmids = sequences **not mapped** to reference    | True            | **Used** to identify unmapped regions (plasmids in mod.fa)        | Reduced to **1 contig** (chromosome only)                                                                  | All modules          | `ref.fa`, `mod.fa` (1 contig) <br> `*_contig_0.fasta` <br> `*_plasmid.fasta` |
 | **2** | Fragmented assembly (below limit)             | `prokaryote`               | **ref.fa:** 1 sequence <br> **mod.fa:** multiple sequences (≤ limit)                           | In reference: <br> - Longest = chromosome <br> - Rest = plasmids <br><br> In **mod.fa**: <br> - Unmapped sequences → plasmids <br> - Mapped sequences → contigs | True            | **Used** to split mod.fa into mapped contigs vs unmapped plasmids | - Split into individual contigs (`*_contig.fasta`) <br> - `mod.fa` becomes multifasta **without plasmids** | All modules          | `ref.fa`, `mod.fa` + contig set <br> `*_contig.fasta` <br> `*_plasmid.fasta` |
@@ -766,38 +765,11 @@ At pipeline completion, the workflow attempts to remove the temporary `work/` di
 * Because the `work/` directory is removed even on failure, `-resume` is not supported — every run starts fresh.
 
 
-## 📁 `data/valid` Directory Structure
+## Validation Artifacts
 
-This directory contains all input data used by the Nextflow pipeline.
-```
-data/valid/
-├── assembled_genome.fasta
-├── reference_genome.fasta
-├── mod_config_[0..4].fasta    # Presence of multiple contigs in case of a fragmented assembly
-├── ref_plasmid.fa             # Reference plasmid sequences (if used)
-├── mod_plasmid.fa             # Modified/assembled plasmid sequences (if used)
-│
-├── illumina/                  
-│   ├── SampleName_1.fastq.gz  
-│   ├── SampleName_2.fastq.gz  
-│
-├── ont/                       
-│   └── SampleName.fastq.gz
-│
-└── pacbio/                   
-    └── SampleName.fastq.gz
-
-```
-
-| File / Folder            | Description                                           |
-| ------------------------ | ----------------------------------------------------- |
-| `reference_genome.fasta` | The primary reference genome sequence.                |
-| `assembled_genome.fasta` | Assembled or modified genome for comparison/analysis. |
-| `ref_plasmid.fa`         | Reference plasmid sequences.                          |
-| `mod_plasmid.fa`         | Modified or assembled plasmid sequences.              |
-| `illumina/`              | Paired-end Illumina short reads.                      |
-| `ont/`                   | Oxford Nanopore long reads.                           |
-| `pacbio/`                | PacBio long reads.                                    |
+Validation files are no longer published to a persistent `data/valid` directory.
+They are generated inside the Nextflow task work directory and consumed directly
+by downstream workflow channels.
 
 ## 📁 `data/outputs` Directory Structure
 
@@ -805,7 +777,7 @@ After successful pipeline execution, the outputs are organized as follows:
 
 ```
 data/outputs
-├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod is set to true in `data/valid/validated_params.json`)
+├── fasta_ref_mod       → Results from reference vs modified FASTA comparison (if run_ref_x_mod is true in validated_params.json)
 ├── illumina            → Short-read (Illumina) mapping results
 ├── logs/               → Pipeline logs, Nextflow reports, trace data, and process manifest
 ├── ont                 → Long-read (Oxford Nanopore) mapping results
@@ -1057,28 +1029,21 @@ data/outputs/illumina/
 │   └── trimmed_reads
 ├── short-mod
 │   ├── bam
-│   ├── bwa_index
 │   ├── multiqc
 │   ├── picard
-│   ├── samtools_stats
-│   └── unmapped_fastq
+│   └── samtools_stats
 ├── short-ref
 │   ├── bam
 │   ├── bcftools_stats
-│   ├── bwa_index
 │   ├── multiqc
 │   ├── picard
-│   ├── samtools_index_dict
 │   ├── samtools_stats
-│   ├── unmapped_fastq
 │   └── vcf
 └── short-ref-plasmid
     ├── bam
-    ├── bwa_index
     ├── multiqc
     ├── picard
-    ├── samtools_stats
-    └── unmapped_fastq
+    └── samtools_stats
 ```
 
 #### `qc_trimming/`
@@ -1102,28 +1067,23 @@ This folder contains Illumina reads mapped to the **reference genome**.
 Includes:
 
 * `bam/` — Sorted and indexed BAM alignment files
-* `bwa_index/` — Precomputed BWA reference genome indices
-* `samtools_index_dict/` — FASTA index and sequence dictionary files
 * `samtools_stats/` — Alignment and coverage statistics
 * `picard/` — Alignment QC metrics
 * `bcftools_stats/` — Variant calling summary statistics
 * `vcf/` — Variant calls generated by Delly and (SVs) and FreeBayes (SNP and INDELs) and (SNP and INDELs)
 * `multiqc/` — Combined QC report from mapping and alignment metrics and variant calling metrics
-* `unmapped_fastq/` — fastq file with reads that failed to align to the reference genome
 
 
 #### `short-ref-plasmid/`
 
-This folder holds the mapping results of Illumina reads aligned to the reference plasmid fasta. It is created only if a reference plasmid is present in the `data/valid` folder. A folder with a similar structure, `short-mod-plasmid/`, is created if a modified plasmid is present within the `data/valid` folder.
+This folder holds the mapping results of Illumina reads aligned to the reference plasmid fasta. It is created only if a reference plasmid is present in the validated inputs. A folder with a similar structure, `short-mod-plasmid/`, is created if a modified plasmid is present in the validated inputs.
 
 Includes:
 
 * `bam/` — Aligned reads (that were not mapped to the reference) mapped to the plasmid
-* `bwa_index/` — Plasmid reference index files
 * `samtools_stats/` — Mapping and coverage statistics
 * `picard/` — Alignment QC metrics
 * `multiqc/` — Summary report of mapping and alignment metrics
-* `unmapped_fastq/` — Reads not mapped to the plasmid and not mapped to the reference genome
 
 #### `short-mod/`
 
@@ -1132,11 +1092,9 @@ This folder contains Illumina read alignments against the **modified/assembled g
 Includes:
 
 * `bam/` — Sorted BAM files for modified genome mapping
-* `bwa_index/` — Modified genome BWA index
 * `samtools_stats/` — Mapping and coverage statistics
 * `picard/` — Alignment QC metrics
 * `multiqc/` — Summary report of mapping and alignment metrics
-* `unmapped_fastq/` — Fastq file containing reads that failed to align to the modified genome
 
 The table below summarises all tools used within the pipeline:
 
@@ -1258,19 +1216,16 @@ Both follow the **same folder structure** and processing logic.
 data/outputs/ont/
 data/outputs/pacbio/
 ├── long-mod
-│   ├── bam
-│   └── unmapped_fastq
+│   └── bam
 ├── long-ref
 │   ├── bam
 │   ├── bcftools_stats
 │   ├── cutesv_out
 │   ├── debreak_out
 │   ├── sniffles_out
-│   ├── survivor_out
-│   └── unmapped_fastq
+│   └── survivor_out
 ├── long-ref-plasmid
-│   ├── bam
-│   └── unmapped_fastq
+│   └── bam
 ```
 
 #### `long-ref/`
@@ -1297,19 +1252,16 @@ Includes:
 * `survivor_out/`
   Merged structural variant callsets generated by **SURVIVOR**.
 
-* `unmapped_fastq/`
-  Long reads that failed to align to the reference genome.
 
 ---
 
 #### `long-ref-plasmid/`
 
-This folder holds the mapping results of long reads aligned to the reference plasmid sequence. It is created only if a reference plasmid is present in the `data/valid` folder. A folder with a similar structure, `long-mod-plasmid/`, is created if a modified plasmid is present within the `data/valid` folder.
+This folder holds the mapping results of long reads aligned to the reference plasmid sequence. It is created only if a reference plasmid is present in the validated inputs. A folder with a similar structure, `long-mod-plasmid/`, is created if a modified plasmid is present in the validated inputs.
 
 Includes:
 
 * `bam/` — Plasmid-mapped long-read alignments
-* `unmapped_fastq/` — Fastq file containing reads that did not map to the plasmid
 
 
 #### `long-mod/`
@@ -1319,7 +1271,6 @@ Contains alignments of long reads mapped to the **modified/assembled genome**.
 Includes:
 
 * `bam/` — Sorted alignment files
-* `unmapped_fastq/` — Reads that failed to align to the modified genome
 
 This enables comparison between mapping reads on reference vs modified assemblies.
 

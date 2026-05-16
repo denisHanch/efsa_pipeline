@@ -4,7 +4,6 @@
 
 process bwa_index {
     tag "$fasta_file"
-    publishDir "${params.out_dir}/${out_folder_name}/bwa_index", mode: "copy"
 
     input:
     path fasta_file
@@ -268,7 +267,6 @@ process calc_unmapped {
 
 process get_unmapped_reads {
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/unmapped_fastq", mode: "copy"
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index)

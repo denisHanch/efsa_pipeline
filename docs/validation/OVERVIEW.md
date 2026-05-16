@@ -9,11 +9,11 @@ Depending on the structure of `ref.fa` and `mod.fa`, different strategies are ap
 - chromosome and plasmid separation
 - contig handling
 - usage of minimap2 for sequence mapping
-- preparation of files in `data/valid/`
+- preparation of validated files for downstream workflows
 
 The following table summarizes all supported scenarios:
 
-| #     | Scenario                                                  | Mode (`config.json`)       | Input Structure                                                                                | Plasmids Handling                                                                                                                                               | `run_ref_x_mod` | **minimap2 Mapping**                                              | mod.fa Processing                                                                                          | Modules Run          | Output in `data/valid/`                                                      |
+| #     | Scenario                                                  | Mode (`config.json`)       | Input Structure                                                                                | Plasmids Handling                                                                                                                                               | `run_ref_x_mod` | **minimap2 Mapping**                                              | mod.fa Processing                                                                                          | Modules Run          | Validated outputs                                                      |
 | ----- | --------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------- |
 | **1** | Single contig + plasmids                    | `PROKARYOTE`               | **ref.fa:** 1 sequence (+ optional plasmids) <br> **mod.fa:** 1 sequence (+ optional plasmids) |  In **ref.fa**: <br> - Longest sequence → chromosome <br> - Remaining → plasmids `*ref_plasmid.fasta` <br><br> In **mod.fa**: plasmids = sequences **not mapped** to reference    | True            | **Used** to identify unmapped regions (plasmids in mod.fa)        | Reduced to **1 contig** (chromosome only)                                                                  | All modules          | `ref.fa`, `mod.fa` (1 contig) <br> `*_contig_0.fasta` <br> `*_plasmid.fasta` |
 | **2** | Fragmented assembly (below limit)            | `PROKARYOTE`               | **ref.fa:** 1 sequence <br> **mod.fa:** multiple sequences (≤ limit)                           | In reference: <br> - In **ref.fa**: <br> - Longest sequence → chromosome <br> - Remaining → plasmids `*ref_plasmid.fasta` <br><br> In **mod.fa**: <br> - Unmapped sequences → plasmids <br> - Mapped sequences → contigs | True            | **Used** to split mod.fa into mapped contigs vs unmapped plasmids | - Split into individual contigs (`*_contig.fasta`) <br> - `mod.fa` becomes multifasta **without plasmids** | All modules          | `ref.fa`, `mod.fa` + contig set <br> `*_contig.fasta` <br> `*_plasmid.fasta` |
@@ -45,9 +45,9 @@ The validation process:
 1. Reads the configuration file from `data/inputs/config.json`
 2. Validates each input file according to its type (genome, reads, features)
 3. Converts files to standardized formats
-4. Outputs validated files to a timestamped run directory `data/valid/run_YYYYMMDD_HHMMSS/`
-5. Writes `data/valid/validated_params.json` (at the top level, not inside the run directory) with validated file paths and flags for Nextflow
-6. Generates a log and report inside the run directory
+4. Produces validated files and metadata inside the validation task work directory
+5. Writes `validated_params.json` with validated file paths and flags for Nextflow
+6. Generates a log and report as part of the validation outputs
 
 ## Running Validation
 
@@ -57,7 +57,7 @@ Validation is integrated into the main pipeline and runs automatically:
 nextflow run main.nf --max_cpu $(nproc)
 ```
 
-This runs the validation inside the `ecomolegmo/validation` Docker image as a Nextflow process, then proceeds to the processing workflows. It reads `data/inputs/config.json` (configurable via `--config_json`) and publishes validated outputs to `data/valid/`.
+This runs the validation inside the `ecomolegmo/validation` Docker image as a Nextflow process, then proceeds to the processing workflows. It reads `data/inputs/config.json` (configurable via `--config_json`) and passes validation outputs directly through Nextflow channels.
 
 ## Related Documentation
 
@@ -70,8 +70,8 @@ This runs the validation inside the `ecomolegmo/validation` Docker image as a Ne
 
 After successful validation:
 
-- Validated files are placed in `data/valid/run_YYYYMMDD_HHMMSS/` (a new timestamped directory per run; previous runs are preserved)
-- `data/valid/validated_params.json` is written at the top level of `data/valid/` so Nextflow can always find it at a fixed path
+- Validated files are produced by the `validate` process and consumed directly by downstream channels
+- `validated_params.json` is emitted by the validation process and used at runtime by the analysis workflow
 - If any genome exceeds `n_sequence_limit` or `type` is `"EUKARYOTE"`, the file is still copied but `run_ref_x_mod` will be set to `false`
 - Log and report are written inside the run directory
 

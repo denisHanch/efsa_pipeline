@@ -19,7 +19,7 @@ nextflow run main.nf --max_cpu $(nproc)
 
 This first validates input data from `data/inputs/config.json`, then automatically runs the processing workflows (short-read, long-read, ref-vs-mod comparison) based on the validated inputs.
 
-Validated files are written to `data/valid/run_YYYYMMDD_HHMMSS/` and `data/valid/validated_params.json` is produced for runtime consumption. See the [Validation Overview](../validation/OVERVIEW.md) for details on what this file contains.
+Validated files are produced by the `validate` process and passed directly to downstream workflows through channels. A `validated_params.json` file is also emitted for runtime consumption. See the [Validation Overview](../validation/OVERVIEW.md) for details on what this file contains.
 
 By default, runtime logs are written to `data/outputs/logs/nextflow.log` and console output is kept quiet.
 
