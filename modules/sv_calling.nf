@@ -103,7 +103,7 @@ process cute_sv {
 
 process debreak {
 
-    publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
+    publishDir "${params.out_dir}/${out_folder_name}/", mode: "copy"
 
     input:
     each path(fasta_file)
