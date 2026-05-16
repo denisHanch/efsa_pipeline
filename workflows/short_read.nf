@@ -32,17 +32,18 @@ workflow short_read {
         calc_unmapped(unmapped_fastq) | map { _pair_id, reads -> reads } | set { nreads }
         logUnmapped(nreads, total_reads, out_folder_name, "")
 
-        // mapping reads to plasmid
-        if (plasmid_fasta) {
-            plasmid_fasta.flatten() | set { plasmid_fasta }
+        // mapping reads to plasmid (only when plasmid input exists)
+        plasmid_fasta
+            .filter { it && !(it instanceof Collection && it.isEmpty()) }
+            .flatten()
+            | set { plasmid_fasta_present }
 
-            bwa_index_plasmid(plasmid_fasta, "${out_folder_name}-plasmid") | set { unmapped_fasta_index } 
-            mapping_plasmid(plasmid_fasta, unmapped_fasta_index, unmapped_fastq, "${out_folder_name}-plasmid") | set { unmapped_bam }
-            get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq }
+        bwa_index_plasmid(plasmid_fasta_present, "${out_folder_name}-plasmid") | set { unmapped_fasta_index } 
+        mapping_plasmid(plasmid_fasta_present, unmapped_fasta_index, unmapped_fastq, "${out_folder_name}-plasmid") | set { unmapped_bam }
+        get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq_plasmid }
 
-            calc_unmapped_plasmid(unmapped_fastq) | map { _pair_id, reads -> reads } | set { nreads }
-            logUnmapped_plasmid(nreads, total_reads, "${out_folder_name}-plasmid", " against plasmid")
-        }
+        calc_unmapped_plasmid(unmapped_fastq_plasmid) | map { _pair_id, reads -> reads } | set { nreads_plasmid }
+        logUnmapped_plasmid(nreads_plasmid, total_reads, "${out_folder_name}-plasmid", " against plasmid")
 
          if (out_folder_name == "illumina/short-ref") { 
             

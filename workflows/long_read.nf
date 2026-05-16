@@ -46,16 +46,17 @@ workflow long_read {
         calc_unmapped_long(unmapped_fastq) | map { _pair_id, reads -> reads } | set { nreads }
         logUnmapped(nreads, total_reads, out_folder_name, "")
 
-        // mapping reads to plasmid & variant calling
-        if (plasmid_fasta) {
-            plasmid_fasta.flatten() | set { plasmid_fasta }
+        // mapping reads to plasmid (only when plasmid input exists)
+        plasmid_fasta
+            .filter { it && !(it instanceof Collection && it.isEmpty()) }
+            .flatten()
+            | set { plasmid_fasta_present }
 
-            mapping_long_plasmid(unmapped_fastq, plasmid_fasta, mapping_tag, "${out_folder_name}-plasmid") | set { unmapped_bam }
-            get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq }
+        mapping_long_plasmid(unmapped_fastq, plasmid_fasta_present, mapping_tag, "${out_folder_name}-plasmid") | set { unmapped_bam }
+        get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq_plasmid }
 
-            calc_unmapped_plasmid(unmapped_fastq) | map { _pair_id, reads -> reads } | set { nreads }
-            logUnmapped_plasmid(nreads, total_reads, "${out_folder_name}-plasmid", " against plasmid")
-        }
+        calc_unmapped_plasmid(unmapped_fastq_plasmid) | map { _pair_id, reads -> reads } | set { nreads_plasmid }
+        logUnmapped_plasmid(nreads_plasmid, total_reads, "${out_folder_name}-plasmid", " against plasmid")
 
         // SV calling against the reference
         if (out_folder_name == "ont/long-ref" || out_folder_name == "pacbio/long-ref") { 

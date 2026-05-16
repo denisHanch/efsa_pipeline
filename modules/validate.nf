@@ -3,6 +3,9 @@
 process validate {
 
     tag "validate"
+    publishDir "${params.valid_dir}", mode: 'copy', overwrite: true, saveAs: { filename ->
+        filename == 'validated_params.json' ? filename : null
+    }
 
     input:
     path config_json
