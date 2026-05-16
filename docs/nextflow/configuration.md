@@ -22,7 +22,6 @@ As a result, operational runtime messages are primarily captured in `data/output
 | `valid_dir` | `data/outputs/valid` | Directory where only `validated_params.json` is saved |
 | `max_cpu` | `1` | Maximum CPUs available per process (override with `--max_cpu`) |
 | `cleanup` | `true` | Enables end-of-run cleanup hooks (for example, work directory cleanup) |
-| `ref_plasmid_fasta` | `null` | Optional reference plasmid FASTA |
 | `validation_level` | `null` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — `null` means not forwarded; `config.json` governs |
 | `logging_level` | `null` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — `null` means not forwarded; `config.json` governs |
 | `organism_type` | `null` | Organism type: `PROKARYOTE` or `EUKARYOTE` — `null` means not forwarded; `config.json` governs |

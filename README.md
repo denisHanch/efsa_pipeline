@@ -44,6 +44,13 @@ nextflow run main.nf --max_cpu $(nproc)
 Executes validation first, then runs only the workflow branches enabled by validated inputs.
 If a modified genome FASTA is available, both reference and modified branches run; if it is missing, the pipeline runs reference-only processing.
 
+> **Note on execution modes**
+>
+> A two-step approach (separate validation, then analysis) is available and was integrated in branch `remotes/origin/feature/EFSA-268_nfx_integration_v2` on April 12th.
+> It can be more robust because Nextflow builds the DAG up front, and runtime `true/false` decisions from validation are easier to handle when analysis is launched from already validated outputs.
+>
+> However, as was requested the default mode remains the one-step execution in `main`, where validation and analysis run together in a single command.
+
 ### Individual Workflows
 
 You can also run specific workflows directly:
@@ -108,6 +115,16 @@ The pipeline has three main processing branches:
 3. **Reference vs Modified** - Genome comparison using MUMmer and SyRI
 
 All outputs are aggregated into unified SV tables in `data/outputs/tables/`.
+
+## Module Change History and Restoration
+
+Some modules used in previous pipeline revisions (for example `gcf_annotation` and `truvari`) are currently not active in `main`.
+
+If you need them again, restore them by:
+
+1. Checking repository history (`git log`, `git show`) to identify the last commit where the module was present.
+2. Reintroducing the module files and workflow wiring from that commit.
+3. Alternatively, running an earlier tagged/released pipeline version where those modules were still included.
 
 ## Attribution
 
