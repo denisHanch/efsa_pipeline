@@ -70,14 +70,19 @@ This runs the validation inside the `ecomolegmo/validation` Docker image as a Ne
 
 After successful validation:
 
-- Validated files are produced by the `validate` process and consumed directly by downstream channels
-- `validated_params.json` is emitted by the validation process and used at runtime by the analysis workflow
+- `validated_params.json` is **published to `data/outputs/valid/`** and used at runtime by the analysis workflow
+- Validated genome/read/feature files are produced by the `validate` process and consumed directly by downstream channels via Nextflow
 - If any genome exceeds `n_sequence_limit` or `type` is `"EUKARYOTE"`, the file is still copied but `run_ref_x_mod` will be set to `false`
-- Log and report are written inside the run directory
+- Log and report are written to `data/outputs/logs/`
 
 ### `validated_params.json`
 
-This file is produced by the validation step and consumed by the pipeline workflow at runtime via channels. It contains all validated file paths and pipeline flags.
+This file is produced by the validation step and **persisted in `data/outputs/valid/validated_params.json`**. It contains:
+- All validated file paths and locations
+- Runtime pipeline flags (e.g., `run_ref_x_mod`, `run_illumina`, `run_pacbio`, `run_nanopore`)
+- Metadata about the validated inputs
+
+It is used at runtime by the analysis workflow to determine which pipelines to execute and where to find the validated input files.
 
 #### Pipeline switches
 

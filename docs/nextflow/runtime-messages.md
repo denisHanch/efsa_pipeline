@@ -15,7 +15,8 @@ When the pipeline is running, `nextflow.log` contains messages like:
 
 ```
 
-These messages help track the execution order and confirm that all three pipelines are being executed as expected.
+These messages help track execution order for whichever branches are enabled by validated inputs.
+If `mod_fasta` is missing, modified-genome branches are skipped and reference-only branches continue.
 
 ## Unmapped Reads Statistics
 

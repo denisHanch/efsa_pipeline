@@ -2,7 +2,7 @@
 
 ## Overview
 
-The main pipeline (`main.nf`) executes **all three workflows** in sequence:
+The main pipeline (`main.nf`) coordinates three workflow families:
 
 - Short-read processing for Illumina data
 - Long-read processing for PacBio/Oxford Nanopore data
@@ -17,11 +17,14 @@ The pipeline runs validation and processing in a **single command**:
 nextflow run main.nf --max_cpu $(nproc)
 ```
 
-This first validates input data from `data/inputs/config.json`, then automatically runs the processing workflows (short-read, long-read, ref-vs-mod comparison) based on the validated inputs.
+This first validates input data from `data/inputs/config.json`, then automatically runs eligible processing workflows (short-read, long-read, ref-vs-mod comparison) based on the validated inputs.
+
+`mod_fasta` is optional after validation. If no validated modified FASTA is present, the pipeline runs in reference-only mode and skips modified-genome mapping/comparison branches.
 
 Validated files are produced by the `validate` process and passed directly to downstream workflows through channels. A `validated_params.json` file is also emitted for runtime consumption. See the [Validation Overview](../validation/OVERVIEW.md) for details on what this file contains.
 
 By default, runtime logs are written to `data/outputs/logs/nextflow.log` and console output is kept quiet.
+At completion (success or failure), the pipeline also writes `data/outputs/logs/process_manifest.txt` (or `${params.log_dir}/process_manifest.txt` if `log_dir` is overridden).
 
 To use a custom configuration file:
 

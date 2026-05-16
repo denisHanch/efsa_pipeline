@@ -74,10 +74,8 @@ workflow analysis {
         // Empty ont table when not active
         create_ont_tbl(pmap.filter { !it.run_nanopore }.map { "ont" })
 
-        // --- Illumina short-read pipeline (hard gated by run_illumina) ---
-        illumina_cfg = pmap.filter { it.run_illumina }
-
-        illumina_reads = illumina_cfg
+        // --- Illumina short-read pipeline 
+        illumina_reads = pmap.filter { it.run_illumina }
             .flatMap { it.illumina_fastqs }
             .map { f ->
                 def fobj = file(f)

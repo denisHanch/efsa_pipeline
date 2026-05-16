@@ -2,12 +2,12 @@
 
 ## Validation Outputs
 
-Validation outputs are not published to a persistent top-level directory. They are generated within the `validate` process task workspace and consumed directly by downstream channels.
+Validation outputs are published to `data/outputs/valid/` and consumed by downstream workflows:
 
-The validation stage emits:
+- `validated_params.json` (runtime pipeline switches and file-path metadata) — **published to persistent directory**
+- validated FASTA/FASTQ/BAM/GFF/TSV files — consumed directly via Nextflow channels during processing
 
-- `validated_params.json` (runtime pipeline switches and file-path metadata)
-- validated FASTA/FASTQ/BAM/GFF/TSV files used by subsequent workflows
+The validation stage runs automatically as the first step of the pipeline inside the `ecomolegmo/validation` container and produces validated files for all downstream analysis workflows.
 
 ## `data/outputs` Directory Structure
 
