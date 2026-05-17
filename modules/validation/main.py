@@ -268,7 +268,7 @@ def main():
     genomexgenome_res = None
     if mod_genome_res is not None and ref_genome_res is not None and not getattr(mod_genome_res, 'fragmented', False):
         try:
-            genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings, mod_plasmid_res)
+            genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings, mod_plasmid_res, ref_plasmid_res)
             report.write(genomexgenome_res, file_type="genomexgenome")
         except ValidationError as e:
             logger.error(f"Inter-genome validation failed: {e}")

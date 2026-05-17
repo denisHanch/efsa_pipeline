@@ -470,7 +470,26 @@ class GenomeValidator(BaseValidator):
                 self.logger.debug("All sequences filtered out")
                 return
 
-        # 2. Replace sequence IDs
+        # 2. Handle plasmid sequences — must happen before renaming so that plasmid
+        #    sequences keep their original IDs regardless of rename settings.
+        if self.settings.is_plasmid:
+            # All sequences are plasmids — skip renaming entirely
+            self._handle_plasmids(self.sequences)
+            self.sequences = []
+        elif self.settings.plasmid_split or self.settings.plasmids_to_one:
+            # Separate main chromosome from plasmids, then rename only the main sequence(s)
+            self.main_sequence, plasmid_sequences = self._select_main_sequence(self.sequences)
+            self._handle_plasmids(plasmid_sequences)
+            self.sequences = [self.main_sequence]
+            self._rename_sequences()
+        else:
+            # All sequences stay in main output file — rename all
+            self._rename_sequences()
+
+        self.logger.debug(f"✓ Edits applied, {len(self.sequences)} sequence(s) remaining")
+
+    def _rename_sequences(self) -> None:
+        """Replace sequence IDs according to rename settings."""
         if self.settings.replace_id_with:
             new_id = self.settings.replace_id_with
             for record in self.sequences:
@@ -484,20 +503,6 @@ class GenomeValidator(BaseValidator):
                 record.description = f"{record.id}"
                 record.id = prefix if idx == 0 else f"{prefix}{idx}"
             self.logger.debug(f"Replaced sequence IDs with '{prefix}' (incremental)")
-
-        # 3. Handle plasmid sequences
-        if self.settings.is_plasmid:
-            # Treat all sequences as plasmids (no main chromosome)
-            self._handle_plasmids(self.sequences)
-            self.sequences = []
-        elif self.settings.plasmid_split or self.settings.plasmids_to_one:
-            # Only select main sequence if we're actually doing plasmid handling
-            self.main_sequence, plasmid_sequences = self._select_main_sequence(self.sequences)
-            self._handle_plasmids(plasmid_sequences)
-            self.sequences = [self.main_sequence]
-        # else: keep all sequences in main output file (default behavior)
-
-        self.logger.debug(f"✓ Edits applied, {len(self.sequences)} sequence(s) remaining")
 
     def _select_main_sequence(self, sequences: List[SeqRecord]) -> tuple[SeqRecord, List[SeqRecord]]:
         """Select main chromosome from sequences based on settings."""

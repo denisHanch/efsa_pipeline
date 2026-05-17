@@ -1079,10 +1079,10 @@ class TestGenomeValidatorValidationLevels:
             validator.run()
 
     def test_trust_applies_edits(self, multi_seq_fasta, output_dir):
-        """Test trust mode applies all edits to all sequences."""
+        """Test trust mode renames only the main chromosome; plasmid sequences keep original IDs."""
         settings = GenomeValidator.Settings(replace_id_with_incremental='genome',
             min_sequence_length=0,
-            plasmid_split=True  # Enable plasmid split to test edits on all sequences
+            plasmid_split=True
         )
         genome_config = GenomeConfig(
             filename="genome.fasta",
@@ -1097,8 +1097,6 @@ class TestGenomeValidatorValidationLevels:
         validator = GenomeValidator(genome_config, settings)
         validator.run()
 
-        # Check that ID replacement was applied to ALL sequences with auto-increment
-        # Main sequence + plasmid files
         output_files = sorted(output_dir.glob("*.fasta"))
         assert len(output_files) == 3  # main + 2 plasmids
 
@@ -1107,12 +1105,13 @@ class TestGenomeValidatorValidationLevels:
         for output_file in output_files:
             with open(output_file, 'r') as f:
                 sequences = list(SeqIO.parse(f, 'fasta'))
-                # Each file has 1 sequence
                 assert len(sequences) == 1
                 all_ids.append(sequences[0].id)
 
-        # Check that IDs are replaced with auto-increment: genome, genome1, genome2
-        assert sorted(all_ids) == sorted(['genome', 'genome1', 'genome2'])
+        # Main chromosome is renamed to 'genome'; plasmid sequences keep original IDs
+        assert 'genome' in all_ids
+        plasmid_ids = [i for i in all_ids if i != 'genome']
+        assert sorted(plasmid_ids) == sorted(['chr2', 'plasmid1'])
 
     def test_trust_filters_short_sequences(self, multi_seq_fasta, output_dir):
         """Test trust mode applies min_sequence_length filter."""

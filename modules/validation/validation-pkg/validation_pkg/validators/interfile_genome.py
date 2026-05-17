@@ -42,11 +42,43 @@ class GenomeXGenomeSettings(BaseSettings):
             )
 
 
+def _deduplicate_plasmid_ids(plasmid_path: str, logger) -> List[tuple]:
+    """Rename duplicate sequence IDs in-place in a plasmid FASTA file.
+
+    For each ID appearing more than once the second occurrence becomes <id>_1,
+    the third <id>_2, etc. The file is rewritten only when duplicates are found.
+    Returns a list of (original_id, new_id) pairs for every renamed sequence.
+    """
+    from collections import Counter
+    records = list(SeqIO.parse(str(plasmid_path), 'fasta'))
+    duplicated = {seq_id for seq_id, n in Counter(r.id for r in records).items() if n > 1}
+    if not duplicated:
+        return []
+
+    renamed: List[tuple] = []
+    seen: Dict[str, int] = {}
+    for record in records:
+        orig_id = record.id
+        n = seen.get(orig_id, 0)
+        seen[orig_id] = n + 1
+        if n > 0:
+            new_id = f"{orig_id}_{n}"
+            renamed.append((orig_id, new_id))
+            record.id = new_id
+            record.description = ''
+
+    with open(str(plasmid_path), 'w') as handle:
+        SeqIO.write(records, handle, 'fasta')
+
+    return renamed
+
+
 def genomexgenome_validation(
     ref_genome_result,  # OutputMetadata or Dict[str, Any]
     mod_genome_result,  # OutputMetadata or Dict[str, Any]
     settings: Optional[GenomeXGenomeSettings] = None,
     mod_plasmid_result=None,  # OutputMetadata or None
+    ref_plasmid_result=None,  # OutputMetadata or None
 ) -> Dict[str, Any]:
     """Validate consistency between two genome files (reference vs modified).
 
@@ -167,6 +199,24 @@ def genomexgenome_validation(
                 'contig_files': [],
                 'plasmid_file': None,
             })
+
+    # Check for duplicate sequence IDs in plasmid files — rename in-place, log as warning
+    ref_plasmid_path = _get_metadata_field(ref_plasmid_result, 'output_file') or (
+        (_get_metadata_field(ref_genome_result, 'plasmid_output_paths') or [None])[0]
+    )
+    mod_plasmid_path = metadata.get('plasmid_file') or _get_metadata_field(mod_plasmid_result, 'output_file')
+
+    for label, ppath in [('ref', ref_plasmid_path), ('mod', mod_plasmid_path)]:
+        if ppath and Path(ppath).exists():
+            renamed = _deduplicate_plasmid_ids(ppath, logger)
+            if renamed:
+                pairs = ', '.join(f"{old} → {new}" for old, new in renamed)
+                warning_msg = (
+                    f"{label} plasmid file contained {len(renamed)} duplicate sequence ID(s) "
+                    f"— renamed in-place: {pairs}"
+                )
+                warnings.append(warning_msg)
+                logger.warning(warning_msg)
 
     # Determine if validation passed (no ERROR-level issues)
     passed = len(errors) == 0
