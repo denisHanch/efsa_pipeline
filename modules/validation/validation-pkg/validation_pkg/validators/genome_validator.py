@@ -1,5 +1,6 @@
 """Genome file validator and processor for FASTA and GenBank formats."""
 
+from collections import Counter
 from pathlib import Path
 from typing import Optional, List, Type, Any
 from dataclasses import dataclass
@@ -361,6 +362,7 @@ class GenomeValidator(BaseValidator):
                 details={'type': organism_type}
             )
             copy_file(self.input_path, self.output_path, self.logger)
+            self._deduplicate_copied_ids()
             self._sequence_limit_exceeded = True
             return
 
@@ -381,6 +383,7 @@ class GenomeValidator(BaseValidator):
                 }
             )
             copy_file(self.input_path, self.output_path, self.logger)
+            self._deduplicate_copied_ids()
             self._sequence_limit_exceeded = True
             return
 
@@ -503,6 +506,42 @@ class GenomeValidator(BaseValidator):
                 record.description = f"{record.id}"
                 record.id = prefix if idx == 0 else f"{prefix}{idx}"
             self.logger.debug(f"Replaced sequence IDs with '{prefix}' (incremental)")
+
+    def _deduplicate_copied_ids(self) -> None:
+        """Rename duplicate sequence IDs in-place in a just-copied output file.
+
+        Called after copy_file() for fragmented/eukaryote genomes so that
+        downstream tools (e.g. samtools) do not encounter duplicate SAM header
+        entries.  The file is rewritten only when duplicates are actually found.
+        """
+        if not self.output_path or not self.output_path.exists():
+            return
+        records = list(SeqIO.parse(str(self.output_path), 'fasta'))
+        duplicated = {sid for sid, n in Counter(r.id for r in records).items() if n > 1}
+        if not duplicated:
+            return
+
+        seen: dict = {}
+        renamed = []
+        for record in records:
+            orig_id = record.id
+            n = seen.get(orig_id, 0)
+            seen[orig_id] = n + 1
+            if n > 0:
+                new_id = f"{orig_id}_{n}"
+                renamed.append((orig_id, new_id))
+                record.id = new_id
+                record.description = ''
+
+        with open(str(self.output_path), 'w') as fh:
+            SeqIO.write(records, fh, 'fasta')
+
+        pairs = ', '.join(f"{old} → {new}" for old, new in renamed)
+        self.logger.warning(
+            f"Deduplicated {len(renamed)} sequence ID(s) in copied genome output: {pairs}"
+        )
+        # Refresh self.sequences so metadata reflects renamed IDs
+        self.sequences = records
 
     def _select_main_sequence(self, sequences: List[SeqRecord]) -> tuple[SeqRecord, List[SeqRecord]]:
         """Select main chromosome from sequences based on settings."""

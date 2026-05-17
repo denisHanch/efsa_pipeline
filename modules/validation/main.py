@@ -264,9 +264,11 @@ def main():
         except ValidationError as e:
             logger.error(f"Optional mod_plasmid validation failed: {e}")
 
-    # Inter-genome validation — only if both genomes validated successfully and mod is not fragmented
+    # Inter-genome validation — only if both genomes validated successfully and neither is fragmented
     genomexgenome_res = None
-    if mod_genome_res is not None and ref_genome_res is not None and not getattr(mod_genome_res, 'fragmented', False):
+    if (mod_genome_res is not None and ref_genome_res is not None
+            and not getattr(mod_genome_res, 'fragmented', False)
+            and not getattr(ref_genome_res, 'fragmented', False)):
         try:
             genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings, mod_plasmid_res, ref_plasmid_res)
             report.write(genomexgenome_res, file_type="genomexgenome")
