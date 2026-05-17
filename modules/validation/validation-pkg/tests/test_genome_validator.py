@@ -1856,5 +1856,278 @@ class TestGenomeValidatorEukaryoteType:
         assert result.fragmented is True
 
 
+class TestIsPlasmidMode:
+    """Tests for is_plasmid=True validator mode.
+
+    When is_plasmid=True the validator treats the entire input as plasmid
+    sequences.  _apply_edits() routes every sequence through _handle_plasmids()
+    and clears self.sequences, so _write_output() must return the plasmid file
+    path rather than None.  These tests guard against that regression and
+    confirm that output_file / plasmid_filenames are always populated correctly.
+    """
+
+    @pytest.fixture
+    def temp_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def output_dir(self, temp_dir):
+        out_dir = temp_dir / "output"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir
+
+    def _make_fasta(self, path: Path, n: int = 1, length: int = 200) -> Path:
+        records = [
+            SeqRecord(Seq("ATCG" * (length // 4)), id=f"plasmid{i}", description="")
+            for i in range(1, n + 1)
+        ]
+        with open(path, "w") as f:
+            SeqIO.write(records, f, "fasta")
+        return path
+
+    def _make_config(self, filepath: Path, output_dir: Path, validation_level: str = "trust") -> GenomeConfig:
+        return GenomeConfig(
+            filename=filepath.name,
+            basename=filepath.stem,
+            filepath=filepath,
+            coding_type=CT.NONE,
+            detected_format=GenomeFormat.FASTA,
+            output_dir=output_dir,
+            global_options={"validation_level": validation_level},
+            n_sequence_limit=None,
+        )
+
+    def _make_settings(self, **kwargs) -> GenomeValidator.Settings:
+        defaults = dict(is_plasmid=True, plasmids_to_one=True, min_sequence_length=0)
+        defaults.update(kwargs)
+        return GenomeValidator.Settings(**defaults)
+
+    # ── output_file is set (regression for the is_plasmid bug) ───────────────
+
+    def test_output_file_is_not_none_single_sequence(self, temp_dir, output_dir):
+        """output_file must be set even when is_plasmid=True routes sequences away."""
+        fasta = self._make_fasta(temp_dir / "plasmid.fasta")
+        config = self._make_config(fasta, output_dir)
+        result = GenomeValidator(config, self._make_settings()).run()
+        assert result.output_file is not None
+
+    def test_output_file_is_not_none_multi_sequence(self, temp_dir, output_dir):
+        """output_file is set when multiple plasmid sequences are merged to one file."""
+        fasta = self._make_fasta(temp_dir / "plasmid.fasta", n=3)
+        config = self._make_config(fasta, output_dir)
+        result = GenomeValidator(config, self._make_settings()).run()
+        assert result.output_file is not None
+
+    def test_output_file_exists_on_disk(self, temp_dir, output_dir):
+        """The path stored in output_file must actually exist after validation."""
+        fasta = self._make_fasta(temp_dir / "plasmid.fasta")
+        config = self._make_config(fasta, output_dir)
+        result = GenomeValidator(config, self._make_settings()).run()
+        assert Path(result.output_file).exists()
+
+    def test_output_file_contains_sequences(self, temp_dir, output_dir):
+        """The file at output_file must be a readable FASTA with the plasmid sequences."""
+        fasta = self._make_fasta(temp_dir / "plasmid.fasta", n=2)
+        config = self._make_config(fasta, output_dir)
+        result = GenomeValidator(config, self._make_settings()).run()
+        records = list(SeqIO.parse(result.output_file, "fasta"))
+        assert len(records) == 2
+
+    def test_output_file_matches_plasmid_filenames(self, temp_dir, output_dir):
+        """output_file must be the same path recorded in plasmid_filenames."""
+        fasta = self._make_fasta(temp_dir / "plasmid.fasta")
+        config = self._make_config(fasta, output_dir)
+        result = GenomeValidator(config, self._make_settings()).run()
+        expected = str(output_dir / result.plasmid_filenames[0])
+        assert result.output_file == expected
+
+    # ── plasmid_filenames metadata ─────────────────────────────────────────────
+
+    def test_plasmid_filenames_populated(self, temp_dir, output_dir):
+        """plasmid_filenames must contain the written file name."""
+        fasta = self._make_fasta(temp_dir / "plasmid.fasta")
+        config = self._make_config(fasta, output_dir)
+        result = GenomeValidator(config, self._make_settings()).run()
+        assert result.plasmid_filenames
+        assert len(result.plasmid_filenames) == 1
+
+    def test_plasmid_count_matches(self, temp_dir, output_dir):
+        """plasmid_count equals the number of files in plasmid_filenames."""
+        fasta = self._make_fasta(temp_dir / "plasmid.fasta", n=3)
+        config = self._make_config(fasta, output_dir)
+        result = GenomeValidator(config, self._make_settings()).run()
+        assert result.plasmid_count == len(result.plasmid_filenames)
+
+    # ── output_filename_suffix is applied ─────────────────────────────────────
+
+    def test_suffix_applied_to_output_file(self, temp_dir, output_dir):
+        """output_filename_suffix must appear in the plasmid filename."""
+        fasta = self._make_fasta(temp_dir / "myplasmid.fasta")
+        config = self._make_config(fasta, output_dir)
+        settings = self._make_settings(output_filename_suffix="mod_plasmid")
+        result = GenomeValidator(config, settings).run()
+        assert "mod_plasmid" in Path(result.output_file).name
+
+    # ── strict mode also works ────────────────────────────────────────────────
+
+    def test_output_file_set_in_strict_mode(self, temp_dir, output_dir):
+        """Strict mode: output_file is set and the file exists."""
+        fasta = self._make_fasta(temp_dir / "plasmid.fasta", n=2)
+        config = self._make_config(fasta, output_dir, validation_level="strict")
+        result = GenomeValidator(config, self._make_settings()).run()
+        assert result.output_file is not None
+        assert Path(result.output_file).exists()
+
+    # ── edge case: no sequences after filtering ───────────────────────────────
+
+    def test_output_file_none_when_all_sequences_filtered(self, temp_dir, output_dir):
+        """When min_sequence_length filters every sequence, output_file stays None."""
+        fasta = self._make_fasta(temp_dir / "plasmid.fasta", n=1, length=20)
+        config = self._make_config(fasta, output_dir)
+        settings = self._make_settings(min_sequence_length=10_000)
+        result = GenomeValidator(config, settings).run()
+        assert result.output_file is None
+
+
+class TestPlasmidMerge:
+    """Tests for the plasmid merge behaviour.
+
+    When a ref_genome validator (plasmids_to_one=True) already wrote a
+    *_ref_plasmid.fasta file, a subsequent ref_plasmid validator
+    (is_plasmid=True, plasmids_to_one=True) must append its sequences to
+    that file rather than creating a second one.
+    """
+
+    @pytest.fixture
+    def temp_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    @pytest.fixture
+    def output_dir(self, temp_dir):
+        out_dir = temp_dir / "output"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir
+
+    def _make_fasta(self, path: Path, ids: list, length: int = 200) -> Path:
+        records = [SeqRecord(Seq("ATCG" * (length // 4)), id=sid, description="") for sid in ids]
+        with open(path, "w") as f:
+            SeqIO.write(records, f, "fasta")
+        return path
+
+    def _genome_config(self, filepath: Path, output_dir: Path, level: str = "trust") -> GenomeConfig:
+        return GenomeConfig(
+            filename=filepath.name,
+            basename=filepath.stem,
+            filepath=filepath,
+            coding_type=CT.NONE,
+            detected_format=GenomeFormat.FASTA,
+            output_dir=output_dir,
+            global_options={"validation_level": level},
+            n_sequence_limit=None,
+        )
+
+    def _ref_genome_settings(self):
+        return GenomeValidator.Settings(
+            plasmids_to_one=True,
+            main_longest=True,
+            coding_type=None,
+            output_filename_suffix="ref",
+            min_sequence_length=0,
+        )
+
+    def _ref_plasmid_settings(self, merge_into: str = None):
+        return GenomeValidator.Settings(
+            is_plasmid=True,
+            plasmids_to_one=True,
+            coding_type=None,
+            output_filename_suffix="ref_plasmid",
+            min_sequence_length=0,
+            merge_into_plasmid=merge_into,
+        )
+
+    def _run_ref_genome(self, fasta: Path, output_dir: Path):
+        return GenomeValidator(
+            self._genome_config(fasta, output_dir), self._ref_genome_settings()
+        ).run()
+
+    def _run_ref_plasmid(self, fasta: Path, output_dir: Path, genome_result=None):
+        """Mirrors main.py: pass extracted plasmid path when ref_genome produced one."""
+        merge_path = None
+        if genome_result and getattr(genome_result, 'plasmid_output_paths', None):
+            merge_path = genome_result.plasmid_output_paths[0]
+        return GenomeValidator(
+            self._genome_config(fasta, output_dir), self._ref_plasmid_settings(merge_path)
+        ).run()
+
+    # ── single combined file after merge ──────────────────────────────────────
+
+    def test_only_one_plasmid_file_exists_after_merge(self, temp_dir, output_dir):
+        """Only one *_ref_plasmid.fasta must exist after both validators run."""
+        genome_fasta = self._make_fasta(temp_dir / "genome.fasta", ["chr", "extra_plasmid"])
+        plasmid_fasta = self._make_fasta(temp_dir / "plasmid.fasta", ["explicit_plasmid"])
+
+        genome_result = self._run_ref_genome(genome_fasta, output_dir)
+        self._run_ref_plasmid(plasmid_fasta, output_dir, genome_result)
+
+        plasmid_files = list(output_dir.glob("*_ref_plasmid.fasta"))
+        assert len(plasmid_files) == 1
+
+    def test_merged_file_contains_sequences_from_both_validators(self, temp_dir, output_dir):
+        """The combined file must hold sequences from genome extraction AND explicit plasmid."""
+        genome_fasta = self._make_fasta(temp_dir / "genome.fasta", ["chr", "extra_plasmid"])
+        plasmid_fasta = self._make_fasta(temp_dir / "plasmid.fasta", ["explicit_plasmid"])
+
+        genome_result = self._run_ref_genome(genome_fasta, output_dir)
+        result = self._run_ref_plasmid(plasmid_fasta, output_dir, genome_result)
+
+        records = list(SeqIO.parse(result.output_file, "fasta"))
+        ids = {r.id for r in records}
+        assert "extra_plasmid" in ids
+        assert "explicit_plasmid" in ids
+
+    def test_ref_plasmid_output_file_points_to_merged_file(self, temp_dir, output_dir):
+        """output_file of the ref_plasmid validator must point to the merged file,
+        not to a freshly created separate file."""
+        genome_fasta = self._make_fasta(temp_dir / "genome.fasta", ["chr", "extra"])
+        plasmid_fasta = self._make_fasta(temp_dir / "plasmid.fasta", ["explicit"])
+
+        genome_result = self._run_ref_genome(genome_fasta, output_dir)
+        plasmid_result = self._run_ref_plasmid(plasmid_fasta, output_dir, genome_result)
+
+        assert plasmid_result.output_file == genome_result.plasmid_output_paths[0]
+
+    # ── no genome-extracted plasmid — ref_plasmid creates its own file ────────
+
+    def test_new_file_created_when_no_existing_plasmid(self, temp_dir, output_dir):
+        """When no genome-extracted plasmid file exists, ref_plasmid creates its own."""
+        genome_fasta = self._make_fasta(temp_dir / "genome.fasta", ["chr"])  # single seq → no extraction
+        plasmid_fasta = self._make_fasta(temp_dir / "plasmid.fasta", ["explicit"])
+
+        genome_result = self._run_ref_genome(genome_fasta, output_dir)
+        result = self._run_ref_plasmid(plasmid_fasta, output_dir, genome_result)
+
+        assert result.output_file is not None
+        assert Path(result.output_file).exists()
+        records = list(SeqIO.parse(result.output_file, "fasta"))
+        assert len(records) == 1
+        assert records[0].id == "explicit"
+
+    # ── total sequence count is correct ───────────────────────────────────────
+
+    def test_merged_file_total_sequence_count(self, temp_dir, output_dir):
+        """Merged file sequence count equals genome-extracted + explicit plasmid sequences."""
+        genome_fasta = self._make_fasta(temp_dir / "genome.fasta", ["chr", "p1", "p2"])
+        plasmid_fasta = self._make_fasta(temp_dir / "plasmid.fasta", ["ep1", "ep2", "ep3"])
+
+        genome_result = self._run_ref_genome(genome_fasta, output_dir)
+        result = self._run_ref_plasmid(plasmid_fasta, output_dir, genome_result)
+
+        records = list(SeqIO.parse(result.output_file, "fasta"))
+        assert len(records) == 5  # 2 genome-extracted (p1,p2) + 3 explicit (ep1,ep2,ep3)
+
+
 if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
     pytest.main([__file__, "-v"])

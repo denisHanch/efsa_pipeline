@@ -32,6 +32,7 @@ class GenomeOutputMetadata(BaseOutputMetadata):
     n50: int = None  # strict only
     plasmid_count: int = None
     plasmid_filenames: List[str] = None
+    plasmid_output_paths: List[str] = None  # full absolute paths, one per plasmid file
     num_sequences_filtered: int = None
 
     # Inter-file validation fields
@@ -124,6 +125,7 @@ class GenomeValidator(BaseValidator):
         replace_id_with: Optional[str] = None
         replace_id_with_incremental: Optional[str] = None
         min_sequence_length: int = 100
+        merge_into_plasmid: Optional[str] = None
 
         def __post_init__(self):
             """Validate and normalize settings after initialization."""
@@ -156,6 +158,7 @@ class GenomeValidator(BaseValidator):
         self.sequences = []  # List of SeqRecord objects
         self.num_sequences_filtered = 0
         self.plasmid_filenames = []
+        self.plasmid_output_paths = []
 
     # Required abstract properties and methods from BaseValidator
 
@@ -198,6 +201,8 @@ class GenomeValidator(BaseValidator):
         """Write processed genome to output file."""
         # Check if we have sequences to write
         if self.sequences == []:
+            if self.settings.is_plasmid and self.plasmid_output_paths:
+                return Path(self.plasmid_output_paths[0])
             self.logger.warning("No sequences to write")
             return None
 
@@ -239,6 +244,7 @@ class GenomeValidator(BaseValidator):
         if self.plasmid_filenames:
             self.output_metadata.plasmid_count = len(self.plasmid_filenames)
             self.output_metadata.plasmid_filenames = self.plasmid_filenames
+            self.output_metadata.plasmid_output_paths = self.plasmid_output_paths
         elif self.num_sequences_filtered > 0:
             # No plasmids split, but sequences were filtered
             pass
@@ -568,17 +574,31 @@ class GenomeValidator(BaseValidator):
 
         plasmid_path = output_dir / plasmid_filename
 
-        # Write plasmid sequences with appropriate compression
-        self.logger.debug(f"Writing plasmid sequences to: {plasmid_path}")
+        # If an explicit merge target was supplied, append there instead of creating a new file.
+        if self.settings.plasmids_to_one and self.settings.merge_into_plasmid:
+            merge_path = Path(self.settings.merge_into_plasmid)
+            if merge_path.exists():
+                self.logger.info(
+                    f"Merging {len(plasmid_sequences)} plasmid sequence(s) into "
+                    f"existing file: {merge_path}"
+                )
+                with open(str(merge_path), 'a') as handle:
+                    SeqIO.write(plasmid_sequences, handle, 'fasta')
+                self.plasmid_filenames.append(merge_path.name)
+                self.plasmid_output_paths.append(str(merge_path))
+                for seq in plasmid_sequences:
+                    self.logger.debug(f"  Plasmid: {seq.id} ({len(seq.seq)} bp)")
+                return
 
-        # Use optimized compression writer
+        # No merge target — write a new file.
+        self.logger.debug(f"Writing plasmid sequences to: {plasmid_path}")
         with open_compressed_writer(plasmid_path, self.settings.coding_type, threads=self.threads) as handle:
             SeqIO.write(plasmid_sequences, handle, 'fasta')
 
         self.logger.info(f"Plasmid sequences saved: {plasmid_path}")
 
-        # Track plasmid filename for metadata
         self.plasmid_filenames.append(plasmid_filename)
+        self.plasmid_output_paths.append(str(plasmid_path))
 
         # Log details about each plasmid
         for seq in plasmid_sequences:

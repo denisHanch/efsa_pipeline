@@ -245,6 +245,11 @@ def main():
     # Validate plasmid genomes (optional)
     ref_plasmid_res = None
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
+        genome_plasmid_paths = getattr(ref_genome_res, 'plasmid_output_paths', None) or []
+        if genome_plasmid_paths:
+            ref_plasmid_settings = ref_plasmid_settings.update(
+                merge_into_plasmid=genome_plasmid_paths[0]
+            )
         try:
             ref_plasmid_res = validate_genome(config.ref_plasmid, ref_plasmid_settings)
             report.write(ref_plasmid_res, file_type="genome")
