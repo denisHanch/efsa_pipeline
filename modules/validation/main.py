@@ -318,6 +318,27 @@ def main():
     # ========================================================================
     # Step 4: Write validated_params.json for Nextflow (-params-file)
     # ========================================================================
+
+    # Correct mod_genome_size_bp to chromosome-only.
+    # The genome validator records total_genome_size / sequence_lengths before GXG runs,
+    # so the value includes plasmid sequences. After GXG, contig_orientations holds the
+    # IDs of all sequences that mapped to the reference (= chromosomal contigs, one or many).
+    # Those IDs match sequence_lengths (both use post-rename IDs), so we can sum without
+    # re-reading any files. Falls back to the uncorrected total when GXG did not run
+    # (fragmented assemblies, Scenarios 3/4).
+    if genomexgenome_res is not None and mod_genome_res is not None:
+        gxg_meta = genomexgenome_res.get('metadata') or {}
+        chr_ids = set((gxg_meta.get('contig_orientations') or {}).keys())
+        seq_lengths = getattr(mod_genome_res, 'sequence_lengths', None) or {}
+        if chr_ids and seq_lengths:
+            mod_chr_size = sum(seq_lengths[sid] for sid in chr_ids if sid in seq_lengths)
+            if mod_chr_size > 0:
+                mod_genome_res.total_genome_size = mod_chr_size
+                logger.debug(
+                    f"mod_genome_size corrected to chromosome-only: {mod_chr_size:,} bp "
+                    f"({len(chr_ids)} contig(s))"
+                )
+
     validation_results = {
         "ref_genome":    ref_genome_res,
         "mod_genome":    mod_genome_res,
