@@ -37,7 +37,7 @@ process picard_dict {
 
 process delly {
 
-    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
+    publishDir { "${params.out_dir}/${out_folder_name}/vcf" }, mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index)
@@ -59,7 +59,7 @@ process delly {
 
 process convert_bcf_to_vcf {
 
-    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
+    publishDir { "${params.out_dir}/${out_folder_name}/vcf" }, mode: 'copy'
 
     input:
     tuple val(pair_id), path(bcf_file)
@@ -80,7 +80,7 @@ process convert_bcf_to_vcf {
 
 process cute_sv {
 
-    publishDir "${params.out_dir}/${out_folder_name}/cutesv_out", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/cutesv_out" }, mode: "copy"
 
     input:
     each path(fasta_file)
@@ -103,7 +103,7 @@ process cute_sv {
 
 process debreak {
 
-    publishDir "${params.out_dir}/${out_folder_name}/", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/debreak_out" }, mode: "copy"
 
     input:
     each path(fasta_file)
@@ -123,7 +123,7 @@ process debreak {
 
 process sniffles {
     
-    publishDir "${params.out_dir}/${out_folder_name}/sniffles_out", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/sniffles_out" }, mode: "copy"
 
     input:
     each path(fasta_file)
@@ -142,7 +142,7 @@ process sniffles {
 
 process survivor {
 
-    publishDir "${params.out_dir}/${out_folder_name}/survivor_out", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/survivor_out" }, mode: "copy"
 
     input:
     tuple val(pair_id), path(cute_vcf), path(debreak_vcf), path(sniffles_vcf)
@@ -238,12 +238,60 @@ process restructure_sv_tbl {
     path script
     tuple path(assembly_tsv), path(long_ont_tsv), path(long_pb_tsv), path(short_tsv)
     path supp_reads
+    path ref_fasta
+    path mod_fasta
+    val ref_genome_size_bp
+    val mod_genome_size_bp
 
     output:
     path "csv_per_sv_summary"
 
     script:
+    def refGenomeSize = ref_genome_size_bp ?: ""
+    def modGenomeSize = mod_genome_size_bp ?: ""
     """
+    compute_fasta_size() {
+        python - "\$1" <<'PY'
+import bz2
+import gzip
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if not path.exists():
+    print("")
+    sys.exit(0)
+
+if path.suffix == ".gz":
+    opener = gzip.open
+elif path.suffix == ".bz2":
+    opener = bz2.open
+else:
+    opener = open
+
+total = 0
+with opener(path, "rt", encoding="utf-8", errors="ignore") as handle:
+    for line in handle:
+        if not line or line.startswith(">"):
+            continue
+        total += len(line.strip().replace(" ", "").replace("\\t", ""))
+
+print(total if total > 0 else "")
+PY
+    }
+
+    ref_genome_size="${refGenomeSize}"
+    mod_genome_size="${modGenomeSize}"
+
+    if [ -z "\$ref_genome_size" ]; then
+        ref_genome_size=\$(compute_fasta_size "${ref_fasta}")
+    fi
+    if [ -z "\$mod_genome_size" ]; then
+        mod_genome_size=\$(compute_fasta_size "${mod_fasta}")
+    fi
+
+    export SV_REF_GENOME_SIZE_BP="\$ref_genome_size"
+    export SV_MOD_GENOME_SIZE_BP="\$mod_genome_size"
     python ${script} --asm ${assembly_tsv} --short ${short_tsv} --long_ont ${long_ont_tsv} --long_pacbio ${long_pb_tsv} --out csv_per_sv_summary
     """
 }

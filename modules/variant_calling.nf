@@ -4,7 +4,7 @@
 
 process freebayes {
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/vcf", mode: 'copy'
+    publishDir { "${params.out_dir}/${out_folder_name}/vcf" }, mode: 'copy'
 
     input:
     each path(fasta_file)
@@ -22,7 +22,7 @@ process freebayes {
 
 process bcftools_stats {
 
-    publishDir "${params.out_dir}/${out_folder_name}/bcftools_stats", mode: 'copy'
+    publishDir { "${params.out_dir}/${out_folder_name}/bcftools_stats" }, mode : 'copy'
 
     input:
     tuple val(pair_id), path(vcf_file)

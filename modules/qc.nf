@@ -4,7 +4,7 @@
 
 process trimgalore {
 
-    publishDir "${params.out_dir}/${out_folder_name}/trimmed_reads", mode: 'copy'
+    publishDir { "${params.out_dir}/${out_folder_name}/trimmed_reads" }, mode: 'copy'
 
     input:
     tuple val(pair_id), path(reads)
@@ -27,7 +27,7 @@ process trimgalore {
 
 process fastqc {
 
-    publishDir "${params.out_dir}/${out_folder_name}/fastqc_out", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/fastqc_out" }, mode: "copy"
 
     input:
     tuple val(pair_id), path(reads)
@@ -46,7 +46,7 @@ process fastqc {
 
 process multiqc {
     
-    publishDir "${params.out_dir}/${out_folder_name}/multiqc", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/multiqc" }, mode: "copy"
 
     input:
     path files

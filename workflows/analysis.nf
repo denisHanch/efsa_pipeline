@@ -27,6 +27,9 @@ workflow analysis {
         mod_fasta = pmap
             .filter { it.mod_fasta_validated }
             .map { file(it.mod_fasta_validated) }
+        mod_fasta = pmap.map { file(it.mod_fasta_validated) }
+        ref_genome_size_bp = pmap.map { it.ref_genome_size_bp ?: "" }
+        mod_genome_size_bp = pmap.map { it.mod_genome_size_bp ?: "" }
 
         ref_plasmid = pmap.map { it.ref_plasmid_fasta ? [file(it.ref_plasmid_fasta)] : [] }
         mod_plasmid = pmap.map { it.mod_plasmid_fasta ? [file(it.mod_plasmid_fasta)] : [] }
@@ -119,5 +122,13 @@ workflow analysis {
             tuple(asm, long_ont, long_pb, sht)
         }
 
-        restructure_sv_tbl(script, tbl_channel, supp_reads_ch.collect().ifEmpty(file('NO_FILE')))
+        restructure_sv_tbl(
+            script,
+            tbl_channel,
+            supp_reads_ch.collect().ifEmpty(file('NO_FILE')),
+            ref_fasta,
+            mod_fasta,
+            ref_genome_size_bp,
+            mod_genome_size_bp
+        )
 }
