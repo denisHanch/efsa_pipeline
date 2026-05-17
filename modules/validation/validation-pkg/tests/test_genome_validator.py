@@ -1661,14 +1661,14 @@ class TestGenomeValidatorErrorNSequences:
 
     # ── boundary conditions ───────────────────────────────────────────────────
 
-    def test_no_error_when_count_equals_threshold(self, temp_dir, output_dir):
-        """Exactly at threshold (count == n_sequence_limit) should pass — 'higher than'."""
+    def test_fragmented_when_count_equals_threshold(self, temp_dir, output_dir):
+        """Exactly at threshold (count == n_sequence_limit) is treated as fragmented (>=)."""
         fasta = self._make_fasta(temp_dir / "genome.fasta", n=5)
         config = self._make_config(fasta, output_dir, n_sequence_limit=5)
         settings = GenomeValidator.Settings(min_sequence_length=0)
 
-        # Should not raise
-        GenomeValidator(config, settings).run()
+        result = GenomeValidator(config, settings).run()
+        assert result.fragmented is True
 
     def test_no_error_when_count_below_threshold(self, temp_dir, output_dir):
         """Count below threshold should always pass."""

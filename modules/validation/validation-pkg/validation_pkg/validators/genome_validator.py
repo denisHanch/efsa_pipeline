@@ -368,9 +368,9 @@ class GenomeValidator(BaseValidator):
 
         # Check error threshold for number of sequences
         n_sequence_limit = self.genome_config.n_sequence_limit
-        if n_sequence_limit is not None and len(self.sequences) > n_sequence_limit:
+        if n_sequence_limit is not None and len(self.sequences) >= n_sequence_limit:
             error_msg = (
-                f"Number of sequences ({len(self.sequences)}) exceeds maximum allowed "
+                f"Number of sequences ({len(self.sequences)}) meets or exceeds the limit "
                 f"({n_sequence_limit} -> the assembly is too fragmented for further analysis)"
             )
             self.logger.add_validation_issue(
