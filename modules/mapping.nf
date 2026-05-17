@@ -41,7 +41,7 @@ process bwa_mapping {
 
 process samtools_index_bam {
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/bam", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/bam" }, mode: "copy"
 
     input:
     tuple val(pair_id), path(bam_file)
@@ -59,7 +59,7 @@ process samtools_index_bam {
 
 process picard {
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/picard", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/picard" }, mode: "copy"
     
     input:
     each path(fasta_file)
@@ -81,7 +81,7 @@ process picard {
 
 process samtools_stats {
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/samtools_stats", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/samtools_stats" }, mode: "copy"
 
     input:
     tuple val(pair_id), path(bam_file)
@@ -144,7 +144,7 @@ process build_sv_flank_bed {
 
 process mosdepth {
     tag "$pair_id"
-    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+    publishDir { "${params.out_dir}/tables/tsv" }, mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index), path(input_sv_tsv), path(regions_bed)
@@ -211,7 +211,7 @@ process minimap2 {
 
 process samtools_sort {
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/bam", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/bam" }, mode: "copy"
 
     input:
     tuple val(pair_id), path(sam)
@@ -283,7 +283,7 @@ process get_unmapped_reads {
 
 process compare_unmapped {
     tag "$pair_id1"
-    publishDir "${params.out_dir}/unmapped_stats", mode: "copy"
+    publishDir { "${params.out_dir}/unmapped_stats" }, mode: "copy"
 
     input:
     tuple val(pair_id1), path(unmapped_1, stageAs: "unmapped_ref.fastq")

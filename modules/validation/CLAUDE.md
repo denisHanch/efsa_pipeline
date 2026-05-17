@@ -845,6 +845,8 @@ run_nanopore      : bool = False   # ont reads validated
 run_pacbio        : bool = False   # pacbio reads validated
 contig_file_size  : int  = 0       # len(gxg_metadata['contig_files'])
 validation_timestamp : str = ""    # YYYYMMDD_HHMMSS
+ref_genome_size_bp : Optional[int] = None  # validated reference genome size, bp
+mod_genome_size_bp : Optional[int] = None  # validated modified genome size, bp
 
 # input_output_options (omitted from JSON when None)
 ref_fasta_validated : Optional[str] = None
@@ -896,6 +898,11 @@ reads = [r for r in (validation_results.get("reads") or [])
 - `ref_path` and `mod_path` are both non-None (and non-`"None"`)
 - Neither genome has `fragmented=True`
 - `gxg.get("passed", False)` is True
+
+Genome-size params:
+- `ref_genome_size_bp` and `mod_genome_size_bp` are derived from validator metadata.
+- The builder prefers `total_genome_size` when available, otherwise it sums `sequence_lengths`.
+- These values are consumed by `restructure_sv_tbl` to populate `pct_of_ref_genome` and `pct_of_mod_genome` without asking users to pass genome sizes manually.
 
 ### `write_params(params, path: Path) → None`
 Writes JSON with 2-space indent, UTF-8, `ensure_ascii=False`.

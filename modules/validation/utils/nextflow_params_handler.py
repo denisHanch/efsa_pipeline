@@ -16,6 +16,8 @@ general_options (pipeline execution switches):
   run_nanopore         – True when validated Nanopore (ONT) reads are present
   run_pacbio           – True when validated PacBio reads are present
   contig_file_size     – number of contig files from inter-genome characterisation
+  ref_genome_size_bp   – validated reference genome size in base pairs, when available
+  mod_genome_size_bp   – validated modified genome size in base pairs, when available
   validation_timestamp – timestamp of the validation run (YYYYMMDD_HHMMSS)
 
 input_output_options (file paths, null / empty list when absent):
@@ -49,6 +51,8 @@ class NextflowParams:
     run_pacbio: bool = False
     contig_file_size: int = 0
     validation_timestamp: str = ""
+    ref_genome_size_bp: Optional[int] = None
+    mod_genome_size_bp: Optional[int] = None
     # input_output_options — omitted from JSON when None
     ref_fasta_validated: Optional[str] = None
     mod_fasta_validated: Optional[str] = None
@@ -83,6 +87,10 @@ class NextflowParams:
             v = getattr(self, k)
             if v is not None:
                 result[k] = v
+        if self.ref_genome_size_bp is not None:
+            result["ref_genome_size_bp"] = int(self.ref_genome_size_bp)
+        if self.mod_genome_size_bp is not None:
+            result["mod_genome_size_bp"] = int(self.mod_genome_size_bp)
         return result
 
 
@@ -136,8 +144,40 @@ def build_params(
                 pass
         return value
 
-    ref_path         = _path(validation_results.get("ref_genome"))
-    mod_path         = _path(validation_results.get("mod_genome"))
+    def _genome_size(meta) -> Optional[int]:
+        """Extract validated genome size from validator metadata.
+
+        Strict validation sets ``total_genome_size``. Trust/strict metadata also
+        usually carries ``sequence_lengths``; summing that dict keeps genome-size
+        reporting available without asking users to pass size parameters.
+        """
+        if meta is None:
+            return None
+
+        total = getattr(meta, "total_genome_size", None)
+        if total is not None:
+            try:
+                total_int = int(total)
+                return total_int if total_int > 0 else None
+            except (TypeError, ValueError):
+                pass
+
+        sequence_lengths = getattr(meta, "sequence_lengths", None) or {}
+        if isinstance(sequence_lengths, dict) and sequence_lengths:
+            try:
+                total_int = sum(int(v) for v in sequence_lengths.values() if v is not None)
+                return total_int if total_int > 0 else None
+            except (TypeError, ValueError):
+                return None
+
+        return None
+
+    ref_meta         = validation_results.get("ref_genome")
+    mod_meta         = validation_results.get("mod_genome")
+    ref_path         = _path(ref_meta)
+    mod_path         = _path(mod_meta)
+    ref_genome_size_bp = _genome_size(ref_meta)
+    mod_genome_size_bp = _genome_size(mod_meta)
     ref_plasmid_path = _path(validation_results.get("ref_plasmid"))
     mod_plasmid_path = _path(validation_results.get("mod_plasmid"))
     gxg      = validation_results.get("genomexgenome") or {}
@@ -145,14 +185,14 @@ def build_params(
 
     # Fall back to plasmids detected during genome validation when not explicitly configured
     if ref_plasmid_path is None:
-        ref_genome_meta = validation_results.get("ref_genome")
+        ref_genome_meta = ref_meta
         plasmid_filenames = getattr(ref_genome_meta, "plasmid_filenames", None) or []
         if plasmid_filenames and ref_genome_meta is not None:
             run_dir = Path(ref_genome_meta.output_file).parent
             ref_plasmid_path = _relpath(str(run_dir / plasmid_filenames[0]))
 
     if mod_plasmid_path is None:
-        mod_genome_meta = validation_results.get("mod_genome")
+        mod_genome_meta = mod_meta
         plasmid_filenames = getattr(mod_genome_meta, "plasmid_filenames", None) or []
         if plasmid_filenames and mod_genome_meta is not None:
             run_dir = Path(mod_genome_meta.output_file).parent
@@ -181,8 +221,8 @@ def build_params(
 
     contig_files = [_relpath(p) for p in gxg_metadata.get("contig_files", []) if p]
 
-    ref_fragmented = getattr(validation_results.get("ref_genome"), 'fragmented', False)
-    mod_fragmented = getattr(validation_results.get("mod_genome"), 'fragmented', False)
+    ref_fragmented = getattr(ref_meta, 'fragmented', False)
+    mod_fragmented = getattr(mod_meta, 'fragmented', False)
 
     return NextflowParams(
         # general_options — pipeline switches
@@ -194,6 +234,8 @@ def build_params(
         run_pacbio=("pacbio" in fastqs_by_type or "pacbio" in bams_by_type),
         contig_file_size=len(contig_files),
         validation_timestamp=run_timestamp or datetime.now().strftime("%Y%m%d_%H%M%S"),
+        ref_genome_size_bp=ref_genome_size_bp,
+        mod_genome_size_bp=mod_genome_size_bp,
         # input_output_options
         ref_fasta_validated=ref_path,
         mod_fasta_validated=mod_path,
