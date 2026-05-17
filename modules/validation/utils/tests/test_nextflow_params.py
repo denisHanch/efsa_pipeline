@@ -4,8 +4,7 @@ Tests for nextflow_params.py
 Tests cover:
 - run_ref_x_mod conditions
 - Read type detection (illumina, ont, pacbio)
-- GFF / run_vcf_annotation
-- Conditional keys (ref_fasta_validated, mod_fasta_validated, pacbio_fastq, gff)
+- Conditional keys (ref_fasta_validated, mod_fasta_validated, pacbio_fastq)
 - write_params serialises valid JSON
 """
 
@@ -15,6 +14,13 @@ from pathlib import Path
 from types import SimpleNamespace  # noqa: F401 — used in tests and helpers
 
 import pytest
+
+import sys
+from pathlib import Path
+
+_VALIDATION_ROOT = Path(__file__).parent.parent.parent  # modules/validation/
+if str(_VALIDATION_ROOT) not in sys.path:
+    sys.path.insert(0, str(_VALIDATION_ROOT))
 
 from nextflow_params_handler import build_params, write_params
 
@@ -232,6 +238,50 @@ class TestPlasmidPaths:
         p = build_params(_base())
         assert p.ref_plasmid_fasta is None
         assert p.mod_plasmid_fasta is None
+
+    # -- regression tests: output_file set by is_plasmid validator fix --------
+
+    def test_mod_plasmid_from_output_file_not_fallback(self):
+        """mod_plasmid_fasta is read from mod_plasmid.output_file, not from the
+        gxg plasmid_file fallback — this is the scenario fixed by setting
+        output_file correctly in is_plasmid validator mode."""
+        gxg_plasmid = "/gxg/should_not_be_used.fasta"
+        r = _base(plasmid_file=gxg_plasmid)
+        r["mod_plasmid"] = _meta("/valid/mod_plasmid_mod_plasmid.fasta")
+        p = build_params(r)
+        assert p.mod_plasmid_fasta == "/valid/mod_plasmid_mod_plasmid.fasta"
+
+    def test_ref_plasmid_from_output_file_not_genome_fallback(self):
+        """ref_plasmid_fasta is read from ref_plasmid.output_file, not from
+        ref_genome.plasmid_filenames — ensures explicit config takes precedence
+        over the genome-extraction fallback."""
+        r = _base()
+        r["ref_genome"] = SimpleNamespace(
+            output_file="/valid/ref.fasta",
+            plasmid_filenames=["/valid/genome_extracted_plasmid.fasta"],
+        )
+        r["ref_plasmid"] = _meta("/valid/ref_plasmid_ref_plasmid.fasta")
+        p = build_params(r)
+        assert p.ref_plasmid_fasta == "/valid/ref_plasmid_ref_plasmid.fasta"
+
+    def test_mod_plasmid_absent_from_json_when_output_file_none_and_no_fallback(self):
+        """When mod_plasmid.output_file is None and no gxg plasmid_file exists,
+        mod_plasmid_fasta must be absent from the serialised JSON."""
+        r = _base()  # gxg plasmid_file is None, no mod_plasmid key
+        r["mod_plasmid"] = SimpleNamespace(output_file=None)
+        p = build_params(r)
+        d = p.to_dict()
+        assert "mod_plasmid_fasta" not in d
+
+    def test_mod_plasmid_present_in_json_when_output_file_set(self):
+        """When mod_plasmid.output_file is set, mod_plasmid_fasta must appear in
+        the serialised JSON — end-to-end check of to_dict()."""
+        r = _base()
+        r["mod_plasmid"] = _meta("/valid/mod_plasmid.fasta")
+        p = build_params(r)
+        d = p.to_dict()
+        assert "mod_plasmid_fasta" in d
+        assert d["mod_plasmid_fasta"] == "/valid/mod_plasmid.fasta"
 
 
 # ---------------------------------------------------------------------------

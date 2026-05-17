@@ -1,6 +1,6 @@
 """Validation report generation module."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Optional, Any, Union
@@ -21,8 +21,6 @@ class FileValidationRecord:
 
     def _get_metadata(self):
         """Get OutputMetadata object from output_data."""
-        from dataclasses import fields
-
         if self.validator_type == "genome":
             metadata_class = GenomeOutputMetadata
         elif self.validator_type == "read":

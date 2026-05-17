@@ -31,7 +31,4 @@ RUN chmod +x /usr/local/bin/nextflow
 
 WORKDIR /EFSA_workspace
 
-# Copy shell configuration for better user experience
-COPY .devcontainer/.inputrc /root/
-
 ENV SHELL=/bin/bash

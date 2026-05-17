@@ -146,7 +146,6 @@ validation_pkg/
 ├── __init__.py           # Public API exports
 ├── config_manager.py     # Configuration loading and parsing
 ├── exceptions.py         # Exception hierarchy
-├── logger.py            # Structured logging system
 ├── report.py            # Validation report generation
 ├── validators/
 │   ├── genome_validator.py      # Genome file validation
@@ -158,7 +157,8 @@ validation_pkg/
     ├── base_settings.py  # BaseSettings, BaseOutputMetadata, BaseValidatorSettings
     ├── base_validator.py # BaseValidator abstract class
     ├── file_handler.py   # File I/O and compression utilities
-    ├── formats.py        # CodingType, GenomeFormat, ReadFormat, FeatureFormat enums
+    ├── formats.py        # CodingType, GenomeFormat, ReadFormat, FeatureFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType enums
+    ├── logger.py         # Structured logging system
     ├── path_utils.py     # Path resolution and directory-traversal security
     └── sequence_stats.py # N50 calculation
 ```
@@ -391,7 +391,6 @@ This technical documentation (located in `docs/validation/validation_pkg/`):
 - Python 3.10+
 - BioPython
 - structlog
-- pysam (optional, for BAM support)
 
 **External Tools (optional):**
 - pigz - Parallel gzip (2-4x faster compression)

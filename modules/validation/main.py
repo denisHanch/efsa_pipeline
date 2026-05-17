@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os
+import argparse
 import sys
 import traceback
 from pathlib import Path
@@ -28,31 +28,39 @@ from validation_pkg.exceptions import ValidationError
 from validation_pkg.utils.formats import CodingType, GenomeFormat
 from utils.ref_defragment import defragment_reference
 
-import nextflow_params_handler as nf_params
+import utils.nextflow_params_handler as nf_params
 
 
 def main():
-    # Check command line arguments
-    args = sys.argv[1:]
+    parser = argparse.ArgumentParser(description="Validation pipeline for genomic input files")
+    parser.add_argument("config_path", help="Path to config.json")
+    parser.add_argument("--threads",          type=int,  help="Number of threads (overrides config.json)")
+    parser.add_argument("--validation-level", choices=["strict", "trust", "minimal"], help="Validation depth (overrides config.json)")
+    parser.add_argument("--logging-level",    choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Log verbosity (overrides config.json)")
+    parser.add_argument("--type",             dest="organism_type", choices=["prokaryote", "eukaryote"], help="Organism type (overrides config.json)")
+    parser.add_argument("--force-defragment-ref", action="store_true", default=False, help="Merge fragmented reference contigs (unsupported workaround)")
+    parsed = parser.parse_args()
 
-    if not args:
-        print("Usage: python main.py <config_path> ")
-        print("\nExample:")
-        print("  python main.py config.json")
-        return 1
+    config_path = Path(parsed.config_path).resolve()
 
-    config_path = Path(args[0]).resolve()
-    base_valid_dir = Path.cwd()
-    # Use the run-specific dir exported by validation.sh; fall back to CWD.
-    run_dir = os.environ.get("VALIDATION_RUN_DIR")
-    output_dir = Path(run_dir).resolve() if run_dir else base_valid_dir
+    cli_options = {}
+    if parsed.threads            is not None: cli_options["threads"]             = parsed.threads
+    if parsed.validation_level   is not None: cli_options["validation_level"]    = parsed.validation_level
+    if parsed.logging_level      is not None: cli_options["logging_level"]       = parsed.logging_level
+    if parsed.organism_type      is not None: cli_options["type"]                = parsed.organism_type
+    if parsed.force_defragment_ref:           cli_options["force_defragment_ref"] = True
+
+    output_dir = Path.cwd()
     output_dir.mkdir(parents=True, exist_ok=True)
+    logs_dir = config_path.parent.parent / "outputs" / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
     logger = None
     log_file = None
 
     # Setup logging
+    log_filename = "validation.log"
     try:
-        logger = setup_logging(console_level='DEBUG', log_file=output_dir / "validation.log")
+        logger = setup_logging(console_level='DEBUG', log_file=logs_dir / log_filename)
     except (PermissionError, OSError) as e:
         logger = setup_logging(console_level='DEBUG')
         logger.warning(f"Could not write log file ({e}); logging to console only")
@@ -63,16 +71,13 @@ def main():
     # ========================================================================
     config = None
     try:
-        config = ConfigManager.load(config_path)
+        config = ConfigManager.load(config_path, cli_options=cli_options or None)
     except Exception as e:
         logger.error(f"Loading a config file failed: {e}")
         return 1
 
-    # Redirect all validator configs to write into the run-specific output_dir.
-    # ConfigManager sets config.output_dir from the config file's location on
-    # disk (e.g. the real data/valid/ in the project root), which is wrong when
-    # running inside a Nextflow work directory.  Override every sub-config here
-    # so genome, read, and feature outputs all land in the same run_* folder.
+    # Override sub-config output dirs to CWD. ConfigManager sets output_dir from
+    # the config file location, which is wrong inside a Nextflow work directory.
     _all_sub_configs = [
         config.ref_genome, config.mod_genome,
         config.ref_plasmid, config.mod_plasmid,
@@ -202,7 +207,8 @@ def main():
     # ========================================================================
     # Step 3: Run validation using functional API
     # ========================================================================
-    report = ValidationReport(output_dir / "report.txt")
+    report_filename = "report.txt"
+    report = ValidationReport(logs_dir / report_filename)
     fatal_errors: list[str] = []
 
     def register_required_failure(label: str, exc: Exception) -> None:
@@ -239,6 +245,11 @@ def main():
     # Validate plasmid genomes (optional)
     ref_plasmid_res = None
     if hasattr(config, 'ref_plasmid') and config.ref_plasmid:
+        genome_plasmid_paths = getattr(ref_genome_res, 'plasmid_output_paths', None) or []
+        if genome_plasmid_paths:
+            ref_plasmid_settings = ref_plasmid_settings.update(
+                merge_into_plasmid=genome_plasmid_paths[0]
+            )
         try:
             ref_plasmid_res = validate_genome(config.ref_plasmid, ref_plasmid_settings)
             report.write(ref_plasmid_res, file_type="genome")
@@ -253,11 +264,13 @@ def main():
         except ValidationError as e:
             logger.error(f"Optional mod_plasmid validation failed: {e}")
 
-    # Inter-genome validation — only if both genomes validated successfully and mod is not fragmented
+    # Inter-genome validation — only if both genomes validated successfully and neither is fragmented
     genomexgenome_res = None
-    if mod_genome_res is not None and ref_genome_res is not None and not getattr(mod_genome_res, 'fragmented', False):
+    if (mod_genome_res is not None and ref_genome_res is not None
+            and not getattr(mod_genome_res, 'fragmented', False)
+            and not getattr(ref_genome_res, 'fragmented', False)):
         try:
-            genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings, mod_plasmid_res)
+            genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings, mod_plasmid_res, ref_plasmid_res)
             report.write(genomexgenome_res, file_type="genomexgenome")
         except ValidationError as e:
             logger.error(f"Inter-genome validation failed: {e}")
@@ -305,6 +318,27 @@ def main():
     # ========================================================================
     # Step 4: Write validated_params.json for Nextflow (-params-file)
     # ========================================================================
+
+    # Correct mod_genome_size_bp to chromosome-only.
+    # The genome validator records total_genome_size / sequence_lengths before GXG runs,
+    # so the value includes plasmid sequences. After GXG, contig_orientations holds the
+    # IDs of all sequences that mapped to the reference (= chromosomal contigs, one or many).
+    # Those IDs match sequence_lengths (both use post-rename IDs), so we can sum without
+    # re-reading any files. Falls back to the uncorrected total when GXG did not run
+    # (fragmented assemblies, Scenarios 3/4).
+    if genomexgenome_res is not None and mod_genome_res is not None:
+        gxg_meta = genomexgenome_res.get('metadata') or {}
+        chr_ids = set((gxg_meta.get('contig_orientations') or {}).keys())
+        seq_lengths = getattr(mod_genome_res, 'sequence_lengths', None) or {}
+        if chr_ids and seq_lengths:
+            mod_chr_size = sum(seq_lengths[sid] for sid in chr_ids if sid in seq_lengths)
+            if mod_chr_size > 0:
+                mod_genome_res.total_genome_size = mod_chr_size
+                logger.debug(
+                    f"mod_genome_size corrected to chromosome-only: {mod_chr_size:,} bp "
+                    f"({len(chr_ids)} contig(s))"
+                )
+
     validation_results = {
         "ref_genome":    ref_genome_res,
         "mod_genome":    mod_genome_res,
@@ -317,15 +351,11 @@ def main():
     if force_defragment:
         logger.warning(
             "force_defragment_ref is active: GFF validation for the reference is "
-            "skipped. Feature coordinates are not meaningful on a defragmented "
-            "reference — run_vcf_annotation will be disabled."
+            "skipped. Feature coordinates are not meaningful on a defragmented reference."
         )
-    # Extract timestamp from run directory name (run_YYYYMMDD_HHMMSS) so
-    # validation_timestamp matches the folder name exactly.
-    run_timestamp = output_dir.name.removeprefix("run_") if output_dir.name.startswith("run_") else None
     repo_root = config_path.parent.parent.parent
-    params = nf_params.build_params(validation_results, run_timestamp=run_timestamp, base_dir=repo_root)
-    nf_params.write_params(params, base_valid_dir / "validated_params.json")
+    params = nf_params.build_params(validation_results, base_dir=repo_root)
+    nf_params.write_params(params, output_dir / "validated_params.json")
 
     return 0
 

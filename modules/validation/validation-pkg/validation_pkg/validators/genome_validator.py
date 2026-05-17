@@ -1,5 +1,6 @@
 """Genome file validator and processor for FASTA and GenBank formats."""
 
+from collections import Counter
 from pathlib import Path
 from typing import Optional, List, Type, Any
 from dataclasses import dataclass
@@ -8,7 +9,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.SeqUtils import gc_fraction
 
 from validation_pkg.utils.base_settings import BaseOutputMetadata, BaseValidatorSettings
-from validation_pkg.utils.formats import GenomeFormat
+from validation_pkg.utils.formats import GenomeFormat, ValidationLevel, OrganismType
 from validation_pkg.exceptions import (
     GenomeValidationError,
     FileFormatError,
@@ -32,6 +33,7 @@ class GenomeOutputMetadata(BaseOutputMetadata):
     n50: int = None  # strict only
     plasmid_count: int = None
     plasmid_filenames: List[str] = None
+    plasmid_output_paths: List[str] = None  # full absolute paths, one per plasmid file
     num_sequences_filtered: int = None
 
     # Inter-file validation fields
@@ -124,6 +126,7 @@ class GenomeValidator(BaseValidator):
         replace_id_with: Optional[str] = None
         replace_id_with_incremental: Optional[str] = None
         min_sequence_length: int = 100
+        merge_into_plasmid: Optional[str] = None
 
         def __post_init__(self):
             """Validate and normalize settings after initialization."""
@@ -156,6 +159,7 @@ class GenomeValidator(BaseValidator):
         self.sequences = []  # List of SeqRecord objects
         self.num_sequences_filtered = 0
         self.plasmid_filenames = []
+        self.plasmid_output_paths = []
 
     # Required abstract properties and methods from BaseValidator
 
@@ -198,6 +202,8 @@ class GenomeValidator(BaseValidator):
         """Write processed genome to output file."""
         # Check if we have sequences to write
         if self.sequences == []:
+            if self.settings.is_plasmid and self.plasmid_output_paths:
+                return Path(self.plasmid_output_paths[0])
             self.logger.warning("No sequences to write")
             return None
 
@@ -218,7 +224,7 @@ class GenomeValidator(BaseValidator):
         self._fill_base_metadata(output_path)
 
         # Minimal mode - only basic info available
-        if self.validation_level == 'minimal':
+        if self.validation_level == ValidationLevel.MINIMAL:
             return
 
         # Trust and Strict modes - sequences were parsed
@@ -239,6 +245,7 @@ class GenomeValidator(BaseValidator):
         if self.plasmid_filenames:
             self.output_metadata.plasmid_count = len(self.plasmid_filenames)
             self.output_metadata.plasmid_filenames = self.plasmid_filenames
+            self.output_metadata.plasmid_output_paths = self.plasmid_output_paths
         elif self.num_sequences_filtered > 0:
             # No plasmids split, but sequences were filtered
             pass
@@ -247,7 +254,7 @@ class GenomeValidator(BaseValidator):
         self.output_metadata.fragmented = getattr(self, '_sequence_limit_exceeded', False)
 
         # Strict mode only - compute expensive statistics
-        if self.validation_level == 'strict' and self.sequences:
+        if self.validation_level == ValidationLevel.STRICT and self.sequences:
             # Total genome size
             self.output_metadata.total_genome_size = sum(len(seq.seq) for seq in self.sequences)
 
@@ -307,7 +314,7 @@ class GenomeValidator(BaseValidator):
                 )
                 raise GenomeValidationError(error_msg)
 
-            if self.validation_level == 'trust':
+            if self.validation_level == ValidationLevel.TRUST:
                 self.logger.info(f"Trust mode - parsed {len(self.sequences)} sequence(s), will validate first only")
             else:
                 self.logger.debug(f"Parsed {len(self.sequences)} sequence(s)")
@@ -342,8 +349,8 @@ class GenomeValidator(BaseValidator):
         self.logger.debug("Validating sequences...")
 
         # Check if organism type is eukaryote — too complex for inter-genome alignment
-        organism_type = self.genome_config.global_options.get('type', 'prokaryote')
-        if organism_type == 'eukaryote':
+        organism_type = OrganismType.normalize(self.genome_config.global_options.get('type'))
+        if organism_type == OrganismType.EUKARYOTE:
             error_msg = (
                 "Organism type is 'eukaryote' — the assembly is too complex for "
                 "inter-genome alignment and will not be processed further"
@@ -355,14 +362,15 @@ class GenomeValidator(BaseValidator):
                 details={'type': organism_type}
             )
             copy_file(self.input_path, self.output_path, self.logger)
+            self._deduplicate_copied_ids()
             self._sequence_limit_exceeded = True
             return
 
         # Check error threshold for number of sequences
         n_sequence_limit = self.genome_config.n_sequence_limit
-        if n_sequence_limit is not None and len(self.sequences) > n_sequence_limit:
+        if n_sequence_limit is not None and len(self.sequences) >= n_sequence_limit:
             error_msg = (
-                f"Number of sequences ({len(self.sequences)}) exceeds maximum allowed "
+                f"Number of sequences ({len(self.sequences)}) meets or exceeds the limit "
                 f"({n_sequence_limit} -> the assembly is too fragmented for further analysis)"
             )
             self.logger.add_validation_issue(
@@ -375,11 +383,12 @@ class GenomeValidator(BaseValidator):
                 }
             )
             copy_file(self.input_path, self.output_path, self.logger)
+            self._deduplicate_copied_ids()
             self._sequence_limit_exceeded = True
             return
 
         # Trust mode - validate only first sequence
-        if self.validation_level == 'trust':
+        if self.validation_level == ValidationLevel.TRUST:
             self.logger.debug("Trust mode - validating first sequence only")
             if len(self.sequences) > 0:
                 record = self.sequences[0]
@@ -439,7 +448,7 @@ class GenomeValidator(BaseValidator):
         self.logger.debug("Applying editing specifications from settings...")
 
         # Minimal mode - skip edits, file will be copied as-is
-        if self.validation_level == 'minimal':
+        if self.validation_level == ValidationLevel.MINIMAL:
             self.logger.debug("Minimal mode - skipping edits")
             return
 
@@ -464,7 +473,26 @@ class GenomeValidator(BaseValidator):
                 self.logger.debug("All sequences filtered out")
                 return
 
-        # 2. Replace sequence IDs
+        # 2. Handle plasmid sequences — must happen before renaming so that plasmid
+        #    sequences keep their original IDs regardless of rename settings.
+        if self.settings.is_plasmid:
+            # All sequences are plasmids — skip renaming entirely
+            self._handle_plasmids(self.sequences)
+            self.sequences = []
+        elif self.settings.plasmid_split or self.settings.plasmids_to_one:
+            # Separate main chromosome from plasmids, then rename only the main sequence(s)
+            self.main_sequence, plasmid_sequences = self._select_main_sequence(self.sequences)
+            self._handle_plasmids(plasmid_sequences)
+            self.sequences = [self.main_sequence]
+            self._rename_sequences()
+        else:
+            # All sequences stay in main output file — rename all
+            self._rename_sequences()
+
+        self.logger.debug(f"✓ Edits applied, {len(self.sequences)} sequence(s) remaining")
+
+    def _rename_sequences(self) -> None:
+        """Replace sequence IDs according to rename settings."""
         if self.settings.replace_id_with:
             new_id = self.settings.replace_id_with
             for record in self.sequences:
@@ -479,19 +507,41 @@ class GenomeValidator(BaseValidator):
                 record.id = prefix if idx == 0 else f"{prefix}{idx}"
             self.logger.debug(f"Replaced sequence IDs with '{prefix}' (incremental)")
 
-        # 3. Handle plasmid sequences
-        if self.settings.is_plasmid:
-            # Treat all sequences as plasmids (no main chromosome)
-            self._handle_plasmids(self.sequences)
-            self.sequences = []
-        elif self.settings.plasmid_split or self.settings.plasmids_to_one:
-            # Only select main sequence if we're actually doing plasmid handling
-            self.main_sequence, plasmid_sequences = self._select_main_sequence(self.sequences)
-            self._handle_plasmids(plasmid_sequences)
-            self.sequences = [self.main_sequence]
-        # else: keep all sequences in main output file (default behavior)
+    def _deduplicate_copied_ids(self) -> None:
+        """Rename duplicate sequence IDs in-place in a just-copied output file.
 
-        self.logger.debug(f"✓ Edits applied, {len(self.sequences)} sequence(s) remaining")
+        Called after copy_file() for fragmented/eukaryote genomes so that
+        downstream tools (e.g. samtools) do not encounter duplicate SAM header
+        entries.  The file is rewritten only when duplicates are actually found.
+        """
+        if not self.output_path or not self.output_path.exists():
+            return
+        records = list(SeqIO.parse(str(self.output_path), 'fasta'))
+        duplicated = {sid for sid, n in Counter(r.id for r in records).items() if n > 1}
+        if not duplicated:
+            return
+
+        seen: dict = {}
+        renamed = []
+        for record in records:
+            orig_id = record.id
+            n = seen.get(orig_id, 0)
+            seen[orig_id] = n + 1
+            if n > 0:
+                new_id = f"{orig_id}_{n}"
+                renamed.append((orig_id, new_id))
+                record.id = new_id
+                record.description = ''
+
+        with open(str(self.output_path), 'w') as fh:
+            SeqIO.write(records, fh, 'fasta')
+
+        pairs = ', '.join(f"{old} → {new}" for old, new in renamed)
+        self.logger.warning(
+            f"Deduplicated {len(renamed)} sequence ID(s) in copied genome output: {pairs}"
+        )
+        # Refresh self.sequences so metadata reflects renamed IDs
+        self.sequences = records
 
     def _select_main_sequence(self, sequences: List[SeqRecord]) -> tuple[SeqRecord, List[SeqRecord]]:
         """Select main chromosome from sequences based on settings."""
@@ -568,17 +618,31 @@ class GenomeValidator(BaseValidator):
 
         plasmid_path = output_dir / plasmid_filename
 
-        # Write plasmid sequences with appropriate compression
-        self.logger.debug(f"Writing plasmid sequences to: {plasmid_path}")
+        # If an explicit merge target was supplied, append there instead of creating a new file.
+        if self.settings.plasmids_to_one and self.settings.merge_into_plasmid:
+            merge_path = Path(self.settings.merge_into_plasmid)
+            if merge_path.exists():
+                self.logger.info(
+                    f"Merging {len(plasmid_sequences)} plasmid sequence(s) into "
+                    f"existing file: {merge_path}"
+                )
+                with open(str(merge_path), 'a') as handle:
+                    SeqIO.write(plasmid_sequences, handle, 'fasta')
+                self.plasmid_filenames.append(merge_path.name)
+                self.plasmid_output_paths.append(str(merge_path))
+                for seq in plasmid_sequences:
+                    self.logger.debug(f"  Plasmid: {seq.id} ({len(seq.seq)} bp)")
+                return
 
-        # Use optimized compression writer
+        # No merge target — write a new file.
+        self.logger.debug(f"Writing plasmid sequences to: {plasmid_path}")
         with open_compressed_writer(plasmid_path, self.settings.coding_type, threads=self.threads) as handle:
             SeqIO.write(plasmid_sequences, handle, 'fasta')
 
         self.logger.info(f"Plasmid sequences saved: {plasmid_path}")
 
-        # Track plasmid filename for metadata
         self.plasmid_filenames.append(plasmid_filename)
+        self.plasmid_output_paths.append(str(plasmid_path))
 
         # Log details about each plasmid
         for seq in plasmid_sequences:

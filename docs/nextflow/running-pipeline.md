@@ -2,7 +2,7 @@
 
 ## Overview
 
-The main pipeline (`main.nf`) executes **all three workflows** in sequence:
+The main pipeline (`main.nf`) coordinates three workflow families:
 
 - Short-read processing for Illumina data
 - Long-read processing for PacBio/Oxford Nanopore data
@@ -17,14 +17,25 @@ The pipeline runs validation and processing in a **single command**:
 nextflow run main.nf --max_cpu $(nproc)
 ```
 
-This first validates input data from `data/inputs/config.json`, then automatically runs the processing workflows (short-read, long-read, ref-vs-mod comparison) based on the validated inputs.
+This first validates input data from `data/inputs/config.json`, then automatically runs eligible processing workflows (short-read, long-read, ref-vs-mod comparison) based on the validated inputs.
 
-Validated files are written to `data/valid/run_YYYYMMDD_HHMMSS/` and `data/valid/validated_params.json` is produced for runtime consumption. See the [Validation Overview](../validation/OVERVIEW.md) for details on what this file contains.
+`mod_fasta` is optional after validation. If no validated modified FASTA is present, the pipeline runs in reference-only mode and skips modified-genome mapping/comparison branches.
+
+Validated files are produced by the `validate` process and passed directly to downstream workflows through channels. A `validated_params.json` file is also emitted for runtime consumption. See the [Validation Overview](../validation/OVERVIEW.md) for details on what this file contains.
+
+By default, runtime logs are written to `data/outputs/logs/nextflow.log` and console output is kept quiet.
+At completion (success or failure), the pipeline also writes `data/outputs/logs/process_manifest.txt` (or `${params.log_dir}/process_manifest.txt` if `log_dir` is overridden).
 
 To use a custom configuration file:
 
 ```bash
 nextflow run main.nf --config_json /path/to/config.json --max_cpu $(nproc)
+```
+
+If you want verbose console output for debugging, override quiet mode at launch time:
+
+```bash
+NXF_QUIET=false nextflow run main.nf --max_cpu $(nproc)
 ```
 
 ## Nextflow Options
@@ -36,10 +47,23 @@ nextflow run main.nf --config_json /path/to/config.json --max_cpu $(nproc)
 | `-with-timeline` | Generate a timeline visualization showing when each pipeline process started and finished. The timeline is saved by default to `data/outputs/logs/timeline.html`.                   |
 | `-with-dag`      | Generate a directed acyclic graph (DAG) illustrating task dependencies in the workflow.                                                                                             |
 
+> **Note:** `-resume` is not supported in this pipeline. The `work/` directory is automatically deleted at the end of every run — including failed runs — so Nextflow has no cached task outputs to resume from.
+
 
 ## Pipeline Options
 
-The most commonly used options are `--config_json`, `--out_dir`, `--max_cpu`, `--clean_work`, and `--help`. For the full parameter list (including plasmid FASTAs, etc.), see [Configuration](configuration.md#parameters-params).
+| Option | Description |
+|--------|-------------|
+| `--config_json <path>` | Path to the input `config.json` (default: `data/inputs/config.json`) |
+| `--out_dir <path>` | Output directory (default: `data/outputs`) |
+| `--max_cpu <n>` | Maximum CPUs per process (default: `1`) |
+| `--validation_level <level>` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — overridden by `config.json` when set there |
+| `--logging_level <level>` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — overridden by `config.json` when set there |
+| `--organism_type <type>` | Organism type: `PROKARYOTE` or `EUKARYOTE` — overridden by `config.json` when set there |
+| `--force_defragment_ref` | Force reference defragmentation — unsupported workaround |
+| `--help` | Print help message and exit |
+
+For the full parameter list and priority rules, see [Configuration](configuration.md#parameters-params).
 
 
 ## Next Steps

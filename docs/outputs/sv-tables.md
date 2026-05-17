@@ -1,6 +1,6 @@
 ## Generation of per structural variation (SV) type CSV tables
 
-These utilities convert SV VCFs into compact TSV summaries, enrich short/long-read SV rows with flank coverage using `mosdepth`, and then merge available summaries into per-SV-type CSV tables.
+These utilities convert SV VCFs into compact TSV summaries, enrich short/long-read SV rows with local coverage using `mosdepth` (100 bp flanks + SV span), and then merge available summaries into per-SV-type CSV tables.
 
 ```mermaid
 flowchart LR
@@ -20,8 +20,9 @@ flowchart LR
 
 - By default a nextflow pipeline is collecting the tables from pipelines and runs restructure_sv_tbl to create all summary tables
 - Variants are extracted into a table format with processes `vcf_to_table` and `vcf_to_table_long`
-- For short-read and long-read SV tables, flank coverage is added by `build_sv_flank_bed` and `mosdepth`:
+- For short-read and long-read SV tables, local coverage is added by `build_sv_flank_bed` and `mosdepth`:
   - `coverage_before_100bp`: mean depth in the 100 bp upstream flank
+  - `coverage_sv_span`: mean depth across the full SV interval (`start..end`)
   - `coverage_after_100bp`: mean depth in the 100 bp downstream flank
 - If one of the pipelines was not running (short/long/assembly) an empty tsv file is generated with a process create_empty_tbl
 - `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
@@ -50,14 +51,14 @@ The pipeline extracts variants from VCF files using different fields depending o
 - **Supporting reads:** Extracted from FORMAT/DR (`DR{1}`) for long-read evidence
 - **Supporting methods:** Populated from `INFO/SUPP` and stored in `long_(ont|pacbio)_supporting_methods`
 
-### Flank coverage with mosdepth
+### Local coverage with mosdepth
 
 For short-read and long-read calls, the pipeline adds local depth around each SV event before final table merging:
 
 - **Processes:** `build_sv_flank_bed` (build regions) and `mosdepth` (compute depth)
 - **Input:** indexed BAM + SV TSV (`chrom`, `start`, `end`)
-- **Flanks:** 100 bp upstream and 100 bp downstream of each event
-- **Output columns in TSV:** `coverage_before_100bp`, `coverage_after_100bp`
+- **Regions:** 100 bp upstream flank, full SV span, and 100 bp downstream flank
+- **Output columns in TSV:** `coverage_before_100bp`, `coverage_sv_span`, `coverage_after_100bp`
 - Assembly (`asm`) records are not coverage-enriched because no assembly BAM is used in this step.
 
 ### Variant Type Standardization
@@ -132,6 +133,8 @@ python3 modules/utils/create_sv_output.py --asm assembly_sv_summary.tsv \
   --out csv_per_sv_sumary
 ```
 
+During normal Nextflow runs, genome-size context is supplied automatically from `data/valid/validated_params.json` when present, or by counting bases in the validated FASTA files. Direct script runs do not expose manual genome-size arguments; the percentage columns are left empty/`NaN` unless the internal pipeline environment variables are set.
+
 ### All supported processing script options
 
 | Option | Description |
@@ -165,6 +168,8 @@ The final table in each CSV file contains one row per final structural variant (
 | **event_start** | Start coordinate of the selected representative call used to anchor the final event. This is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
 | **event_end** | End coordinate of the selected representative call used to anchor the final event. This is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
 | **event_length_bp** | Representative event size in base pairs, computed as the minimum available **absolute** source length (`min(abs(svlen))`) across assembly, long ONT, long PacBio, and short source representatives. If no source provides `svlen`, this field is `NaN` and coordinates use fallback cluster logic. |
+| **pct_of_ref_genome** | Percentage of the reference genome covered by the representative event length, calculated as `event_length_bp / ref_genome_size_bp * 100`. `ref_genome_size_bp` comes from `data/valid/validated_params.json` when available, otherwise `restructure_sv_tbl` derives it from the validated reference FASTA. Empty/`NaN` when the genome size or `event_length_bp` is unavailable. |
+| **pct_of_mod_genome** | Percentage of the modified genome or assembly covered by the representative event length, calculated as `event_length_bp / mod_genome_size_bp * 100`. `mod_genome_size_bp` comes from `data/valid/validated_params.json` when available, otherwise `restructure_sv_tbl` derives it from the validated modified FASTA. Empty/`NaN` when the genome size or `event_length_bp` is unavailable. |
 | **support_score** | Number of input sources contributing to the final event row. In the current implementation this is the count of non-empty calls among `asm`, `long_ont`, `long_pacbio`, and `short`. |
 | **percentage_overlap** | Comma-separated overlap percentages collected during same-type event clustering. Each value is calculated during one clustering merge step as `(intersection length / longer interval length) × 100`. This field is empty when the final event was built from a single record only. |
 | **linked_event** | Semicolon-separated list of overlapping final SV events on the same chromosome. This single column includes both same-type and cross-type links. Each linked entry has the format `<event_id> (<std_svtype>, <chrom>:<start>-<end>, <relation>)`. Standard relation values are `exact_coordinates`, `overlap`, `nested_in`, and `contains`, always from the point of view of the current row. If `--cross_type_tol` is set above `0`, near-identical boundaries may also be reported as `same_coordinates_within_<N>bp`. Leave empty when no linked events are found. |
@@ -188,11 +193,13 @@ The examples below use simplified coordinates for clarity.
 | **long_(ont\|pacbio)_supporting_reads** | Number of Oxford Nanopore or PacBio reads supporting the structural variant (VCF `FORMAT` field `DR`, when present). |
 | **long_(ont\|pacbio)_supporting_methods** | Number or label of long-read variant calling methods supporting the structural variant, derived from the TSV summary when available. |
 | **long_(ont\|pacbio)_coverage_before_100bp** | Mean depth in the 100 bp flank before the long-read SV event, computed by `mosdepth`. |
+| **long_(ont\|pacbio)_coverage_sv_span** | Mean depth across the full long-read SV event span (`start..end`), computed by `mosdepth`. |
 | **long_(ont\|pacbio)_coverage_after_100bp** | Mean depth in the 100 bp flank after the long-read SV event, computed by `mosdepth`. |
 | **short_chr2** | Partner chromosome for short-read translocation/breakend calls (from short-read TSV `chr2`, extracted from VCF `INFO/CHR2`). Empty for non-translocation short-read events or when unavailable. |
 | **short_pos2** | Partner breakpoint position for short-read translocation/breakend calls (from short-read TSV `pos2`, extracted from VCF `INFO/POS2`). Empty for non-translocation short-read events or when unavailable. |
 | **short_reads_copy_number_estimate** | Estimated copy number derived from short-read depth information (VCF `FORMAT` field `RDCN`). |
 | **short_coverage_before_100bp** | Mean depth in the 100 bp flank before the short-read SV event, computed by `mosdepth`. |
+| **short_coverage_sv_span** | Mean depth across the full short-read SV event span (`start..end`), computed by `mosdepth`. |
 | **short_coverage_after_100bp** | Mean depth in the 100 bp flank after the short-read SV event, computed by `mosdepth`. |
 
 ### Source-specific length columns and calculation strategy
@@ -210,6 +217,7 @@ The examples below use simplified coordinates for clarity.
 - These are mapped to standardized types: `DEL`, `INS`, `INV`, `DUP`, `TRA`, `RPL` (replacements)
 - Coordinates extracted as real intervals from VCF `POS` and `INFO/END` fields
 - Breakpoint information available in `INFO/StartB` and `INFO/EndB` (stored as `asm_start_mod` and `asm_end_mod`)
+- In SyRI output, some `TRA` records can legitimately have `svlen = 0`. This reflects translocation breakpoint notation (a junction between loci) rather than a contiguous sequence interval with its own span on one chromosome.
 
 **Long-read variants (cuteSV, sniffles, debreak, SURVIVOR merged):**
 - Reported with `SVTYPE` in INFO field
@@ -225,6 +233,7 @@ The `create_sv_output.py` script handles `svlen` consistently across all sources
    - **For TRA:** Set `svlen = 0` (breakpoint semantics)
    - **For INS:** Keep as missing (`None`/`NaN`) unless explicitly provided by caller
    - **For unknown types**: Attempt coordinate-based derivation, fallback to `None`
+
 
 3. **If `svlen` is present but signed or inconsistent (interval variants):**
    - Normalize sign first: `svlen = abs(svlen)`

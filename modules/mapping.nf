@@ -4,7 +4,6 @@
 
 process bwa_index {
     tag "$fasta_file"
-    publishDir "${params.out_dir}/${out_folder_name}/bwa_index", mode: "copy"
 
     input:
     path fasta_file
@@ -42,7 +41,7 @@ process bwa_mapping {
 
 process samtools_index_bam {
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/bam", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/bam" }, mode: "copy"
 
     input:
     tuple val(pair_id), path(bam_file)
@@ -60,7 +59,7 @@ process samtools_index_bam {
 
 process picard {
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/picard", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/picard" }, mode: "copy"
     
     input:
     each path(fasta_file)
@@ -82,7 +81,7 @@ process picard {
 
 process samtools_stats {
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/samtools_stats", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/samtools_stats" }, mode: "copy"
 
     input:
     tuple val(pair_id), path(bam_file)
@@ -131,6 +130,10 @@ process build_sv_flank_bed {
         b1=start-1
         if (b1 > b0) print chrom, b0, b1, (NR-1)"|before"
 
+        s0=start-1; if (s0 < 0) s0=0
+        s1=end
+        if (s1 > s0) print chrom, s0, s1, (NR-1)"|sv_span"
+
         a0=end; if (a0 < 0) a0=0
         a1=end+100
         if (a1 > a0) print chrom, a0, a1, (NR-1)"|after"
@@ -141,7 +144,7 @@ process build_sv_flank_bed {
 
 process mosdepth {
     tag "$pair_id"
-    publishDir "${params.out_dir}/tables/tsv", mode: 'copy'
+    publishDir { "${params.out_dir}/tables/tsv" }, mode: 'copy'
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index), path(input_sv_tsv), path(regions_bed)
@@ -169,7 +172,7 @@ process mosdepth {
     awk '
       BEGIN{FS=OFS="\\t"}
       NR==FNR { cov[\$1 "|" \$2] = \$3; next }
-      FNR==1 { print \$0, "coverage_before_100bp", "coverage_after_100bp"; next }
+      FNR==1 { print \$0, "coverage_before_100bp", "coverage_sv_span", "coverage_after_100bp"; next }
       function get_cov(id, side, key, value) {
         key = id "|" side
         value = cov[key]
@@ -177,7 +180,7 @@ process mosdepth {
       }
       {
         id = FNR - 1
-        print \$0, get_cov(id, "before"), get_cov(id, "after")
+        print \$0, get_cov(id, "before"), get_cov(id, "sv_span"), get_cov(id, "after")
       }
     ' "\${coverage_tsv}" "${input_sv_tsv}" > "${outfile}"
     """
@@ -208,7 +211,7 @@ process minimap2 {
 
 process samtools_sort {
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/bam", mode: "copy"
+    publishDir { "${params.out_dir}/${out_folder_name}/bam" }, mode: "copy"
 
     input:
     tuple val(pair_id), path(sam)
@@ -230,15 +233,11 @@ process calc_total_reads {
     tuple val(pair_id), path(bam), path(bam_index)
 
     output:
-    env total
+    tuple val(pair_id), stdout
 
     script:
     """
-    #!/usr/bin/env bash
-
-    total=\$(samtools view -c "$bam")
-
-    export total
+    samtools view -c "$bam"
     """
 }
 
@@ -250,11 +249,10 @@ process calc_unmapped {
     tuple val(pair_id), path(fastq)
 
     output:
-    env reads 
+    tuple val(pair_id), stdout
 
     script:
     """
-    #!/usr/bin/env bash
     if [[ "$fastq" == *.gz ]]; then
         total_lines=\$(zcat "$fastq" | wc -l)
     else
@@ -262,15 +260,13 @@ process calc_unmapped {
     fi
     
     reads=\$((total_lines / 4))
-
-    export reads
+    echo \$reads
     """
 }
 
 
 process get_unmapped_reads {
     tag "$pair_id"
-    publishDir "${params.out_dir}/${out_folder_name}/unmapped_fastq", mode: "copy"
 
     input:
     tuple val(pair_id), path(bam_file), path(bam_index)
@@ -287,7 +283,7 @@ process get_unmapped_reads {
 
 process compare_unmapped {
     tag "$pair_id1"
-    publishDir "${params.out_dir}/unmapped_stats", mode: "copy"
+    publishDir { "${params.out_dir}/unmapped_stats" }, mode: "copy"
 
     input:
     tuple val(pair_id1), path(unmapped_1, stageAs: "unmapped_ref.fastq")

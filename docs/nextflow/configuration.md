@@ -2,6 +2,16 @@
 
 The file `nextflow.config` is the central configuration for the pipeline. It defines default parameters, per-process resource limits and container images, execution profiles, and reporting options.
 
+## Runtime Logging Environment
+
+The pipeline sets the following runtime logging environment variables in `nextflow.config`:
+
+- `NXF_LOG_FILE=${projectDir}/data/outputs/logs/nextflow.log` — writes Nextflow runtime logs to file
+- `NXF_ANSI_LOG=false` — disables ANSI live console rendering
+- `NXF_QUIET=true` — keeps console output quiet by default
+
+As a result, operational runtime messages are primarily captured in `data/outputs/logs/nextflow.log` rather than printed to screen.
+
 ## Parameters (`params`)
 
 | Parameter | Default | Description |
@@ -9,10 +19,29 @@ The file `nextflow.config` is the central configuration for the pipeline. It def
 | `config_json` | `data/inputs/config.json` | Path to the input configuration JSON |
 | `out_dir` | `data/outputs` | Output directory for results |
 | `log_dir` | `data/outputs/logs` | Directory for pipeline logs and reports |
+| `valid_dir` | `data/outputs/valid` | Directory where only `validated_params.json` is saved |
 | `max_cpu` | `1` | Maximum CPUs available per process (override with `--max_cpu`) |
-| `clean_work` | `true` | Remove Nextflow `work/` directory after a successful run |
-| `ref_plasmid_fasta` | `null` | Optional reference plasmid FASTA |
+| `cleanup` | `true` | Enables end-of-run cleanup hooks (for example, work directory cleanup) |
+| `validation_level` | `null` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — `null` means not forwarded; `config.json` governs |
+| `logging_level` | `null` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — `null` means not forwarded; `config.json` governs |
+| `organism_type` | `null` | Organism type: `PROKARYOTE` or `EUKARYOTE` — `null` means not forwarded; `config.json` governs |
+| `force_defragment_ref` | `false` | Force reference defragmentation — unsupported workaround, use with caution |
 | `help` | `false` | Print help message and exit |
+
+### Parameter priority
+
+For options shared between Nextflow and `config.json` (`validation_level`, `logging_level`, `organism_type`), the following priority applies — higher entries win:
+
+```
+1. Per-file setting in config.json    {"filename": "ref.fa", "validation_level": "STRICT"}
+2. Global options block in config.json  "options": {"validation_level": "TRUST"}
+3. CLI flag                           nextflow run main.nf --validation_level MINIMAL
+4. nextflow.config default            validation_level = null  (no override)
+```
+
+When a param is `null` in `nextflow.config`, the flag is not forwarded to the validation script at all, so `config.json` has full control. A `WARNING` is logged whenever a per-file setting overrides a global `config.json` option.
+
+> `threads` follows the same hierarchy but is not exposed as a Nextflow CLI flag — set it only inside `config.json`.
 
 ## Per-Process Configuration
 
@@ -32,6 +61,7 @@ withName: minimap2 {
 - **Container pinning**: All images use `@sha256:` digests for reproducibility — the exact image bytes are locked, not just the tag.
 - **CPU scaling**: Uses `Math.min(params.max_cpu, N)` so processes scale to available hardware but never exceed a tool-specific cap.
 - **Centralized updates**: To upgrade a tool version, change it in `nextflow.config` only — individual process definitions do not specify containers.
+- **`ecomolegmo/*` images**: Some `ecomolegmo` images were created because equivalent tool images were unavailable in trusted Docker Hub sources at the time; these custom images are therefore pinned by digest for reproducibility and supply-chain traceability.
 
 ### Default Resource Limits
 
@@ -69,7 +99,7 @@ Containers run as the current user to avoid root-owned output files.
 | Profile | Description |
 |---------|-------------|
 | `standard` | Default — uses parameters as defined above |
-| `test` | Sets `config_json` to `data/inputs/test/config.json` for the bundled test dataset |
+| `test` | Keeps the same input paths but enforces low resource caps (`cpus=1`, `memory=2 GB`, `time=1h`) for all processes |
 
 Run with a profile:
 

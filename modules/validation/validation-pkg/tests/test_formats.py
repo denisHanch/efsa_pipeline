@@ -7,7 +7,11 @@ from validation_pkg.utils.formats import (
     CodingType,
     GenomeFormat,
     ReadFormat,
-    FeatureFormat
+    FeatureFormat,
+    OrganismType,
+    ValidationLevel,
+    LoggingLevel,
+    NgsType,
 )
 
 
@@ -394,3 +398,156 @@ class TestEnumStringRepresentation:
         assert GenomeFormat.FASTA.value == "fasta"
         assert ReadFormat.FASTQ.value == "fastq"
         assert FeatureFormat.GFF.value == "gff"
+
+
+class TestOrganismType:
+    """Tests for OrganismType enum."""
+
+    def test_enum_values(self):
+        assert OrganismType.PROKARYOTE.value == "prokaryote"
+        assert OrganismType.EUKARYOTE.value == "eukaryote"
+
+    def test_normalize_exact(self):
+        assert OrganismType.normalize("prokaryote") == OrganismType.PROKARYOTE
+        assert OrganismType.normalize("eukaryote") == OrganismType.EUKARYOTE
+
+    def test_normalize_uppercase(self):
+        assert OrganismType.normalize("PROKARYOTE") == OrganismType.PROKARYOTE
+        assert OrganismType.normalize("EUKARYOTE") == OrganismType.EUKARYOTE
+
+    def test_normalize_mixed_case(self):
+        assert OrganismType.normalize("Prokaryote") == OrganismType.PROKARYOTE
+        assert OrganismType.normalize("Eukaryote") == OrganismType.EUKARYOTE
+
+    def test_normalize_strips_whitespace(self):
+        assert OrganismType.normalize("  prokaryote  ") == OrganismType.PROKARYOTE
+
+    def test_normalize_none_returns_default(self):
+        assert OrganismType.normalize(None) == OrganismType.PROKARYOTE
+
+    def test_normalize_enum_instance_passthrough(self):
+        assert OrganismType.normalize(OrganismType.EUKARYOTE) == OrganismType.EUKARYOTE
+
+    def test_normalize_invalid_raises(self):
+        with pytest.raises(ValueError, match="is not a valid OrganismType"):
+            OrganismType.normalize("bacteria")
+
+    def test_normalize_value_is_lowercase(self):
+        assert OrganismType.normalize("PROKARYOTE").value == "prokaryote"
+
+
+class TestValidationLevel:
+    """Tests for ValidationLevel enum."""
+
+    def test_enum_values(self):
+        assert ValidationLevel.STRICT.value == "strict"
+        assert ValidationLevel.TRUST.value == "trust"
+        assert ValidationLevel.MINIMAL.value == "minimal"
+
+    def test_normalize_exact(self):
+        assert ValidationLevel.normalize("strict") == ValidationLevel.STRICT
+        assert ValidationLevel.normalize("trust") == ValidationLevel.TRUST
+        assert ValidationLevel.normalize("minimal") == ValidationLevel.MINIMAL
+
+    def test_normalize_uppercase(self):
+        assert ValidationLevel.normalize("STRICT") == ValidationLevel.STRICT
+        assert ValidationLevel.normalize("TRUST") == ValidationLevel.TRUST
+        assert ValidationLevel.normalize("MINIMAL") == ValidationLevel.MINIMAL
+
+    def test_normalize_mixed_case(self):
+        assert ValidationLevel.normalize("Strict") == ValidationLevel.STRICT
+        assert ValidationLevel.normalize("Trust") == ValidationLevel.TRUST
+
+    def test_normalize_strips_whitespace(self):
+        assert ValidationLevel.normalize("  strict  ") == ValidationLevel.STRICT
+
+    def test_normalize_none_returns_default(self):
+        assert ValidationLevel.normalize(None) == ValidationLevel.TRUST
+
+    def test_normalize_enum_instance_passthrough(self):
+        assert ValidationLevel.normalize(ValidationLevel.MINIMAL) == ValidationLevel.MINIMAL
+
+    def test_normalize_invalid_raises(self):
+        with pytest.raises(ValueError, match="is not a valid ValidationLevel"):
+            ValidationLevel.normalize("moderate")
+
+    def test_normalize_value_is_lowercase(self):
+        assert ValidationLevel.normalize("STRICT").value == "strict"
+
+
+class TestLoggingLevel:
+    """Tests for LoggingLevel enum."""
+
+    def test_enum_values(self):
+        assert LoggingLevel.DEBUG.value == "DEBUG"
+        assert LoggingLevel.INFO.value == "INFO"
+        assert LoggingLevel.WARNING.value == "WARNING"
+        assert LoggingLevel.ERROR.value == "ERROR"
+
+    def test_normalize_exact_uppercase(self):
+        assert LoggingLevel.normalize("DEBUG") == LoggingLevel.DEBUG
+        assert LoggingLevel.normalize("INFO") == LoggingLevel.INFO
+        assert LoggingLevel.normalize("WARNING") == LoggingLevel.WARNING
+        assert LoggingLevel.normalize("ERROR") == LoggingLevel.ERROR
+
+    def test_normalize_lowercase(self):
+        assert LoggingLevel.normalize("debug") == LoggingLevel.DEBUG
+        assert LoggingLevel.normalize("info") == LoggingLevel.INFO
+        assert LoggingLevel.normalize("warning") == LoggingLevel.WARNING
+        assert LoggingLevel.normalize("error") == LoggingLevel.ERROR
+
+    def test_normalize_mixed_case(self):
+        assert LoggingLevel.normalize("Debug") == LoggingLevel.DEBUG
+        assert LoggingLevel.normalize("Warning") == LoggingLevel.WARNING
+
+    def test_normalize_strips_whitespace(self):
+        assert LoggingLevel.normalize("  info  ") == LoggingLevel.INFO
+
+    def test_normalize_none_returns_default(self):
+        assert LoggingLevel.normalize(None) == LoggingLevel.INFO
+
+    def test_normalize_enum_instance_passthrough(self):
+        assert LoggingLevel.normalize(LoggingLevel.ERROR) == LoggingLevel.ERROR
+
+    def test_normalize_invalid_raises(self):
+        with pytest.raises(ValueError, match="is not a valid LoggingLevel"):
+            LoggingLevel.normalize("VERBOSE")
+
+    def test_normalize_value_is_uppercase(self):
+        assert LoggingLevel.normalize("debug").value == "DEBUG"
+
+
+class TestNgsType:
+    """Tests for NgsType enum."""
+
+    def test_enum_values(self):
+        assert NgsType.ILLUMINA.value == "illumina"
+        assert NgsType.ONT.value == "ont"
+        assert NgsType.PACBIO.value == "pacbio"
+
+    def test_normalize_exact(self):
+        assert NgsType.normalize("illumina") == NgsType.ILLUMINA
+        assert NgsType.normalize("ont") == NgsType.ONT
+        assert NgsType.normalize("pacbio") == NgsType.PACBIO
+
+    def test_normalize_uppercase(self):
+        assert NgsType.normalize("ILLUMINA") == NgsType.ILLUMINA
+        assert NgsType.normalize("ONT") == NgsType.ONT
+        assert NgsType.normalize("PACBIO") == NgsType.PACBIO
+
+    def test_normalize_mixed_case(self):
+        assert NgsType.normalize("Illumina") == NgsType.ILLUMINA
+        assert NgsType.normalize("PacBio") == NgsType.PACBIO
+
+    def test_normalize_strips_whitespace(self):
+        assert NgsType.normalize("  ont  ") == NgsType.ONT
+
+    def test_normalize_enum_instance_passthrough(self):
+        assert NgsType.normalize(NgsType.PACBIO) == NgsType.PACBIO
+
+    def test_normalize_invalid_raises(self):
+        with pytest.raises(ValueError, match="is not a valid NgsType"):
+            NgsType.normalize("nanopore")
+
+    def test_normalize_value_is_lowercase(self):
+        assert NgsType.normalize("ILLUMINA").value == "illumina"

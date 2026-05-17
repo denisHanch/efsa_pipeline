@@ -7,7 +7,6 @@ include { short_read as short_ref; short_read as short_mod } from "./short_read.
 include { qc } from "./subworkflows.nf"
 
 include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_unmapped as compare_unmapped_pacbio } from "../modules/mapping.nf"
-include { nanoplot as nanoplot_pacbio; nanoplot as nanoplot_ont } from "../modules/qc.nf"
 include { restructure_sv_tbl; create_empty_tbl as create_ont_tbl; create_empty_tbl as create_asm_tbl; create_empty_tbl as create_pacbio_tbl; create_empty_tbl as create_short_tbl } from "../modules/sv_calling.nf"
 
 
@@ -24,7 +23,13 @@ workflow analysis {
 
         // Core genome file channels (single-item value channels)
         ref_fasta = pmap.map { file(it.ref_fasta_validated) }
+        // Allow reference-only execution when mod_fasta_validated is absent
+        mod_fasta = pmap
+            .filter { it.mod_fasta_validated }
+            .map { file(it.mod_fasta_validated) }
         mod_fasta = pmap.map { file(it.mod_fasta_validated) }
+        ref_genome_size_bp = pmap.map { it.ref_genome_size_bp ?: "" }
+        mod_genome_size_bp = pmap.map { it.mod_genome_size_bp ?: "" }
 
         ref_plasmid = pmap.map { it.ref_plasmid_fasta ? [file(it.ref_plasmid_fasta)] : [] }
         mod_plasmid = pmap.map { it.mod_plasmid_fasta ? [file(it.mod_plasmid_fasta)] : [] }
@@ -52,8 +57,6 @@ workflow analysis {
             .flatMap { it.pacbio_fastqs }
             .map(toNamedFastq)
 
-        nanoplot_pacbio(pacbio_fastqs, "pacbio")
-
         long_ref_pacbio(pacbio_fastqs, ref_fasta, "map-pb", ref_plasmid, "pacbio/long-ref")
         long_mod_pacbio(pacbio_fastqs, mod_fasta, "map-pb", mod_plasmid, "pacbio/long-mod")
         compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
@@ -67,8 +70,6 @@ workflow analysis {
             .flatMap { it.ont_fastqs }
             .map(toNamedFastq)
 
-        nanoplot_ont(ont_fastqs, "ont")
-
         long_ref_ont(ont_fastqs, ref_fasta, "map-ont", ref_plasmid, "ont/long-ref")
         long_mod_ont(ont_fastqs, mod_fasta, "map-ont", mod_plasmid, "ont/long-mod")
         compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
@@ -76,9 +77,8 @@ workflow analysis {
         // Empty ont table when not active
         create_ont_tbl(pmap.filter { !it.run_nanopore }.map { "ont" })
 
-        // --- Illumina short-read pipeline ---
-        illumina_reads = pmap
-            .filter { it.run_illumina }
+        // --- Illumina short-read pipeline 
+        illumina_reads = pmap.filter { it.run_illumina }
             .flatMap { it.illumina_fastqs }
             .map { f ->
                 def fobj = file(f)
@@ -90,11 +90,8 @@ workflow analysis {
 
         qc(illumina_reads, "illumina/qc_trimming") | set { trimmed }
 
-        // VCF annotation flag (GFF removed)
-        run_vcf_annotation = pmap.map { it.run_vcf_annotation }
-
-        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid, run_vcf_annotation)
-        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid, run_vcf_annotation)
+        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid)
+        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
         compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
 
         // Empty short table when not active
@@ -118,12 +115,20 @@ workflow analysis {
 
         def tbl_channel = sv_tbl.collect().map { list ->
             def tagged = list.collate(2)
-            def asm = tagged.find { it[0] == 'assembly' }[1]
-            def long_pb = tagged.find { it[0] == 'pb' }[1]
-            def long_ont = tagged.find { it[0] == 'ont' }[1]
-            def sht = tagged.find { it[0] == 'short' }[1]
+            def asm = tagged.find { entry -> entry[0] == 'assembly' }[1]
+            def long_pb = tagged.find { entry -> entry[0] == 'pb' }[1]
+            def long_ont = tagged.find { entry -> entry[0] == 'ont' }[1]
+            def sht = tagged.find { entry -> entry[0] == 'short' }[1]
             tuple(asm, long_ont, long_pb, sht)
         }
 
-        restructure_sv_tbl(script, tbl_channel, supp_reads_ch.collect().ifEmpty(file('NO_FILE')))
+        restructure_sv_tbl(
+            script,
+            tbl_channel,
+            supp_reads_ch.collect().ifEmpty(file('NO_FILE')),
+            ref_fasta,
+            mod_fasta,
+            ref_genome_size_bp,
+            mod_genome_size_bp
+        )
 }

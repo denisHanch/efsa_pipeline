@@ -48,13 +48,13 @@ class TestParameterDefaults:
         assert config.threads is None
 
     def test_validation_level_default_is_trust(self, config):
-        assert config.validation_level == 'trust'
+        assert config.validation_level.value == 'trust'
 
     def test_logging_level_default_is_info(self, config):
-        assert config.logging_level == 'INFO'
+        assert config.logging_level.value == 'INFO'
 
     def test_type_default_is_prokaryote(self, config):
-        assert config.type == 'prokaryote'
+        assert config.type.value == 'prokaryote'
 
     def test_force_defragment_ref_default_is_false(self, config):
         assert config.force_defragment_ref is False
@@ -62,25 +62,25 @@ class TestParameterDefaults:
     def test_all_defaults_stored_in_options_dict(self, config):
         """Defaults are in config.options, not only accessible via properties."""
         assert config.options['threads'] is None
-        assert config.options['validation_level'] == 'trust'
-        assert config.options['logging_level'] == 'INFO'
-        assert config.options['type'] == 'prokaryote'
+        assert config.options['validation_level'].value == 'trust'
+        assert config.options['logging_level'].value == 'INFO'
+        assert config.options['type'].value == 'prokaryote'
         assert config.options['force_defragment_ref'] is False
 
     def test_defaults_propagated_to_ref_genome_global_options(self, config):
         gopt = config.ref_genome.global_options
         assert gopt['threads'] is None
-        assert gopt['validation_level'] == 'trust'
-        assert gopt['logging_level'] == 'INFO'
-        assert gopt['type'] == 'prokaryote'
+        assert gopt['validation_level'].value == 'trust'
+        assert gopt['logging_level'].value == 'INFO'
+        assert gopt['type'].value == 'prokaryote'
         assert gopt['force_defragment_ref'] is False
 
     def test_defaults_propagated_to_read_global_options(self, config):
         gopt = config.reads[0].global_options
         assert gopt['threads'] is None
-        assert gopt['validation_level'] == 'trust'
-        assert gopt['logging_level'] == 'INFO'
-        assert gopt['type'] == 'prokaryote'
+        assert gopt['validation_level'].value == 'trust'
+        assert gopt['logging_level'].value == 'INFO'
+        assert gopt['type'].value == 'prokaryote'
         assert gopt['force_defragment_ref'] is False
 
 
@@ -143,15 +143,15 @@ class TestCliOptionsFallback:
 
     def test_cli_validation_level_applied(self, temp_dir):
         config = ConfigManager.load(str(_write_config(temp_dir)), cli_options={'validation_level': 'strict'})
-        assert config.validation_level == 'strict'
+        assert config.validation_level.value == 'strict'
 
     def test_cli_logging_level_applied(self, temp_dir):
         config = ConfigManager.load(str(_write_config(temp_dir)), cli_options={'logging_level': 'DEBUG'})
-        assert config.logging_level == 'DEBUG'
+        assert config.logging_level.value == 'DEBUG'
 
     def test_cli_type_applied(self, temp_dir):
         config = ConfigManager.load(str(_write_config(temp_dir)), cli_options={'type': 'eukaryote'})
-        assert config.type == 'eukaryote'
+        assert config.type.value == 'eukaryote'
 
     def test_cli_force_defragment_ref_applied(self, temp_dir):
         config = ConfigManager.load(str(_write_config(temp_dir)), cli_options={'force_defragment_ref': True})
@@ -162,18 +162,18 @@ class TestCliOptionsFallback:
             str(_write_config(temp_dir)),
             cli_options={'validation_level': 'minimal', 'threads': 2}
         )
-        assert config.ref_genome.global_options['validation_level'] == 'minimal'
+        assert config.ref_genome.global_options['validation_level'].value == 'minimal'
         assert config.ref_genome.global_options['threads'] == 2
-        assert config.reads[0].global_options['validation_level'] == 'minimal'
+        assert config.reads[0].global_options['validation_level'].value == 'minimal'
 
     def test_none_cli_options_uses_defaults(self, temp_dir):
         config = ConfigManager.load(str(_write_config(temp_dir)), cli_options=None)
-        assert config.validation_level == 'trust'
+        assert config.validation_level.value == 'trust'
         assert config.threads is None
 
     def test_empty_cli_options_uses_defaults(self, temp_dir):
         config = ConfigManager.load(str(_write_config(temp_dir)), cli_options={})
-        assert config.validation_level == 'trust'
+        assert config.validation_level.value == 'trust'
         assert config.threads is None
 
 
@@ -203,21 +203,21 @@ class TestOptionsPriority:
             str(_write_config(temp_dir, {"validation_level": "strict"})),
             cli_options={'validation_level': 'minimal'}
         )
-        assert config.validation_level == 'strict'
+        assert config.validation_level.value == 'strict'
 
     def test_config_beats_cli_logging_level(self, temp_dir):
         config = ConfigManager.load(
             str(_write_config(temp_dir, {"logging_level": "WARNING"})),
             cli_options={'logging_level': 'DEBUG'}
         )
-        assert config.logging_level == 'WARNING'
+        assert config.logging_level.value == 'WARNING'
 
     def test_config_beats_cli_type(self, temp_dir):
         config = ConfigManager.load(
             str(_write_config(temp_dir, {"type": "eukaryote"})),
             cli_options={'type': 'prokaryote'}
         )
-        assert config.type == 'eukaryote'
+        assert config.type.value == 'eukaryote'
 
     def test_config_beats_cli_force_defragment_ref(self, temp_dir):
         config = ConfigManager.load(
@@ -234,11 +234,11 @@ class TestOptionsPriority:
 
     def test_cli_beats_default_validation_level(self, temp_dir):
         config = ConfigManager.load(str(_write_config(temp_dir)), cli_options={'validation_level': 'minimal'})
-        assert config.validation_level == 'minimal'
+        assert config.validation_level.value == 'minimal'
 
     def test_cli_beats_default_type(self, temp_dir):
         config = ConfigManager.load(str(_write_config(temp_dir)), cli_options={'type': 'eukaryote'})
-        assert config.type == 'eukaryote'
+        assert config.type.value == 'eukaryote'
 
     def test_cli_beats_default_force_defragment_ref(self, temp_dir):
         config = ConfigManager.load(str(_write_config(temp_dir)), cli_options={'force_defragment_ref': True})
@@ -256,9 +256,9 @@ class TestOptionsPriority:
             }
         )
         assert config.threads == 8              # from config.json
-        assert config.type == 'eukaryote'       # from config.json
-        assert config.validation_level == 'minimal'   # from CLI
-        assert config.logging_level == 'INFO'   # from default
+        assert config.type.value == 'eukaryote'       # from config.json
+        assert config.validation_level.value == 'minimal'   # from CLI
+        assert config.logging_level.value == 'INFO'   # from default
         assert config.force_defragment_ref is False   # from default
 
     def test_mixed_sources_reflected_in_file_global_options(self, temp_dir):
@@ -269,9 +269,9 @@ class TestOptionsPriority:
         )
         gopt = config.ref_genome.global_options
         assert gopt['threads'] == 8
-        assert gopt['type'] == 'eukaryote'
-        assert gopt['validation_level'] == 'minimal'
-        assert gopt['logging_level'] == 'INFO'
+        assert gopt['type'].value == 'eukaryote'
+        assert gopt['validation_level'].value == 'minimal'
+        assert gopt['logging_level'].value == 'INFO'
         assert gopt['force_defragment_ref'] is False
 
 

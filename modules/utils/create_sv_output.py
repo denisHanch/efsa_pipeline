@@ -35,6 +35,12 @@ integer to also link near-identical final coordinates.
 Usage:
     python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10 --cross_type_tol 0
 
+Genome-percentage columns:
+    pct_of_ref_genome and pct_of_mod_genome are calculated when the pipeline sets
+    SV_REF_GENOME_SIZE_BP and SV_MOD_GENOME_SIZE_BP from validated genome-size
+    context. These are internal Nextflow-provided values, not manual script arguments.
+    The columns are NaN when the genome size or event length is unavailable.
+
 Any of the inputs may be omitted; the script will process whichever of the assembly, long_ont,
 long_pacbio or short tables are provided. Long-read inputs (ONT and PacBio) are treated
 the same for clustering, but preserved as separate `long_ont_*` and `long_pacbio_*` columns in the final output tables.
@@ -118,7 +124,16 @@ ROW_LOG_FIELDS = (
     "start_mod",
     "end_mod",
     "coverage_before_100bp",
+    "coverage_sv_span",
     "coverage_after_100bp",
+    # Delly raw fields (short-read)
+    "PE",   # paired-end support (reference pairs)
+    "DV",   # high-quality variant pairs
+    "SR",   # split-read support (reference junction reads)
+    "RV",   # high-quality variant junction reads
+    # Long-read caller raw fields (sniffles / cuteSV use DR+DV; debreak uses RE)
+    "DR",   # reference-supporting reads (sniffles / cuteSV)
+    "RE",   # supporting reads (debreak)
 )
 
 
@@ -241,6 +256,68 @@ def _is_missing(value: Any) -> bool:
     except Exception:
         return False
 
+def _parse_genome_size(value: Optional[str]) -> Optional[int]:
+    """Parse a genome size string into an integer number of base pairs.
+
+    The value is normally read from an internal pipeline environment variable
+    populated by Nextflow from validated parameters or validated FASTA files.
+    Plain integers are treated as bp;
+    suffixes k/kb/kbp, m/mb/mbp, and g/gb/gbp are accepted for compatibility.
+    """
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s or s.lower() in {"none", "null", "nan"}:
+        return None
+    multipliers = [
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Gg][Bb][Pp]?$", 1_000_000_000),
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Gg][Bb]?$",      1_000_000_000),
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Mm][Bb][Pp]?$",  1_000_000),
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Mm][Bb]?$",       1_000_000),
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Kk][Bb][Pp]?$",  1_000),
+        (r"(?i)^([0-9]*\.?[0-9]+)\s*[Kk][Bb]?$",       1_000),
+    ]
+    for pat, mult in multipliers:
+        m = re.fullmatch(pat, s)
+        if m:
+            parsed = int(float(m.group(1)) * mult)
+            return parsed if parsed > 0 else None
+    try:
+        parsed = int(float(s))
+        return parsed if parsed > 0 else None
+    except ValueError as exc:
+        raise ValueError(
+            f"Cannot parse genome size {s!r}. "
+            "Use a positive integer number of bp or a value with suffix "
+            "k/kb/kbp, m/mb/mbp, g/gb/gbp."
+        ) from exc
+
+
+def _read_genome_size_from_env(env_var: str, logger: Any = None) -> Optional[int]:
+    """Read a genome size from an internal Nextflow-populated environment variable."""
+    raw_value = os.environ.get(env_var)
+    try:
+        parsed = _parse_genome_size(raw_value)
+    except ValueError as exc:
+        if logger is not None:
+            logger.warning(
+                "genome_size_env_invalid",
+                env_var=env_var,
+                value=raw_value,
+                error=str(exc),
+            )
+        return None
+
+    if logger is not None:
+        logger.info(
+            "genome_size_env_resolved",
+            env_var=env_var,
+            value=raw_value,
+            genome_size_bp=parsed,
+        )
+    return parsed
+
+
 def _to_int(x: Any) -> Optional[int]:
     try:
         if pd.isna(x):
@@ -257,26 +334,87 @@ def _to_float(x: Any) -> Optional[float]:
     except Exception:
         return None
 
+
+def _resolve_delly_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
+    """Compute supporting reads for a Delly short-read VCF row.
+
+    Delly reports four FORMAT fields relevant to read support:
+      PE - paired-end reads supporting the *reference* allele
+      DV - high-quality paired-end reads supporting the *variant* allele
+      SR - split-reads supporting the reference allele
+      RV - high-quality split-reads supporting the variant allele
+
+    We sum the variant-supporting counts (DV + RV) because those directly
+    measure evidence for the called SV.  If neither DV nor RV is present in
+    the row we fall back to the pre-computed ``supporting_reads`` column; if
+    that is also absent the result is ``None`` (serialised as NaN in the CSV).
+
+    Note: PE and SR (reference-supporting reads) are intentionally excluded
+    from the sum - they represent reads that do NOT support the variant.
+    """
+    dv = _to_int(row.get("DV"))
+    rv = _to_int(row.get("RV"))
+
+    if dv is not None or rv is not None:
+        return (dv or 0) + (rv or 0)
+
+    # Fall back to whatever was already computed upstream (e.g. from a
+    # pre-processed TSV that already merged these fields).
+    return _to_int(row.get("supporting_reads"))
+
+
+def _resolve_long_read_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
+    """Compute supporting reads for a long-read SV caller row.
+
+    Sniffles and cuteSV both emit FORMAT fields:
+      DR - reference-supporting reads
+      DV - variant-supporting reads
+
+    DeBreak emits:
+      RE - supporting reads for the variant
+
+    We use the variant-supporting count (DV for sniffles/cuteSV, RE for
+    debreak).  If none of these caller-specific fields are present we fall
+    back to the ``supporting_reads`` column that may have been set by an
+    upstream VCF parser.  Returns ``None`` (NaN) only when no read-count
+    information can be found at all.
+    """
+    # sniffles / cuteSV: DV = variant-supporting reads
+    dv = _to_int(row.get("DV"))
+    if dv is not None:
+        return dv
+
+    # debreak: RE = supporting reads
+    re_val = _to_int(row.get("RE"))
+    if re_val is not None:
+        return re_val
+
+    # Generic fallback
+    return _to_int(row.get("supporting_reads"))
+
 def standardize_type_details(
     raw_svtype: str,
     info_svtype: Optional[str],
     source: str,
 ) -> Tuple[str, str, Optional[str]]:
-    if info_svtype is not None:
+
+    if info_svtype is not None and not _is_missing(info_svtype):
         key = str(info_svtype).strip().upper()
         if key in INFO_MAP:
             return INFO_MAP[key], "info_svtype", key
 
-    raw_u = str(raw_svtype).upper()
-
-    for token, mapped in INFO_MAP.items():
-        if token in raw_u:
-            return mapped, "raw_svtype", token
-
-    if source == "asm":
         for pat, mapped in ASM_PREFIX_MAP:
-            if re.search(pat, raw_u):
-                return mapped, "asm_prefix", pat
+            if re.search(pat, key):
+                return mapped, "info_svtype_prefix", pat
+
+    raw_u = str(raw_svtype).strip().upper()
+
+    if raw_u in INFO_MAP:
+        return INFO_MAP[raw_u], "raw_svtype", raw_u
+
+    for pat, mapped in ASM_PREFIX_MAP:
+        if re.search(pat, raw_u):
+            return mapped, "raw_svtype_prefix", pat
 
     return "RPL", "fallback_default", None
 
@@ -305,6 +443,7 @@ class Record:
     start_mod: Optional[int] = None
     end_mod: Optional[int] = None
     coverage_before_100bp: Optional[float] = None
+    coverage_sv_span: Optional[float] = None
     coverage_after_100bp: Optional[float] = None
 
 @dataclass
@@ -423,7 +562,7 @@ def _load_supp_reads_files(paths: List[str]) -> pd.DataFrame:
             continue
         df = df.rename(columns={"supporting_reads": "reads"})
         df["start"] = pd.to_numeric(df["start"], errors="coerce")
-        df["reads"] = pd.to_numeric(df["reads"], errors="coerce").fillna(0).astype(int)
+        df["reads"] = pd.to_numeric(df["reads"], errors="coerce")
         df = df.dropna(subset=["chrom", "start"])
         df["start"] = df["start"].astype(int)
         # Standardise caller svtype so it matches the record's std_type
@@ -487,7 +626,7 @@ def resolve_supporting_reads(records: List[Record], supp_files: List[str], tol: 
     # Write resolved values back into the Record objects
     for _, row in merged.iterrows():
         reads = row.get("reads")
-        if pd.notna(reads) and int(reads) > 0:
+        if pd.notna(reads):
             records[int(row["_idx"])].supporting_reads = int(reads)
 
     return records
@@ -614,6 +753,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
         start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
         end_mod = _to_int(row.get("end_mod")) if source == "asm" else None
         coverage_before_100bp = _to_float(row.get("coverage_before_100bp"))
+        coverage_sv_span = _to_float(row.get("coverage_sv_span"))
         coverage_after_100bp = _to_float(row.get("coverage_after_100bp"))
         svlen_input = _to_int(row.get("svlen"))
         svlen = abs(svlen_input) if svlen_input is not None else None
@@ -703,6 +843,17 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                     std_type_match=std_match,
                 )
 
+        # Resolve supporting reads using caller-specific FORMAT fields where
+        # available, falling back to the generic `supporting_reads` column.
+        # This prevents false zeros when a caller (e.g. Delly) only populates
+        # split-read fields (RV) but not paired-end fields (DV), or vice-versa.
+        if source == "short":
+            resolved_supporting_reads = _resolve_delly_supporting_reads(row)
+        elif str(source).startswith("long"):
+            resolved_supporting_reads = _resolve_long_read_supporting_reads(row)
+        else:
+            resolved_supporting_reads = _to_int(row.get("supporting_reads"))
+
         out.append(
             Record(
                 source,
@@ -712,7 +863,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 std,
                 raw_svtype,
                 row.get("info_svtype"),
-                _to_int(row.get("supporting_reads")),
+                resolved_supporting_reads,
                 _to_float(row.get("score")),
                 copy_number,
                 chr2,
@@ -722,6 +873,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 start_mod,
                 end_mod,
                 coverage_before_100bp,
+                coverage_sv_span,
                 coverage_after_100bp,
             )
         )
@@ -739,7 +891,11 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
 
     return out
 
-def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
+def build_output_table(
+    clusters: List[EventCluster],
+    ref_genome_size_bp: Optional[int] = None,
+    mod_genome_size_bp: Optional[int] = None,
+) -> pd.DataFrame:
     rows = []
     counters = {k: 0 for k in TAB_BY_TYPE}
 
@@ -840,6 +996,17 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
                 overlap_end = min(member_ends) if member_ends else c.end
 
             event_length_bp = np.nan
+        # Percentage of genome columns (NaN when genome size or event length is unknown)
+        if ref_genome_size_bp and pd.notna(event_length_bp) and ref_genome_size_bp > 0:
+            pct_of_ref = (event_length_bp / ref_genome_size_bp) * 100
+        else:
+            pct_of_ref = np.nan
+
+        if mod_genome_size_bp and pd.notna(event_length_bp) and mod_genome_size_bp > 0:
+            pct_of_mod = (event_length_bp / mod_genome_size_bp) * 100
+        else:
+            pct_of_mod = np.nan
+
         row = {
             "event_id": eid,
             "chrom": c.chrom,
@@ -847,6 +1014,8 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "event_start": overlap_start,
             "event_end": overlap_end,
             "event_length_bp": event_length_bp,
+            "pct_of_ref_genome": pct_of_ref,
+            "pct_of_mod_genome": pct_of_mod,
 
             "asm_start": asm.start if asm else np.nan,
             "asm_end": asm.end if asm else np.nan,
@@ -864,6 +1033,7 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "long_ont_supporting_reads": long_ont.supporting_reads if long_ont else np.nan,
             "long_ont_supporting_methods": long_ont.supporting_methods if long_ont else np.nan,
             "long_ont_coverage_before_100bp": long_ont.coverage_before_100bp if long_ont else np.nan,
+            "long_ont_coverage_sv_span": long_ont.coverage_sv_span if long_ont else np.nan,
             "long_ont_coverage_after_100bp": long_ont.coverage_after_100bp if long_ont else np.nan,
 
             "long_pacbio_start": long_pacbio.start if long_pacbio else np.nan,
@@ -874,6 +1044,7 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "long_pacbio_supporting_reads": long_pacbio.supporting_reads if long_pacbio else np.nan,
             "long_pacbio_supporting_methods": long_pacbio.supporting_methods if long_pacbio else np.nan,
             "long_pacbio_coverage_before_100bp": long_pacbio.coverage_before_100bp if long_pacbio else np.nan,
+            "long_pacbio_coverage_sv_span": long_pacbio.coverage_sv_span if long_pacbio else np.nan,
             "long_pacbio_coverage_after_100bp": long_pacbio.coverage_after_100bp if long_pacbio else np.nan,
 
             "short_start": sht.start if sht else np.nan,
@@ -887,6 +1058,7 @@ def build_output_table(clusters: List[EventCluster]) -> pd.DataFrame:
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
             "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
             "short_coverage_before_100bp": sht.coverage_before_100bp if sht else np.nan,
+            "short_coverage_sv_span": sht.coverage_sv_span if sht else np.nan,
             "short_coverage_after_100bp": sht.coverage_after_100bp if sht else np.nan,
 
             "percentage_overlap": pct_str,
@@ -1024,23 +1196,68 @@ def annotate_linked_events(df: pd.DataFrame, coord_tol: int = 0) -> pd.DataFrame
     ]
     return df
 
-def write_csv_tables(df: pd.DataFrame, outdir: Union[str, Path]) -> None:
+def write_csv_tables(df: pd.DataFrame, outdir: str | os.PathLike[str]) -> None:
     os.makedirs(outdir, exist_ok=True)
 
-    for std_type, name in TAB_BY_TYPE.items():
-        sub = df[df["std_svtype"] == std_type].copy()
-        if not sub.empty:
-            # Drop type-specific columns
+    # When all inputs are empty, build_output_table returns a DataFrame with no
+    # columns. Subsetting on "std_svtype" would raise a KeyError, so write
+    # header-only CSVs for every SV type and return early.
+    if df.empty or "std_svtype" not in df.columns:
+        for std_type, name in TAB_BY_TYPE.items():
+            skeleton = build_output_table(
+                [
+                    EventCluster(
+                        chrom="placeholder",
+                        std_type=std_type,
+                        start=0,
+                        end=0,
+                        members=[
+                            Record(
+                                source="asm",
+                                chrom="placeholder",
+                                start=0,
+                                end=0,
+                                std_type=std_type,
+                                raw_svtype=std_type,
+                            )
+                        ],
+                    )
+                ]
+            )
+
             cols_to_drop = ["std_svtype"]
             if std_type != "TRA":
                 cols_to_drop.extend(["asm_start_mod", "asm_end_mod"])
-            sub = sub.drop(columns=cols_to_drop, errors="ignore")
-            path = os.path.join(outdir, f"{name}.csv")
-            sub.sort_values(["chrom", "event_start", "event_end"]).to_csv(path, index=False)
+
+            header_df = skeleton.drop(
+                columns=cols_to_drop,
+                errors="ignore",
+            ).iloc[0:0]
+
+            header_df.to_csv(os.path.join(outdir, f"{name}.csv"), index=False)
+
+        return
+
+    for std_type, name in TAB_BY_TYPE.items():
+        sub = df[df["std_svtype"] == std_type].copy()
+
+        cols_to_drop = ["std_svtype"]
+        if std_type != "TRA":
+            cols_to_drop.extend(["asm_start_mod", "asm_end_mod"])
+
+        sub = sub.drop(columns=cols_to_drop, errors="ignore")
+
+        if not sub.empty:
+            sub = sub.sort_values(["chrom", "event_start", "event_end"])
+
+        sub.to_csv(os.path.join(outdir, f"{name}.csv"), index=False)
 
     other = df[~df["std_svtype"].isin(TAB_BY_TYPE)].copy()
     if not other.empty:
-        other = other.drop(columns=["std_svtype", "asm_start_mod", "asm_end_mod"], errors="ignore")
+        other = other.drop(
+            columns=["std_svtype", "asm_start_mod", "asm_end_mod"],
+            errors="ignore",
+        )
         other.to_csv(os.path.join(outdir, "Other.csv"), index=False)
 
 # Main
@@ -1059,14 +1276,19 @@ def main() -> None:
         default=0,
         help="Tolerance in bp for linking near-identical final event coordinates in linked_event. Default 0 keeps overlap-only linking.",
     )
+
     args = p.parse_args()
 
     logger, log_path = setup_logging()
+    ref_genome_size_bp = _read_genome_size_from_env("SV_REF_GENOME_SIZE_BP", logger=logger)
+    mod_genome_size_bp = _read_genome_size_from_env("SV_MOD_GENOME_SIZE_BP", logger=logger)
     logger.info(
         "create_sv_output_started",
         output_dir=str(args.out),
         tol=args.tol,
         cross_type_tol=args.cross_type_tol,
+        ref_genome_size_bp=ref_genome_size_bp,
+        mod_genome_size_bp=mod_genome_size_bp,
         inputs=_clean_dict(
             {
                 "asm": args.asm,
@@ -1105,7 +1327,8 @@ def main() -> None:
             "create_sv_output_no_valid_records",
             output_dir=str(args.out),
         )
-        print("No valid input records found; created output directory and exiting.")
+        write_csv_tables(pd.DataFrame(), args.out)
+        print("No valid input records found; wrote empty header-only CSV tables.")
         print(f"Load-record audit log: {log_path}")
         return
 
@@ -1119,7 +1342,7 @@ def main() -> None:
     if not clusters:
         df = pd.DataFrame()
     else:
-        df = build_output_table(clusters)
+        df = build_output_table(clusters, ref_genome_size_bp=ref_genome_size_bp, mod_genome_size_bp=mod_genome_size_bp)
 
     if "long_ont_info_svtype" in df.columns:
         mask = df["long_ont_info_svtype"].notna() & (df["long_ont_info_svtype"] != "")

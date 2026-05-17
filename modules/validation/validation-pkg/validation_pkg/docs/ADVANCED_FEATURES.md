@@ -177,7 +177,7 @@ result = validator.run()
 ```
 
 **Requirements:**
-- `pysam` installed or `samtools` in PATH
+- `samtools` in PATH
 - BAM must contain sequence and quality scores
 
 **Limitations:**

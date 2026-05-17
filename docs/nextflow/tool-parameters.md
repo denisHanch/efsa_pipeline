@@ -84,6 +84,7 @@ All other parameters use DeBreak defaults.
 ### NUCmer (whole-genome alignment)
 
 **Module:** `modules/assembly.nf`
+**Package note:** `nucmer` is a command from the **MUMmer** package. Versioning should be documented as the MUMmer package version (for this pipeline: MUMmer `4.0.1`), not as a separate `nucmer` version.
 
 ```bash
 nucmer --maxmatch -c 100 -b 500 -l 50 <ref> <mod> -p <prefix>
@@ -106,6 +107,7 @@ nucmer --maxmatch -c 100 -b 500 -l 50 <ref> <mod> -p <prefix>
 ### Delta-filter
 
 **Module:** `modules/assembly.nf`
+**Package note:** `delta-filter` is also a command from the **MUMmer** package and follows the same package version (MUMmer `4.0.1`).
 
 ```bash
 delta-filter -m -i 90 -l 100 <delta>

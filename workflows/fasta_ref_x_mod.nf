@@ -18,15 +18,14 @@
 
 include { nucmer; delta_filter; show_coords; syri; bcftools_concat; bgzip_tabix } from "../modules/assembly.nf"
 include { vcf_to_table_asm } from "../modules/sv_calling.nf"
-
-def executed = false
+include { logToNextflowFile } from "../modules/logs.nf"
 
 workflow ref_mod {
     take:
         ref_fasta
         contigs
     main:
-        log.info "▶ Running pipeline comparing reference and modified fasta or reference and contigs."
+        logToNextflowFile("▶ Running pipeline comparing reference and modified fasta or reference and contigs.")
 
         ref_mod_fasta = contigs
             .combine(ref_fasta)
@@ -47,24 +46,13 @@ workflow ref_mod {
         
         bgzip_tabix(sv_vcf) | set { sv_vcf_bgz }
 
-        vcfs = sv_vcf_bgz.map { prefix, vcf, tbi -> vcf }.collect()
+        vcfs = sv_vcf_bgz.map { _pair_id, vcf, _tbi -> vcf }.collect()
 
-        tbis = sv_vcf_bgz.map { prefix, vcf, tbi -> tbi }.collect()
+        tbis = sv_vcf_bgz.map { _pair_id, _vcf, tbi -> tbi }.collect()
 
         bcftools_concat(vcfs, tbis) | vcf_to_table_asm | set { sv_tbl }
 
     emit: 
         sv_vcf
         sv_tbl
-}
-
-
-workflow.onComplete {
-    if (executed) {
-        if (workflow.success) {
-            log.info "✅ The ref_mod processing pipeline completed successfully.\n"
-        } else {
-            log.error "❌ The ref_mod processing pipeline failed: ${workflow.errorReport}"
-        }
-    }
 }

@@ -1,51 +1,13 @@
 # Directory Structures
 
-## `data/valid` Directory Structure
+## Validation Outputs
 
-Each validation run creates a timestamped subdirectory. Previous runs are preserved.
+Validation outputs are published to `data/outputs/valid/` and consumed by downstream workflows:
 
-```
-data/valid/
-├── validated_params.json          # Fixed path — consumed by pipeline at runtime
-│
-└── run_YYYYMMDD_HHMMSS/           # Per-run output directory
-    ├── SampleName_ref.fasta       # Validated reference genome FASTA
-    ├── SampleName_mod.fasta       # Validated modified genome FASTA (if provided)
-    ├── SampleName_ref_plasmid.fasta  # Reference plasmid (if identified)
-    ├── SampleName_mod_plasmid.fasta  # Modified plasmid (if identified)
-    ├── SampleName_contig_0.fasta  # Contig files from fragmented assembly (if applicable)
-    ├── validation.log             # Structured JSON log for this run
-    ├── report.txt                 # Human-readable validation statistics
-    │
-    ├── illumina/
-    │   ├── SampleName_R1.fastq.gz
-    │   └── SampleName_R2.fastq.gz
-    │
-    ├── ont/
-    │   ├── SampleName.fastq.gz    # FASTQ input (converted/copied)
-    │   └── SampleName.bam         # BAM input (copied as-is, if provided)
-    │
-    └── pacbio/
-        ├── SampleName.fastq.gz    # FASTQ input (converted/copied)
-        └── SampleName.bam         # BAM input (copied as-is, if provided)
-```
+- `validated_params.json` (runtime pipeline switches and file-path metadata) — **published to persistent directory**
+- validated FASTA/FASTQ/BAM/GFF/TSV files — consumed directly via Nextflow channels during processing
 
-### File Descriptions
-
-| File / Folder              | Description                                                                   |
-| -------------------------- | ----------------------------------------------------------------------------- |
-| `validated_params.json`    | Produced by the validation step; consumed by the pipeline workflow at runtime via channels. Contains all validated file paths and pipeline flags. Always written at `data/valid/` (top level) so the path is consistent between runs. |
-| `run_YYYYMMDD_HHMMSS/`     | Timestamped directory for one validation run. All validated files, the log, and the report go here. Previous runs are never overwritten. |
-| `*_ref.fasta`              | Validated reference genome FASTA.                                             |
-| `*_mod.fasta`              | Validated modified genome FASTA.                                              |
-| `*_ref_plasmid.fasta`      | Reference plasmid sequences (if identified).                                  |
-| `*_mod_plasmid.fasta`      | Modified plasmid sequences (if identified).                                   |
-| `*_contig_N.fasta`         | Individual contig files from a fragmented modified assembly.                  |
-| `validation.log`           | Structured JSON log for the run (auto-incremented if re-run in same second).  |
-| `report.txt`               | Human-readable statistics for all validated files.                            |
-| `illumina/`                | Paired-end Illumina FASTQ reads.                                              |
-| `ont/`                     | Nanopore reads — FASTQ and/or BAM depending on input.                         |
-| `pacbio/`                  | PacBio reads — FASTQ and/or BAM depending on input.                           |
+The validation stage runs automatically as the first step of the pipeline inside the `ecomolegmo/validation` container and produces validated files for all downstream analysis workflows.
 
 ## `data/outputs` Directory Structure
 
