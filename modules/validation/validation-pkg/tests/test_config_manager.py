@@ -691,12 +691,12 @@ class TestConfigManagerOutputDirectory:
         assert loaded_config.output_dir.exists()
         assert loaded_config.output_dir.is_dir()
 
-        # Check it's at the expected location (config_dir.parent / "valid")
-        expected_output_dir = config_file.parent.parent / "valid"
+        # Check it's at the expected location (config_dir.parent / "outputs" / "valid")
+        expected_output_dir = config_file.parent.parent / "outputs" / "valid"
         assert loaded_config.output_dir == expected_output_dir
 
     def test_output_directory_path_structure(self, temp_dir):
-        """Test output directory is at config_dir.parent / 'valid'."""
+        """Test output directory is at config_dir.parent / 'outputs' / 'valid'."""
         # Create config in a subdirectory
         config_subdir = temp_dir / "config"
         config_subdir.mkdir()
@@ -716,8 +716,8 @@ class TestConfigManagerOutputDirectory:
 
         loaded_config = ConfigManager.load(str(config_file))
 
-        # Output dir should be at temp_dir / "valid" (parent of config_subdir)
-        expected_output_dir = temp_dir / "valid"
+        # Output dir should be at temp_dir / "outputs" / "valid" (parent of config_subdir)
+        expected_output_dir = temp_dir / "outputs" / "valid"
         assert loaded_config.output_dir == expected_output_dir
         assert expected_output_dir.exists()
 
@@ -739,7 +739,7 @@ class TestConfigManagerOutputDirectory:
         loaded_config = ConfigManager.load(str(config_file))
 
         # Check genome configs have output_dir
-        expected_output_dir = temp_dir.parent / "valid"
+        expected_output_dir = temp_dir.parent / "outputs" / "valid"
         assert loaded_config.ref_genome.output_dir == expected_output_dir
         assert loaded_config.mod_genome.output_dir == expected_output_dir
 
@@ -761,7 +761,7 @@ class TestConfigManagerOutputDirectory:
         loaded_config = ConfigManager.load(str(config_file))
 
         # Check read configs have output_dir
-        expected_output_dir = temp_dir.parent / "valid"
+        expected_output_dir = temp_dir.parent / "outputs" / "valid"
         assert all(read.output_dir == expected_output_dir for read in loaded_config.reads)
 
 

@@ -58,7 +58,8 @@ modules/validation/
         ├── test_file_handler.py
         ├── test_path_utils.py
         ├── test_path_sanitization.py
-        └── test_settings.py
+        ├── test_settings.py
+        └── test_scenarios_integration.py   # end-to-end scenario tests (all 5 OVERVIEW.md scenarios)
 ```
 
 ---
@@ -116,7 +117,7 @@ pytest tests/
 6.  validate_genome(ref_genome_config, ref_settings)              # required
       → register_missing_output on success, register_required_failure on ValidationError
 7.  validate_genome(mod_genome_config, mod_settings)              # optional
-8.  genomexgenome_validation(ref_res, mod_res, gxg_settings)      # only if both present
+8.  genomexgenome_validation(ref_res, mod_res, gxg_settings)      # only if both present AND neither fragmented
 9.  validate_genome(ref_plasmid_config, plasmid_settings)         # optional
 10. validate_genome(mod_plasmid_config, plasmid_settings)         # optional
 11. validate_reads(reads_configs, reads_settings)                  # required
@@ -251,7 +252,7 @@ for keys not set in `config.json`. Full validation pipeline:
 2. `_parse_options(data, config, cli_options=cli_options)` — validates and
    normalises global options; config.json values override CLI values
 3. `_validate_required_fields()` — requires `ref_genome_filename` and non-empty `reads`
-4. `_setup_output_directory()` — creates `config_dir.parent / "valid"`
+4. `_setup_output_directory()` — creates `config_dir.parent / "outputs" / "valid"`
 5. `_parse_genome_configs()` — ref (required), mod/plasmids (optional)
 6. `_parse_reads_configs()` — supports both `filename` and `directory` keys;
    each file in the directory becomes a separate `ReadConfig` entry (all ngs types
@@ -478,7 +479,7 @@ sequence_lengths           : List[int]
 num_sequences_filtered     : int          # count removed by min_sequence_length
 plasmid_count              : int
 plasmid_filenames          : List[str]
-fragmented                 : bool         # True when sequence count > n_sequence_limit
+fragmented                 : bool         # True when sequence count >= n_sequence_limit
 
 # Strict mode only
 total_genome_size  : int
@@ -490,12 +491,20 @@ n50                : int
 
 ### Internal processing order
 ```
-_parse_file()        # BioPython parse → self.sequences
-_validate_sequences() # duplicates, empty IDs, min_length filter
-_apply_edits()       # plasmid split/merge, reorder, replace IDs
-_write_output()      # FASTA + compression
+_parse_file()           # BioPython parse → self.sequences
+_validate_sequences()   # duplicates, empty IDs, min_length filter;
+                        # if len(seqs) >= n_sequence_limit: copy file as-is,
+                        #   call _deduplicate_copied_ids(), set fragmented=True, return early
+_apply_edits()          # plasmid split/merge, reorder, replace IDs
+_write_output()         # FASTA + compression
 _fill_output_metadata()
 ```
+
+### `_deduplicate_copied_ids()`
+Called immediately after `copy_file()` in the fragmented early-exit path.
+Renames duplicate sequence IDs in-place in the output file: second occurrence of
+`id` becomes `id_1`, third becomes `id_2`, etc. Logs a WARNING for each renamed
+pair. Updates `self.sequences` to the deduplicated list.
 
 ---
 
@@ -648,7 +657,7 @@ genomexgenome_validation(
 
 **Called by `main.py` only when:**
 - Both `ref_genome_res` and `mod_genome_res` are not None
-- `mod_genome_res.fragmented` is False
+- `ref_genome_res.fragmented` is False **and** `mod_genome_res.fragmented` is False
 
 ### `readxread_validation` (`validators/interfile_read.py`)
 
@@ -988,6 +997,46 @@ validate_features(feature_configs, settings=None) → List[FeatureOutputMetadata
 7. Export from `validation_pkg/__init__.py`
 8. Add `write(result, file_type="new_type")` handling in `report.py`
 9. Write tests in `validation-pkg/tests/test_new_validator.py`
+
+---
+
+## Bug fixes (changelog)
+
+### `n_sequence_limit` off-by-one (`genome_validator.py`)
+**Symptom:** ref.fa or mod.fa with exactly `n_sequence_limit` sequences (e.g. 5 with
+default limit=5) was treated as NOT fragmented. `main_longest` ran on a multi-sequence
+reference, splitting it into a chromosome + plasmid file instead of copying as-is
+(scenario 4 per OVERVIEW.md).
+
+**Fix:** changed `len(self.sequences) > n_sequence_limit` → `>= n_sequence_limit`.
+
+**Semantics after fix:** sequences `< limit` → normal processing; sequences `>= limit`
+→ `fragmented=True`, file copied as-is, `_deduplicate_copied_ids()` called.
+Default `n_sequence_limit=5` means 1–4 sequences → normal, 5+ → fragmented.
+
+---
+
+### GXG called when ref was fragmented (`main.py`)
+**Symptom:** `genomexgenome_validation` (minimap2 alignment) was called even when
+`ref_genome_res.fragmented=True` — only `mod.fragmented` was checked.
+
+**Fix:** condition now requires BOTH to be not fragmented:
+```python
+if (mod_genome_res is not None and ref_genome_res is not None
+        and not getattr(mod_genome_res, 'fragmented', False)
+        and not getattr(ref_genome_res, 'fragmented', False)):
+```
+
+---
+
+### Duplicate sequence IDs in fragmented output (`genome_validator.py`)
+**Symptom:** when a genome was copied as-is (fragmented path), duplicate IDs were
+preserved in the output file, causing `samtools sort` to fail with "duplicate entry
+in sam header".
+
+**Fix:** `_deduplicate_copied_ids()` is called immediately after `copy_file()` in
+both fragmented early-exit paths. Also applied in `interfile_genome.py`
+(`_deduplicate_plasmid_ids()`) for plasmid output files.
 
 ---
 
