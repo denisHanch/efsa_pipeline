@@ -10,7 +10,7 @@ In summary, the process:
 
 1. Reads the input configuration (`config.json`)
 2. Validates and cross-validates all input files
-3. Copies validated files into `data/valid/run_YYYYMMDD_HHMMSS/`
+3. Emits validated files for downstream workflow channels
 4. Produces `validated_params.json` for the downstream analysis workflow
 
 ## Process Definition
@@ -18,14 +18,13 @@ In summary, the process:
 ```groovy
 process validate {
     tag "validate"
-    publishDir "${projectDir}/data/valid/", mode: 'copy', overwrite: true
 
     input:
     path config_json
 
     output:
     path 'validated_params.json', emit: params_json
-    path 'run_*/**',              emit: run_dir
+    path '{*.fasta,*.fasta.gz,*.gff,*.gff3,*.tsv,*/*.fastq.gz,*/*.bam}', optional: true, emit: validated_files
 
     script:
     """
@@ -40,7 +39,7 @@ process validate {
 |-----------|------|-------------|
 | Input | `config_json` | Path to the JSON configuration file (default: `data/inputs/config.json`) |
 | Output | `params_json` | `validated_params.json` — runtime parameters for the analysis workflow |
-| Output | `run_dir` | Timestamped directory with validated/copied input files |
+| Output | `validated_files` | Validated/copied genome, reads, and annotation files emitted to channels |
 
 ## Container
 
@@ -52,7 +51,7 @@ The validation process runs inside the `ecomolegmo/validation` Docker image, whi
 main.nf
   └─ validate(config_json)
        ├─ params_json ──► analysis workflow (feeds all downstream workflows)
-       └─ run_dir     ──► data/valid/run_*/  (validated input files)
+       └─ validated_files ──► analysis workflow (validated input files)
 ```
 
 The `analysis` workflow parses `validated_params.json` to determine which workflows to run and where the validated input files are located.

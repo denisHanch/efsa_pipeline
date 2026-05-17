@@ -23,7 +23,10 @@ workflow analysis {
 
         // Core genome file channels (single-item value channels)
         ref_fasta = pmap.map { file(it.ref_fasta_validated) }
-        mod_fasta = pmap.map { file(it.mod_fasta_validated) }
+        // Allow reference-only execution when mod_fasta_validated is absent
+        mod_fasta = pmap
+            .filter { it.mod_fasta_validated }
+            .map { file(it.mod_fasta_validated) }
 
         ref_plasmid = pmap.map { it.ref_plasmid_fasta ? [file(it.ref_plasmid_fasta)] : [] }
         mod_plasmid = pmap.map { it.mod_plasmid_fasta ? [file(it.mod_plasmid_fasta)] : [] }
@@ -71,9 +74,8 @@ workflow analysis {
         // Empty ont table when not active
         create_ont_tbl(pmap.filter { !it.run_nanopore }.map { "ont" })
 
-        // --- Illumina short-read pipeline ---
-        illumina_reads = pmap
-            .filter { it.run_illumina }
+        // --- Illumina short-read pipeline 
+        illumina_reads = pmap.filter { it.run_illumina }
             .flatMap { it.illumina_fastqs }
             .map { f ->
                 def fobj = file(f)

@@ -19,8 +19,9 @@ As a result, operational runtime messages are primarily captured in `data/output
 | `config_json` | `data/inputs/config.json` | Path to the input configuration JSON |
 | `out_dir` | `data/outputs` | Output directory for results |
 | `log_dir` | `data/outputs/logs` | Directory for pipeline logs and reports |
+| `valid_dir` | `data/outputs/valid` | Directory where only `validated_params.json` is saved |
 | `max_cpu` | `1` | Maximum CPUs available per process (override with `--max_cpu`) |
-| `ref_plasmid_fasta` | `null` | Optional reference plasmid FASTA |
+| `cleanup` | `true` | Enables end-of-run cleanup hooks (for example, work directory cleanup) |
 | `validation_level` | `null` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — `null` means not forwarded; `config.json` governs |
 | `logging_level` | `null` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — `null` means not forwarded; `config.json` governs |
 | `organism_type` | `null` | Organism type: `PROKARYOTE` or `EUKARYOTE` — `null` means not forwarded; `config.json` governs |
@@ -60,6 +61,7 @@ withName: minimap2 {
 - **Container pinning**: All images use `@sha256:` digests for reproducibility — the exact image bytes are locked, not just the tag.
 - **CPU scaling**: Uses `Math.min(params.max_cpu, N)` so processes scale to available hardware but never exceed a tool-specific cap.
 - **Centralized updates**: To upgrade a tool version, change it in `nextflow.config` only — individual process definitions do not specify containers.
+- **`ecomolegmo/*` images**: Some `ecomolegmo` images were created because equivalent tool images were unavailable in trusted Docker Hub sources at the time; these custom images are therefore pinned by digest for reproducibility and supply-chain traceability.
 
 ### Default Resource Limits
 

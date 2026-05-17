@@ -4,11 +4,9 @@
 
 process samtools_index {
     
-    publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
 
     input:
     path fasta_file
-    val out_folder_name
 
     output:
     path("${fasta_file}.fai")
@@ -22,11 +20,9 @@ process samtools_index {
 
 process picard_dict {
     
-    publishDir "${params.out_dir}/${out_folder_name}/samtools_index_dict", mode: 'copy'
     
     input:
     path fasta_file
-    val out_folder_name
 
     output:
     path("*.dict")
@@ -107,7 +103,7 @@ process cute_sv {
 
 process debreak {
 
-    publishDir "${params.out_dir}/${out_folder_name}/debreak_out", mode: "copy"
+    publishDir "${params.out_dir}/${out_folder_name}/", mode: "copy"
 
     input:
     each path(fasta_file)
