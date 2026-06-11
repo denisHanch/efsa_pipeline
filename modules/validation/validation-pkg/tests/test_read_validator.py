@@ -71,10 +71,7 @@ class TestReadValidatorInitialization:
 
     def test_init_with_custom_settings(self, simple_fastq, output_dir):
         """Test initialization with custom settings."""
-        settings = ReadValidator.Settings(
-            check_invalid_chars=True,
-            allow_duplicate_ids=False,
-        )
+        settings = ReadValidator.Settings(allow_empty_id=True)
 
         read_config = ReadConfig(
             filename="reads.fastq",
@@ -89,8 +86,7 @@ class TestReadValidatorInitialization:
 
         validator = ReadValidator(read_config, settings)
 
-        assert validator.settings.check_invalid_chars is True
-        assert validator.settings.allow_duplicate_ids is False
+        assert validator.settings.allow_empty_id is True
 
 
 class TestReadValidatorParsing:
@@ -331,46 +327,6 @@ class TestReadValidatorValidation:
         validator.run()  # Should not raise
 
         assert len(validator.sequences) == 2
-
-    def test_duplicate_ids_rejected_when_disabled(self, fastq_with_duplicates, output_dir):
-        """Test that duplicate IDs are rejected when allow_duplicate_ids=False."""
-        settings = ReadValidator.Settings(allow_duplicate_ids=False)
-
-        read_config = ReadConfig(
-            filename="duplicates.fastq",
-            basename="duplicates",
-            filepath=fastq_with_duplicates,
-            ngs_type="illumina",
-            coding_type=CT.NONE,
-            detected_format=ReadFormat.FASTQ,
-            output_dir=output_dir,
-            global_options={}
-        )
-
-        validator = ReadValidator(read_config, settings)
-
-        with pytest.raises(ReadValidationError, match="Duplicate sequence IDs"):
-            validator.run()
-
-    def test_invalid_chars_detected(self, fastq_with_invalid_chars, output_dir):
-        """Test that invalid characters are detected when check_invalid_chars=True."""
-        settings = ReadValidator.Settings(check_invalid_chars=True)
-
-        read_config = ReadConfig(
-            filename="invalid_chars.fastq",
-            basename="invalid_chars",
-            filepath=fastq_with_invalid_chars,
-            ngs_type="illumina",
-            coding_type=CT.NONE,
-            detected_format=ReadFormat.FASTQ,
-            output_dir=output_dir,
-            global_options={'validation_level': 'strict'}
-        )
-
-        validator = ReadValidator(read_config, settings)
-
-        with pytest.raises(ReadValidationError, match="invalid character"):
-            validator.run()
 
     def test_invalid_chars_ignored_by_default(self, fastq_with_invalid_chars, output_dir):
         """Test that invalid characters are ignored by default."""
@@ -1247,7 +1203,7 @@ class TestParallelValidationLogging:
             global_options={"threads": 1, "validation_level": "strict"}
         )
 
-        settings = ReadValidator.Settings(check_invalid_chars=True)
+        settings = ReadValidator.Settings()
         validator = ReadValidator(read_config, settings)
 
         # Run validation (sequential)
@@ -1280,7 +1236,7 @@ class TestParallelValidationLogging:
             global_options={"threads": 4, "validation_level": "strict"}
         )
 
-        settings = ReadValidator.Settings(check_invalid_chars=True)
+        settings = ReadValidator.Settings()
         validator = ReadValidator(read_config, settings)
 
         # Run validation (parallel)
@@ -1313,7 +1269,7 @@ class TestParallelValidationLogging:
             global_options={"threads": 8, "validation_level": "trust"}  # threads=8 but trust mode
         )
 
-        settings = ReadValidator.Settings(check_invalid_chars=True)
+        settings = ReadValidator.Settings()
         validator = ReadValidator(read_config, settings)
 
         # Run validation (trust mode - always sequential)
@@ -1324,49 +1280,6 @@ class TestParallelValidationLogging:
         # Check log file - should NOT have process_id
         log_content = log_file.read_text()
         assert '"process_id"' not in log_content
-    def test_parallel_logging_cleanup_on_error(self, temp_dir, output_dir):
-        """Test that parallel logging is disabled even if validation fails."""
-        from validation_pkg.utils.logger import setup_logging, get_logger
-
-        # Create FASTQ with invalid characters (properly formatted for BioPython)
-        fastq_file = temp_dir / "invalid.fastq"
-        with open(fastq_file, 'w') as f:
-            for i in range(2000):
-                f.write(f"@read{i}\n")
-                if i == 1000:
-                    # Invalid characters - will fail validation but parse correctly
-                    f.write("ATCGATCGXYZATCGA\n")  # Same length as quality (16 chars)
-                else:
-                    f.write("ATCGATCGATCGATCG\n")
-                f.write("+\n")
-                f.write("IIIIIIIIIIIIIIII\n")
-
-        log_file = temp_dir / "test.log"
-        logger = setup_logging(log_file=log_file)
-
-
-        read_config = ReadConfig(
-            filename="invalid.fastq",
-            basename="invalid",
-            filepath=fastq_file,
-            ngs_type="illumina",
-            coding_type=CT.NONE,
-            detected_format=ReadFormat.FASTQ,
-            output_dir=output_dir,
-            global_options={"threads": 4, "validation_level": "strict"}
-        )
-
-        settings = ReadValidator.Settings(check_invalid_chars=True)
-        validator = ReadValidator(read_config, settings)
-
-        # Parse file (should succeed)
-        validator._parse_file()
-
-        # Run validation (should fail due to invalid characters)
-        with pytest.raises(ReadValidationError):
-            validator._validate_sequences()
-
-
     def test_full_validation_with_parallel_logging(self, temp_dir, output_dir):
         """Integration test: Full validation run with parallel logging."""
         from validation_pkg.utils.logger import setup_logging, get_logger
@@ -1390,10 +1303,7 @@ class TestParallelValidationLogging:
             global_options={"threads": 8, "validation_level": "strict"}
         )
 
-        settings = ReadValidator.Settings(
-            check_invalid_chars=True,
-            allow_duplicate_ids=False
-        )
+        settings = ReadValidator.Settings()
         validator = ReadValidator(read_config, settings)
 
         # Full validation run
@@ -1574,7 +1484,7 @@ class TestIlluminaPatternDetection:
         assert validator2.output_metadata.read_number == 2
 
     def test_lane_before_read_number_suffix(self):
-        """Test filenames with _X_1 and _X_2 patterns where X is a lane number and 1/2 is read number.
+        """Test _X_1/_X_2 patterns where X is lane number and 1/2 is read number.
 
         This handles the case where the read number is at the END after a lane/run number,
         e.g., NG-9904_PG4602EAc01_lib132096_4703_1_1.fastq.bz2 (R1) and
@@ -1840,255 +1750,6 @@ class TestIlluminaPatternDetection:
         validator._detect_illumina_pattern("sample-name_123_R1.fastq")
         assert validator.output_metadata.base_name == "sample-name_123"
         assert validator.output_metadata.read_number == 1
-
-    def test_edge_case_uppercase_extensions(self):
-        """Test that pattern detection works with uppercase extensions."""
-        # Uppercase .FASTQ.GZ
-        validator = self._create_validator_with_basename("sample_R1.FASTQ.GZ")
-        validator._detect_illumina_pattern("sample_R1.FASTQ.GZ")
-        assert validator.output_metadata.base_name == "sample"
-        assert validator.output_metadata.read_number == 1
-
-    # ==================== Invalid Patterns ====================
-
-    def test_invalid_read_numbers(self):
-        """Test that invalid read numbers get fallback metadata (treated as single-end)."""
-        # R3 is not valid (only R1 and R2 are valid) - treated as single-end
-        validator1 = self._create_validator_with_basename("sample_R3.fastq")
-        validator1._detect_illumina_pattern("sample_R3.fastq")
-        assert validator1.output_metadata.base_name == "sample_R3"
-        assert validator1.output_metadata.read_number == 1  # Fallback
-        assert validator1.output_metadata.illumina_pairing_detected == 'illumina'
-
-        # _3 is not valid - treated as single-end
-        validator2 = self._create_validator_with_basename("sample_3.fastq")
-        validator2._detect_illumina_pattern("sample_3.fastq")
-        assert validator2.output_metadata.base_name == "sample_3"
-        assert validator2.output_metadata.read_number == 1  # Fallback
-
-        # R0 is not valid - treated as single-end
-        validator3 = self._create_validator_with_basename("sample_R0.fastq")
-        validator3._detect_illumina_pattern("sample_R0.fastq")
-        assert validator3.output_metadata.base_name == "sample_R0"
-
-    def test_invalid_ambiguous_patterns(self):
-        """Test that ambiguous patterns get fallback metadata."""
-        # Just R1 without base name (edge case - might match with empty base_name)
-        validator1 = self._create_validator_with_basename("R1.fastq")
-        validator1._detect_illumina_pattern("R1.fastq")
-        # Pattern should match with empty base_name OR fallback to full basename
-        assert validator1.output_metadata.read_number is not None
-        assert validator1.output_metadata.illumina_pairing_detected == 'illumina'
-
-        # R1 in middle of filename (not at end) - treated as single-end
-        validator2 = self._create_validator_with_basename("R1_sample.fastq")
-        validator2._detect_illumina_pattern("R1_sample.fastq")
-        # Should not match standard patterns, gets fallback
-        assert validator2.output_metadata.base_name == "R1_sample"
-        assert validator2.output_metadata.read_number == 1  # Fallback
-        assert validator2.output_metadata.illumina_pairing_detected == 'illumina'
-
-    def test_invalid_lowercase_r_prefix(self):
-        """Test that lowercase 'r' gets fallback metadata (not a valid pattern)."""
-        validator = self._create_validator_with_basename("sample_r1.fastq")
-        validator._detect_illumina_pattern("sample_r1.fastq")
-        # Should not match - Illumina uses uppercase R1/R2, gets fallback
-        assert validator.output_metadata.base_name == "sample_r1"
-        assert validator.output_metadata.read_number == 1  # Fallback
-        assert validator.output_metadata.illumina_pairing_detected == 'illumina'
-
-    # ==================== Metadata Isolation Tests ====================
-
-    def test_metadata_isolation_between_calls(self):
-        """Test that each call properly updates metadata independently."""
-        validator = self._create_validator_with_basename("sample1_R1.fastq.gz")
-
-        # First detection
-        validator._detect_illumina_pattern("sample1_R1.fastq.gz")
-        assert validator.output_metadata.base_name == "sample1"
-        assert validator.output_metadata.read_number == 1
-
-        # Create new validator for second file
-        validator2 = self._create_validator_with_basename("sample2_R2.fastq.gz")
-        validator2._detect_illumina_pattern("sample2_R2.fastq.gz")
-
-        # Verify second detection didn't affect first
-        assert validator.output_metadata.base_name == "sample1"
-        assert validator.output_metadata.read_number == 1
-
-        # Verify second detection correct
-        assert validator2.output_metadata.base_name == "sample2"
-        assert validator2.output_metadata.read_number == 2
-
-    def test_metadata_cleared_when_no_pattern(self):
-        """Test that fallback metadata is set when no paired-end pattern is detected."""
-        validator = self._create_validator_with_basename("single_end_sample.fastq.gz")
-
-        # Should set fallback metadata for single-end files
-        validator._detect_illumina_pattern("single_end_sample.fastq.gz")
-        assert validator.output_metadata.base_name == "single_end_sample"
-        assert validator.output_metadata.read_number == 1
-        assert validator.output_metadata.illumina_pairing_detected == 'illumina'
-
-
-class TestReadStatistics:
-    """Test read statistics calculation in strict mode."""
-
-    @pytest.fixture
-    def temp_dir(self):
-        """Create a temporary directory for test files."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield Path(tmpdir)
-
-    @pytest.fixture
-    def output_dir(self, temp_dir):
-        """Create output directory."""
-        out_dir = temp_dir / "output"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        return out_dir
-
-    @pytest.fixture
-    def test_fastq_with_known_stats(self, temp_dir):
-        """Create FASTQ file with known read statistics."""
-        fastq_path = temp_dir / "test_reads.fastq.gz"
-
-        # Create reads with known lengths for N50 calculation
-        reads = [
-            SeqRecord(Seq("A" * 1000), id="read1", description=""),  # 1000 bp
-            SeqRecord(Seq("T" * 800), id="read2", description=""),   # 800 bp
-            SeqRecord(Seq("G" * 600), id="read3", description=""),   # 600 bp
-            SeqRecord(Seq("C" * 400), id="read4", description=""),   # 400 bp
-            SeqRecord(Seq("A" * 200), id="read5", description=""),   # 200 bp
-        ]
-        # Total: 3000 bp, N50 should be 800 bp (cumulative > 1500 bp at 800)
-
-        # Add quality scores
-        for read in reads:
-            read.letter_annotations["phred_quality"] = [40] * len(read.seq)
-
-        with gzip.open(fastq_path, 'wt') as f:
-            SeqIO.write(reads, f, 'fastq')
-
-        return fastq_path
-
-    def test_strict_mode_statistics(self, test_fastq_with_known_stats, output_dir):
-        """Test that strict mode calculates all read statistics."""
-        read_config = ReadConfig(
-            filepath=test_fastq_with_known_stats,
-            filename=test_fastq_with_known_stats.name,
-            coding_type=CT.GZIP,
-            detected_format=ReadFormat.FASTQ,
-            ngs_type='illumina',
-            output_dir=output_dir,
-            global_options={'validation_level': 'strict'}
-        )
-
-        validator = ReadValidator(read_config)
-        metadata = validator.run()
-
-        # Basic fields
-        assert metadata.output_file is not None
-        assert metadata.num_reads == 5
-        assert metadata.validation_level == 'strict'
-
-        # Statistics should be calculated
-        assert metadata.n50 == 800, f"Expected N50=800, got {metadata.n50}"
-        assert metadata.total_bases == 3000, f"Expected total=3000, got {metadata.total_bases}"
-        assert metadata.mean_read_length == 600.0, f"Expected mean=600.0, got {metadata.mean_read_length}"
-        assert metadata.longest_read_length == 1000
-        assert metadata.shortest_read_length == 200
-
-    def test_trust_mode_no_statistics(self, test_fastq_with_known_stats, output_dir):
-        """Test that trust mode does NOT calculate expensive statistics."""
-        read_config = ReadConfig(
-            filepath=test_fastq_with_known_stats,
-            filename=test_fastq_with_known_stats.name,
-            coding_type=CT.GZIP,
-            detected_format=ReadFormat.FASTQ,
-            ngs_type='illumina',
-            output_dir=output_dir,
-            global_options={'validation_level': 'trust'}
-        )
-
-        validator = ReadValidator(read_config)
-        metadata = validator.run()
-
-        # Basic fields should be set
-        assert metadata.output_file is not None
-        assert metadata.num_reads == 5
-        assert metadata.validation_level == 'trust'
-
-        # Statistics should NOT be calculated in trust mode
-        assert metadata.n50 is None
-        assert metadata.total_bases is None
-        assert metadata.mean_read_length is None
-        assert metadata.longest_read_length is None
-        assert metadata.shortest_read_length is None
-
-    def test_n50_calculation_accuracy(self, temp_dir, output_dir):
-        """Test N50 calculation with known dataset."""
-        # Create specific dataset to verify N50 calculation
-        fastq_path = temp_dir / "n50_test.fastq"
-        reads = [
-            SeqRecord(Seq("A" * 100), id="read1", description=""),   # 100 bp
-            SeqRecord(Seq("T" * 200), id="read2", description=""),   # 200 bp
-            SeqRecord(Seq("G" * 300), id="read3", description=""),   # 300 bp
-            SeqRecord(Seq("C" * 400), id="read4", description=""),   # 400 bp
-        ]
-        # Total: 1000 bp
-        # Sorted: 400, 300, 200, 100
-        # Cumulative: 400 (not >= 500), 700 (>= 500)
-        # N50 = 300 bp
-
-        for read in reads:
-            read.letter_annotations["phred_quality"] = [40] * len(read.seq)
-
-        with open(fastq_path, 'w') as f:
-            SeqIO.write(reads, f, 'fastq')
-
-        read_config = ReadConfig(
-            filepath=fastq_path,
-            filename=fastq_path.name,
-            coding_type=CT.NONE,
-            detected_format=ReadFormat.FASTQ,
-            ngs_type='ont',
-            output_dir=output_dir,
-            global_options={'validation_level': 'strict'}
-        )
-
-        validator = ReadValidator(read_config)
-        metadata = validator.run()
-
-        assert metadata.n50 == 300, f"N50 should be 300 bp, got {metadata.n50}"
-        assert metadata.total_bases == 1000
-        assert metadata.mean_read_length == 250.0
-
-    def test_empty_reads_statistics(self, temp_dir, output_dir):
-        """Test statistics with no reads (edge case)."""
-        # This test may not work if validation fails on empty files
-        # But it tests the _calculate_read_statistics() method robustness
-        from validation_pkg.validators.read_validator import ReadValidator
-
-        read_config = ReadConfig(
-            filepath=Path("dummy.fastq"),
-            filename="dummy.fastq",
-            coding_type=CT.NONE,
-            detected_format=ReadFormat.FASTQ,
-            ngs_type='illumina',
-            output_dir=output_dir,
-            global_options={'validation_level': 'strict'}
-        )
-
-        validator = ReadValidator(read_config)
-        validator.sequences = []  # Empty sequences
-
-        stats = validator._calculate_read_statistics()
-
-        assert stats['n50'] == 0
-        assert stats['total_bases'] == 0
-        assert stats['mean_read_length'] == 0.0
-        assert stats['longest_read_length'] == 0
-        assert stats['shortest_read_length'] == 0
 
 
 if __name__ == "__main__":

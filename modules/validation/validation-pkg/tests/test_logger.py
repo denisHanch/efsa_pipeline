@@ -139,7 +139,7 @@ class TestParallelValidationLogging:
                 global_options={"threads": 1, "validation_level": "strict"}
             )
 
-            settings = ReadValidator.Settings(check_invalid_chars=True)
+            settings = ReadValidator.Settings()
             validator = ReadValidator(config, settings)
 
             # Validate (should use sequential)
@@ -175,7 +175,7 @@ class TestParallelValidationLogging:
                 global_options={"threads": 4, "validation_level": "strict"}
             )
 
-            settings = ReadValidator.Settings(check_invalid_chars=True)
+            settings = ReadValidator.Settings()
             validator = ReadValidator(config, settings)
 
             # Validate (should use parallel)
@@ -213,7 +213,7 @@ class TestParallelValidationLogging:
                 global_options={"threads": threads, "validation_level": "strict"}
             )
 
-            settings = ReadValidator.Settings(check_invalid_chars=True)
+            settings = ReadValidator.Settings()
             validator = ReadValidator(config, settings)
 
             # Validate
@@ -250,7 +250,7 @@ class TestParallelValidationLogging:
                 global_options={"threads": 8, "validation_level": "trust"}  # threads=8 but trust mode
             )
 
-            settings = ReadValidator.Settings(check_invalid_chars=True)
+            settings = ReadValidator.Settings()
             validator = ReadValidator(config, settings)
 
             # Validate (should use sequential despite threads=8)

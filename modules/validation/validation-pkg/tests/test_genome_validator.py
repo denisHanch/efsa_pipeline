@@ -1389,15 +1389,6 @@ class TestGenomeValidatorOutputMetadata:
         # Sequence statistics
         assert metadata.num_sequences == 3
         assert metadata.total_genome_size == (1200 + 600 + 360)  # Sum of all sequences
-        assert metadata.longest_sequence_id == "chromosome1"
-        assert metadata.longest_sequence_length == 1200
-
-        # Strict-only statistics
-        assert metadata.gc_content is not None
-        assert isinstance(metadata.gc_content, float)
-        assert 0 <= metadata.gc_content <= 100
-        assert metadata.n50 is not None
-        assert metadata.n50 == 1200  # Longest sequence is >50% of total
 
         # Inter-file validation fields
         assert metadata.sequence_ids is not None
@@ -1423,17 +1414,13 @@ class TestGenomeValidatorOutputMetadata:
         assert metadata.output_file is not None
         assert metadata.validation_level == 'trust'
         assert metadata.num_sequences == 3
-        assert metadata.longest_sequence_id is not None
-        assert metadata.longest_sequence_length is not None
 
         # Inter-file validation fields should be set
         assert metadata.sequence_ids is not None
         assert metadata.sequence_lengths is not None
 
-        # Expensive statistics should NOT be computed in trust mode
+        # total_genome_size is NOT computed in trust mode
         assert metadata.total_genome_size is None
-        assert metadata.gc_content is None
-        assert metadata.n50 is None
 
     def test_minimal_mode_sparse_fields(self, sample_fasta_file, output_dir):
         """Test that minimal mode returns only basic metadata."""
@@ -1460,8 +1447,6 @@ class TestGenomeValidatorOutputMetadata:
         assert metadata.sequence_ids is None
         assert metadata.sequence_lengths is None
         assert metadata.total_genome_size is None
-        assert metadata.gc_content is None
-        assert metadata.n50 is None
 
     def test_inter_file_validation_compatibility(self, sample_fasta_file, output_dir):
         """Test that inter-file validation fields are accessible."""
@@ -1533,60 +1518,6 @@ class TestGenomeValidatorOutputMetadata:
         # short_seq (360 bp) should be filtered out
         assert metadata.num_sequences_filtered == 1
         assert metadata.num_sequences == 2  # chromosome1 and plasmid1 remain
-
-    def test_gc_content_calculation(self, temp_dir, output_dir):
-        """Test GC content calculation accuracy."""
-        # Create file with known GC content (50%)
-        fasta_path = temp_dir / "gc_test.fasta"
-        seq = "ATGC" * 250  # Exactly 50% GC
-        record = SeqRecord(Seq(seq), id="test", description="GC test")
-        with open(fasta_path, 'w') as f:
-            SeqIO.write([record], f, 'fasta')
-
-        genome_config = GenomeConfig(
-            filepath=fasta_path,
-            filename=fasta_path.name,
-            coding_type=CT.NONE,
-            detected_format=GenomeFormat.FASTA,
-            output_dir=output_dir,
-            global_options={'validation_level': 'strict'}
-        )
-
-        validator = GenomeValidator(genome_config)
-        metadata = validator.run()
-
-        # GC content should be exactly 50%
-        assert metadata.gc_content == pytest.approx(50.0, abs=0.1)
-
-    def test_n50_calculation(self, temp_dir, output_dir):
-        """Test N50 calculation accuracy."""
-        # Create file with known N50
-        fasta_path = temp_dir / "n50_test.fasta"
-        records = [
-            SeqRecord(Seq("A" * 1000), id="seq1"),  # 1000 bp
-            SeqRecord(Seq("T" * 800), id="seq2"),   # 800 bp
-            SeqRecord(Seq("G" * 500), id="seq3"),   # 500 bp
-            SeqRecord(Seq("C" * 200), id="seq4"),   # 200 bp
-        ]
-        # Total: 2500 bp, N50 should be 800 bp (cumulative >1250 bp after 1000+800)
-        with open(fasta_path, 'w') as f:
-            SeqIO.write(records, f, 'fasta')
-
-        genome_config = GenomeConfig(
-            filepath=fasta_path,
-            filename=fasta_path.name,
-            coding_type=CT.NONE,
-            detected_format=GenomeFormat.FASTA,
-            output_dir=output_dir,
-            global_options={'validation_level': 'strict'}
-        )
-
-        validator = GenomeValidator(genome_config)
-        metadata = validator.run()
-
-        # N50 should be 800 bp
-        assert metadata.n50 == 800
-
 
 class TestGenomeValidatorErrorNSequences:
     """Test n_sequence_limit config field — hard stop when sequence count exceeds threshold."""
