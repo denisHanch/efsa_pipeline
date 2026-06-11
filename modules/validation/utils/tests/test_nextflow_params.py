@@ -4,16 +4,14 @@ Tests for nextflow_params.py
 Tests cover:
 - run_ref_x_mod conditions
 - Read type detection (illumina, ont, pacbio)
-- Conditional keys (ref_fasta_validated, mod_fasta_validated, pacbio_fastq)
+- Conditional keys (ref_fasta_validated, mod_fasta_validated, pacbio_fastqs)
 - write_params serialises valid JSON
 """
 
 import json
 import tempfile
 from pathlib import Path
-from types import SimpleNamespace  # noqa: F401 — used in tests and helpers
-
-import pytest
+from types import SimpleNamespace
 
 import sys
 from pathlib import Path
@@ -131,7 +129,7 @@ class TestReads:
         r["reads"] = [_meta("/reads/nano.fastq", ngs_type="ont")]
         p = build_params(r)
         assert p.run_nanopore is True
-        assert p.nanopore_fastq == "/reads/nano.fastq"
+        assert "/reads/nano.fastq" in p.ont_fastqs
         assert p.run_illumina is False
 
     def test_pacbio_read(self):
@@ -139,44 +137,13 @@ class TestReads:
         r["reads"] = [_meta("/reads/pb.fastq", ngs_type="pacbio")]
         p = build_params(r)
         assert p.run_pacbio is True
-        assert p.pacbio_fastq == "/reads/pb.fastq"
+        assert "/reads/pb.fastq" in p.pacbio_fastqs
 
     def test_no_pacbio_key_when_absent(self):
         r = _base()
         r["reads"] = [_meta("/reads/R1.fastq", ngs_type="illumina")]
         p = build_params(r)
-        assert p.pacbio_fastq is None
-
-    def test_multiple_reads_same_type_is_not_supported(self):
-        """Multiple ONT/PacBio files from a directory input must be rejected at config load time."""
-        # build_params itself does not enforce this — the guard lives in ConfigManager.
-        # This test documents that submitting two ONT paths is not a supported use case:
-        # ConfigManager._parse_reads_configs raises ValueError before we ever reach build_params.
-        from validation_pkg.config_manager import ConfigManager
-        with pytest.raises(ValueError, match="Only one ONT or PacBio file"):
-            # Simulate the directory-iteration branch with two ONT files
-            import types, pathlib
-            config_stub = types.SimpleNamespace(
-                config_dir=pathlib.Path("/fake"),
-                output_dir=pathlib.Path("/fake/valid"),
-                options={},
-                reads=[],
-            )
-            read_entry = {"directory": "ont_dir", "ngs_type": "ont"}
-            # Patch iterdir to return two files
-            fake_files = [pathlib.Path("/fake/ont_dir/a.fastq"), pathlib.Path("/fake/ont_dir/b.fastq")]
-            original_iterdir = pathlib.Path.iterdir
-            pathlib.Path.iterdir = lambda self: iter(fake_files)
-            original_exists = pathlib.Path.exists
-            original_is_dir = pathlib.Path.is_dir
-            pathlib.Path.exists = lambda self: True
-            pathlib.Path.is_dir = lambda self: True
-            try:
-                ConfigManager._parse_reads_configs({"reads": [read_entry]}, config_stub)
-            finally:
-                pathlib.Path.iterdir = original_iterdir
-                pathlib.Path.exists = original_exists
-                pathlib.Path.is_dir = original_is_dir
+        assert p.pacbio_fastqs == []
 
     def test_mixed_read_types(self):
         r = _base()
@@ -195,7 +162,7 @@ class TestReads:
         assert p.run_illumina is False
         assert p.run_nanopore is False
         assert p.run_pacbio is False
-        assert p.nanopore_fastq is None
+        assert p.ont_fastqs == []
 
 
 # ---------------------------------------------------------------------------
@@ -285,17 +252,6 @@ class TestPlasmidPaths:
 
 
 # ---------------------------------------------------------------------------
-# run_truvari always False
-# ---------------------------------------------------------------------------
-
-class TestRunTruvari:
-
-    def test_always_false(self):
-        p = build_params(_base())
-        assert p.run_truvari is False
-
-
-# ---------------------------------------------------------------------------
 # write_params
 # ---------------------------------------------------------------------------
 
@@ -317,4 +273,3 @@ class TestWriteParams:
             loaded = json.loads(out.read_text())
         assert isinstance(loaded, dict)
         assert "run_ref_x_mod" in loaded
-        assert "run_truvari" in loaded

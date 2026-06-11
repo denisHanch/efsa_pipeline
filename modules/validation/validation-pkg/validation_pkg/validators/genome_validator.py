@@ -2,7 +2,7 @@
 
 from collections import Counter
 from pathlib import Path
-from typing import Optional, List, Type, Any
+from typing import Optional, List, Type
 from dataclasses import dataclass
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
@@ -20,6 +20,7 @@ from validation_pkg.utils.file_handler import open_compressed_writer, copy_file
 from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
 from validation_pkg.utils.base_validator import BaseValidator
 from validation_pkg.utils.sequence_stats import calculate_n50
+from validation_pkg.utils.formatting import format_metadata_value
 
 @dataclass
 class GenomeOutputMetadata(BaseOutputMetadata):
@@ -46,14 +47,6 @@ class GenomeOutputMetadata(BaseOutputMetadata):
     def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
         """Format genome-specific statistics for report output."""
         lines = []
-
-        # Helper to format values
-        def format_value(value):
-            if isinstance(value, float):
-                return f"{value:.2f}"
-            elif isinstance(value, int) and value > 999:
-                return f"{value:,}"
-            return str(value)
 
         # Iterate through all fields, skipping common ones and internal fields
         skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
@@ -100,9 +93,7 @@ class GenomeOutputMetadata(BaseOutputMetadata):
                 lines.append(f"{indent}{key}: {value:,}")
 
             elif key not in special_fields:
-                # Generic field formatting
-                formatted_value = format_value(value)
-                lines.append(f"{indent}{key}: {formatted_value}")
+                lines.append(f"{indent}{key}: {format_metadata_value(value)}")
 
         return lines
 
@@ -161,27 +152,10 @@ class GenomeValidator(BaseValidator):
         self.plasmid_filenames = []
         self.plasmid_output_paths = []
 
-    # Required abstract properties and methods from BaseValidator
-
-    @property
-    def _validator_type(self) -> str:
-        """Return validator type string."""
-        return 'genome'
-
-    @property
-    def OutputMetadata(self) -> Type:
-        """Return GenomeOutputMetadata class for this validator."""
-        return GenomeOutputMetadata
-
-    @property
-    def _output_format(self) -> str:
-        """Return output format string for build_output_path."""
-        return 'fasta'
-
-    @property
-    def _expected_format(self) -> Any:
-        """Return expected format for minimal mode validation."""
-        return GenomeFormat.FASTA
+    _validator_type = 'genome'
+    OutputMetadata = GenomeOutputMetadata
+    _output_format = 'fasta'
+    _expected_format = GenomeFormat.FASTA
 
     def _get_validator_exception(self) -> Type[Exception]:
         """Return the validator-specific exception class."""

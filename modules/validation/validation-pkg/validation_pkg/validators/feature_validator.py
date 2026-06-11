@@ -1,7 +1,7 @@
 """Feature file validator and processor for GFF, GTF, and BED formats."""
 
 from pathlib import Path
-from typing import Optional, List, Type, Any
+from typing import Optional, List, Type
 from dataclasses import dataclass
 from multiprocessing import Pool
 import tempfile
@@ -12,6 +12,7 @@ from validation_pkg.exceptions import FeatureValidationError
 from validation_pkg.utils.formats import CodingType as CT, FeatureFormat, ValidationLevel
 from validation_pkg.utils.file_handler import open_compressed_writer, check_tool_available
 from validation_pkg.utils.base_validator import BaseValidator
+from validation_pkg.utils.formatting import format_metadata_value
 
 TRUST_MODE_SAMPLE_SIZE = 10
 PARALLEL_CHUNK_MULTIPLIER = 4
@@ -41,14 +42,6 @@ class FeatureOutputMetadata(BaseOutputMetadata):
         """Format feature-specific statistics for report output."""
         lines = []
 
-        # Helper to format values
-        def format_value(value):
-            if isinstance(value, float):
-                return f"{value:.2f}"
-            elif isinstance(value, int) and value > 999:
-                return f"{value:,}"
-            return str(value)
-
         # Iterate through all fields, skipping common ones
         skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
         special_fields = {'feature_types', 'sequence_ids'}
@@ -73,9 +66,7 @@ class FeatureOutputMetadata(BaseOutputMetadata):
                     lines.append(f"{indent}sequence_ids: {value[0]}, {value[1]}, ... (+{len(value)-2} more)")
 
             elif key not in special_fields:
-                # Generic field formatting
-                formatted_value = format_value(value)
-                lines.append(f"{indent}{key}: {formatted_value}")
+                lines.append(f"{indent}{key}: {format_metadata_value(value)}")
 
         return lines
 
@@ -144,27 +135,10 @@ class FeatureValidator(BaseValidator):
         # Validator-specific data
         self.features: List[Feature] = []
 
-    # Required abstract properties and methods from BaseValidator
-
-    @property
-    def _validator_type(self) -> str:
-        """Return validator type string."""
-        return 'feature'
-
-    @property
-    def OutputMetadata(self) -> Type:
-        """Return FeatureOutputMetadata class for this validator."""
-        return FeatureOutputMetadata
-
-    @property
-    def _output_format(self) -> str:
-        """Return output format string for build_output_path."""
-        return 'gff'
-
-    @property
-    def _expected_format(self) -> Any:
-        """Return expected format for minimal mode validation."""
-        return FeatureFormat.GFF
+    _validator_type = 'feature'
+    OutputMetadata = FeatureOutputMetadata
+    _output_format = 'gff'
+    _expected_format = FeatureFormat.GFF
 
     def _get_validator_exception(self) -> Type[Exception]:
         """Return the validator-specific exception class."""
