@@ -16,9 +16,6 @@ from validation_pkg import (
     ReadXReadSettings,
     GenomeXGenomeSettings,
     ValidationReport,
-    validate_genome,
-    validate_reads,
-    validate_feature,
     setup_logging,
     get_logger,
     readxread_validation,
@@ -205,7 +202,7 @@ def main():
 
 
     # ========================================================================
-    # Step 3: Run validation using functional API
+    # Step 3: Run validation
     # ========================================================================
     report_filename = "report.txt"
     report = ValidationReport(logs_dir / report_filename)
@@ -227,7 +224,7 @@ def main():
     ref_genome_res = None
     if hasattr(config, 'ref_genome') and config.ref_genome:
         try:
-            ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
+            ref_genome_res = GenomeValidator(config.ref_genome, ref_genome_settings).run()
             report.write(ref_genome_res, file_type="genome")
             register_missing_output("ref_genome", ref_genome_res)
         except ValidationError as e:
@@ -237,7 +234,7 @@ def main():
     mod_genome_res = None
     if hasattr(config, 'mod_genome') and config.mod_genome:
         try:
-            mod_genome_res = validate_genome(config.mod_genome, mod_genome_settings)
+            mod_genome_res = GenomeValidator(config.mod_genome, mod_genome_settings).run()
             report.write(mod_genome_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional mod_genome validation failed: {e}")
@@ -251,7 +248,7 @@ def main():
                 merge_into_plasmid=genome_plasmid_paths[0]
             )
         try:
-            ref_plasmid_res = validate_genome(config.ref_plasmid, ref_plasmid_settings)
+            ref_plasmid_res = GenomeValidator(config.ref_plasmid, ref_plasmid_settings).run()
             report.write(ref_plasmid_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional ref_plasmid validation failed: {e}")
@@ -259,7 +256,7 @@ def main():
     mod_plasmid_res = None
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
         try:
-            mod_plasmid_res = validate_genome(config.mod_plasmid, mod_plasmid_settings)
+            mod_plasmid_res = GenomeValidator(config.mod_plasmid, mod_plasmid_settings).run()
             report.write(mod_plasmid_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional mod_plasmid validation failed: {e}")
@@ -281,7 +278,7 @@ def main():
     reads_res = None
     if hasattr(config, 'reads') and config.reads:
         try:
-            reads_res = validate_reads(config.reads, reads_settings)
+            reads_res = [ReadValidator(rc, reads_settings).run() for rc in config.reads]
             report.write(reads_res, file_type="read")
             for read_result in reads_res:
                 register_missing_output("reads", read_result)
@@ -304,7 +301,7 @@ def main():
     ref_feature_res = None
     if hasattr(config, 'ref_feature') and config.ref_feature and not force_defragment:
         try:
-            ref_feature_res = validate_feature(config.ref_feature, ref_feature_settings)
+            ref_feature_res = FeatureValidator(config.ref_feature, ref_feature_settings).run()
             report.write(ref_feature_res, file_type="feature")
         except ValidationError as e:
             logger.error(f"Optional ref_feature validation failed: {e}")

@@ -22,41 +22,6 @@ from validation_pkg.validators.interfile_genome import GenomeXGenomeSettings, ge
 from validation_pkg.utils.logger import setup_logging, get_logger
 from validation_pkg.report import ValidationReport
 
-# Functional API imports
-from typing import Optional, List
-
-# ============================================================================
-# Functional API - Simplified wrapper functions
-# ============================================================================
-
-def validate_genome(
-    genome_config,
-    settings: Optional[GenomeValidator.Settings] = None
-) -> GenomeOutputMetadata:
-    """Validate a genome file with optional custom settings."""
-    validator = GenomeValidator(genome_config, settings)
-    return validator.run()
-
-def validate_reads(
-    read_configs: List,
-    settings: Optional[ReadValidator.Settings] = None
-) -> List[ReadOutputMetadata]:
-    """Validate multiple read files with optional custom settings."""
-    results = []
-    for read_config in read_configs:
-        validator = ReadValidator(read_config, settings)
-        result = validator.run()
-        results.append(result)
-    return results
-
-def validate_feature(
-    feature_config,
-    settings: Optional[FeatureValidator.Settings] = None
-) -> FeatureOutputMetadata:
-    """Validate a feature annotation file with optional custom settings."""
-    validator = FeatureValidator(feature_config, settings)
-    return validator.run()
-
 __all__ = [
     # Configuration
     'ConfigManager',
@@ -66,11 +31,6 @@ __all__ = [
     'GenomeValidator',
     'ReadValidator',
     'FeatureValidator',
-
-    # Functional API (Primary Interface)
-    'validate_genome',
-    'validate_reads',
-    'validate_feature',
 
     # Inter-file Validation
     'ReadXReadSettings',
