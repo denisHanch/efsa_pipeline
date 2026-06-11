@@ -12,7 +12,6 @@ import sys
 import gzip
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -31,11 +30,6 @@ from ref_defragment import defragment_reference
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-@pytest.fixture
-def logger():
-    return MagicMock()
-
 
 @pytest.fixture
 def tmp_inputs(tmp_path):
@@ -100,77 +94,70 @@ class TestDefragmentFasta:
         _write_fasta(fasta_path, self.CONTIGS)
         return _make_genome_config(fasta_path, GenomeFormat.FASTA)
 
-    def test_returns_two_paths(self, fasta_config, logger):
-        merged, tsv = defragment_reference(fasta_config, logger)
+    def test_returns_two_paths(self, fasta_config):
+        merged, tsv = defragment_reference(fasta_config)
         assert isinstance(merged, Path)
         assert isinstance(tsv, Path)
 
-    def test_merged_fasta_exists(self, fasta_config, logger):
-        merged, _ = defragment_reference(fasta_config, logger)
+    def test_merged_fasta_exists(self, fasta_config):
+        merged, _ = defragment_reference(fasta_config)
         assert merged.exists()
 
-    def test_tsv_exists(self, fasta_config, logger):
-        _, tsv = defragment_reference(fasta_config, logger)
+    def test_tsv_exists(self, fasta_config):
+        _, tsv = defragment_reference(fasta_config)
         assert tsv.exists()
 
-    def test_merged_fasta_has_one_sequence(self, fasta_config, logger):
-        merged, _ = defragment_reference(fasta_config, logger)
+    def test_merged_fasta_has_one_sequence(self, fasta_config):
+        merged, _ = defragment_reference(fasta_config)
         records = list(SeqIO.parse(merged, "fasta"))
         assert len(records) == 1
 
-    def test_merged_sequence_is_concatenation(self, fasta_config, logger):
-        merged, _ = defragment_reference(fasta_config, logger)
+    def test_merged_sequence_is_concatenation(self, fasta_config):
+        merged, _ = defragment_reference(fasta_config)
         records = list(SeqIO.parse(merged, "fasta"))
         assert str(records[0].seq) == self.EXPECTED_SEQ
 
-    def test_merged_fasta_id_contains_basename(self, fasta_config, logger):
-        merged, _ = defragment_reference(fasta_config, logger)
+    def test_merged_fasta_id_contains_basename(self, fasta_config):
+        merged, _ = defragment_reference(fasta_config)
         records = list(SeqIO.parse(merged, "fasta"))
         assert "ref" in records[0].id
 
-    def test_fasta_written_next_to_input(self, fasta_config, logger):
-        merged, _ = defragment_reference(fasta_config, logger)
+    def test_fasta_written_next_to_input(self, fasta_config):
+        merged, _ = defragment_reference(fasta_config)
         assert merged.parent == fasta_config.filepath.parent
 
-    def test_tsv_written_to_outputs_tables(self, fasta_config, logger):
-        _, tsv = defragment_reference(fasta_config, logger)
+    def test_tsv_written_to_outputs_tables(self, fasta_config):
+        _, tsv = defragment_reference(fasta_config)
         assert "outputs" in tsv.parts
         assert "tables" in tsv.parts
 
-    def test_tsv_header(self, fasta_config, logger):
-        _, tsv = defragment_reference(fasta_config, logger)
+    def test_tsv_header(self, fasta_config):
+        _, tsv = defragment_reference(fasta_config)
         lines = tsv.read_text().splitlines()
         assert lines[0] == "seq_id\tlength\tstart"
 
-    def test_tsv_row_count(self, fasta_config, logger):
-        _, tsv = defragment_reference(fasta_config, logger)
+    def test_tsv_row_count(self, fasta_config):
+        _, tsv = defragment_reference(fasta_config)
         lines = tsv.read_text().splitlines()
         assert len(lines) == 1 + len(self.CONTIGS)  # header + one row per contig
 
-    def test_tsv_seq_ids(self, fasta_config, logger):
-        _, tsv = defragment_reference(fasta_config, logger)
+    def test_tsv_seq_ids(self, fasta_config):
+        _, tsv = defragment_reference(fasta_config)
         rows = tsv.read_text().splitlines()[1:]
         ids = [r.split("\t")[0] for r in rows]
         assert ids == [c[0] for c in self.CONTIGS]
 
-    def test_tsv_lengths(self, fasta_config, logger):
-        _, tsv = defragment_reference(fasta_config, logger)
+    def test_tsv_lengths(self, fasta_config):
+        _, tsv = defragment_reference(fasta_config)
         rows = tsv.read_text().splitlines()[1:]
         lengths = [int(r.split("\t")[1]) for r in rows]
         assert lengths == [len(seq) for _, seq in self.CONTIGS]
 
-    def test_tsv_start_offsets(self, fasta_config, logger):
-        _, tsv = defragment_reference(fasta_config, logger)
+    def test_tsv_start_offsets(self, fasta_config):
+        _, tsv = defragment_reference(fasta_config)
         rows = tsv.read_text().splitlines()[1:]
         starts = [int(r.split("\t")[2]) for r in rows]
-        expected = [0, 12, 24]
-        assert starts == expected
-
-    def test_logger_warns_for_each_contig(self, fasta_config, logger):
-        defragment_reference(fasta_config, logger)
-        # At least one warning call per contig
-        warning_calls = logger.warning.call_count
-        assert warning_calls >= len(self.CONTIGS)
+        assert starts == [1, 13, 25]  # 1-based: contig_1 at 1, contig_2 at 13, contig_3 at 25
 
 
 # ---------------------------------------------------------------------------
@@ -191,26 +178,26 @@ class TestDefragmentGenbank:
         _write_genbank(gbk_path, self.CONTIGS)
         return _make_genome_config(gbk_path, GenomeFormat.GENBANK)
 
-    def test_merged_fasta_has_one_sequence(self, gbk_config, logger):
-        merged, _ = defragment_reference(gbk_config, logger)
+    def test_merged_fasta_has_one_sequence(self, gbk_config):
+        merged, _ = defragment_reference(gbk_config)
         records = list(SeqIO.parse(merged, "fasta"))
         assert len(records) == 1
 
-    def test_merged_sequence_is_concatenation(self, gbk_config, logger):
-        merged, _ = defragment_reference(gbk_config, logger)
+    def test_merged_sequence_is_concatenation(self, gbk_config):
+        merged, _ = defragment_reference(gbk_config)
         records = list(SeqIO.parse(merged, "fasta"))
         assert str(records[0].seq) == self.EXPECTED_SEQ
 
-    def test_tsv_row_count(self, gbk_config, logger):
-        _, tsv = defragment_reference(gbk_config, logger)
+    def test_tsv_row_count(self, gbk_config):
+        _, tsv = defragment_reference(gbk_config)
         lines = tsv.read_text().splitlines()
         assert len(lines) == 1 + len(self.CONTIGS)
 
-    def test_tsv_start_offsets(self, gbk_config, logger):
-        _, tsv = defragment_reference(gbk_config, logger)
+    def test_tsv_start_offsets(self, gbk_config):
+        _, tsv = defragment_reference(gbk_config)
         rows = tsv.read_text().splitlines()[1:]
         starts = [int(r.split("\t")[2]) for r in rows]
-        assert starts == [0, 20]
+        assert starts == [1, 21]  # 1-based: rec1 at 1, rec2 at 21 (after 20 bp)
 
 
 # ---------------------------------------------------------------------------
@@ -233,8 +220,8 @@ class TestDefragmentCompressed:
         config.coding_type = CodingType.GZIP
         return config
 
-    def test_merged_sequence_correct(self, gz_config, logger):
-        merged, _ = defragment_reference(gz_config, logger)
+    def test_merged_sequence_correct(self, gz_config):
+        merged, _ = defragment_reference(gz_config)
         records = list(SeqIO.parse(merged, "fasta"))
         expected = "".join(seq for _, seq in self.CONTIGS)
         assert str(records[0].seq) == expected
@@ -246,29 +233,29 @@ class TestDefragmentCompressed:
 
 class TestDefragmentEdgeCases:
 
-    def test_empty_fasta_raises(self, tmp_inputs, logger):
+    def test_empty_fasta_raises(self, tmp_inputs):
         empty = tmp_inputs / "empty.fasta"
         empty.write_text("")
         config = _make_genome_config(empty, GenomeFormat.FASTA)
         with pytest.raises(ValueError, match="No sequences found"):
-            defragment_reference(config, logger)
+            defragment_reference(config)
 
-    def test_single_contig_works(self, tmp_inputs, logger):
+    def test_single_contig_works(self, tmp_inputs):
         fasta_path = tmp_inputs / "single.fasta"
         _write_fasta(fasta_path, [("only", "ATCGATCG")])
         config = _make_genome_config(fasta_path, GenomeFormat.FASTA)
-        merged, tsv = defragment_reference(config, logger)
+        merged, tsv = defragment_reference(config)
         records = list(SeqIO.parse(merged, "fasta"))
         assert len(records) == 1
         assert str(records[0].seq) == "ATCGATCG"
         rows = tsv.read_text().splitlines()
         assert len(rows) == 2  # header + 1 row
 
-    def test_empty_fasta_cleans_up_partial_files(self, tmp_inputs, logger):
+    def test_empty_fasta_cleans_up_partial_files(self, tmp_inputs):
         empty = tmp_inputs / "empty.fasta"
         empty.write_text("")
         config = _make_genome_config(empty, GenomeFormat.FASTA)
         with pytest.raises(ValueError):
-            defragment_reference(config, logger)
+            defragment_reference(config)
         merged_path = tmp_inputs / "empty_defragmented.fasta"
         assert not merged_path.exists()

@@ -4,16 +4,14 @@ Tests for nextflow_params.py
 Tests cover:
 - run_ref_x_mod conditions
 - Read type detection (illumina, ont, pacbio)
-- Conditional keys (ref_fasta_validated, mod_fasta_validated, pacbio_fastq)
+- Conditional keys (ref_fasta_validated, mod_fasta_validated, pacbio_fastqs)
 - write_params serialises valid JSON
 """
 
 import json
 import tempfile
 from pathlib import Path
-from types import SimpleNamespace  # noqa: F401 — used in tests and helpers
-
-import pytest
+from types import SimpleNamespace
 
 import sys
 from pathlib import Path
@@ -156,6 +154,7 @@ class TestReads:
         p = build_params(r)
         assert p.run_pacbio is False
         assert p.pacbio_read_type is None
+        assert p.pacbio_fastqs == []
 
     def test_mixed_read_types(self):
         r = _base()
@@ -176,6 +175,7 @@ class TestReads:
         assert p.run_nanopore is False
         assert p.run_pacbio is False
         assert p.pacbio_read_type is None
+        assert p.ont_fastqs == []
 
 
 # ---------------------------------------------------------------------------

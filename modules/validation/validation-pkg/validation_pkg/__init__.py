@@ -37,15 +37,6 @@ def validate_genome(
     validator = GenomeValidator(genome_config, settings)
     return validator.run()
 
-def validate_read(
-    read_config,
-    settings: Optional[ReadValidator.Settings] = None
-) -> ReadOutputMetadata:
-    """Validate a single read file with optional custom settings."""
-    validator = ReadValidator(read_config, settings)
-    output_metadata = validator.run()
-    return output_metadata
-
 def validate_reads(
     read_configs: List,
     settings: Optional[ReadValidator.Settings] = None
@@ -58,18 +49,6 @@ def validate_reads(
         results.append(result)
     return results
 
-def validate_genomes(
-    genome_configs: List,
-    settings: Optional[GenomeValidator.Settings] = None
-) -> List[GenomeOutputMetadata]:
-    """Validate multiple genome files with optional custom settings."""
-    results = []
-    for genome_config in genome_configs:
-        validator = GenomeValidator(genome_config, settings)
-        result = validator.run()
-        results.append(result)
-    return results
-
 def validate_feature(
     feature_config,
     settings: Optional[FeatureValidator.Settings] = None
@@ -77,18 +56,6 @@ def validate_feature(
     """Validate a feature annotation file with optional custom settings."""
     validator = FeatureValidator(feature_config, settings)
     return validator.run()
-
-def validate_features(
-    feature_configs: List,
-    settings: Optional[FeatureValidator.Settings] = None
-) -> List[FeatureOutputMetadata]:
-    """Validate multiple feature annotation files with optional custom settings."""
-    results = []
-    for feature_config in feature_configs:
-        validator = FeatureValidator(feature_config, settings)
-        result = validator.run()
-        results.append(result)
-    return results
 
 __all__ = [
     # Configuration
@@ -102,11 +69,8 @@ __all__ = [
 
     # Functional API (Primary Interface)
     'validate_genome',
-    'validate_genomes',
-    'validate_read',
     'validate_reads',
     'validate_feature',
-    'validate_features',
 
     # Inter-file Validation
     'ReadXReadSettings',

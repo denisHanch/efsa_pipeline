@@ -1,8 +1,8 @@
 """Read file validator and processor for FASTQ and BAM formats."""
 
 from pathlib import Path
-from typing import Optional, List, Union, Dict, Any, Type
-from dataclasses import dataclass, asdict
+from typing import Optional, Any, Type
+from dataclasses import dataclass
 from Bio import SeqIO
 import shutil
 from multiprocessing import Pool
@@ -18,6 +18,7 @@ from validation_pkg.exceptions import (
 )
 from validation_pkg.utils.formats import ReadFormat, NgsType, ValidationLevel
 from validation_pkg.utils.base_validator import BaseValidator
+from validation_pkg.utils.formatting import format_metadata_value
 from validation_pkg.utils.file_handler import (
     convert_file_compression,
     open_compressed_writer
@@ -121,14 +122,6 @@ class ReadOutputMetadata(BaseOutputMetadata):
             data = self.to_dict()
             return key in data and data[key] is not None
 
-        # Helper to format values
-        def format_value(value):
-            if isinstance(value, float):
-                return f"{value:.2f}"
-            elif isinstance(value, int) and value > 999:
-                return f"{value:,}"
-            return str(value)
-
         # Iterate through all fields, skipping common ones
         skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
         special_fields = {'base_name', 'read_number', 'illumina_pairing_detected', 'longest_read_length', 'shortest_read_length'}
@@ -156,9 +149,7 @@ class ReadOutputMetadata(BaseOutputMetadata):
                 # Skip, handled with longest_read_length
                 continue
             elif key not in special_fields:
-                # Generic field formatting
-                formatted_value = format_value(value)
-                lines.append(f"{indent}{key}: {formatted_value}")
+                lines.append(f"{indent}{key}: {format_metadata_value(value)}")
 
         return lines
 
@@ -231,27 +222,10 @@ class ReadValidator(BaseValidator):
             self.settings = self.settings.update(output_subdir_name=subdir)
             self.logger.debug(f"Applied outdir_by_ngs_type: output_subdir_name set to '{subdir}'")
 
-    # Required abstract properties and methods from BaseValidator
-
-    @property
-    def _validator_type(self) -> str:
-        """Return validator type string."""
-        return 'read'
-
-    @property
-    def OutputMetadata(self) -> Type:
-        """Return ReadOutputMetadata class for this validator."""
-        return ReadOutputMetadata
-
-    @property
-    def _output_format(self) -> str:
-        """Return output format string for build_output_path."""
-        return 'fastq'
-
-    @property
-    def _expected_format(self) -> Any:
-        """Return expected format for minimal mode validation."""
-        return ReadFormat.FASTQ
+    _validator_type = 'read'
+    OutputMetadata = ReadOutputMetadata
+    _output_format = 'fastq'
+    _expected_format = ReadFormat.FASTQ
 
     def _get_validator_exception(self) -> Type[Exception]:
         """Return the validator-specific exception class."""
