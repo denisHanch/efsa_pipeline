@@ -308,7 +308,7 @@ setup_logging(log_file=log_file)
 ### Example 1: Basic Logging
 
 ```python
-from validation_pkg import setup_logging, get_logger, ConfigManager, validate_genome
+from validation_pkg import setup_logging, get_logger, ConfigManager, GenomeValidator
 
 # Setup logging
 setup_logging(
@@ -325,7 +325,7 @@ try:
     config = ConfigManager.load("config.json")
     logger.info(f"Loaded config with {len(config.reads)} read files")
 
-    result = validate_genome(config.ref_genome)
+    result = GenomeValidator(config.ref_genome).run()
     logger.info(f"✓ Validated {result.num_sequences} sequences")
 
 except Exception as e:
@@ -340,8 +340,8 @@ from validation_pkg import (
     setup_logging,
     get_logger,
     ConfigManager,
-    validate_genome,
-    validate_reads,
+    GenomeValidator,
+    ReadValidator,
     genomexgenome_validation,
     ValidationReport
 )
@@ -359,14 +359,14 @@ config = ConfigManager.load("config.json")
 
 # Validate genomes
 logger.info("Validating genomes...")
-ref_result = validate_genome(config.ref_genome)
-mod_result = validate_genome(config.mod_genome)
+ref_result = GenomeValidator(config.ref_genome).run()
+mod_result = GenomeValidator(config.mod_genome).run()
 report.write(ref_result, 'genome')
 report.write(mod_result, 'genome')
 
 # Validate reads
 logger.info("Validating reads...")
-reads_results = validate_reads(config.reads)
+reads_results = [ReadValidator(rc).run() for rc in config.reads]
 report.write(reads_results, 'read')
 
 # Inter-file validation
@@ -387,7 +387,7 @@ logger.info(f"Report written to: {report.report_path}")
 ### Example 3: Debug Mode with Timing
 
 ```python
-from validation_pkg import setup_logging, get_logger, validate_genome
+from validation_pkg import setup_logging, get_logger, GenomeValidator
 
 # Enable debug logging
 setup_logging(console_level='DEBUG', log_file='./logs/debug.log')
@@ -396,7 +396,7 @@ logger = get_logger()
 # Time validation
 logger.start_timer('genome_validation')
 
-result = validate_genome(config.ref_genome)
+result = GenomeValidator(config.ref_genome).run()
 
 elapsed = logger.stop_timer('genome_validation')
 logger.info(f"Validation completed in {elapsed:.2f}s")
@@ -438,7 +438,7 @@ def validate_custom_rules(genome_result):
         )
 
 # Run custom validation
-result = validate_genome(config.ref_genome)
+result = GenomeValidator(config.ref_genome).run()
 validate_custom_rules(result)
 
 # Review issues

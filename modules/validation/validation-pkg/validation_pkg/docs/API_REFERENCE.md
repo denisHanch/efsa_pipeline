@@ -5,7 +5,6 @@ Technical API documentation for the `validation_pkg` bioinformatics validation p
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [Functional API](#functional-api)
 - [Configuration Management](#configuration-management)
 - [Validator Classes](#validator-classes)
 - [Output Metadata](#output-metadata)
@@ -33,170 +32,22 @@ pip install -e "/path/to/validation-pkg[dev]"
 ### Basic Usage
 
 ```python
-from validation_pkg import ConfigManager, validate_genome, validate_reads, validate_feature
+from validation_pkg import ConfigManager, GenomeValidator, ReadValidator, FeatureValidator
 
 # Load configuration
 config = ConfigManager.load("config.json")
 
 # Validate genome files
-ref_result = validate_genome(config.ref_genome)
-mod_result = validate_genome(config.mod_genome)
+ref_result = GenomeValidator(config.ref_genome).run()
+mod_result = GenomeValidator(config.mod_genome).run()
 
 # Validate read files
-reads_results = validate_reads(config.reads)
+reads_results = [ReadValidator(rc).run() for rc in config.reads]
 
 # Validate feature file (if present)
 if config.ref_feature:
-    feature_result = validate_feature(config.ref_feature)
+    feature_result = FeatureValidator(config.ref_feature).run()
 ```
-
----
-
-## Functional API
-
-The functional API provides simplified wrapper functions for common validation tasks.
-
-### Genome Validation
-
-#### `validate_genome(genome_config, settings=None)`
-
-Validate a single genome file.
-
-**Parameters:**
-- `genome_config` (GenomeConfig): Genome configuration from ConfigManager
-- `settings` (GenomeValidator.Settings, optional): Custom validation settings
-
-**Returns:**
-- `GenomeOutputMetadata`: Metadata object with validation results
-
-**Example:**
-```python
-from validation_pkg import ConfigManager, validate_genome, GenomeValidator
-
-config = ConfigManager.load("config.json")
-
-# Use default settings
-result = validate_genome(config.ref_genome)
-print(f"Validated {result.num_sequences} sequences")
-
-# Use custom settings
-settings = GenomeValidator.Settings()
-settings = settings.update(
-    plasmid_split=True,
-    min_sequence_length=1000
-)
-result = validate_genome(config.ref_genome, settings)
-```
-
-#### `validate_genomes(genome_configs, settings=None)`
-
-Validate multiple genome files with the same settings.
-
-**Parameters:**
-- `genome_configs` (List[GenomeConfig]): List of genome configurations
-- `settings` (GenomeValidator.Settings, optional): Settings applied to all genomes
-
-**Returns:**
-- `List[GenomeOutputMetadata]`: List of metadata objects
-
-**Example:**
-```python
-# Validate both ref and mod genomes with same settings
-genome_list = [config.ref_genome, config.mod_genome]
-results = validate_genomes(genome_list, settings)
-
-for result in results:
-    print(f"{result.output_filename}: {result.num_sequences} sequences")
-```
-
----
-
-### Read Validation
-
-#### `validate_read(read_config, settings=None)`
-
-Validate a single read file.
-
-**Parameters:**
-- `read_config` (ReadConfig): Read configuration from ConfigManager
-- `settings` (ReadValidator.Settings, optional): Custom validation settings
-
-**Returns:**
-- `ReadOutputMetadata`: Metadata object with validation results
-
-**Example:**
-```python
-from validation_pkg import validate_read, ReadValidator
-
-# Validate single read file
-result = validate_read(config.reads[0])
-print(f"Reads: {result.num_reads}")
-print(f"N50: {result.n50} bp")
-```
-
-#### `validate_reads(read_configs, settings=None)`
-
-Validate multiple read files.
-
-**Parameters:**
-- `read_configs` (List[ReadConfig]): List of read configurations
-- `settings` (ReadValidator.Settings, optional): Settings applied to all reads
-
-**Returns:**
-- `List[ReadOutputMetadata]`: List of metadata objects
-
-**Example:**
-```python
-# Validate all read files
-results = validate_reads(config.reads)
-
-for result in results:
-    print(f"{result.output_filename}:")
-    print(f"  Reads: {result.num_reads:,}")
-    print(f"  Mean length: {result.mean_read_length:.1f} bp")
-    print(f"  N50: {result.n50:,} bp")
-```
-
----
-
-### Feature Validation
-
-#### `validate_feature(feature_config, settings=None)`
-
-Validate a single feature annotation file.
-
-**Parameters:**
-- `feature_config` (FeatureConfig): Feature configuration from ConfigManager
-- `settings` (FeatureValidator.Settings, optional): Custom validation settings
-
-**Returns:**
-- `FeatureOutputMetadata`: Metadata object with validation results
-
-**Example:**
-```python
-from validation_pkg import validate_feature, FeatureValidator
-
-# Validate with custom settings
-settings = FeatureValidator.Settings()
-settings = settings.update(
-    replace_id_with='chr1',
-    sort_by_position=True
-)
-result = validate_feature(config.ref_feature, settings)
-print(f"Features: {result.num_features}")
-print(f"Types: {result.feature_types}")
-```
-
-#### `validate_features(feature_configs, settings=None)`
-
-Validate multiple feature files.
-
-**Parameters:**
-- `feature_configs` (List[FeatureConfig]): List of feature configurations
-- `settings` (FeatureValidator.Settings, optional): Settings applied to all features
-
-**Returns:**
-- `List[FeatureOutputMetadata]`: List of metadata objects
 
 ---
 
