@@ -6,8 +6,6 @@ from typing import Optional, List, Type
 from dataclasses import dataclass
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
-from Bio.SeqUtils import gc_fraction
-
 from validation_pkg.utils.base_settings import BaseOutputMetadata, BaseValidatorSettings
 from validation_pkg.utils.formats import GenomeFormat, ValidationLevel, OrganismType
 from validation_pkg.exceptions import (
@@ -19,7 +17,6 @@ from validation_pkg.exceptions import (
 from validation_pkg.utils.file_handler import open_compressed_writer, copy_file
 from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
 from validation_pkg.utils.base_validator import BaseValidator
-from validation_pkg.utils.sequence_stats import calculate_n50
 from validation_pkg.utils.formatting import format_metadata_value
 
 @dataclass
@@ -28,10 +25,6 @@ class GenomeOutputMetadata(BaseOutputMetadata):
     # Genome-specific fields
     num_sequences: int = None
     total_genome_size: int = None  # strict only
-    longest_sequence_length: int = None
-    longest_sequence_id: str = None
-    gc_content: float = None  # strict only
-    n50: int = None  # strict only
     plasmid_count: int = None
     plasmid_filenames: List[str] = None
     plasmid_output_paths: List[str] = None  # full absolute paths, one per plasmid file
@@ -205,12 +198,6 @@ class GenomeValidator(BaseValidator):
         if self.sequences:
             self.output_metadata.num_sequences = len(self.sequences)
 
-            # Find longest sequence
-            if self.sequences:
-                longest_seq = max(self.sequences, key=lambda x: len(x.seq))
-                self.output_metadata.longest_sequence_length = len(longest_seq.seq)
-                self.output_metadata.longest_sequence_id = str(longest_seq.id)
-
             # Inter-file validation fields (trust and strict modes)
             self.output_metadata.sequence_ids = [str(seq.id) for seq in self.sequences]
             self.output_metadata.sequence_lengths = {str(seq.id): len(seq.seq) for seq in self.sequences}
@@ -227,44 +214,11 @@ class GenomeValidator(BaseValidator):
         self.output_metadata.num_sequences_filtered = self.num_sequences_filtered
         self.output_metadata.fragmented = getattr(self, '_sequence_limit_exceeded', False)
 
-        # Strict mode only - compute expensive statistics
+        # Strict mode only
         if self.validation_level == ValidationLevel.STRICT and self.sequences:
-            # Total genome size
             self.output_metadata.total_genome_size = sum(len(seq.seq) for seq in self.sequences)
 
-            # GC content
-            self.output_metadata.gc_content = self._calculate_gc_content(self.sequences)
-
-            # N50
-            self.output_metadata.n50 = self._calculate_n50(self.sequences)
-
     # ===== Validator Helper Functions =====
-
-    def _calculate_gc_content(self, sequences: List[SeqRecord]) -> float:
-        """Calculate GC content percentage for all sequences using BioPython."""
-        if not sequences:
-            return 0.0
-
-        total_gc = 0.0
-        total_bases = 0
-
-        for seq in sequences:
-            seq_length = len(seq.seq)
-            if seq_length > 0:
-                # gc_fraction returns value between 0 and 1
-                total_gc += gc_fraction(seq.seq) * seq_length
-                total_bases += seq_length
-
-        if total_bases == 0:
-            return 0.0
-
-        # Return as percentage (0-100)
-        return (total_gc / total_bases) * 100
-
-    def _calculate_n50(self, sequences: List[SeqRecord]) -> int:
-        """Calculate N50 assembly quality metric."""
-        lengths = [len(seq.seq) for seq in sequences]
-        return calculate_n50(lengths)
 
     def _parse_file(self) -> None:
         """Parse file using BioPython and validate format from genome_config."""

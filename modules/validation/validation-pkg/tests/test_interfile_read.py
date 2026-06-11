@@ -35,14 +35,12 @@ class TestPairedEndValidation:
                 base_name='sample',
                 read_number=1,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             ),
             ReadOutputMetadata(
                 output_file='sample_R2.fastq.gz',
                 base_name='sample',
                 read_number=2,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             )
         ]
 
@@ -61,7 +59,6 @@ class TestPairedEndValidation:
                 base_name='sample',
                 read_number=2,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             )
         ]
 
@@ -79,7 +76,6 @@ class TestPairedEndValidation:
                 base_name='sample',
                 read_number=1,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             )
         ]
 
@@ -96,14 +92,12 @@ class TestPairedEndValidation:
                 base_name='sample1',
                 read_number=2,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             ),
             ReadOutputMetadata(
                 output_file='sample2_R2.fastq.gz',
                 base_name='sample2',
                 read_number=2,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             )
         ]
 
@@ -123,14 +117,12 @@ class TestPairedEndValidation:
                 base_name='sample1',
                 read_number=1,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             ),
             ReadOutputMetadata(
                 output_file='sample1_R2.fastq.gz',
                 base_name='sample1',
                 read_number=2,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             ),
             # Incomplete pair (R2 only)
             ReadOutputMetadata(
@@ -138,7 +130,6 @@ class TestPairedEndValidation:
                 base_name='sample2',
                 read_number=2,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             )
         ]
 
@@ -153,7 +144,6 @@ class TestPairedEndValidation:
             ReadOutputMetadata(
                 output_file='sample.fastq.gz',
                 illumina_pairing_detected='ont',
-                num_reads=1000
             )
         ]
 
@@ -170,7 +160,6 @@ class TestPairedEndValidation:
                 base_name='sample',
                 read_number=2,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             )
         ]
 
@@ -189,14 +178,12 @@ class TestPairedEndValidation:
                 base_name='sample',
                 read_number=1,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             ),
             ReadOutputMetadata(
                 output_file='sample_R1_copy2.fastq.gz',
                 base_name='sample',
                 read_number=1,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             )
         ]
 
@@ -214,21 +201,18 @@ class TestPairedEndValidation:
                 base_name='sample',
                 read_number=1,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             ),
             ReadOutputMetadata(
                 output_file='sample_R2_copy1.fastq.gz',
                 base_name='sample',
                 read_number=2,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             ),
             ReadOutputMetadata(
                 output_file='sample_R2_copy2.fastq.gz',
                 base_name='sample',
                 read_number=2,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             )
         ]
 
@@ -253,7 +237,6 @@ class TestPairedEndValidation:
                 base_name='sample',
                 read_number=2,
                 illumina_pairing_detected='illumina',
-                num_reads=1000
             )
         ]
 

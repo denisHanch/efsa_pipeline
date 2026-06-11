@@ -20,7 +20,6 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-from validation_pkg import validate_genome
 from validation_pkg.validators.genome_validator import GenomeValidator
 from validation_pkg.validators.interfile_genome import GenomeXGenomeSettings, genomexgenome_validation
 from validation_pkg.config_manager import GenomeConfig
@@ -154,13 +153,13 @@ class TestScenario1SingleContigWithPlasmids:
 
     def test_ref_plasmid_extracted(self, setup):
         ref_cfg, _ = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         assert ref_res.plasmid_filenames, "ref plasmid should be extracted (shorter sequence)"
         assert len(ref_res.plasmid_filenames) == 1
 
     def test_ref_output_is_single_chromosome(self, setup):
         ref_cfg, _ = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         assert ref_res.num_sequences == 1
         ids = _read_ids(Path(ref_res.output_file))
         assert ids == ["chr"], f"Expected renamed id 'chr', got {ids}"
@@ -170,7 +169,7 @@ class TestScenario1SingleContigWithPlasmids:
     def test_mod_output_contains_both_sequences_before_gxg(self, setup):
         """mod keeps all sequences until minimap2 splits them in GXG."""
         _, mod_cfg = setup
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         assert mod_res.num_sequences == 2
         assert mod_res.fragmented is False
 
@@ -178,8 +177,8 @@ class TestScenario1SingleContigWithPlasmids:
 
     def test_minimap2_is_called(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         # mod output has 2 renamed sequences: 'chr' (chromosome) and 'chr1' (plasmid)
         paf = _paf_line("chr")
         with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
@@ -190,8 +189,8 @@ class TestScenario1SingleContigWithPlasmids:
 
     def test_one_contig_file_produced(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         paf = _paf_line("chr")  # only 'chr' (index 0) maps; 'chr1' (plasmid) does not
         with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
              patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
@@ -202,8 +201,8 @@ class TestScenario1SingleContigWithPlasmids:
 
     def test_plasmid_file_produced_from_mod(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         paf = _paf_line("chr")
         with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
              patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
@@ -216,8 +215,8 @@ class TestScenario1SingleContigWithPlasmids:
 
     def test_run_ref_x_mod_is_true(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         paf = _paf_line("chr")
         with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
              patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
@@ -228,8 +227,8 @@ class TestScenario1SingleContigWithPlasmids:
 
     def test_contig_file_size_is_one(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         paf = _paf_line("chr")
         with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
              patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
@@ -240,8 +239,8 @@ class TestScenario1SingleContigWithPlasmids:
 
     def test_ref_plasmid_fasta_is_set_in_params(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         paf = _paf_line("chr")
         with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
              patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
@@ -252,8 +251,8 @@ class TestScenario1SingleContigWithPlasmids:
 
     def test_mod_plasmid_fasta_is_set_in_params(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         paf = _paf_line("chr")
         with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
              patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
@@ -291,14 +290,14 @@ class TestScenario2FragmentedBelowLimit:
 
     def test_mod_not_fragmented(self, setup):
         _, mod_cfg = setup
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         assert mod_res.fragmented is False
         assert mod_res.num_sequences == 3
 
     def test_minimap2_is_called(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         paf = "\n".join([_paf_line("chr"), _paf_line("chr1")])
         with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
              patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
@@ -308,8 +307,8 @@ class TestScenario2FragmentedBelowLimit:
 
     def test_two_contigs_and_one_plasmid(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         paf = "\n".join([_paf_line("chr"), _paf_line("chr1")])
         with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
              patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
@@ -320,8 +319,8 @@ class TestScenario2FragmentedBelowLimit:
 
     def test_run_ref_x_mod_is_true(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         paf = "\n".join([_paf_line("chr"), _paf_line("chr1")])
         with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
              patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
@@ -332,8 +331,8 @@ class TestScenario2FragmentedBelowLimit:
 
     def test_contig_file_size_is_two(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         paf = "\n".join([_paf_line("chr"), _paf_line("chr1")])
         with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
              patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
@@ -377,29 +376,29 @@ class TestScenario3FragmentedAboveLimit:
 
     def test_mod_is_fragmented(self, setup):
         _, mod_cfg = setup
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         assert mod_res.fragmented is True, "mod (3 seqs > limit=2) must be fragmented"
 
     def test_mod_output_contains_all_original_sequences(self, setup):
         """mod output is a direct copy — sequence count must match input."""
         _, mod_cfg = setup
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         assert mod_res.num_sequences == 3, "copied mod should report all 3 sequences"
         ids = _read_ids(Path(mod_res.output_file))
         assert len(ids) == 3, f"output file should have 3 sequences, got {ids}"
 
     def test_run_ref_x_mod_is_false(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         params = build_params(_build_validation_results(ref_res, mod_res, gxg_res=None))
         assert params.run_ref_x_mod is False
 
     def test_minimap2_not_called_when_mod_fragmented(self, setup):
         """Replicate main.py's condition: skip GXG when mod is fragmented."""
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
 
         with patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
             # main.py condition: only run GXG if mod is not fragmented
@@ -410,8 +409,8 @@ class TestScenario3FragmentedAboveLimit:
 
     def test_no_contig_files(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         params = build_params(_build_validation_results(ref_res, mod_res, gxg_res=None))
         assert params.contig_file_size == 0
         assert params.contig_files == []
@@ -419,16 +418,16 @@ class TestScenario3FragmentedAboveLimit:
     def test_mod_plasmid_fasta_is_none(self, setup):
         """No minimap2 means no plasmid detection for mod."""
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         params = build_params(_build_validation_results(ref_res, mod_res, gxg_res=None))
         assert params.mod_plasmid_fasta is None
 
     def test_ref_plasmid_fasta_is_none_when_ref_single_seq(self, setup):
         """Single-sequence ref produces no plasmid file."""
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         params = build_params(_build_validation_results(ref_res, mod_res, gxg_res=None))
         assert params.ref_plasmid_fasta is None
 
@@ -459,8 +458,8 @@ class TestScenario3RefWithPlasmid:
     def test_ref_plasmid_still_extracted_despite_fragmented_mod(self, setup):
         """Ref plasmid extraction is independent of mod's fragmentation status."""
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         params = build_params(_build_validation_results(ref_res, mod_res, gxg_res=None))
         assert params.ref_plasmid_fasta is not None, (
             "ref_plasmid_fasta should be set even when mod is fragmented"
@@ -468,15 +467,15 @@ class TestScenario3RefWithPlasmid:
 
     def test_mod_plasmid_fasta_still_none(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         params = build_params(_build_validation_results(ref_res, mod_res, gxg_res=None))
         assert params.mod_plasmid_fasta is None
 
     def test_run_ref_x_mod_is_false(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         params = build_params(_build_validation_results(ref_res, mod_res, gxg_res=None))
         assert params.run_ref_x_mod is False
 
@@ -513,18 +512,18 @@ class TestScenario4aEukaryoteType:
 
     def test_ref_is_fragmented(self, setup):
         ref_cfg, _ = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         assert ref_res.fragmented is True, "EUKARYOTE ref must be marked fragmented"
 
     def test_mod_is_fragmented(self, setup):
         _, mod_cfg = setup
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         assert mod_res.fragmented is True, "EUKARYOTE mod must be marked fragmented"
 
     def test_ref_output_file_exists_and_is_copied_as_is(self, setup):
         """EUKARYOTE ref should be copied without any plasmid extraction."""
         ref_cfg, _ = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         assert ref_res.output_file is not None
         ids = _read_ids(Path(ref_res.output_file))
         assert len(ids) == 3, "EUKARYOTE ref should be copied with all 3 sequences"
@@ -532,23 +531,23 @@ class TestScenario4aEukaryoteType:
     def test_ref_no_plasmid_extracted(self, setup):
         """Plasmid splitting must not happen for EUKARYOTE."""
         ref_cfg, _ = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         assert not ref_res.plasmid_filenames, (
             "EUKARYOTE ref should not have plasmids extracted"
         )
 
     def test_run_ref_x_mod_is_false(self, setup):
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         params = build_params(_build_validation_results(ref_res, mod_res, gxg_res=None))
         assert params.run_ref_x_mod is False
 
     def test_minimap2_not_called_for_eukaryote(self, setup):
         """Expected: genomexgenome (minimap2) should NOT run when both genomes are fragmented."""
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
 
         with patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
             # Correct condition (per docs): skip if EITHER genome is fragmented
@@ -560,8 +559,8 @@ class TestScenario4aEukaryoteType:
     def test_fixed_main_py_skips_gxg_for_eukaryote(self, setup):
         """Fixed condition checks both ref and mod — GXG skipped for EUKARYOTE."""
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
 
         fixed_main_py_would_call_gxg = (
             mod_res is not None
@@ -608,24 +607,24 @@ class TestScenario4bProkaryoteFragmentedRef:
 
     def test_ref_is_fragmented(self, setup):
         ref_cfg, _ = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         assert ref_res.fragmented is True
 
     def test_mod_is_not_fragmented(self, setup):
         _, mod_cfg = setup
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         assert mod_res.fragmented is False
 
     def test_ref_output_is_copied_as_is(self, setup):
         """Fragmented ref should be copied without plasmid extraction."""
         ref_cfg, _ = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         ids = _read_ids(Path(ref_res.output_file))
         assert len(ids) == 3, "fragmented ref must be copied with all sequences"
 
     def test_ref_no_plasmid_extracted(self, setup):
         ref_cfg, _ = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         assert not ref_res.plasmid_filenames, (
             "fragmented ref must not have plasmids extracted"
         )
@@ -633,8 +632,8 @@ class TestScenario4bProkaryoteFragmentedRef:
     def test_run_ref_x_mod_is_false(self, setup):
         """build_params checks both ref_fragmented and mod_fragmented."""
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         params = build_params(_build_validation_results(ref_res, mod_res, gxg_res=None))
         assert params.run_ref_x_mod is False, (
             "run_ref_x_mod must be False when ref is fragmented"
@@ -646,8 +645,8 @@ class TestScenario4bProkaryoteFragmentedRef:
         sequences. The correct condition to guard GXG should check both ref and mod.
         """
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
 
         # Expected (documented) condition: skip if EITHER genome is fragmented
         should_run_gxg = not mod_res.fragmented and not ref_res.fragmented
@@ -661,8 +660,8 @@ class TestScenario4bProkaryoteFragmentedRef:
         When only ref is fragmented (scenario 4), GXG / minimap2 must be skipped.
         """
         ref_cfg, mod_cfg = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
 
         # Fixed condition (both ref and mod must be non-fragmented):
         fixed_main_py_would_call_gxg = (
@@ -723,7 +722,7 @@ class TestScenario3DuplicateIdsInFragmentedMod:
 
     def test_mod_is_fragmented_with_five_seqs_over_limit(self, setup):
         _, mod_cfg = setup
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         assert mod_res.fragmented is True, "5 sequences > limit=4 must be fragmented"
 
     def test_output_has_no_duplicate_ids(self, setup):
@@ -732,7 +731,7 @@ class TestScenario3DuplicateIdsInFragmentedMod:
         must be unique so downstream tools do not fail.
         """
         _, mod_cfg = setup
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         ids = _read_ids(Path(mod_res.output_file))
         assert len(ids) == len(set(ids)), (
             f"Duplicate IDs found in copied fragmented output: "
@@ -742,7 +741,7 @@ class TestScenario3DuplicateIdsInFragmentedMod:
     def test_all_sequences_preserved_after_deduplication(self, setup):
         """Deduplication must rename, not drop sequences."""
         _, mod_cfg = setup
-        mod_res = validate_genome(mod_cfg, _mod_settings())
+        mod_res = GenomeValidator(mod_cfg, _mod_settings()).run()
         ids = _read_ids(Path(mod_res.output_file))
         assert len(ids) == 5, "All 5 sequences must be present after deduplication"
 
@@ -782,7 +781,7 @@ class TestScenario4cRefAtSequenceLimit:
     def test_ref_is_fragmented_at_exact_limit(self, setup):
         """5 seqs with limit=5: >= check → ref IS fragmented (scenario 4)."""
         ref_cfg, _ = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         assert ref_res.fragmented is True
 
     def test_ref_copied_as_is_no_chromosome_extraction(self, setup):
@@ -791,7 +790,7 @@ class TestScenario4cRefAtSequenceLimit:
         All 5 sequences must be present in output (no plasmid extraction).
         """
         ref_cfg, _ = setup
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         assert ref_res.num_sequences == 5, "All sequences preserved when fragmented"
         assert not ref_res.plasmid_filenames, "No plasmid extraction in scenario 4"
 
@@ -805,7 +804,7 @@ class TestScenario4cRefAtSequenceLimit:
             ("seq3", _CHR_SEQ), ("seq4", _CHR_SEQ),
         ])
         cfg4 = _make_genome_config(fasta_4, out, n_sequence_limit=5)
-        ref_res = validate_genome(cfg4, _ref_settings())
+        ref_res = GenomeValidator(cfg4, _ref_settings()).run()
         assert ref_res.fragmented is False
 
 
@@ -820,7 +819,7 @@ class TestScenario5ForceDefragmentRefBaseline:
         out = tmp_path / "out"
         out.mkdir()
         ref_cfg = _make_genome_config(ref_path, out, n_sequence_limit=1)
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         assert ref_res.fragmented is True, (
             "Without force_defragment_ref, fragmented ref is marked fragmented"
         )
@@ -833,7 +832,7 @@ class TestScenario5ForceDefragmentRefBaseline:
         out = tmp_path / "out"
         out.mkdir()
         ref_cfg = _make_genome_config(ref_path, out, n_sequence_limit=1)
-        ref_res = validate_genome(ref_cfg, _ref_settings())
+        ref_res = GenomeValidator(ref_cfg, _ref_settings()).run()
         assert not ref_res.plasmid_filenames, (
             "Fragmented ref without force_defragment_ref: no plasmid extraction"
         )

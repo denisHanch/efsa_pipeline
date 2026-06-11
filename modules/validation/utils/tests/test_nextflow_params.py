@@ -47,6 +47,7 @@ def _base(contig_files=None, passed=True, plasmid_file=None):
         "genomexgenome": _gxg(contig_files or [], passed=passed, plasmid_file=plasmid_file),
         "reads":         [],
         "ref_feature":   None,
+        "mod_feature":   None,
     }
 
 
@@ -249,6 +250,54 @@ class TestPlasmidPaths:
         d = p.to_dict()
         assert "mod_plasmid_fasta" in d
         assert d["mod_plasmid_fasta"] == "/valid/mod_plasmid.fasta"
+
+
+# ---------------------------------------------------------------------------
+# Feature / GFF paths
+# ---------------------------------------------------------------------------
+
+class TestFeaturePaths:
+
+    def test_ref_feature_gff_present_when_set(self):
+        r = _base()
+        r["ref_feature"] = _meta("/valid/ref.gff3")
+        p = build_params(r)
+        assert p.ref_feature_gff == "/valid/ref.gff3"
+
+    def test_mod_feature_gff_present_when_set(self):
+        r = _base()
+        r["mod_feature"] = _meta("/valid/mod.gff3")
+        p = build_params(r)
+        assert p.mod_feature_gff == "/valid/mod.gff3"
+
+    def test_both_feature_gffs_present(self):
+        r = _base()
+        r["ref_feature"] = _meta("/valid/ref.gff3")
+        r["mod_feature"] = _meta("/valid/mod.gff3")
+        p = build_params(r)
+        assert p.ref_feature_gff == "/valid/ref.gff3"
+        assert p.mod_feature_gff == "/valid/mod.gff3"
+
+    def test_feature_gff_absent_from_json_when_none(self):
+        p = build_params(_base())
+        d = p.to_dict()
+        assert "ref_feature_gff" not in d
+        assert "mod_feature_gff" not in d
+
+    def test_ref_feature_gff_present_in_json_when_set(self):
+        r = _base()
+        r["ref_feature"] = _meta("/valid/ref.gff3")
+        p = build_params(r)
+        d = p.to_dict()
+        assert "ref_feature_gff" in d
+        assert d["ref_feature_gff"] == "/valid/ref.gff3"
+
+    def test_feature_gff_absent_when_output_file_is_none(self):
+        r = _base()
+        r["ref_feature"] = SimpleNamespace(output_file=None)
+        p = build_params(r)
+        d = p.to_dict()
+        assert "ref_feature_gff" not in d
 
 
 # ---------------------------------------------------------------------------
