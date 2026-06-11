@@ -24,7 +24,7 @@ The `validation_pkg` is a comprehensive Python package for validating and proces
 ### Getting Started
 
 - **[API_REFERENCE.md](API_REFERENCE.md)** - Core API documentation
-  - Functional API (`validate_genome`, `validate_reads`, `validate_feature`)
+  - Validator classes (`GenomeValidator`, `ReadValidator`, `FeatureValidator`)
   - Configuration management (`ConfigManager`, `Config`)
   - Output metadata objects
   - Quick start examples
@@ -107,14 +107,14 @@ pip install -e "/path/to/validation-pkg[dev]"
 ### Basic Usage
 
 ```python
-from validation_pkg import ConfigManager, validate_genome, validate_reads
+from validation_pkg import ConfigManager, GenomeValidator, ReadValidator
 
 # Load configuration
 config = ConfigManager.load("config.json")
 
 # Validate files
-ref_result = validate_genome(config.ref_genome)
-reads_results = validate_reads(config.reads)
+ref_result = GenomeValidator(config.ref_genome).run()
+reads_results = [ReadValidator(rc).run() for rc in config.reads]
 
 print(f"Validated {ref_result.num_sequences} sequences")
 print(f"Validated {len(reads_results)} read files")
@@ -155,7 +155,8 @@ validation_pkg/
 │   └── interfile_read.py        # Paired-end checking
 └── utils/
     ├── base_settings.py  # BaseSettings, BaseOutputMetadata, BaseValidatorSettings
-    ├── base_validator.py # BaseValidator abstract class
+    ├── base_validator.py # BaseValidator abstract class (ClassVar interface)
+    ├── formatting.py     # Shared format_metadata_value() helper
     ├── file_handler.py   # File I/O and compression utilities
     ├── formats.py        # CodingType, GenomeFormat, ReadFormat, FeatureFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType enums
     ├── logger.py         # Structured logging system
@@ -233,11 +234,11 @@ data/valid/
 ### 1. Basic Validation
 
 ```python
-from validation_pkg import ConfigManager, validate_genome, validate_reads
+from validation_pkg import ConfigManager, GenomeValidator, ReadValidator
 
 config = ConfigManager.load("config.json")
-ref = validate_genome(config.ref_genome)
-reads = validate_reads(config.reads)
+ref = GenomeValidator(config.ref_genome).run()
+reads = [ReadValidator(rc).run() for rc in config.reads]
 ```
 
 See: [EXAMPLES.md](EXAMPLES.md#quick-start)
@@ -251,7 +252,7 @@ settings = GenomeValidator.Settings(
     plasmid_split=True,
     validation_level='trust'
 )
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 ```
 
 See: [VALIDATORS.md](VALIDATORS.md#basic-usage)
@@ -262,8 +263,8 @@ See: [VALIDATORS.md](VALIDATORS.md#basic-usage)
 from validation_pkg import (
     setup_logging,
     ValidationReport,
-    validate_genome,
-    validate_reads,
+    GenomeValidator,
+    ReadValidator,
     genomexgenome_validation
 )
 
@@ -271,9 +272,9 @@ setup_logging(log_file='./logs/validation.log')
 report = ValidationReport('./logs/report.txt')
 
 # Validate
-ref = validate_genome(config.ref_genome)
-mod = validate_genome(config.mod_genome)
-reads = validate_reads(config.reads)
+ref = GenomeValidator(config.ref_genome).run()
+mod = GenomeValidator(config.mod_genome).run()
+reads = [ReadValidator(rc).run() for rc in config.reads]
 
 # Report
 report.write(ref, 'genome')

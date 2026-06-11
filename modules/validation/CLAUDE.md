@@ -25,7 +25,7 @@ modules/validation/
     ├── requirements.txt           # biopython, numpy, pysam, structlog, typing_extensions
     ├── requirements-dev.txt       # pytest
     ├── validation_pkg/
-    │   ├── __init__.py            # Functional API (validate_genome, validate_reads, …); __all__ exports ValidationReport and __version__ individually
+    │   ├── __init__.py            # Public exports (validator classes, inter-file functions, logging, report); no functional-API wrappers
     │   ├── config_manager.py      # JSON config loader → Config / *Config dataclasses
     │   ├── exceptions.py          # Exception hierarchy rooted at ValidationError
     │   ├── report.py              # ValidationReport — collects results, writes report.txt
@@ -114,17 +114,16 @@ pytest tests/
 3.  ConfigManager.load(config_path) → Config   # returns 1 on failure
 4.  Instantiate per-validator Settings objects
 5.  Initialise fatal_errors list + register_required_failure / register_missing_output helpers
-6.  validate_genome(ref_genome_config, ref_settings)              # required
+6.  GenomeValidator(ref_genome_config, ref_settings).run()        # required
       → register_missing_output on success, register_required_failure on ValidationError
-7.  validate_genome(mod_genome_config, mod_settings)              # optional
+7.  GenomeValidator(mod_genome_config, mod_settings).run()        # optional
 8.  genomexgenome_validation(ref_res, mod_res, gxg_settings)      # only if both present AND neither fragmented
-9.  validate_genome(ref_plasmid_config, plasmid_settings)         # optional
-10. validate_genome(mod_plasmid_config, plasmid_settings)         # optional
-11. validate_reads(reads_configs, reads_settings)                  # required
+9.  GenomeValidator(ref_plasmid_config, plasmid_settings).run()   # optional
+10. GenomeValidator(mod_plasmid_config, plasmid_settings).run()   # optional
+11. [ReadValidator(rc, reads_settings).run() for rc in reads]     # required
       → register_missing_output per read, register_required_failure on ValidationError
 12. readxread_validation(reads_res, readxread_settings)            # only if reads validated
-13. validate_feature(ref_feature_config, ref_feature_settings)    # optional
-14. validate_feature(mod_feature_config, mod_feature_settings)    # optional
+13. FeatureValidator(ref_feature_config, ref_feature_settings).run()  # optional
 15. if fatal_errors: report.add_fatal_errors(fatal_errors)
 16. report.flush(format='text')
 17. nf_params.build_params(validation_results) → NextflowParams
@@ -975,21 +974,6 @@ readxread_settings = ReadXReadSettings()   # all defaults
 ```
 
 ---
-
-## Functional API (`validation_pkg/__init__.py`)
-
-Thin wrappers — prefer these over instantiating validators directly.
-
-```python
-validate_genome(genome_config, settings=None)   → GenomeOutputMetadata
-validate_genomes(genome_configs, settings=None) → List[GenomeOutputMetadata]
-
-validate_read(read_config, settings=None)       → ReadOutputMetadata
-validate_reads(read_configs, settings=None)     → List[ReadOutputMetadata]
-
-validate_feature(feature_config, settings=None) → FeatureOutputMetadata
-validate_features(feature_configs, settings=None) → List[FeatureOutputMetadata]
-```
 
 ---
 

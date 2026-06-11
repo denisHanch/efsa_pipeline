@@ -50,7 +50,7 @@ from validation_pkg.exceptions import ValidationError
 **Catching All Validation Errors:**
 ```python
 try:
-    result = validate_genome(config.ref_genome)
+    result = GenomeValidator(config.ref_genome).run()
 except ValidationError as e:
     print(f"Validation failed: {e}")
 ```
@@ -147,7 +147,7 @@ Base exception for file format errors.
 from validation_pkg.exceptions import FastaFormatError
 
 try:
-    result = validate_genome(config.ref_genome)
+    result = GenomeValidator(config.ref_genome).run()
 except FastaFormatError as e:
     print(f"FASTA format error: {e}")
     # Check input file format
@@ -170,7 +170,7 @@ Raised when genome validation fails.
 from validation_pkg.exceptions import GenomeValidationError
 
 try:
-    result = validate_genome(config.ref_genome)
+    result = GenomeValidator(config.ref_genome).run()
 except GenomeValidationError as e:
     print(f"Genome validation failed: {e}")
     # Check genome file quality
@@ -205,7 +205,7 @@ Raised when read validation fails.
 from validation_pkg.exceptions import ReadValidationError
 
 try:
-    result = validate_read(config.reads[0])
+    result = ReadValidator(config.reads[0]).run()
 except ReadValidationError as e:
     print(f"Read validation failed: {e}")
 ```
@@ -240,7 +240,7 @@ Raised when feature validation fails.
 from validation_pkg.exceptions import FeatureValidationError
 
 try:
-    result = validate_feature(config.ref_feature)
+    result = FeatureValidator(config.ref_feature).run()
 except FeatureValidationError as e:
     print(f"Feature validation failed: {e}")
 ```
@@ -274,7 +274,7 @@ Raised when file decompression fails.
 from validation_pkg.exceptions import CompressionError
 
 try:
-    result = validate_genome(config.ref_genome)
+    result = GenomeValidator(config.ref_genome).run()
 except CompressionError as e:
     print(f"Compression error: {e}")
 ```
@@ -319,7 +319,7 @@ All exceptions provide detailed error messages:
 
 ```python
 try:
-    result = validate_genome(config.ref_genome)
+    result = GenomeValidator(config.ref_genome).run()
 except GenomeValidationError as e:
     # Error message
     print(f"Error: {e}")
@@ -342,7 +342,7 @@ from validation_pkg import setup_logging, get_logger
 setup_logging(log_file="./logs/validation.log")
 
 try:
-    result = validate_genome(config.ref_genome)
+    result = GenomeValidator(config.ref_genome).run()
 except ValidationError as e:
     # Error is already logged to file
     # Additional context can be added
@@ -357,13 +357,13 @@ except ValidationError as e:
 ### Pattern 1: Catch All Validation Errors
 
 ```python
-from validation_pkg import ConfigManager, validate_genome
+from validation_pkg import ConfigManager, GenomeValidator
 from validation_pkg.exceptions import ValidationError
 
 try:
     config = ConfigManager.load("config.json")
-    ref_result = validate_genome(config.ref_genome)
-    mod_result = validate_genome(config.mod_genome)
+    ref_result = GenomeValidator(config.ref_genome).run()
+    mod_result = GenomeValidator(config.mod_genome).run()
 
 except ValidationError as e:
     print(f"Validation failed: {e}")
@@ -385,7 +385,7 @@ from validation_pkg.exceptions import (
 
 try:
     config = ConfigManager.load("config.json")
-    result = validate_genome(config.ref_genome)
+    result = GenomeValidator(config.ref_genome).run()
 
 except ConfigurationError as e:
     print(f"Fix your config.json: {e}")
@@ -421,7 +421,7 @@ try:
         allow_empty_id=False,
         allow_empty_sequences=False
     )
-    result = validate_genome(config.ref_genome, settings)
+    result = GenomeValidator(config.ref_genome, settings).run()
 
 except GenomeValidationError as e:
     print(f"Strict validation failed: {e}")
@@ -432,7 +432,7 @@ except GenomeValidationError as e:
         allow_empty_id=True,
         allow_empty_sequences=True
     )
-    result = validate_genome(config.ref_genome, relaxed_settings)
+    result = GenomeValidator(config.ref_genome, relaxed_settings).run()
     print("Validation succeeded with relaxed settings")
 ```
 
@@ -443,7 +443,7 @@ except GenomeValidationError as e:
 ### Pattern 4: Continue on Error
 
 ```python
-from validation_pkg import validate_reads
+from validation_pkg import ReadValidator
 from validation_pkg.exceptions import ReadValidationError
 
 successful_results = []
@@ -451,7 +451,7 @@ failed_files = []
 
 for read_config in config.reads:
     try:
-        result = validate_read(read_config)
+        result = ReadValidator(read_config).run()
         successful_results.append(result)
 
     except ReadValidationError as e:
@@ -480,7 +480,7 @@ from validation_pkg.exceptions import ValidationError
 logger = get_logger()
 
 try:
-    result = validate_genome(config.ref_genome)
+    result = GenomeValidator(config.ref_genome).run()
 
 except ValidationError as e:
     # Log with additional context
@@ -515,21 +515,21 @@ def validate_with_fallback(genome_config):
     # Try strict
     try:
         settings = GenomeValidator.Settings(validation_level='strict')
-        return validate_genome(genome_config, settings)
+        return GenomeValidator(genome_config, settings).run()
     except ValidationError as e:
         print(f"Strict failed: {e}, trying trust mode...")
 
     # Try trust
     try:
         settings = GenomeValidator.Settings(validation_level='trust')
-        return validate_genome(genome_config, settings)
+        return GenomeValidator(genome_config, settings).run()
     except ValidationError as e:
         print(f"Trust failed: {e}, trying minimal mode...")
 
     # Try minimal
     try:
         settings = GenomeValidator.Settings(validation_level='minimal')
-        return validate_genome(genome_config, settings)
+        return GenomeValidator(genome_config, settings).run()
     except ValidationError as e:
         print(f"All validation levels failed: {e}")
         raise
@@ -668,7 +668,7 @@ gffread and the direct GFF3 fallback parser return 0 features.
    ```python
    # Minimal mode fails fast if format is wrong
    settings = GenomeValidator.Settings(validation_level='minimal')
-   result = validate_genome(config.ref_genome, settings)
+   result = GenomeValidator(config.ref_genome, settings).run()
    ```
 
 5. **Check BioPython compatibility:**

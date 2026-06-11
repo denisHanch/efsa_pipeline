@@ -30,8 +30,8 @@ Inter-file validation should be run **after** individual file validation:
 
 ```python
 # Step 1: Validate individual files
-ref_result = validate_genome(config.ref_genome)
-mod_result = validate_genome(config.mod_genome)
+ref_result = GenomeValidator(config.ref_genome).run()
+mod_result = GenomeValidator(config.mod_genome).run()
 
 # Step 2: Validate inter-file consistency
 from validation_pkg import genomexgenome_validation
@@ -157,7 +157,7 @@ result = genomexgenome_validation(ref_result, mod_result, settings)
 ```python
 from validation_pkg import (
     ConfigManager,
-    validate_genome,
+    GenomeValidator,
     genomexgenome_validation,
     GenomeXGenomeSettings
 )
@@ -166,8 +166,8 @@ from validation_pkg import (
 config = ConfigManager.load("config.json")
 
 # Validate genomes
-ref_result = validate_genome(config.ref_genome)
-mod_result = validate_genome(config.mod_genome)
+ref_result = GenomeValidator(config.ref_genome).run()
+mod_result = GenomeValidator(config.mod_genome).run()
 
 # Inter-file validation with default settings
 result = genomexgenome_validation(ref_result, mod_result)
@@ -332,7 +332,7 @@ result = readxread_validation(reads_results, settings)
 ```python
 from validation_pkg import (
     ConfigManager,
-    validate_reads,
+    ReadValidator,
     readxread_validation
 )
 
@@ -340,7 +340,7 @@ from validation_pkg import (
 config = ConfigManager.load("config.json")
 
 # Validate all read files
-reads_results = validate_reads(config.reads)
+reads_results = [ReadValidator(rc).run() for rc in config.reads]
 
 # Inter-file validation
 result = readxread_validation(reads_results)
@@ -361,7 +361,7 @@ else:
 from validation_pkg import ReadXReadSettings
 
 # Validate reads
-reads_results = validate_reads(config.reads)
+reads_results = [ReadValidator(rc).run() for rc in config.reads]
 
 # Check paired-end completeness
 settings = ReadXReadSettings(
@@ -427,9 +427,9 @@ Complete example with all validation steps.
 ```python
 from validation_pkg import (
     ConfigManager,
-    validate_genome,
-    validate_reads,
-    validate_feature,
+    GenomeValidator,
+    ReadValidator,
+    FeatureValidator,
     genomexgenome_validation,
     readxread_validation,
     GenomeXGenomeSettings,
@@ -444,18 +444,18 @@ config = ConfigManager.load("config.json")
 report = ValidationReport("./logs/validation_report.txt")
 
 # 3. Validate genomes
-ref_genome_result = validate_genome(config.ref_genome)
-mod_genome_result = validate_genome(config.mod_genome)
+ref_genome_result = GenomeValidator(config.ref_genome).run()
+mod_genome_result = GenomeValidator(config.mod_genome).run()
 report.write(ref_genome_result, "genome")
 report.write(mod_genome_result, "genome")
 
 # 4. Validate reads
-reads_results = validate_reads(config.reads)
+reads_results = [ReadValidator(rc).run() for rc in config.reads]
 report.write(reads_results, "read")
 
 # 5. Validate features
 if config.ref_feature:
-    feature_result = validate_feature(config.ref_feature)
+    feature_result = FeatureValidator(config.ref_feature).run()
     report.write(feature_result, "feature")
 
 # 6. Inter-file validation: Genome ↔ Genome
@@ -507,8 +507,8 @@ print(f"Read check: {'PASSED' if read_check['passed'] else 'FAILED'}")
 
 ```python
 # ✓ GOOD: Validate files first, then check consistency
-ref_result = validate_genome(config.ref_genome)
-mod_result = validate_genome(config.mod_genome)
+ref_result = GenomeValidator(config.ref_genome).run()
+mod_result = GenomeValidator(config.mod_genome).run()
 check = genomexgenome_validation(ref_result, mod_result)
 
 # ✗ BAD: Cannot run inter-file validation without results
@@ -596,7 +596,7 @@ Genome sequence count mismatch: reference has 2 sequence(s), modified has 1 sequ
 2. **Split plasmids** before validation:
    ```python
    genome_settings = GenomeValidator.Settings(plasmid_split=True)
-   ref_result = validate_genome(config.ref_genome, genome_settings)
+   ref_result = GenomeValidator(config.ref_genome, genome_settings).run()
    ```
 
 3. **Filter sequences** by length:
@@ -619,8 +619,8 @@ Genome sequence ID mismatch: reference-only: ['chr1'], modified-only: ['chromoso
 1. **Standardize IDs** before validation:
    ```python
    settings = GenomeValidator.Settings(replace_id_with='chr')
-   ref_result = validate_genome(config.ref_genome, settings)
-   mod_result = validate_genome(config.mod_genome, settings)
+   ref_result = GenomeValidator(config.ref_genome, settings).run()
+   mod_result = GenomeValidator(config.mod_genome, settings).run()
    ```
 
 2. **Disable ID check** if acceptable:

@@ -26,7 +26,7 @@ from validation_pkg import GenomeValidator
 
 # Default: longest sequence = chromosome, others = plasmids
 settings = GenomeValidator.Settings(main_longest=True)
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 print(f"Chromosome: {result.longest_sequence_id} ({result.longest_sequence_length} bp)")
 print(f"Plasmids: {result.plasmid_count}")
@@ -41,7 +41,7 @@ print(f"Plasmids: {result.plasmid_count}")
 
 ```python
 settings = GenomeValidator.Settings(plasmid_split=True)
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Output files:
 # - reference_genome.fasta (main chromosome)
@@ -58,7 +58,7 @@ print(f"Plasmids: {result.plasmid_filenames}")
 
 ```python
 settings = GenomeValidator.Settings(plasmids_to_one=True)
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Output files:
 # - reference_genome.fasta (chromosome only)
@@ -76,7 +76,7 @@ For files containing only plasmids (no chromosome):
 
 ```python
 settings = GenomeValidator.Settings(is_plasmid=True)
-result = validate_genome(config.plasmid_config, settings)
+result = GenomeValidator(config.plasmid_config, settings).run()
 
 # All sequences treated as plasmids
 # No "main" chromosome selection
@@ -99,7 +99,7 @@ settings = GenomeValidator.Settings(
     replace_id_with='seq'       # Rename sequences
 )
 
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Output:
 # - reference_genome.fasta: seq (chromosome)
@@ -119,7 +119,7 @@ GenomeValidator automatically converts GenBank to FASTA:
 
 ```python
 # Input: genome.gbk (GenBank)
-result = validate_genome(config.ref_genome)
+result = GenomeValidator(config.ref_genome).run()
 # Output: genome.fasta (FASTA)
 ```
 
@@ -148,7 +148,7 @@ FeatureValidator automatically converts BED to GFF3:
 
 ```python
 # Input: features.bed
-result = validate_feature(config.ref_feature)
+result = FeatureValidator(config.ref_feature).run()
 # Output: features.gff3
 ```
 
@@ -195,7 +195,7 @@ Advanced sequence ID modification and tracking.
 
 ```python
 settings = GenomeValidator.Settings(replace_id_with='chr')
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Input IDs: NC_000913.3, plasmid_pA
 # Output IDs: chr, chr1
@@ -215,7 +215,7 @@ Original IDs are stored in the description field of each sequence record:
 
 ```python
 settings = GenomeValidator.Settings(replace_id_with='chromosome')
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Output FASTA:
 # >chromosome NC_000913.3
@@ -232,7 +232,7 @@ Replace chromosome names in feature files (strict mode only):
 
 ```python
 settings = FeatureValidator.Settings(replace_id_with='chr1')
-result = validate_feature(config.ref_feature, settings)
+result = FeatureValidator(config.ref_feature, settings).run()
 
 # Input GFF:
 # NC_000913.3  source  gene  100  200  .  +  .  ID=gene1
@@ -265,7 +265,7 @@ ReadValidator detects these patterns:
 ### Access Pattern Information
 
 ```python
-result = validate_read(config.reads[0])
+result = ReadValidator(config.reads[0]).run()
 
 if result.read_number:
     print(f"Paired-end detected:")
@@ -293,7 +293,7 @@ Use inter-file validation to check R1↔R2 matching:
 ```python
 from validation_pkg import readxread_validation, ReadXReadSettings
 
-reads_results = validate_reads(config.reads)
+reads_results = [ReadValidator(rc).run() for rc in config.reads]
 
 settings = ReadXReadSettings(pair_end_basename=True)
 check = readxread_validation(reads_results, settings)
@@ -350,7 +350,7 @@ both cover positions 101–200 in 1-based coordinates).
 ### Manual Verification
 
 ```python
-result = validate_feature(config.ref_feature)
+result = FeatureValidator(config.ref_feature).run()
 
 # Input was BED format
 # Output is GFF3 format with corrected coordinates
@@ -386,7 +386,7 @@ No code changes required:
 ```python
 # Automatically uses pigz if available
 settings = GenomeValidator.Settings(coding_type='gz')
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Falls back to standard gzip if pigz not found
 ```
@@ -405,7 +405,7 @@ Control compression threads:
 config.options['threads'] = 16
 
 # Compression will use 16 threads
-result = validate_genome(config.ref_genome)
+result = GenomeValidator(config.ref_genome).run()
 ```
 
 ### Compression Comparison
