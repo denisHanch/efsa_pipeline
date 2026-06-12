@@ -33,6 +33,8 @@ input_output_options (file paths, null / empty list when absent):
   pacbio_fastqs        – list of validated PacBio FASTQ paths
   pacbio_bams          – list of validated PacBio BAM paths
   contig_files         – list of contig FASTA paths from inter-genome characterisation
+  ref_feature_gff      – absolute path to the validated reference GFF/GTF/BED feature file (omitted when absent)
+  mod_feature_gff      – absolute path to the validated modified GFF/GTF/BED feature file (omitted when absent)
 """
 
 import json
@@ -121,6 +123,7 @@ def build_params(
           genomexgenome – dict with 'contig_files' key (from genomexgenome_validation), or None
           reads         – List[ReadOutputMetadata], each with a .ngs_type attribute
           ref_feature   – FeatureOutputMetadata or None
+          mod_feature   – FeatureOutputMetadata or None
     Returns
     -------
     NextflowParams
