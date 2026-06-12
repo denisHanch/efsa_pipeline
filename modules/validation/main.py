@@ -31,9 +31,9 @@ def main():
     parser = argparse.ArgumentParser(description="Validation pipeline for genomic input files")
     parser.add_argument("config_path", help="Path to config.json")
     parser.add_argument("--threads",          type=int,  help="Number of threads (overrides config.json)")
-    parser.add_argument("--validation-level", choices=["strict", "trust", "minimal"], help="Validation depth (overrides config.json)")
-    parser.add_argument("--logging-level",    choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Log verbosity (overrides config.json)")
-    parser.add_argument("--type",             dest="organism_type", choices=["prokaryote", "eukaryote"], help="Organism type (overrides config.json)")
+    parser.add_argument("--validation-level", type=str.lower, choices=["strict", "trust", "minimal"], help="Validation depth (overrides config.json)")
+    parser.add_argument("--logging-level",    type=str.upper, choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Log verbosity (overrides config.json)")
+    parser.add_argument("--type",             dest="organism_type", type=str.lower, choices=["prokaryote", "eukaryote"], help="Organism type (overrides config.json)")
     parser.add_argument("--force-defragment-ref", action="store_true", default=False, help="Merge fragmented reference contigs (unsupported workaround)")
     parsed = parser.parse_args()
 
@@ -337,7 +337,7 @@ if __name__ == '__main__':
         logger = get_logger()
         logger.error(f"✗ Fatal error: {e}")
         logger.debug(traceback.format_exc())
-        if len(sys.argv) >= 2:
-            actual_log_file = getattr(get_logger(), 'log_file', None) or (Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log")
-            print(f"Log file: {actual_log_file}")
+        log_file = getattr(logger, 'log_file', None)
+        if log_file:
+            print(f"Log file: {log_file}")
         sys.exit(1)
