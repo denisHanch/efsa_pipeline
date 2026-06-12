@@ -7,7 +7,6 @@ __all__ = [
     'CodingType',
     'GenomeFormat',
     'ReadFormat',
-    'FeatureFormat',
     'OrganismType',
     'ValidationLevel',
     'LoggingLevel',
@@ -163,49 +162,6 @@ class ReadFormat(Enum):
         
         raise ValueError(f"'{value}' is not a valid {cls.__name__}")
 
-
-class FeatureFormat(Enum):
-    GFF = "gff"
-    GTF = "gtf"
-    BED = "bed"
-
-    def to_biopython(self) -> str:
-        """Return format string for file parsing."""
-        return self.value
-
-    def to_extension(self) -> str:
-        """Return file extension for this feature format."""
-        return f'.{self.value}'
-
-    @classmethod
-    def _missing_(cls, value):
-        """Handle flexible input formats for FeatureFormat."""
-        value_lower = str(value).lower().strip()
-
-        # Remove leading dot
-        if value_lower.startswith('.'):
-            value_lower = value_lower[1:]
-
-        # Extension mapping
-        extension_map = {
-            'gff': cls.GFF,
-            'gff3': cls.GFF,
-            'gtf': cls.GTF,
-            'gff2': cls.GTF,
-            'bed': cls.BED,
-        }
-
-        # Direct match
-        if value_lower in extension_map:
-            return extension_map[value_lower]
-
-        # If it looks like a filename, extract extension
-        if '.' in value_lower:
-            ext = Path(value).suffix.lower()[1:]  # Remove dot
-            if ext in extension_map:
-                return extension_map[ext]
-
-        raise ValueError(f"'{value}' is not a valid {cls.__name__}")
 
 
 class OrganismType(Enum):

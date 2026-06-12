@@ -107,8 +107,6 @@ It is used at runtime by the analysis workflow to determine which pipelines to e
 | `mod_fasta_validated` | string        | Path to the validated modified genome FASTA.                   |
 | `ref_plasmid_fasta`   | string        | Path to the validated reference plasmid FASTA (if present).    |
 | `mod_plasmid_fasta`   | string        | Path to the validated modified plasmid FASTA (if present).     |
-| `ref_feature_gff`     | string        | Path to the validated reference GFF3 file (if present).        |
-| `mod_feature_gff`     | string        | Path to the validated modified GFF3 file (if present).         |
 | `illumina_fastqs`     | string array  | Paths to all validated Illumina FASTQ files.                   |
 | `ont_fastqs`          | string array  | Paths to all validated Nanopore FASTQ files.                   |
 | `ont_bams`            | string array  | Paths to all validated Nanopore BAM files (copied as-is).      |

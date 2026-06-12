@@ -1,7 +1,7 @@
 """
-Validation package for genomic data files (genomes, reads, feature annotations).
+Validation package for genomic data files (genomes, reads).
 
-Supports FASTA/GenBank, FASTQ/BAM, GFF/GTF/BED with gzip/bzip2 compression.
+Supports FASTA/GenBank, FASTQ/BAM with gzip/bzip2 compression.
 See docs/CONFIG_GUIDE.md for configuration options.
 """
 
@@ -15,8 +15,6 @@ from validation_pkg.validators.genome_validator import GenomeValidator
 from validation_pkg.validators.genome_validator import GenomeOutputMetadata
 from validation_pkg.validators.read_validator import ReadValidator
 from validation_pkg.validators.read_validator import ReadOutputMetadata
-from validation_pkg.validators.feature_validator import FeatureValidator
-from validation_pkg.validators.feature_validator import FeatureOutputMetadata
 from validation_pkg.validators.interfile_read import ReadXReadSettings, readxread_validation
 from validation_pkg.validators.interfile_genome import GenomeXGenomeSettings, genomexgenome_validation
 from validation_pkg.utils.logger import setup_logging, get_logger
@@ -29,7 +27,6 @@ __all__ = [
     # Validators
     'GenomeValidator',
     'ReadValidator',
-    'FeatureValidator',
 
     # Inter-file Validation
     'ReadXReadSettings',

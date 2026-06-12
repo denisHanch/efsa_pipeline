@@ -6,7 +6,7 @@ Technical documentation for the `validation_pkg` bioinformatics validation packa
 
 The `validation_pkg` is a comprehensive Python package for validating and processing genomic data files. It provides:
 
-- **Multi-format support**: FASTA, GenBank, FASTQ, BAM, GFF, GTF, BED
+- **Multi-format support**: FASTA, GenBank, FASTQ, BAM
 - **Automatic format detection and conversion**
 - **Three validation levels**: strict (thorough), trust (fast), minimal (copy only)
 - **Parallel processing**: Multi-threaded compression and validation
@@ -24,7 +24,7 @@ The `validation_pkg` is a comprehensive Python package for validating and proces
 ### Getting Started
 
 - **[API_REFERENCE.md](API_REFERENCE.md)** - Core API documentation
-  - Validator classes (`GenomeValidator`, `ReadValidator`, `FeatureValidator`)
+  - Validator classes (`GenomeValidator`, `ReadValidator`)
   - Configuration management (`ConfigManager`, `Config`)
   - Output metadata objects
   - Quick start examples
@@ -34,7 +34,6 @@ The `validation_pkg` is a comprehensive Python package for validating and proces
 - **[VALIDATORS.md](VALIDATORS.md)** - Validator class documentation
   - GenomeValidator - Genome and plasmid files
   - ReadValidator - Sequencing reads (FASTQ, BAM)
-  - FeatureValidator - Annotations (GFF, GTF, BED)
   - Validation levels comparison
   - Common patterns
 
@@ -44,7 +43,6 @@ The `validation_pkg` is a comprehensive Python package for validating and proces
   - Global options (threads, validation_level, logging_level)
   - GenomeValidator settings (15+ options)
   - ReadValidator settings
-  - FeatureValidator settings
   - Settings inheritance and priorities
   - Performance impact analysis
 
@@ -59,10 +57,9 @@ The `validation_pkg` is a comprehensive Python package for validating and proces
 
 - **[ADVANCED_FEATURES.md](ADVANCED_FEATURES.md)** - Advanced functionality
   - Plasmid handling (detection, splitting, merging)
-  - Format conversion (GenBank→FASTA, BED→GFF, BAM→FASTQ)
+  - Format conversion (GenBank→FASTA, BAM→FASTQ)
   - Sequence ID management
   - Paired-end pattern detection
-  - Coordinate system conversion (0-based ↔ 1-based)
   - Parallel compression
 
 ### Error Handling & Logging
@@ -124,7 +121,6 @@ print(f"Validated {len(reads_results)} read files")
 |------|---------------|
 | Validate genome files | [API_REFERENCE.md](API_REFERENCE.md#genome-validation) |
 | Validate read files | [API_REFERENCE.md](API_REFERENCE.md#read-validation) |
-| Validate feature files | [API_REFERENCE.md](API_REFERENCE.md#feature-validation) |
 | Compare genomes | [INTERFILE_VALIDATION.md](INTERFILE_VALIDATION.md#genome-genome-validation) |
 | Check paired-end reads | [INTERFILE_VALIDATION.md](INTERFILE_VALIDATION.md#read-read-validation) |
 | Split plasmids | [ADVANCED_FEATURES.md](ADVANCED_FEATURES.md#plasmid-handling) |
@@ -146,14 +142,13 @@ validation_pkg/
 ├── validators/
 │   ├── genome_validator.py      # Genome file validation
 │   ├── read_validator.py        # Read file validation
-│   ├── feature_validator.py     # Feature file validation
 │   ├── interfile_genome.py      # Genome comparison
 │   └── interfile_read.py        # Paired-end checking
 └── utils/
     ├── base_settings.py  # BaseSettings, BaseOutputMetadata, BaseValidatorSettings
     ├── base_validator.py # BaseValidator abstract class (ClassVar interface)
     ├── file_handler.py   # File I/O and compression utilities
-    ├── formats.py        # CodingType, GenomeFormat, ReadFormat, FeatureFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType enums
+    ├── formats.py        # CodingType, GenomeFormat, ReadFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType enums
     ├── logger.py         # Structured logging system
     └── path_utils.py     # Path resolution and directory-traversal security
 ```
@@ -165,9 +160,9 @@ validation_pkg/
    ↓
 2. ConfigManager.load()
    ↓
-3. Config Object (GenomeConfig, ReadConfig, FeatureConfig)
+3. Config Object (GenomeConfig, ReadConfig)
    ↓
-4. Validator (GenomeValidator, ReadValidator, FeatureValidator)
+4. Validator (GenomeValidator, ReadValidator)
    ↓
 5. OutputMetadata (validation results)
    ↓
@@ -211,7 +206,6 @@ Validated files are organized by type:
 data/valid/
 ├── reference_genome.fasta      # Genomes
 ├── modified_genome.fasta
-├── ref_feature.gff3           # Features
 ├── illumina/                  # Reads by NGS type
 │   ├── sample_R1.fastq.gz
 │   └── sample_R2.fastq.gz
@@ -284,7 +278,6 @@ See: [EXAMPLES.md](EXAMPLES.md#complete-workflows)
 |-----------|---------|------------|
 | **Genome** | FASTA, GenBank | `.fasta`, `.fa`, `.fna`, `.gb`, `.gbk`, `.genbank` |
 | **Reads** | FASTQ, BAM | `.fastq`, `.fq`, `.bam` |
-| **Features** | GFF, GTF, BED | `.gff`, `.gff3`, `.gtf`, `.bed` |
 | **Compression** | gzip, bzip2 | `.gz`, `.bz2` |
 
 ### Output Formats
@@ -293,7 +286,6 @@ See: [EXAMPLES.md](EXAMPLES.md#complete-workflows)
 |-----------|---------------|
 | **Genome** | FASTA (uncompressed) |
 | **Reads** | FASTQ (gzip compressed) |
-| **Features** | GFF3 (uncompressed) |
 
 ---
 
@@ -335,7 +327,6 @@ See: [SETTINGS.md](SETTINGS.md#performance-impact)
 | "Missing required field" | Fix config.json structure | [ERROR_HANDLING.md](ERROR_HANDLING.md#problem-missing-required-field-ref_genome_filename) |
 | "File not found" | Check file paths | [ERROR_HANDLING.md](ERROR_HANDLING.md#problem-file-not-found-pathtofile) |
 | "Duplicate sequence IDs" | Use `replace_id_with` setting | [ERROR_HANDLING.md](ERROR_HANDLING.md#problem-duplicate-sequence-ids-found) |
-| "Invalid coordinates" | Fix GFF/BED file or use relaxed settings | [ERROR_HANDLING.md](ERROR_HANDLING.md#problem-invalid-coordinates-start-end) |
 | "Genome sequence count mismatch" | Adjust inter-file validation settings | [INTERFILE_VALIDATION.md](INTERFILE_VALIDATION.md#problem-genome-sequence-count-mismatch) |
 | "Missing R1 for R2" | Add missing file or allow incomplete pairs | [INTERFILE_VALIDATION.md](INTERFILE_VALIDATION.md#problem-found-r2-files-without-matching-r1) |
 

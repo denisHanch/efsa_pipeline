@@ -31,15 +31,6 @@ class GenBankFormatError(FileFormatError):
     pass
 
 
-class BedFormatError(FileFormatError):
-    """Raised when BED file has invalid format."""
-    pass
-
-
-class GffFormatError(FileFormatError):
-    """Raised when GFF/GTF file has invalid format."""
-    pass
-
 
 class FastqFormatError(FileFormatError):
     """Raised when FASTQ file has invalid format."""
@@ -60,10 +51,6 @@ class GenomeValidationError(ValidationError):
     """Raised when genome validation fails."""
     pass
 
-
-class FeatureValidationError(ValidationError):
-    """Raised when feature validation fails."""
-    pass
 
 
 class ReadValidationError(ValidationError):

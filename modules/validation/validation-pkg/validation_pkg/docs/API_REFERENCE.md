@@ -32,7 +32,7 @@ pip install -e "/path/to/validation-pkg[dev]"
 ### Basic Usage
 
 ```python
-from validation_pkg import ConfigManager, GenomeValidator, ReadValidator, FeatureValidator
+from validation_pkg import ConfigManager, GenomeValidator, ReadValidator
 
 # Load configuration
 config = ConfigManager.load("config.json")
@@ -43,10 +43,6 @@ mod_result = GenomeValidator(config.mod_genome).run()
 
 # Validate read files
 reads_results = [ReadValidator(rc).run() for rc in config.reads]
-
-# Validate feature file (if present)
-if config.ref_feature:
-    feature_result = FeatureValidator(config.ref_feature).run()
 ```
 
 ---
@@ -103,8 +99,6 @@ Main configuration container returned by `ConfigManager.load()`.
 - `reads` (List[ReadConfig]): Read file configurations (required, non-empty)
 - `ref_plasmid` (GenomeConfig, optional): Reference plasmid configuration
 - `mod_plasmid` (GenomeConfig, optional): Modified plasmid configuration
-- `ref_feature` (FeatureConfig, optional): Reference feature configuration
-- `mod_feature` (FeatureConfig, optional): Modified feature configuration
 - `options` (dict): Global options (threads, validation_level, logging_level)
 - `config_dir` (Path): Directory containing config file
 - `output_dir` (Path): Base output directory for validated files
@@ -147,21 +141,6 @@ Configuration for sequencing read files.
 
 ---
 
-### FeatureConfig
-
-Configuration for feature annotation files.
-
-**Attributes:**
-- `filename` (str): Original filename
-- `filepath` (Path): Absolute resolved path
-- `basename` (str): Filename without extension
-- `coding_type` (CodingType): Compression format
-- `detected_format` (FeatureFormat): File format (GFF, GTF, or BED)
-- `output_dir` (Path): Base output directory
-- `global_options` (dict): Merged global + file-level options
-
----
-
 ## Validator Classes
 
 For advanced use cases, you can instantiate validator classes directly.
@@ -197,20 +176,6 @@ validator = ReadValidator(config.reads[0], settings)
 result = validator.run()
 ```
 
-### FeatureValidator
-
-```python
-from validation_pkg.validators import FeatureValidator
-
-settings = FeatureValidator.Settings(
-    sort_by_position=True,
-    replace_id_with='chr1'
-)
-
-validator = FeatureValidator(config.ref_feature, settings)
-result = validator.run()
-```
-
 ---
 
 ## Output Metadata
@@ -241,16 +206,6 @@ All validators return metadata objects with validation results.
 - `illumina_pairing_detected` (str): Set to 'illumina' if paired-end pattern detected
 - `base_name` (str): Illumina paired-end base name extracted from filename
 - `read_number` (int): Read number (1 or 2) from pattern detection
-- `validation_level` (str): Validation level used
-- `elapsed_time` (float): Processing time in seconds
-
-### FeatureOutputMetadata
-
-**Key Attributes:**
-- `output_file` (str): Path to validated feature file
-- `num_features` (int): Total number of features
-- `feature_types` (List[str]): Unique feature types (gene, CDS, exon, etc.)
-- `sequence_ids` (List[str]): Sequence IDs referenced by features
 - `validation_level` (str): Validation level used
 - `elapsed_time` (float): Processing time in seconds
 

@@ -31,8 +31,6 @@ input_output_options (file paths, null / empty list when absent):
   pacbio_fastqs        – list of validated PacBio FASTQ paths
   pacbio_bams          – list of validated PacBio BAM paths
   contig_files         – list of contig FASTA paths from inter-genome characterisation
-  ref_feature_gff      – absolute path to the validated reference GFF/GTF/BED feature file (omitted when absent)
-  mod_feature_gff      – absolute path to the validated modified GFF/GTF/BED feature file (omitted when absent)
 """
 
 import json
@@ -41,8 +39,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-_OPTIONAL_PATHS = {"ref_fasta_validated", "mod_fasta_validated", "ref_plasmid_fasta", "mod_plasmid_fasta",
-                   "ref_feature_gff", "mod_feature_gff"}
+_OPTIONAL_PATHS = {"ref_fasta_validated", "mod_fasta_validated", "ref_plasmid_fasta", "mod_plasmid_fasta"}
 
 
 @dataclass
@@ -61,8 +58,6 @@ class NextflowParams:
     mod_fasta_validated: Optional[str] = None
     ref_plasmid_fasta: Optional[str] = None
     mod_plasmid_fasta: Optional[str] = None
-    ref_feature_gff: Optional[str] = None
-    mod_feature_gff: Optional[str] = None
     # input_output_options — lists, always present (may be empty)
     illumina_fastqs: List[str] = field(default_factory=list)
     ont_fastqs: List[str] = field(default_factory=list)
@@ -115,8 +110,6 @@ def build_params(
           mod_genome    – GenomeOutputMetadata or None
           genomexgenome – dict with 'contig_files' key (from genomexgenome_validation), or None
           reads         – List[ReadOutputMetadata], each with a .ngs_type attribute
-          ref_feature   – FeatureOutputMetadata or None
-          mod_feature   – FeatureOutputMetadata or None
     Returns
     -------
     NextflowParams
@@ -186,8 +179,6 @@ def build_params(
     mod_genome_size_bp = _genome_size(mod_meta)
     ref_plasmid_path = _path(validation_results.get("ref_plasmid"))
     mod_plasmid_path = _path(validation_results.get("mod_plasmid"))
-    ref_feature_path = _path(validation_results.get("ref_feature"))
-    mod_feature_path = _path(validation_results.get("mod_feature"))
     gxg      = validation_results.get("genomexgenome") or {}
     gxg_metadata = gxg.get("metadata") or {}
 
@@ -249,8 +240,6 @@ def build_params(
         mod_fasta_validated=mod_path,
         ref_plasmid_fasta=ref_plasmid_path,
         mod_plasmid_fasta=mod_plasmid_path,
-        ref_feature_gff=ref_feature_path,
-        mod_feature_gff=mod_feature_path,
         illumina_fastqs=fastqs_by_type.get("illumina", []),
         ont_fastqs=fastqs_by_type.get("ont", []),
         ont_bams=bams_by_type.get("ont", []),

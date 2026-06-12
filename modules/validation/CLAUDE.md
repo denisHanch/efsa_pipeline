@@ -2,7 +2,7 @@
 
 Comprehensive reference for the `modules/validation/` directory. This module
 validates and standardises genomic input files (FASTA/GenBank genomes, FASTQ/BAM
-reads, GFF/GTF/BED features) before they enter the Nextflow pipeline. At the end
+reads) before they enter the Nextflow pipeline. At the end
 it emits `validated_params.json`, which Nextflow consumes via `-params-file`.
 
 ---
@@ -29,13 +29,12 @@ modules/validation/
     │   │   ├── base_settings.py   # BaseSettings, BaseOutputMetadata, BaseValidatorSettings
     │   │   ├── base_validator.py  # BaseValidator abstract class
     │   │   ├── file_handler.py    # Compression, format detection, file I/O utilities
-    │   │   ├── formats.py         # Enums: CodingType, GenomeFormat, ReadFormat, FeatureFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType
+    │   │   ├── formats.py         # Enums: CodingType, GenomeFormat, ReadFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType
     │   │   ├── logger.py          # ValidationLogger singleton (structlog-based)
     │   │   └── path_utils.py      # Path resolution + path-traversal security
     │   └── validators/
     │       ├── genome_validator.py        # GenomeValidator + GenomeOutputMetadata
     │       ├── read_validator.py          # ReadValidator + ReadOutputMetadata
-    │       ├── feature_validator.py       # FeatureValidator + FeatureOutputMetadata
     │       ├── interfile_genome.py        # genomexgenome_validation + GenomeXGenomeSettings
     │       └── interfile_read.py          # readxread_validation + ReadXReadSettings
     └── tests/                     # not tracked in git (untracked locally)
@@ -101,10 +100,9 @@ pytest tests/
 10. [ReadValidator(rc, reads_settings).run() for rc in reads]     # required
       → logger.error on ValidationError or missing output_file
 11. readxread_validation(reads_res, readxread_settings)            # only if reads validated
-12. FeatureValidator(ref_feature_config, ref_feature_settings).run()  # optional
-13. nf_params.build_params(validation_results) → NextflowParams
-14. nf_params.write_params(params, data/valid/validated_params.json)
-15. sys.exit(0)   # always 0; errors surfaced through log
+12. nf_params.build_params(validation_results) → NextflowParams
+13. nf_params.write_params(params, data/valid/validated_params.json)
+14. sys.exit(0)   # always 0; errors surfaced through log
 ```
 
 **Exit code is always 0.** Validation failures are logged via `logger.error`.
@@ -140,8 +138,6 @@ Full specification is in `validation-pkg/docs/CONFIG_GUIDE.md`.
     {"filename": "ont_reads.fastq.gz",   "ngs_type": "ont"},
     {"filename": "pacbio_reads.bam",     "ngs_type": "pacbio"}
   ],
-  "ref_feature_filename": {"filename": "ref.gff3"},
-  "mod_feature_filename": {"filename": "mod.gff3"},
   "options": {
     "validation_level": "strict",
     "threads": 4,
@@ -196,11 +192,6 @@ detected_format : ReadFormat    # FASTQ or BAM
 ngs_type        : str           # "illumina", "ont", "pacbio" — validated in __post_init__
 ```
 
-**`FeatureConfig`** (extends `BaseValidatorConfig`)
-```
-detected_format : FeatureFormat   # GFF, GTF, or BED
-```
-
 **`Config`** — top-level container
 ```
 ref_genome   : GenomeConfig          # required
@@ -208,8 +199,6 @@ reads        : List[ReadConfig]      # required, non-empty
 mod_genome   : Optional[GenomeConfig]
 ref_plasmid  : Optional[GenomeConfig]
 mod_plasmid  : Optional[GenomeConfig]
-ref_feature  : Optional[FeatureConfig]
-mod_feature  : Optional[FeatureConfig]
 
 Properties (from options dict):
   .threads              → int | None
@@ -230,8 +219,7 @@ for keys not set in `config.json`. Full validation pipeline:
 6. `_parse_reads_configs()` — supports both `filename` and `directory` keys;
    each file in the directory becomes a separate `ReadConfig` entry (all ngs types
    support multiple files per directory)
-7. `_parse_feature_configs()` — ref_feature, mod_feature (optional)
-8. Returns fully populated `Config`
+7. Returns fully populated `Config`
 
 Raises: `ValidationFileNotFoundError`, `ConfigurationError`, `ValueError`
 
@@ -265,7 +253,6 @@ ValidationError                    # base
 │   └── BamFormatError
 ├── CompressionError               # decompression/compression failure
 ├── GenomeValidationError          # genome-specific validation failure
-├── FeatureValidationError         # feature-specific validation failure
 ├── ReadValidationError            # read-specific validation failure
 └── InterFileValidationError       # inter-file consistency failure
 ```
@@ -306,17 +293,6 @@ FASTQ, BAM
 .to_extension()  → ".fastq" / ".bam"
 
 Aliases:  fq → FASTQ
-```
-
-### `FeatureFormat`
-```
-GFF, GTF, BED
-
-.to_biopython()  → "gff" / "gtf" / "bed"
-.to_extension()  → ".gff" / ".gtf" / ".bed"
-
-Aliases:  gff3 → GFF
-          gff2 → GTF
 ```
 
 ### `OrganismType`
@@ -524,51 +500,6 @@ for R1/R2 markers. Returns `(base_name, read_number)`. Stored in metadata so
 
 ---
 
-## FeatureValidator (`validators/feature_validator.py`)
-
-### `FeatureValidator.Settings` (dataclass)
-```
-sort_by_position  : bool = True       # sort features by seqname + start
-check_coordinates : bool = True       # validate start ≤ end, non-negative
-replace_id_with   : Optional[str]     # replace seqname prefix ("chr")
-
-# From BaseValidatorSettings
-coding_type, output_filename_suffix, output_subdir_name
-```
-
-### `Feature` (dataclass — internal)
-```
-seqname, feature_type, score, strand, source, frame, attributes : str
-start, end : int
-
-.length → int   (end - start)
-```
-
-### `FeatureOutputMetadata` (dataclass)
-```
-input_file, output_file, validation_level, elapsed_time
-num_features  : int
-feature_types : List[str]    # unique feature types (gene, CDS, exon, …)
-sequence_ids  : List[str]    # unique seqnames referenced
-```
-
-### Trust vs strict coordinate validation
-- **Trust:** sample-validates first 10 features only
-- **Strict:** validates every feature
-
-### gffread fallback
-`_parse_input()` first tries `gffread` for format normalisation. Two fallback paths:
-
-1. **gffread succeeds but returns 0 features** → silently retries with direct
-   `_parse_gff()` on the decompressed input (no validation issue recorded, INFO logged).
-2. **gffread unavailable or exits non-zero** → falls back to `_parse_gff()` and records
-   a `WARNING` validation issue (`category='feature'`) with the error detail.
-
-After both paths, if `self.features` is still empty, `FeatureValidationError` is raised.
-This causes `main.py` to leave `ref_feature_res = None`. No output GFF file is created.
-
----
-
 ## Inter-file validators
 
 ### `genomexgenome_validation` (`validators/interfile_genome.py`)
@@ -768,8 +699,6 @@ ref_fasta_validated : Optional[str] = None
 mod_fasta_validated : Optional[str] = None
 ref_plasmid_fasta   : Optional[str] = None
 mod_plasmid_fasta   : Optional[str] = None
-ref_feature_gff     : Optional[str] = None
-mod_feature_gff     : Optional[str] = None
 
 # input_output_options — lists (always present, may be empty)
 illumina_fastqs : List[str]
@@ -802,8 +731,6 @@ ref_genome    : GenomeOutputMetadata | None
 mod_genome    : GenomeOutputMetadata | None
 genomexgenome : dict (from genomexgenome_validation) | None
 reads         : List[ReadOutputMetadata] | None
-ref_feature   : FeatureOutputMetadata | None
-mod_feature   : FeatureOutputMetadata | None
 ```
 
 Before building flags, reads are pre-filtered:
@@ -861,24 +788,6 @@ plasmid_settings = GenomeValidator.Settings(
 reads_settings = ReadValidator.Settings(
     coding_type='gz',
     outdir_by_ngs_type=True
-)
-
-# Reference feature annotations
-ref_feature_settings = FeatureValidator.Settings(
-    sort_by_position=False,
-    check_coordinates=False,
-    replace_id_with='chr',
-    coding_type=None,
-    output_filename_suffix='ref'
-)
-
-# Modified feature annotations
-mod_feature_settings = FeatureValidator.Settings(
-    sort_by_position=False,
-    check_coordinates=False,
-    replace_id_with='chr',
-    coding_type=None,
-    output_filename_suffix='mod'
 )
 
 # Inter-genome

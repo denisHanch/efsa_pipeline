@@ -9,7 +9,7 @@ import threading
 from pathlib import Path
 from typing import Union, TextIO, Type, Tuple, Any, Dict, Optional
 
-from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, FeatureFormat
+from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat
 from validation_pkg.utils.logger import get_logger
 from validation_pkg.exceptions import CompressionError
 
@@ -215,7 +215,7 @@ def detect_compression_type(filepath: Path) -> CodingType:
         return CodingType.NONE
 
 
-def detect_file_format(filepath: Path, format_enum: Type[Union[GenomeFormat, ReadFormat, FeatureFormat]]) -> Union[GenomeFormat, ReadFormat, FeatureFormat]:
+def detect_file_format(filepath: Path, format_enum: Type[Union[GenomeFormat, ReadFormat]]) -> Union[GenomeFormat, ReadFormat]:
     """Detect file format from extension."""
     suffixes = Path(filepath).suffixes
 
