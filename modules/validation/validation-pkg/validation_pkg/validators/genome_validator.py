@@ -17,7 +17,7 @@ from validation_pkg.exceptions import (
 from validation_pkg.utils.file_handler import open_compressed_writer, copy_file
 from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
 from validation_pkg.utils.base_validator import BaseValidator
-from validation_pkg.utils.formatting import format_metadata_value
+
 
 @dataclass
 class GenomeOutputMetadata(BaseOutputMetadata):
@@ -37,58 +37,6 @@ class GenomeOutputMetadata(BaseOutputMetadata):
     # Fragmented assembly flag (sequence limit exceeded — inter-genome validation skipped)
     fragmented: bool = False
 
-    def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
-        """Format genome-specific statistics for report output."""
-        lines = []
-
-        # Iterate through all fields, skipping common ones and internal fields
-        skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
-        special_fields = {'sequence_ids', 'sequence_lengths', 'plasmid_filenames'}
-
-        data = self.to_dict()
-
-        for key, value in data.items():
-            if key in skip_fields or value is None:
-                continue
-
-            # Special handling for specific fields
-            if key == 'sequence_ids' and isinstance(value, list):
-                if len(value) <= 3:
-                    lines.append(f"{indent}sequence_ids: {', '.join(value)}")
-                else:
-                    lines.append(f"{indent}sequence_ids: {value[0]}, {value[1]}, ... (+{len(value)-2} more)")
-
-            elif key == 'sequence_lengths' and isinstance(value, dict):
-                total_len = sum(value.values())
-                lines.append(f"{indent}total_length: {total_len:,} bp")
-
-            elif key == 'plasmid_count' and value > 0:
-                # Show plasmid extraction section
-                lines.append("")
-                lines.append(f"{indent}plasmid_count: {value}")
-
-            elif key == 'plasmid_filenames' and isinstance(value, list):
-                # Show plasmid filenames with tree structure
-                for i, filename in enumerate(value):
-                    if i < len(value) - 1:
-                        lines.append(f"{indent}  ├─ {filename}")
-                    else:
-                        lines.append(f"{indent}  └─ {filename}")
-
-                # Show plasmid handling strategy
-                if input_settings:
-                    if input_settings.get('plasmid_split'):
-                        lines.append(f"{indent}plasmid_handling: split to separate files")
-                    elif input_settings.get('plasmids_to_one'):
-                        lines.append(f"{indent}plasmid_handling: merged to one file")
-
-            elif key == 'num_sequences_filtered' and value > 0:
-                lines.append(f"{indent}{key}: {value:,}")
-
-            elif key not in special_fields:
-                lines.append(f"{indent}{key}: {format_metadata_value(value)}")
-
-        return lines
 
 class GenomeValidator(BaseValidator):
     """Validates and processes genome files in FASTA and GenBank formats."""

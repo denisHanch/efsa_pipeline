@@ -23,8 +23,6 @@ ALLOWED_GLOBAL_OPTIONS = {'threads', 'validation_level', 'logging_level', 'type'
 # Only these fields can be overridden at the file level
 ALLOWED_FILE_OPTIONS = {'threads', 'validation_level'}
 MAX_RECOMMENDED_THREADS = 16
-
-# Default thread count when not specified in config
 DEFAULT_THREADS = 8
 
 

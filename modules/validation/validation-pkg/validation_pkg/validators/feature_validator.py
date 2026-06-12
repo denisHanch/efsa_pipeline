@@ -12,7 +12,6 @@ from validation_pkg.exceptions import FeatureValidationError
 from validation_pkg.utils.formats import CodingType as CT, FeatureFormat, ValidationLevel
 from validation_pkg.utils.file_handler import open_compressed_writer, check_tool_available
 from validation_pkg.utils.base_validator import BaseValidator
-from validation_pkg.utils.formatting import format_metadata_value
 
 TRUST_MODE_SAMPLE_SIZE = 10
 PARALLEL_CHUNK_MULTIPLIER = 4
@@ -37,38 +36,6 @@ class FeatureOutputMetadata(BaseOutputMetadata):
     num_features: int = None
     feature_types: List[str] = None
     sequence_ids: List[str] = None
-
-    def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
-        """Format feature-specific statistics for report output."""
-        lines = []
-
-        # Iterate through all fields, skipping common ones
-        skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
-        special_fields = {'feature_types', 'sequence_ids'}
-
-        data = self.to_dict()
-
-        for key, value in data.items():
-            if key in skip_fields or value is None:
-                continue
-
-            # Special handling for specific fields
-            if key == 'feature_types' and isinstance(value, list):
-                if len(value) <= 5:
-                    lines.append(f"{indent}feature_types: {', '.join(value)}")
-                else:
-                    lines.append(f"{indent}feature_types: {', '.join(list(value)[:5])}, ... (+{len(value)-5} more)")
-
-            elif key == 'sequence_ids' and isinstance(value, list):
-                if len(value) <= 3:
-                    lines.append(f"{indent}sequence_ids: {', '.join(value)}")
-                else:
-                    lines.append(f"{indent}sequence_ids: {value[0]}, {value[1]}, ... (+{len(value)-2} more)")
-
-            elif key not in special_fields:
-                lines.append(f"{indent}{key}: {format_metadata_value(value)}")
-
-        return lines
 
     def __str__(self):
         parts = [f"Validation Level: {self.validation_level or 'N/A'}"]

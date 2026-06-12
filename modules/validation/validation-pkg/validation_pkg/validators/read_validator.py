@@ -18,7 +18,6 @@ from validation_pkg.exceptions import (
 )
 from validation_pkg.utils.formats import ReadFormat, NgsType, ValidationLevel
 from validation_pkg.utils.base_validator import BaseValidator
-from validation_pkg.utils.formatting import format_metadata_value
 from validation_pkg.utils.file_handler import (
     convert_file_compression,
     open_compressed_writer
@@ -85,38 +84,6 @@ class ReadOutputMetadata(BaseOutputMetadata):
     ngs_type: str = None      # Configured NGS type from config (pacbio, illumina, ont, etc.)
     input_format: str = None  # Detected input format: "fastq" or "bam"
     illumina_pairing_detected: str = None  # "illumina" if Illumina paired-end pattern detected
-
-    def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
-        """Format read-specific statistics for report output."""
-        lines = []
-
-        # Helper to check if key has value
-        def has_value(key):
-            data = self.to_dict()
-            return key in data and data[key] is not None
-
-        # Iterate through all fields, skipping common ones
-        skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
-        special_fields = {'base_name', 'read_number', 'illumina_pairing_detected'}
-
-        data = self.to_dict()
-
-        for key, value in data.items():
-            if key in skip_fields or value is None:
-                continue
-
-            # Special handling for specific fields
-            if key == 'base_name' and has_value('read_number'):
-                lines.append(f"{indent}paired_end: R{data['read_number']} (base: {value})")
-            elif key == 'read_number' and not has_value('base_name'):
-                lines.append(f"{indent}{key}: R{value}")
-            elif key == 'illumina_pairing_detected':
-                if value == 'illumina':
-                    lines.append(f"{indent}illumina_pairing_detected: yes")
-            elif key not in special_fields:
-                lines.append(f"{indent}{key}: {format_metadata_value(value)}")
-
-        return lines
 
 
 class ReadValidator(BaseValidator):

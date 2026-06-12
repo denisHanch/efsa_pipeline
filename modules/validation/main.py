@@ -15,7 +15,6 @@ from validation_pkg import (
     FeatureValidator,
     ReadXReadSettings,
     GenomeXGenomeSettings,
-    ValidationReport,
     setup_logging,
     get_logger,
     readxread_validation,
@@ -204,38 +203,21 @@ def main():
     # ========================================================================
     # Step 3: Run validation
     # ========================================================================
-    report_filename = "report.txt"
-    report = ValidationReport(logs_dir / report_filename)
-    fatal_errors: list[str] = []
-
-    def register_required_failure(label: str, exc: Exception) -> None:
-        message = f"{label} validation failed: {exc}"
-        logger.error(message)
-        fatal_errors.append(message)
-
-    def register_missing_output(label: str, result) -> None:
-        output_file = getattr(result, "output_file", None) if result is not None else None
-        if not output_file:
-            message = f"{label} validation produced no usable output file"
-            logger.error(message)
-            fatal_errors.append(message)
-
     # Validate reference genome (required)
     ref_genome_res = None
     if hasattr(config, 'ref_genome') and config.ref_genome:
         try:
             ref_genome_res = GenomeValidator(config.ref_genome, ref_genome_settings).run()
-            report.write(ref_genome_res, file_type="genome")
-            register_missing_output("ref_genome", ref_genome_res)
+            if not getattr(ref_genome_res, "output_file", None):
+                logger.error("ref_genome validation produced no usable output file")
         except ValidationError as e:
-            register_required_failure("ref_genome", e)
+            logger.error(f"ref_genome validation failed: {e}")
 
     # Validate modified genome (optional)
     mod_genome_res = None
     if hasattr(config, 'mod_genome') and config.mod_genome:
         try:
             mod_genome_res = GenomeValidator(config.mod_genome, mod_genome_settings).run()
-            report.write(mod_genome_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional mod_genome validation failed: {e}")
 
@@ -249,7 +231,6 @@ def main():
             )
         try:
             ref_plasmid_res = GenomeValidator(config.ref_plasmid, ref_plasmid_settings).run()
-            report.write(ref_plasmid_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional ref_plasmid validation failed: {e}")
 
@@ -257,7 +238,6 @@ def main():
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
         try:
             mod_plasmid_res = GenomeValidator(config.mod_plasmid, mod_plasmid_settings).run()
-            report.write(mod_plasmid_res, file_type="genome")
         except ValidationError as e:
             logger.error(f"Optional mod_plasmid validation failed: {e}")
 
@@ -268,7 +248,6 @@ def main():
             and not getattr(ref_genome_res, 'fragmented', False)):
         try:
             genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings, mod_plasmid_res, ref_plasmid_res)
-            report.write(genomexgenome_res, file_type="genomexgenome")
         except ValidationError as e:
             logger.error(f"Inter-genome validation failed: {e}")
     else:
@@ -279,11 +258,11 @@ def main():
     if hasattr(config, 'reads') and config.reads:
         try:
             reads_res = [ReadValidator(rc, reads_settings).run() for rc in config.reads]
-            report.write(reads_res, file_type="read")
             for read_result in reads_res:
-                register_missing_output("reads", read_result)
+                if not getattr(read_result, "output_file", None):
+                    logger.error("reads validation produced no usable output file")
         except ValidationError as e:
-            register_required_failure("reads", e)
+            logger.error(f"reads validation failed: {e}")
 
     # Add interread validation — skip when all reads are BAM (pairing check is meaningless)
     readxread_res = None
@@ -291,7 +270,6 @@ def main():
     if reads_res is not None and fastq_reads:
         try:
             readxread_res = readxread_validation(fastq_reads, readxread_settings)
-            report.write(readxread_res, file_type="readxread")
         except ValidationError as e:
             logger.error(f"Inter-read validation failed: {e}")
     else:
@@ -302,14 +280,9 @@ def main():
     if hasattr(config, 'ref_feature') and config.ref_feature and not force_defragment:
         try:
             ref_feature_res = FeatureValidator(config.ref_feature, ref_feature_settings).run()
-            report.write(ref_feature_res, file_type="feature")
         except ValidationError as e:
             logger.error(f"Optional ref_feature validation failed: {e}")
 
-    if fatal_errors:
-        report.add_fatal_errors(fatal_errors)
-
-    report.flush(format='text')
     print(f"Log file: {log_file}")
 
     # ========================================================================
