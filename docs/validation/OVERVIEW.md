@@ -49,7 +49,7 @@ The validation process:
 3. Converts files to standardized formats
 4. Produces validated files and metadata inside the validation task work directory
 5. Writes `validated_params.json` with validated file paths and flags for Nextflow
-6. Generates a log and report as part of the validation outputs
+6. Writes a structured log to `data/outputs/logs/`
 
 ## Running Validation
 
@@ -75,7 +75,7 @@ After successful validation:
 - `validated_params.json` is **published to `data/outputs/valid/`** and used at runtime by the analysis workflow
 - Validated genome/read/feature files are produced by the `validate` process and consumed directly by downstream channels via Nextflow
 - If any genome exceeds `n_sequence_limit` or `type` is `"EUKARYOTE"`, the file is still copied but `run_ref_x_mod` will be set to `false`
-- Log and report are written to `data/outputs/logs/`
+- Log is written to `data/outputs/logs/`
 
 ### `validated_params.json`
 
@@ -109,7 +109,8 @@ It is used at runtime by the analysis workflow to determine which pipelines to e
 | `mod_fasta_validated` | string        | Path to the validated modified genome FASTA. Omitted when no modified genome is provided. |
 | `ref_plasmid_fasta`   | string        | Path to the validated reference plasmid FASTA (if present).    |
 | `mod_plasmid_fasta`   | string        | Path to the validated modified plasmid FASTA (if present).     |
-| `gff`                 | string        | Path to the validated reference GFF/GFF3 file.                 |
+| `ref_feature_gff`     | string        | Path to the validated reference GFF3 file (if present).        |
+| `mod_feature_gff`     | string        | Path to the validated modified GFF3 file (if present).         |
 | `illumina_fastqs`     | string array  | Paths to all validated Illumina FASTQ files.                   |
 | `ont_fastqs`          | string array  | Paths to all validated Nanopore FASTQ files.                   |
 | `ont_bams`            | string array  | Paths to all validated Nanopore BAM files (copied as-is).      |

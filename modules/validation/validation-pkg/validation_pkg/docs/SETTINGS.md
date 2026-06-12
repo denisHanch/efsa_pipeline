@@ -168,7 +168,7 @@ Validation thoroughness (overrides global option if set).
 - Parse all sequences with BioPython
 - Validate all sequence IDs (no duplicates, no empty IDs)
 - Check for empty sequences
-- Calculate statistics (GC content, N50, total size)
+- Calculate total genome size
 - Apply all edits
 
 **Trust Mode:**
@@ -435,7 +435,7 @@ settings = ReadValidator.Settings()
 # Custom settings
 settings = ReadValidator.Settings(
     validation_level='trust',
-    check_invalid_chars=False
+    allow_empty_id=True
 )
 ```
 
@@ -452,14 +452,10 @@ Validation thoroughness.
 **Strict Mode:**
 - Parse all reads with BioPython
 - Validate all read IDs and sequences
-- Check for invalid characters (if enabled)
-- Calculate statistics (N50, total bases, length distribution)
 - Output: gzip compressed FASTQ
 
 **Trust Mode:**
-- Parse all reads (fast line counting)
 - Validate only first 10 reads
-- Count total reads
 - Output: gzip compressed FASTQ
 - ~10-15x faster than strict
 
@@ -468,23 +464,6 @@ Validation thoroughness.
 - Copy and compress file
 - Requires FASTQ input
 - ~100x+ faster than strict
-
-#### `check_invalid_chars`
-
-Check for invalid characters in read sequences.
-
-**Type:** `bool`
-**Default:** `False`
-
-**Valid Characters:** A, T, C, G, N (case-insensitive)
-
-**Example:**
-```python
-# Enable character checking
-settings = ReadValidator.Settings(check_invalid_chars=True)
-```
-
-**Performance Impact:** Moderate (5-10% slower when enabled in strict mode)
 
 #### `allow_empty_id`
 
@@ -776,7 +755,6 @@ Threading mainly benefits compression:
 
 | Option | Performance Impact | Notes |
 |--------|-------------------|-------|
-| `check_invalid_chars=False` | 5-10% faster | Reads only |
 | `sort_by_position=False` | 10-20% faster | Features only |
 | `plasmid_split=True` | 5-10% slower | Genomes only (extra I/O) |
 | `min_sequence_length>0` | Negligible | Filtering is fast |

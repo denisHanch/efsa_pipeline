@@ -190,8 +190,7 @@ See [VALIDATORS.md](VALIDATORS.md) for detailed validator documentation.
 from validation_pkg.validators import ReadValidator
 
 settings = ReadValidator.Settings(
-    validation_level='trust',
-    check_invalid_chars=False
+    validation_level='trust'
 )
 
 validator = ReadValidator(config.reads[0], settings)
@@ -224,32 +223,21 @@ All validators return metadata objects with validation results.
 - `output_file` (str): Path to validated genome file
 - `num_sequences` (int): Number of sequences
 - `total_genome_size` (int): Total length in bp (strict mode)
-- `longest_sequence_id` (str): ID of longest sequence
-- `longest_sequence_length` (int): Length of longest sequence
-- `gc_content` (float): GC content percentage (strict mode)
-- `n50` (int): N50 metric in bp (strict mode)
 - `plasmid_count` (int): Number of plasmids detected
 - `plasmid_filenames` (List[str]): Plasmid output files (if split)
 - `sequence_ids` (List[str]): Sequence IDs for inter-file validation
-- `sequence_lengths` (dict): Mapping of sequence IDs to lengths
+- `sequence_lengths` (List[int]): Lengths of all sequences (used to derive genome size)
+- `fragmented` (bool): True when sequence count ≥ n_sequence_limit
+- `num_sequences_filtered` (int): Sequences removed by min_sequence_length
 - `validation_level` (str): Validation level used
 - `elapsed_time` (float): Processing time in seconds
-
-**Methods:**
-- `to_dict()`: Convert to dictionary
-- `__str__()`: Human-readable string representation
 
 ### ReadOutputMetadata
 
 **Key Attributes:**
 - `output_file` (str): Path to validated read file
-- `num_reads` (int): Total number of reads
-- `n50` (int): N50 read length in bp (strict mode)
-- `total_bases` (int): Sum of all read lengths (strict mode)
-- `mean_read_length` (float): Average read length (strict mode)
-- `longest_read_length` (int): Longest read length (strict mode)
-- `shortest_read_length` (int): Shortest read length (strict mode)
 - `ngs_type` (str): Configured NGS platform from config (illumina, ont, pacbio-hifi, pacbio-clr)
+- `input_format` (str): Detected input format (fastq, bam)
 - `illumina_pairing_detected` (str): Set to 'illumina' if paired-end pattern detected
 - `base_name` (str): Illumina paired-end base name extracted from filename
 - `read_number` (int): Read number (1 or 2) from pattern detection
