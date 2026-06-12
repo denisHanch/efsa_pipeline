@@ -429,7 +429,6 @@ from validation_pkg import (
     ConfigManager,
     GenomeValidator,
     ReadValidator,
-    FeatureValidator,
     genomexgenome_validation,
     readxread_validation,
     GenomeXGenomeSettings,
@@ -453,12 +452,7 @@ report.write(mod_genome_result, "genome")
 reads_results = [ReadValidator(rc).run() for rc in config.reads]
 report.write(reads_results, "read")
 
-# 5. Validate features
-if config.ref_feature:
-    feature_result = FeatureValidator(config.ref_feature).run()
-    report.write(feature_result, "feature")
-
-# 6. Inter-file validation: Genome ↔ Genome
+# 5. Inter-file validation: Genome ↔ Genome
 genome_settings = GenomeXGenomeSettings(
     same_number_of_sequences=True,
     same_sequence_ids=False
@@ -475,7 +469,7 @@ if not genome_check['passed']:
     for error in genome_check['errors']:
         print(f"  {error}")
 
-# 7. Inter-file validation: Read ↔ Read
+# 6. Inter-file validation: Read ↔ Read
 read_settings = ReadXReadSettings(
     pair_end_basename=True,
     allow_missing_r1=False
@@ -488,7 +482,7 @@ if not read_check['passed']:
     for error in read_check['errors']:
         print(f"  {error}")
 
-# 8. Generate final report
+# 7. Generate final report
 report.flush(format="text")
 
 # Summary

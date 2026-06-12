@@ -35,7 +35,6 @@ This document defines the **JSON** configuration file that `ConfigManager` uses 
 | `ref_plasmid_filename` | GenomeConfig | ❌ | Reference plasmid (FASTA or GenBank) |
 | `mod_plasmid_filename` | GenomeConfig | ❌ | Modified plasmid (FASTA or GenBank) |
 | `reads` | List[ReadConfig] | ✅ | Read files (FASTQ/BAM), minimum one |
-| `ref_feature_filename` | FeatureConfig | ❌ | Features for reference genome (BED, GFF, GTF) |
 | `options` | dict | ❌ | Additional options (e.g., `{"threads": 8}`) |
 
 **Important:**
@@ -52,14 +51,6 @@ This document defines the **JSON** configuration file that `ConfigManager` uses 
 |--------|-----------|
 | FASTA | `.fa`, `.fasta`, `.fna` |
 | GenBank | `.gb`, `.gbk`, `.genbank` |
-
-### Feature Files
-
-| Format | Extensions | 
-|--------|-----------|
-| GFF | `.gff`, `.gff3` |
-| GTF | `.gtf`, `.gff2` |
-| BED | `.bed` | 
 
 ### Read Files
 
@@ -181,30 +172,6 @@ All files in the directory inherit the same settings. Each file becomes a separa
 | `"ont"` | Oxford Nanopore long reads | 1-100+ kb |
 | `"pacbio-hifi"` | PacBio HiFi (CCS) long reads | 10-25 kb |
 | `"pacbio-clr"` | PacBio CLR long reads | 10-50+ kb |
-
-### FeatureConfig Object
-
-Specifies feature annotation files (BED, GFF, GTF).
-
-**Structure:**
-```json
-{
-  "filename": "path/to/features.gff"
-}
-```
-
-**Optional fields (validator settings):**
-```json
-{
-  "filename": "path/to/features.gff",
-  "validation_level": "strict"
-}
-```
-
-**Example:**
-```json
-"ref_feature_filename": {"filename": "annotations/reference.gff"}
-```
 
 ---
 
@@ -364,11 +331,6 @@ Complete example with all optional fields and global options:
       "threads": 8
     }
   ],
-  "ref_feature_filename": {
-    "filename": "features_ref.gff3",
-    "validation_level": "STRICT",
-    "threads": 8
-  },
   "options": {
     "threads": 8,
     "validation_level": "STRICT",

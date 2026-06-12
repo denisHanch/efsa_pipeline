@@ -12,7 +12,6 @@ from validation_pkg import (
     ConfigManager,
     GenomeValidator,
     ReadValidator,
-    FeatureValidator,
     ReadXReadSettings,
     GenomeXGenomeSettings,
     setup_logging,
@@ -77,7 +76,6 @@ def main():
     _all_sub_configs = [
         config.ref_genome, config.mod_genome,
         config.ref_plasmid, config.mod_plasmid,
-        config.ref_feature,
     ] + list(config.reads or [])
     for sub_cfg in _all_sub_configs:
         if sub_cfg is not None:
@@ -176,15 +174,6 @@ def main():
             outdir_by_ngs_type=True
         )
 
-        # Settings for reference features
-        ref_feature_settings = FeatureValidator.Settings(
-            sort_by_position=False,
-            check_coordinates=False,
-            replace_id_with='chr',
-            coding_type=None,
-            output_filename_suffix='ref'
-        )
-
         # Inter genome validation settings (using defaults)
         genomexgenome_settings = GenomeXGenomeSettings(
             characterize=True,
@@ -275,14 +264,6 @@ def main():
     else:
         logger.info("Inter-read validation skipped")
 
-    # Validate features (optional — non-fatal)
-    ref_feature_res = None
-    if hasattr(config, 'ref_feature') and config.ref_feature and not force_defragment:
-        try:
-            ref_feature_res = FeatureValidator(config.ref_feature, ref_feature_settings).run()
-        except ValidationError as e:
-            logger.error(f"Optional ref_feature validation failed: {e}")
-
     print(f"Log file: {log_file}")
 
     # ========================================================================
@@ -316,13 +297,7 @@ def main():
         "mod_plasmid":   mod_plasmid_res,
         "genomexgenome": genomexgenome_res,
         "reads":         reads_res,
-        "ref_feature":   ref_feature_res,
     }
-    if force_defragment:
-        logger.warning(
-            "force_defragment_ref is active: GFF validation for the reference is "
-            "skipped. Feature coordinates are not meaningful on a defragmented reference."
-        )
     repo_root = config_path.parent.parent.parent
     params = nf_params.build_params(validation_results, base_dir=repo_root, organism_type=config.type.value)
     nf_params.write_params(params, output_dir / "validated_params.json")
