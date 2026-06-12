@@ -87,15 +87,24 @@ process cute_sv {
     each path(fai)
     tuple val(pair_id), path(bam_file), path(bam_index) 
     val out_folder_name
+    val read_type
 
     output:
     tuple val(pair_id), path("${pair_id}_cutesv.vcf")
     
 
     script:
+    def cutesv_args = [
+        "pacbio-clr":  "--max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 200 --diff_ratio_merging_DEL 0.5",
+        "pacbio-hifi": "--max_cluster_bias_INS 1000 --diff_ratio_merging_INS 0.9 --max_cluster_bias_DEL 1000 --diff_ratio_merging_DEL 0.5",
+        "ont":         "--max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 100 --diff_ratio_merging_DEL 0.3"
+    ][read_type]
+    if (!cutesv_args) {
+        error "Unsupported validated read_type '${read_type}' for CuteSV in ${out_folder_name}. Expected one of: pacbio-hifi, pacbio-clr, ont."
+    }
     """
     mkdir ${pair_id}_out
-    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t ${task.cpus}
+    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t ${task.cpus} ${cutesv_args}
     """
 }
 
@@ -115,7 +124,7 @@ process debreak {
 
     script:
     """
-    debreak --bam $bam_file -r $fasta_file -o debreak_out -t ${task.cpus}
+    debreak --bam $bam_file -o debreak_out -t ${task.cpus} --rescue_large_ins --rescue_dup --poa --ref $fasta_file
     mv debreak_out/debreak.vcf debreak_out/${pair_id}_debreak.vcf
     """
 }
