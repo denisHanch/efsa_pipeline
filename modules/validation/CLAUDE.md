@@ -16,50 +16,29 @@ modules/validation/
 ├── README.md                      # User-facing how-to and config guide pointer
 ├── utils/
 │   ├── nextflow_params_handler.py # Builds and serialises validated_params.json
-│   ├── ref_defragment.py          # Unsupported workaround: merge fragmented reference
-│   └── tests/
-│       ├── test_nextflow_params.py
-│       └── test_ref_defragment.py
+│   └── ref_defragment.py          # Unsupported workaround: merge fragmented reference
 └── validation-pkg/
     ├── setup.py
     ├── requirements.txt           # biopython, numpy, pysam, structlog, typing_extensions
     ├── requirements-dev.txt       # pytest
     ├── validation_pkg/
-    │   ├── __init__.py            # Public exports (validator classes, inter-file functions, logging, report); no functional-API wrappers
+    │   ├── __init__.py            # Public exports (validator classes, inter-file functions, logging); no functional-API wrappers
     │   ├── config_manager.py      # JSON config loader → Config / *Config dataclasses
     │   ├── exceptions.py          # Exception hierarchy rooted at ValidationError
-    │   ├── report.py              # ValidationReport — collects results, writes report.txt
     │   ├── utils/
     │   │   ├── base_settings.py   # BaseSettings, BaseOutputMetadata, BaseValidatorSettings
     │   │   ├── base_validator.py  # BaseValidator abstract class
     │   │   ├── file_handler.py    # Compression, format detection, file I/O utilities
     │   │   ├── formats.py         # Enums: CodingType, GenomeFormat, ReadFormat, FeatureFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType
     │   │   ├── logger.py          # ValidationLogger singleton (structlog-based)
-    │   │   ├── path_utils.py      # Path resolution + path-traversal security
-    │   │   └── sequence_stats.py  # N50 calculation
+    │   │   └── path_utils.py      # Path resolution + path-traversal security
     │   └── validators/
     │       ├── genome_validator.py        # GenomeValidator + GenomeOutputMetadata
     │       ├── read_validator.py          # ReadValidator + ReadOutputMetadata
     │       ├── feature_validator.py       # FeatureValidator + FeatureOutputMetadata
     │       ├── interfile_genome.py        # genomexgenome_validation + GenomeXGenomeSettings
     │       └── interfile_read.py          # readxread_validation + ReadXReadSettings
-    └── tests/
-        ├── test_config_manager.py
-        ├── test_genome_validator.py
-        ├── test_read_validator.py
-        ├── test_feature_validator.py
-        ├── test_interfile_genome.py
-        ├── test_interfile_genome_characterization.py
-        ├── test_interfile_read.py
-        ├── test_logger.py
-        ├── test_report.py
-        ├── test_exceptions.py
-        ├── test_formats.py
-        ├── test_file_handler.py
-        ├── test_path_utils.py
-        ├── test_path_sanitization.py
-        ├── test_settings.py
-        └── test_scenarios_integration.py   # end-to-end scenario tests (all 5 OVERVIEW.md scenarios)
+    └── tests/                     # not tracked in git (untracked locally)
 ```
 
 ---
@@ -88,6 +67,7 @@ python3 ./modules/validation/main.py data/inputs/config.json
 ```
 
 ### Tests
+Test files live under `validation-pkg/tests/` and `utils/tests/` locally but are **not tracked in git**.
 ```bash
 cd modules/validation/validation-pkg/
 pytest tests/
@@ -100,7 +80,6 @@ pytest tests/
 | File | Location | Description |
 |---|---|---|
 | `validation_<run_id>.log` | `data/outputs/logs/` | Structured JSON log (structlog). Falls back to `validation.log` when no run ID. Auto-incremented if exists. |
-| `report_<run_id>.txt` | `data/outputs/logs/` | Human-readable validation report. Falls back to `report.txt` when no run ID. Auto-incremented if exists. |
 | Validated genome/reads/feature files | `data/valid/run_YYYYMMDD_HHMMSS/` | Standardised copies of every input file. |
 | `validated_params.json` | `data/valid/` | Nextflow `-params-file`; consumed by the main pipeline. |
 
@@ -113,28 +92,23 @@ pytest tests/
 2.  setup_logging() → data/outputs/logs/validation_<run_id>.log
 3.  ConfigManager.load(config_path) → Config   # returns 1 on failure
 4.  Instantiate per-validator Settings objects
-5.  Initialise fatal_errors list + register_required_failure / register_missing_output helpers
-6.  GenomeValidator(ref_genome_config, ref_settings).run()        # required
-      → register_missing_output on success, register_required_failure on ValidationError
-7.  GenomeValidator(mod_genome_config, mod_settings).run()        # optional
-8.  genomexgenome_validation(ref_res, mod_res, gxg_settings)      # only if both present AND neither fragmented
-9.  GenomeValidator(ref_plasmid_config, plasmid_settings).run()   # optional
-10. GenomeValidator(mod_plasmid_config, plasmid_settings).run()   # optional
-11. [ReadValidator(rc, reads_settings).run() for rc in reads]     # required
-      → register_missing_output per read, register_required_failure on ValidationError
-12. readxread_validation(reads_res, readxread_settings)            # only if reads validated
-13. FeatureValidator(ref_feature_config, ref_feature_settings).run()  # optional
-15. if fatal_errors: report.add_fatal_errors(fatal_errors)
-16. report.flush(format='text')
-17. nf_params.build_params(validation_results) → NextflowParams
-18. nf_params.write_params(params, data/valid/validated_params.json)
-19. sys.exit(0)   # always 0; errors surfaced through report and log
+5.  GenomeValidator(ref_genome_config, ref_settings).run()        # required
+      → logger.error on ValidationError or missing output_file
+6.  GenomeValidator(mod_genome_config, mod_settings).run()        # optional
+7.  genomexgenome_validation(ref_res, mod_res, gxg_settings)      # only if both present AND neither fragmented
+8.  GenomeValidator(ref_plasmid_config, plasmid_settings).run()   # optional
+9.  GenomeValidator(mod_plasmid_config, plasmid_settings).run()   # optional
+10. [ReadValidator(rc, reads_settings).run() for rc in reads]     # required
+      → logger.error on ValidationError or missing output_file
+11. readxread_validation(reads_res, readxread_settings)            # only if reads validated
+12. FeatureValidator(ref_feature_config, ref_feature_settings).run()  # optional
+13. nf_params.build_params(validation_results) → NextflowParams
+14. nf_params.write_params(params, data/valid/validated_params.json)
+15. sys.exit(0)   # always 0; errors surfaced through log
 ```
 
-**Exit code is always 0.** Fatal errors (required inputs that failed) are
-accumulated in `fatal_errors`, forwarded to the report via `add_fatal_errors()`,
-and cause `overall_status` to show `✗ FAILED`. `main.py` returns 1 **only** if
-config loading fails.
+**Exit code is always 0.** Validation failures are logged via `logger.error`.
+`main.py` returns 1 **only** if config loading fails.
 
 ---
 
@@ -265,11 +239,11 @@ Raises: `ValidationFileNotFoundError`, `ConfigurationError`, `ValueError`
 
 ## Validation modes
 
-| Mode | Scope | Stats collected | Use case |
-|---|---|---|---|
-| `minimal` | Extension/compression check only | Input/output paths, elapsed time | Trust existing data, maximum speed |
-| `trust` | Sample first 10 sequences/reads | Counts, basic per-file stats | Fast QC on reasonably clean data |
-| `strict` (default) | Every sequence/read | Full stats: GC%, N50, per-read lengths | Default; comprehensive QC |
+| Mode | Scope | Use case |
+|---|---|---|
+| `minimal` | Extension/compression check only | Trust existing data, maximum speed |
+| `trust` | Sample first 10 sequences/reads | Fast validation on reasonably clean data |
+| `strict` (default) | Every sequence/read | Default; full validation + total genome size |
 
 In `minimal` mode the input file is copied as-is if format and compression already
 match expectations; otherwise only an extension/coding check is performed.
@@ -471,21 +445,17 @@ Raises `GenomeValidationError` if:
 # Always present
 input_file, output_file, validation_level, elapsed_time   (from BaseOutputMetadata)
 num_sequences              : int
-longest_sequence_length    : int
-longest_sequence_id        : str
 sequence_ids               : List[str]
-sequence_lengths           : List[int]
+sequence_lengths           : List[int]   # critical: summed by build_params() for genome size
 num_sequences_filtered     : int          # count removed by min_sequence_length
 plasmid_count              : int
 plasmid_filenames          : List[str]
+plasmid_output_paths       : List[str]
 fragmented                 : bool         # True when sequence count >= n_sequence_limit
 
 # Strict mode only
 total_genome_size  : int
-gc_content         : float    # percentage
-n50                : int
 
-.format_statistics(indent, input_settings) → List[str]   # used by ValidationReport
 ```
 
 ### Internal processing order
@@ -520,9 +490,7 @@ ILLUMINA_PAIRED_END_PATTERNS = [...]  # regexes to detect R1/R2 suffixes
 ### `ReadValidator.Settings` (dataclass)
 ```
 # Validation
-check_invalid_chars  : bool = False   # reject non-ATCGN bases
 allow_empty_id       : bool = False
-allow_duplicate_ids  : bool = True
 
 # BAM handling
 keep_bam   : bool = False    # keep original BAM alongside FASTQ output
@@ -545,15 +513,8 @@ input_file, output_file, validation_level, elapsed_time
 base_name                  : str     # filename without R1/R2 suffix
 read_number                : int     # 1 or 2 (0 if not detected)
 ngs_type                   : str     # "illumina", "ont", "pacbio"
+input_format               : str     # "fastq" or "bam"
 illumina_pairing_detected  : str     # "illumina" if R1/R2 pattern matched; else ""
-num_reads                  : int
-
-# Strict mode only
-n50                    : int
-total_bases            : int
-mean_read_length       : float
-longest_read_length    : int
-shortest_read_length   : int
 ```
 
 ### Paired-end detection
@@ -736,44 +697,6 @@ and so on — the old log is never overwritten.
 
 ---
 
-## ValidationReport (`report.py`)
-
-### Usage in `main.py`
-```python
-report = ValidationReport(output_dir / "report.txt")
-report.write(ref_genome_res, file_type="genome")
-report.write(reads_res, file_type="read")           # accepts single or list
-report.write(genomexgenome_res, file_type="genomexgenome")
-report.write(readxread_res, file_type="readxread")
-if fatal_errors:
-    report.add_fatal_errors(fatal_errors)           # propagate required-input failures
-report.flush(format='text')   # writes report.txt; also accepts 'json'
-```
-
-### `add_fatal_errors(errors: List[str]) → None`
-Appends file-level fatal error messages (required validators that raised or
-produced no output). These cause `overall_status` to be `✗ FAILED` and are
-printed as a **Fatal File-Level Errors** block in the text report and included
-as `"fatal_errors"` in the JSON summary.
-
-### `overall_status` logic
-```python
-overall_status = "✓ PASSED" if interfile_failed == 0 and not self.fatal_errors else "✗ FAILED"
-```
-
-### Internal record types
-- **`FileValidationRecord`** — wraps a single validator's `OutputMetadata`
-  - `validator_type`: "genome", "read", or "feature"
-  - Renders: title, common fields (input/output/time), statistics, non-default settings
-- **`InterFileValidationRecord`** — wraps an inter-validator result dict
-  - `validation_type`: "genomexgenome" or "readxread"
-  - Renders: status (PASSED/FAILED), errors, warnings, metadata
-
-### Report auto-increment
-Like the log file, `report_1.txt`, `report_2.txt` are created if `report.txt` exists.
-
----
-
 ## Utility functions
 
 ### Path security (`utils/path_utils.py`)
@@ -824,13 +747,6 @@ parse_config_file_value(value, field_name) → Tuple[str, Dict]
     # normalises config entry (plain string or {"filename": …, …} dict)
 ```
 
-### Sequence statistics (`utils/sequence_stats.py`)
-```python
-calculate_n50(lengths: List[int]) → int
-    # Sort descending, cumulative sum until ≥ 50% of total length.
-    # Returns the length at which cumulative sum crosses the 50% threshold.
-```
-
 ---
 
 ## `utils/nextflow_params_handler.py`
@@ -852,6 +768,8 @@ ref_fasta_validated : Optional[str] = None
 mod_fasta_validated : Optional[str] = None
 ref_plasmid_fasta   : Optional[str] = None
 mod_plasmid_fasta   : Optional[str] = None
+ref_feature_gff     : Optional[str] = None
+mod_feature_gff     : Optional[str] = None
 
 # input_output_options — lists (always present, may be empty)
 illumina_fastqs : List[str]
@@ -885,6 +803,7 @@ mod_genome    : GenomeOutputMetadata | None
 genomexgenome : dict (from genomexgenome_validation) | None
 reads         : List[ReadOutputMetadata] | None
 ref_feature   : FeatureOutputMetadata | None
+mod_feature   : FeatureOutputMetadata | None
 ```
 
 Before building flags, reads are pre-filtered:
@@ -986,7 +905,7 @@ readxread_settings = ReadXReadSettings()   # all defaults
 5. Add format support in `utils/formats.py` if needed
 6. Register new exception subclass in `exceptions.py` if needed
 7. Export from `validation_pkg/__init__.py`
-8. Add `write(result, file_type="new_type")` handling in `report.py`
+8. Wire result into `build_params()` in `nextflow_params_handler.py` if the output path is needed by Nextflow
 9. Write tests in `validation-pkg/tests/test_new_validator.py`
 
 ---

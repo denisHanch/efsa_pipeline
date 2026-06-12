@@ -48,7 +48,6 @@ result = validator.run()
 
 print(f"Sequences: {result.num_sequences}")
 print(f"Total size: {result.total_genome_size} bp")
-print(f"GC content: {result.gc_content:.2f}%")
 ```
 
 ### Constructor
@@ -101,7 +100,7 @@ print(f"Processing time: {result.elapsed_time:.2f}s")
 - ✓ Parse all sequences
 - ✓ Validate all sequence IDs (no empty IDs)
 - ✓ Check for empty sequences
-- ✓ Calculate statistics (GC content, N50, total size)
+- ✓ Calculate total genome size
 - ✓ Apply all edits (filtering, ID replacement, plasmid handling)
 
 #### Trust Mode
@@ -200,9 +199,8 @@ config = ConfigManager.load("config.json")
 validator = ReadValidator(config.reads[0])
 result = validator.run()
 
-print(f"Reads: {result.num_reads:,}")
-print(f"N50: {result.n50:,} bp")
-print(f"Mean length: {result.mean_read_length:.1f} bp")
+print(f"NGS type: {result.ngs_type}")
+print(f"Pairing detected: {result.illumina_pairing_detected}")
 ```
 
 ### Constructor
@@ -236,8 +234,7 @@ Execute the validation workflow.
 1. Parse read file (FASTQ or BAM)
 2. Validate reads based on validation level
 3. Detect paired-end patterns (Illumina)
-4. Calculate statistics (N50, mean length, etc.)
-5. Save to compressed FASTQ format
+4. Save to compressed FASTQ format
 
 **Example:**
 ```python
@@ -255,16 +252,12 @@ if result.read_number:
 #### Strict Mode
 - ✓ Parse all reads
 - ✓ Validate all read IDs and sequences
-- ✓ Check for invalid characters (if enabled)
-- ✓ Calculate statistics (N50, total bases, length distribution)
 - ✓ Compress output with gzip
 
 #### Trust Mode
 - ✓ Parse first 10 reads for validation
 - ✓ Validate first 10 reads only
 - ✓ Copy original file to output with compression conversion
-- ○ Skip full read count
-- ○ Skip statistics calculation
 - ○ Skip extensive validation
 
 #### Minimal Mode
@@ -677,8 +670,7 @@ except ValidationError as e:
 ```python
 # Optimize for large files
 settings = ReadValidator.Settings(
-    validation_level='trust',  # Skip extensive validation
-    check_invalid_chars=False  # Skip character checking
+    validation_level='trust'  # Skip extensive validation
 )
 
 # Use maximum threads

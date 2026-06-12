@@ -10,7 +10,7 @@ The `validation_pkg` is a comprehensive Python package for validating and proces
 - **Automatic format detection and conversion**
 - **Three validation levels**: strict (thorough), trust (fast), minimal (copy only)
 - **Parallel processing**: Multi-threaded compression and validation
-- **Comprehensive reporting**: Detailed validation reports and logging
+- **Structured logging**: Detailed structured logs via structlog
 - **Inter-file validation**: Check consistency across multiple files
 
 **Package Location:** `modules/validation/validation-pkg/`
@@ -73,11 +73,9 @@ The `validation_pkg` is a comprehensive Python package for validating and proces
   - Error handling patterns
   - Troubleshooting guide
 
-- **[LOGGING_REPORTING.md](LOGGING_REPORTING.md)** - Logging and reports
+- **[LOGGING_REPORTING.md](LOGGING_REPORTING.md)** - Logging
   - Logging system (`setup_logging`, `get_logger`)
-  - Validation reports (`ValidationReport`)
-  - Log file structure
-  - Report formats (text, JSON)
+  - Log file structure and auto-increment behaviour
 
 ### Examples
 
@@ -132,7 +130,6 @@ print(f"Validated {len(reads_results)} read files")
 | Split plasmids | [ADVANCED_FEATURES.md](ADVANCED_FEATURES.md#plasmid-handling) |
 | Convert formats | [ADVANCED_FEATURES.md](ADVANCED_FEATURES.md#format-conversion) |
 | Handle errors | [ERROR_HANDLING.md](ERROR_HANDLING.md) |
-| Generate reports | [LOGGING_REPORTING.md](LOGGING_REPORTING.md#validation-reports) |
 | Custom settings | [SETTINGS.md](SETTINGS.md) |
 
 ---
@@ -146,7 +143,6 @@ validation_pkg/
 ├── __init__.py           # Public API exports
 ├── config_manager.py     # Configuration loading and parsing
 ├── exceptions.py         # Exception hierarchy
-├── report.py            # Validation report generation
 ├── validators/
 │   ├── genome_validator.py      # Genome file validation
 │   ├── read_validator.py        # Read file validation
@@ -156,12 +152,10 @@ validation_pkg/
 └── utils/
     ├── base_settings.py  # BaseSettings, BaseOutputMetadata, BaseValidatorSettings
     ├── base_validator.py # BaseValidator abstract class (ClassVar interface)
-    ├── formatting.py     # Shared format_metadata_value() helper
     ├── file_handler.py   # File I/O and compression utilities
     ├── formats.py        # CodingType, GenomeFormat, ReadFormat, FeatureFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType enums
     ├── logger.py         # Structured logging system
-    ├── path_utils.py     # Path resolution and directory-traversal security
-    └── sequence_stats.py # N50 calculation
+    └── path_utils.py     # Path resolution and directory-traversal security
 ```
 
 ### Data Flow
@@ -175,11 +169,11 @@ validation_pkg/
    ↓
 4. Validator (GenomeValidator, ReadValidator, FeatureValidator)
    ↓
-5. OutputMetadata (validation results and statistics)
+5. OutputMetadata (validation results)
    ↓
 6. Inter-File Validation (optional)
    ↓
-7. ValidationReport (final report)
+7. nextflow_params_handler.build_params() → validated_params.json
 ```
 
 ---
@@ -257,35 +251,25 @@ result = GenomeValidator(config.ref_genome, settings).run()
 
 See: [VALIDATORS.md](VALIDATORS.md#basic-usage)
 
-### 3. Complete Pipeline with Reports
+### 3. Complete Pipeline
 
 ```python
 from validation_pkg import (
     setup_logging,
-    ValidationReport,
     GenomeValidator,
     ReadValidator,
     genomexgenome_validation
 )
 
 setup_logging(log_file='./logs/validation.log')
-report = ValidationReport('./logs/report.txt')
 
 # Validate
 ref = GenomeValidator(config.ref_genome).run()
 mod = GenomeValidator(config.mod_genome).run()
 reads = [ReadValidator(rc).run() for rc in config.reads]
 
-# Report
-report.write(ref, 'genome')
-report.write(mod, 'genome')
-report.write(reads, 'read')
-
 # Inter-file check
 check = genomexgenome_validation(ref, mod)
-report.write(check, 'genomexgenome')
-
-report.flush(format='text')
 ```
 
 See: [EXAMPLES.md](EXAMPLES.md#complete-workflows)
