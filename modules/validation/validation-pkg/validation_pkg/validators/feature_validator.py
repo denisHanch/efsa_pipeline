@@ -256,12 +256,6 @@ class FeatureValidator(BaseValidator):
 
     def _edit_features(self) -> None:
         """Apply feature edits (sorting, ID replacement) in trust and strict modes."""
-        
-        # Minimal mode - skip edits, file will be copied as-is
-        if self.validation_level == ValidationLevel.MINIMAL:
-            self.logger.debug("Minimal mode - skipping edits")
-            return
-        
         if self.settings.sort_by_position:
             self.logger.debug("Sorting features by position...")
             self.features.sort(key=lambda f: (f.seqname, f.start, f.end))

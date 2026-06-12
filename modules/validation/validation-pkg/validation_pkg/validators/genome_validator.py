@@ -155,9 +155,6 @@ class GenomeValidator(BaseValidator):
             self.output_metadata.plasmid_count = len(self.plasmid_filenames)
             self.output_metadata.plasmid_filenames = self.plasmid_filenames
             self.output_metadata.plasmid_output_paths = self.plasmid_output_paths
-        elif self.num_sequences_filtered > 0:
-            # No plasmids split, but sequences were filtered
-            pass
 
         self.output_metadata.num_sequences_filtered = self.num_sequences_filtered
         self.output_metadata.fragmented = getattr(self, '_sequence_limit_exceeded', False)
@@ -322,11 +319,6 @@ class GenomeValidator(BaseValidator):
     def _apply_edits(self) -> None:
         """Apply editing specifications to sequences based on settings."""
         self.logger.debug("Applying editing specifications from settings...")
-
-        # Minimal mode - skip edits, file will be copied as-is
-        if self.validation_level == ValidationLevel.MINIMAL:
-            self.logger.debug("Minimal mode - skipping edits")
-            return
 
         # 1. Remove short sequences
         if self.settings.min_sequence_length > 0:
