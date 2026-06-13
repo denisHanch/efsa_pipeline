@@ -15,6 +15,7 @@ general_options (pipeline execution switches):
   run_illumina         – True when validated Illumina reads are present
   run_nanopore         – True when validated Nanopore (ONT) reads are present
   run_pacbio           – True when validated PacBio reads are present
+  organism_type        – "prokaryote" or "eukaryote" (from config options; default: "prokaryote")
   contig_file_size     – number of contig files from inter-genome characterisation
   validation_timestamp – timestamp of the validation run (YYYYMMDD_HHMMSS)
 
@@ -47,6 +48,7 @@ class NextflowParams:
     run_illumina: bool = False
     run_nanopore: bool = False
     run_pacbio: bool = False
+    organism_type: str = "prokaryote"
     contig_file_size: int = 0
     validation_timestamp: str = ""
     # input_output_options — omitted from JSON when None
@@ -70,6 +72,7 @@ class NextflowParams:
             "run_illumina": self.run_illumina,
             "run_nanopore": self.run_nanopore,
             "run_pacbio": self.run_pacbio,
+            "organism_type": self.organism_type,
             "contig_file_size": self.contig_file_size,
             "validation_timestamp": self.validation_timestamp,
             "illumina_fastqs": self.illumina_fastqs,
@@ -90,6 +93,7 @@ def build_params(
     validation_results: dict,
     run_timestamp: str = None,
     base_dir: Path = None,
+    organism_type: str = "prokaryote",
 ) -> NextflowParams:
     """
     Build a Nextflow params dataclass from validation results.
@@ -192,6 +196,7 @@ def build_params(
         run_illumina="illumina" in fastqs_by_type,
         run_nanopore=("ont" in fastqs_by_type or "ont" in bams_by_type),
         run_pacbio=("pacbio" in fastqs_by_type or "pacbio" in bams_by_type),
+        organism_type=organism_type,
         contig_file_size=len(contig_files),
         validation_timestamp=run_timestamp or datetime.now().strftime("%Y%m%d_%H%M%S"),
         # input_output_options

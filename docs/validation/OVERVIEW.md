@@ -92,6 +92,7 @@ It is used at runtime by the analysis workflow to determine which pipelines to e
 | `run_illumina`          | boolean | `true` when validated Illumina FASTQ reads are present.                                               |
 | `run_nanopore`          | boolean | `true` when validated Nanopore (ONT) reads are present (FASTQ or BAM).                               |
 | `run_pacbio`            | boolean | `true` when validated PacBio reads are present (FASTQ or BAM).                                       |
+| `organism_type`         | string  | `"prokaryote"` or `"eukaryote"`, taken from the `type` field in `config.json` options.               |
 | `contig_file_size`      | integer | Number of contig files produced by inter-genome characterisation.                                     |
 | `validation_timestamp`  | string  | Timestamp of the validation run (`YYYYMMDD_HHMMSS`).                                                  |
 
