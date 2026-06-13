@@ -302,7 +302,8 @@ class NgsType(Enum):
     """Supported next-generation sequencing technology types."""
     ILLUMINA = "illumina"
     ONT = "ont"
-    PACBIO = "pacbio"
+    PACBIO_HIFI = "pacbio-hifi"
+    PACBIO_CLR = "pacbio-clr"
 
     @classmethod
     def normalize(cls, value):
@@ -315,12 +316,13 @@ class NgsType(Enum):
         mapping = {
             'illumina': cls.ILLUMINA,
             'ont': cls.ONT,
-            'pacbio': cls.PACBIO,
+            'pacbio-hifi': cls.PACBIO_HIFI,
+            'pacbio-clr': cls.PACBIO_CLR,
         }
         if value_lower in mapping:
             return mapping[value_lower]
         raise ValueError(
-            f"'{value}' is not a valid NgsType. Must be one of: illumina, ont, pacbio"
+            f"'{value}' is not a valid NgsType. Must be one of: illumina, ont, pacbio-hifi, pacbio-clr"
         )
 
     @classmethod

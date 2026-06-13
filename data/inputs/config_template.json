@@ -24,13 +24,13 @@
   "reads": [
     {
       "filename": "TBA",
-      "ngs_type": "illumina/pacbio/ont",
+      "ngs_type": "illumina/pacbio-hifi/pacbio-clr/ont",
       "validation_level": "strict/trust/minimal",
       "threads": 8
     },
     {
       "directory": "TBA",
-      "ngs_type": "illumina/pacbio/ont",
+      "ngs_type": "illumina/pacbio-hifi/pacbio-clr/ont",
       "validation_level": "strict/trust/minimal",
       "threads": 8
     }

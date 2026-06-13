@@ -223,9 +223,13 @@ class ReadValidator(BaseValidator):
 
         # Apply outdir_by_ngs_type if enabled
         if self.settings.outdir_by_ngs_type:
-            # Override output_subdir_name with ngs_type
-            self.settings = self.settings.update(output_subdir_name=self.read_config.ngs_type.value)
-            self.logger.debug(f"Applied outdir_by_ngs_type: output_subdir_name set to '{self.read_config.ngs_type.value}'")
+            # Both pacbio subtypes share the same output subdirectory
+            subdir = (
+                "pacbio" if self.read_config.ngs_type.value in ("pacbio-hifi", "pacbio-clr")
+                else self.read_config.ngs_type.value
+            )
+            self.settings = self.settings.update(output_subdir_name=subdir)
+            self.logger.debug(f"Applied outdir_by_ngs_type: output_subdir_name set to '{subdir}'")
 
     # Required abstract properties and methods from BaseValidator
 

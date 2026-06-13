@@ -288,7 +288,7 @@ Configuration for sequencing read files.
 - `filename` (str): Original filename
 - `filepath` (Path): Absolute resolved path
 - `basename` (str): Filename without extension
-- `ngs_type` (str): Sequencing platform ("illumina", "ont", or "pacbio")
+- `ngs_type` (str): Sequencing platform ("illumina", "ont", "pacbio-hifi", or "pacbio-clr")
 - `coding_type` (CodingType): Compression format
 - `detected_format` (ReadFormat): File format (FASTQ or BAM)
 - `output_dir` (Path): Base output directory
@@ -398,7 +398,7 @@ All validators return metadata objects with validation results.
 - `mean_read_length` (float): Average read length (strict mode)
 - `longest_read_length` (int): Longest read length (strict mode)
 - `shortest_read_length` (int): Shortest read length (strict mode)
-- `ngs_type` (str): Configured NGS platform from config (illumina, ont, pacbio)
+- `ngs_type` (str): Configured NGS platform from config (illumina, ont, pacbio-hifi, pacbio-clr)
 - `illumina_pairing_detected` (str): Set to 'illumina' if paired-end pattern detected
 - `base_name` (str): Illumina paired-end base name extracted from filename
 - `read_number` (int): Read number (1 or 2) from pattern detection

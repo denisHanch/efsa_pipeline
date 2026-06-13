@@ -13,6 +13,7 @@
       - mapping_tag: string used as mapping identifier (e.g., "map-ont" or "map-pb")
       - Optional plasmid FASTA (used to remap unmapped reads)
       - out_folder_name: output path prefix / label (controls conditional SV calling)
+      - read_type: validated long-read type used for SV caller parameters
   - Outputs:
       - Channel of structural variant VCFs (per-run) or Channel.empty() when skipped
       - Channel of unmapped FASTQ reads (after reference and optional plasmid mapping)
@@ -33,11 +34,12 @@ workflow long_read {
         mapping_tag
         plasmid_fasta
         out_folder_name
+        read_type
 
     main:
         // mapping to the reference
         samtools_index(fasta) | set { fai }
-        mapping_long(fastqs, fasta, mapping_tag, out_folder_name) | set { indexed_bam }
+        mapping_long(fastqs, fasta, mapping_tag, out_folder_name, read_type) | set { indexed_bam }
 
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
         
@@ -52,7 +54,7 @@ workflow long_read {
             .flatten()
             | set { plasmid_fasta_present }
 
-        mapping_long_plasmid(unmapped_fastq, plasmid_fasta_present, mapping_tag, "${out_folder_name}-plasmid") | set { unmapped_bam }
+        mapping_long_plasmid(unmapped_fastq, plasmid_fasta_present, mapping_tag, "${out_folder_name}-plasmid", read_type) | set { unmapped_bam }
         get_unmapped_reads_plasmid(unmapped_bam, "${out_folder_name}-plasmid") | set { unmapped_fastq_plasmid }
 
         calc_unmapped_plasmid(unmapped_fastq_plasmid) | map { _pair_id, reads -> reads } | set { nreads_plasmid }
@@ -60,7 +62,7 @@ workflow long_read {
 
         // SV calling against the reference
         if (out_folder_name == "ont/long-ref" || out_folder_name == "pacbio/long-ref") { 
-            sv_long(fasta, fai, indexed_bam, mapping_tag, out_folder_name)
+            sv_long(fasta, fai, indexed_bam, mapping_tag, out_folder_name, read_type)
             vcf_to_table_long(mapping_tag, sv_long.out.merged_vcf) | set { sv_tbl_raw }
 
             sv_tbl_keyed = sv_tbl_raw.map { tsv ->

@@ -424,6 +424,16 @@ class ConfigManager:
             except ValueError as e:
                 raise ValueError(f"Invalid reads[{idx}]: {e}")
 
+        pacbio_types_present = {
+            r.ngs_type.value for r in config.reads
+            if r.ngs_type is not None and r.ngs_type.value in ("pacbio-hifi", "pacbio-clr")
+        }
+        if len(pacbio_types_present) > 1:
+            raise ValueError(
+                "Cannot mix pacbio-hifi and pacbio-clr reads in the same run. "
+                f"Found: {', '.join(sorted(pacbio_types_present))}"
+            )
+
     @staticmethod
     def _parse_read_config(value: Any, field_name: str, config_dir: Path, output_dir: Path, global_options: Dict[str, Any] = None) -> ReadConfig:
         """Parse a read configuration entry."""

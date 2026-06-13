@@ -523,27 +523,35 @@ class TestNgsType:
     def test_enum_values(self):
         assert NgsType.ILLUMINA.value == "illumina"
         assert NgsType.ONT.value == "ont"
-        assert NgsType.PACBIO.value == "pacbio"
+        assert NgsType.PACBIO_HIFI.value == "pacbio-hifi"
+        assert NgsType.PACBIO_CLR.value == "pacbio-clr"
 
     def test_normalize_exact(self):
         assert NgsType.normalize("illumina") == NgsType.ILLUMINA
         assert NgsType.normalize("ont") == NgsType.ONT
-        assert NgsType.normalize("pacbio") == NgsType.PACBIO
+        assert NgsType.normalize("pacbio-hifi") == NgsType.PACBIO_HIFI
+        assert NgsType.normalize("pacbio-clr") == NgsType.PACBIO_CLR
 
     def test_normalize_uppercase(self):
         assert NgsType.normalize("ILLUMINA") == NgsType.ILLUMINA
         assert NgsType.normalize("ONT") == NgsType.ONT
-        assert NgsType.normalize("PACBIO") == NgsType.PACBIO
+        assert NgsType.normalize("PACBIO-HIFI") == NgsType.PACBIO_HIFI
+        assert NgsType.normalize("PACBIO-CLR") == NgsType.PACBIO_CLR
 
     def test_normalize_mixed_case(self):
         assert NgsType.normalize("Illumina") == NgsType.ILLUMINA
-        assert NgsType.normalize("PacBio") == NgsType.PACBIO
+        assert NgsType.normalize("PacBio-HiFi") == NgsType.PACBIO_HIFI
+        assert NgsType.normalize("PacBio-CLR") == NgsType.PACBIO_CLR
 
     def test_normalize_strips_whitespace(self):
         assert NgsType.normalize("  ont  ") == NgsType.ONT
 
     def test_normalize_enum_instance_passthrough(self):
-        assert NgsType.normalize(NgsType.PACBIO) == NgsType.PACBIO
+        assert NgsType.normalize(NgsType.PACBIO_HIFI) == NgsType.PACBIO_HIFI
+
+    def test_normalize_plain_pacbio_raises(self):
+        with pytest.raises(ValueError, match="is not a valid NgsType"):
+            NgsType.normalize("pacbio")
 
     def test_normalize_invalid_raises(self):
         with pytest.raises(ValueError, match="is not a valid NgsType"):

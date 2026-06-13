@@ -161,7 +161,7 @@ Specifies sequencing read files. Supports individual files or directories.
 
 #### Option 2: Directory of Files
 
-All files in the directory inherit the same settings. Each file becomes a separate read entry. This works for all NGS types (`illumina`, `ont`, `pacbio`).
+All files in the directory inherit the same settings. Each file becomes a separate read entry. This works for all NGS types (`illumina`, `ont`, `pacbio-hifi`, `pacbio-clr`).
 
 ```json
 "reads": [
@@ -179,9 +179,8 @@ All files in the directory inherit the same settings. Each file becomes a separa
 |-------|-------------|-------------------|
 | `"illumina"` | Illumina short reads (SE or PE) | 50-300 bp |
 | `"ont"` | Oxford Nanopore long reads | 1-100+ kb |
-| `"pacbio"` | PacBio long reads | 10-50+ kb |
-
-<!-- **Note:** BAM files are automatically detected and converted to FASTQ. Default NGS type for BAM: `pacbio`. -->
+| `"pacbio-hifi"` | PacBio HiFi (CCS) long reads | 10-25 kb |
+| `"pacbio-clr"` | PacBio CLR long reads | 10-50+ kb |
 
 ### FeatureConfig Object
 

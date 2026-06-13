@@ -47,14 +47,22 @@ All parameters use Delly defaults. No custom thresholds are applied.
 **Module:** `modules/sv_calling.nf`
 
 ```bash
-cuteSV <bam> <ref> <out.vcf> <work_dir> -t ${task.cpus}
+cuteSV <bam> <ref> <out.vcf> <work_dir> -t ${task.cpus} <read-type-specific args>
 ```
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
 | `-t` | `${task.cpus}` | Number of threads assigned by Nextflow for this task (bounded by process-level CPU limits in `nextflow.config`). |
 
-All other parameters use cuteSV defaults (minimum SV size 50 bp, minimum support 10 reads, etc.). These defaults are suitable for moderate-coverage PacBio/ONT data on both prokaryotic and eukaryotic genomes.
+The pipeline also applies a read-type-specific cuteSV profile based on the validated long-read type:
+
+| Read type | Additional cuteSV parameters |
+|-----------|------------------------------|
+| `pacbio-clr` | `--max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 200 --diff_ratio_merging_DEL 0.5` |
+| `pacbio-hifi` | `--max_cluster_bias_INS 1000 --diff_ratio_merging_INS 0.9 --max_cluster_bias_DEL 1000 --diff_ratio_merging_DEL 0.5` |
+| `ont` | `--max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 100 --diff_ratio_merging_DEL 0.3` |
+
+Any other cuteSV parameters use tool defaults.
 
 
 ### Sniffles (structural variant calling)
@@ -68,14 +76,20 @@ All parameters use Sniffles defaults. No custom thresholds are applied.
 **Module:** `modules/sv_calling.nf`
 
 ```bash
-debreak --bam <bam> -r <ref> -o <out_dir> -t ${task.cpus}
+debreak --bam <bam> -o <out_dir> -t ${task.cpus} --rescue_large_ins --rescue_dup --poa --ref <ref>
 ```
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
+| `--bam` | `<bam>` | Sorted and indexed long-read alignment BAM from the mapping workflow. |
+| `-o` | `<out_dir>` | Output directory for DeBreak results. The pipeline writes to `debreak_out`. |
 | `-t` | `${task.cpus}` | Number of threads assigned by Nextflow for this task (bounded by process-level CPU limits in `nextflow.config`). |
+| `--rescue_large_ins` | *(flag)* | Enables DeBreak rescue logic for large insertion calls. |
+| `--rescue_dup` | *(flag)* | Enables DeBreak rescue logic for duplication calls. |
+| `--poa` | *(flag)* | Enables partial order alignment refinement. |
+| `--ref` | `<ref>` | Reference FASTA used for DeBreak calling and refinement. |
 
-All other parameters use DeBreak defaults.
+Any other DeBreak parameters use tool defaults.
 
 ---
 

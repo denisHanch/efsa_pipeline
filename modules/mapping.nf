@@ -197,14 +197,16 @@ process minimap2 {
     each path(fasta_file)
     val mapping_tag
     val out_folder_name
+    val pacbio_read_type
 
     output:
     tuple val(pair_id), path("${pair_id}.sam")
     
 
     script:
+    def minimap_preset = pacbio_read_type == "pacbio-hifi" ? "map-hifi" : mapping_tag
     """
-    minimap2 -t ${task.cpus} -ax $mapping_tag $fasta_file $reads > ${pair_id}.sam
+    minimap2 -t ${task.cpus} -ax ${minimap_preset} $fasta_file $reads > ${pair_id}.sam
     """
 }
 

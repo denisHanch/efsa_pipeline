@@ -19,7 +19,7 @@ nextflow run main.nf --max_cpu $(nproc)
 
 This first validates input data from `data/inputs/config.json`, then automatically runs eligible processing workflows (short-read, long-read, ref-vs-mod comparison) based on the validated inputs.
 
-`mod_fasta` is optional after validation. If no validated modified FASTA is present, the pipeline runs in reference-only mode and skips modified-genome mapping/comparison branches.
+Modified-genome mapping and reference-vs-modified comparison branches require a validated modified FASTA (`mod_fasta_validated`). Branches that are disabled by validation do not run, but enabled modified-genome branches expect this file to be present.
 
 Validated files are produced by the `validate` process and passed directly to downstream workflows through channels. A `validated_params.json` file is also emitted for runtime consumption. See the [Validation Overview](../validation/OVERVIEW.md) for details on what this file contains.
 
