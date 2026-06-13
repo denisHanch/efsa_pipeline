@@ -1,6 +1,6 @@
 # Tool Parameter Reference
 
-This page documents the hardcoded and automatically derived analysis parameters used by the pipeline's bioinformatics tools. The pipeline supports both **prokaryotic** and **eukaryotic** genomes. Validation writes the normalized organism type to `validated_params.json` as `organism_type`, and downstream Nextflow processes consume that value.
+This page documents the hardcoded and automatically derived analysis parameters used by the pipeline's bioinformatics tools. The pipeline supports both **prokaryotic** and **eukaryotic** genomes. 
 
 ---
 

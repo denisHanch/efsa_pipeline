@@ -24,7 +24,7 @@ As a result, operational runtime messages are primarily captured in `data/output
 | `cleanup` | `true` | Enables end-of-run cleanup hooks (for example, work directory cleanup) |
 | `validation_level` | `null` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — `null` means not forwarded; `config.json` governs |
 | `logging_level` | `null` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — `null` means not forwarded; `config.json` governs |
-| `organism_type` | `null` | Organism type: `prokaryote` or `eukaryote` — `null` means not forwarded; `config.json` governs. The validated value is written to `validated_params.json` and used to derive FreeBayes ploidy. |
+| `organism_type` | `null` | Organism type: `prokaryote` or `eukaryote` — `null` means not forwarded; `config.json` governs |
 | `force_defragment_ref` | `false` | Force reference defragmentation — unsupported workaround, use with caution |
 | `help` | `false` | Print help message and exit |
 
