@@ -15,7 +15,7 @@ At the moment, integration is done through a **JSON handoff**:
 ## Where It Happens
 
 - Validation process definition: `modules/validate.nf`
-- Validation entrypoint script: `validation.sh` is within the `ecomolegmo/validation:1.0.6` image
+- Validation entrypoint script: `validation.sh` is within the pinned `ecomolegmo/validation` image defined in `nextflow.config` (`v1.0.12` at the time of writing)
 - JSON handoff artifact: `validated_params.json`
 - Consumer side (Nextflow): analysis workflow that parses the JSON and maps values into pipeline logic
 
@@ -35,6 +35,8 @@ Because the integration is JSON parsing based:
 - Field names and structure in `validated_params.json` are part of a de facto interface contract.
 - Any schema change on the validation side must be reflected in the Nextflow parsing/consumption logic.
 - Backward compatibility depends on keeping that JSON contract stable or versioned.
+- PacBio chemistry is handed off as `pacbio_read_type` (`pacbio-hifi` or `pacbio-clr`) and drives PacBio-specific minimap2/cuteSV behavior.
+- ONT does not use a separate `ont_read_type` field in Nextflow; when `run_nanopore` is true, downstream long-read processes receive `ont`.
 
 ## Genome-size handoff for SV percentage columns
 

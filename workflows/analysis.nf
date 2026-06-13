@@ -57,7 +57,7 @@ workflow analysis {
             .flatMap { it.pacbio_fastqs }
             .map(toNamedFastq)
 
-        pacbio_read_type = pmap.map { it.pacbio_read_type ?: it.read_type ?: "" }
+        pacbio_read_type = pmap.map { it.pacbio_read_type ?: "" }
 
         long_ref_pacbio(pacbio_fastqs, ref_fasta, "map-pb", ref_plasmid, "pacbio/long-ref", pacbio_read_type)
         long_mod_pacbio(pacbio_fastqs, mod_fasta, "map-pb", mod_plasmid, "pacbio/long-mod", pacbio_read_type)
@@ -72,7 +72,7 @@ workflow analysis {
             .flatMap { it.ont_fastqs }
             .map(toNamedFastq)
 
-        ont_read_type = pmap.map { it.ont_read_type ?: it.read_type ?: (it.run_nanopore ? "ont" : "") }
+        ont_read_type = pmap.map { it.run_nanopore ? "ont" : "" }
 
         long_ref_ont(ont_fastqs, ref_fasta, "map-ont", ref_plasmid, "ont/long-ref", ont_read_type)
         long_mod_ont(ont_fastqs, mod_fasta, "map-ont", mod_plasmid, "ont/long-mod", ont_read_type)

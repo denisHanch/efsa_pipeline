@@ -65,8 +65,10 @@ Read alignment for PacBio or ONT long reads.
 | Sort | samtools sort | 1.23 | MIT |
 | BAM indexing | samtools index | 1.23 | MIT |
 
-**Takes:** `fastqs`, `fasta`, `mapping_tag`, `out_folder_name`
+**Takes:** `fastqs`, `fasta`, `mapping_tag`, `out_folder_name`, `read_type`
 **Emits:** `indexed_bam` — sorted + indexed BAM channel
+
+`read_type` is the validated long-read type. For PacBio HiFi reads, it switches minimap2 from the generic PacBio preset (`map-pb`) to `map-hifi`; PacBio CLR and ONT runs use the mapping tag supplied by the calling workflow.
 
 ---
 
@@ -83,8 +85,10 @@ Structural variant calling from long-read alignments using three callers, with c
 | Consensus merge | SURVIVOR | 1.0.7 | MIT |
 | VCF stats | bcftools stats | 1.23 | MIT |
 
-**Takes:** `fasta`, `fai`, `indexed_bam`, `mapping_tag`, `out_folder_name`
+**Takes:** `fasta`, `fai`, `indexed_bam`, `mapping_tag`, `out_folder_name`, `read_type`
 **Emits:** `merged_vcf` — SURVIVOR-merged VCF channel, `supp_reads` — supporting reads TSV channel
+
+`read_type` selects the cuteSV parameter profile for `pacbio-hifi`, `pacbio-clr`, or `ont`.
 
 ## How Subworkflows Are Used
 
@@ -99,6 +103,6 @@ sv(fasta, mapping.out.indexed_bam, out_folder)
 
 ```groovy
 // In long_read.nf
-mapping_long(fastqs, fasta, mapping_tag, out_folder)
-sv_long(fasta, fai, mapping_long.out.indexed_bam, mapping_tag, out_folder)
+mapping_long(fastqs, fasta, mapping_tag, out_folder, read_type)
+sv_long(fasta, fai, mapping_long.out.indexed_bam, mapping_tag, out_folder, read_type)
 ```
