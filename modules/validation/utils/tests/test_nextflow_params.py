@@ -286,6 +286,30 @@ class TestWriteParams:
             loaded = json.loads(out.read_text())
         assert isinstance(loaded, dict)
         assert "run_ref_x_mod" in loaded
+        assert "organism_type" in loaded
+
+
+# ---------------------------------------------------------------------------
+# organism_type
+# ---------------------------------------------------------------------------
+
+class TestOrganismType:
+
+    def test_default_is_prokaryote(self):
+        p = build_params(_base())
+        assert p.organism_type == "prokaryote"
+
+    def test_eukaryote_passed_through(self):
+        p = build_params(_base(), organism_type="eukaryote")
+        assert p.organism_type == "eukaryote"
+
+    def test_organism_type_in_json(self):
+        params = build_params(_base(), organism_type="eukaryote")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = Path(tmpdir) / "params.json"
+            write_params(params, out)
+            loaded = json.loads(out.read_text())
+        assert loaded["organism_type"] == "eukaryote"
         assert "pacbio_read_type" in loaded
 
     def test_pacbio_read_type_null_when_no_pacbio(self):

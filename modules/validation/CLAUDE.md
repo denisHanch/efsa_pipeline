@@ -844,6 +844,7 @@ run_illumina      : bool = False   # illumina reads validated
 run_nanopore      : bool = False   # ont reads validated
 run_pacbio        : bool = False   # pacbio reads validated
 pacbio_read_type  : Optional[str] = None  # "pacbio-hifi" or "pacbio-clr"; null when run_pacbio is False
+organism_type     : str  = "prokaryote"  # "prokaryote" or "eukaryote" from config options
 contig_file_size  : int  = 0       # len(gxg_metadata['contig_files'])
 validation_timestamp : str = ""    # YYYYMMDD_HHMMSS
 ref_genome_size_bp : Optional[int] = None  # validated reference genome size, bp
@@ -879,7 +880,7 @@ def _path(meta):
     return value if value and value != "None" else None
 ```
 
-### `build_params(validation_results: dict) → NextflowParams`
+### `build_params(validation_results: dict, run_timestamp: str = None, base_dir: Path = None, organism_type: str = "prokaryote") → NextflowParams`
 Expected keys in `validation_results`:
 ```
 ref_genome    : GenomeOutputMetadata | None

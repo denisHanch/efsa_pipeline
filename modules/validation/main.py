@@ -354,7 +354,7 @@ def main():
             "skipped. Feature coordinates are not meaningful on a defragmented reference."
         )
     repo_root = config_path.parent.parent.parent
-    params = nf_params.build_params(validation_results, base_dir=repo_root)
+    params = nf_params.build_params(validation_results, base_dir=repo_root, organism_type=config.type.value)
     nf_params.write_params(params, output_dir / "validated_params.json")
 
     return 0

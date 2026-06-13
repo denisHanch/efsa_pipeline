@@ -16,6 +16,7 @@ general_options (pipeline execution switches):
   run_nanopore         – True when validated Nanopore (ONT) reads are present
   run_pacbio           – True when validated PacBio reads are present
   pacbio_read_type     – "pacbio-hifi" or "pacbio-clr" when run_pacbio is True; null otherwise
+  organism_type        – "prokaryote" or "eukaryote" (from config options; default: "prokaryote")
   contig_file_size     – number of contig files from inter-genome characterisation
   ref_genome_size_bp   – validated reference genome size in base pairs, when available
   mod_genome_size_bp   – validated modified genome size in base pairs, when available
@@ -51,6 +52,7 @@ class NextflowParams:
     run_nanopore: bool = False
     run_pacbio: bool = False
     pacbio_read_type: Optional[str] = None
+    organism_type: str = "prokaryote"
     contig_file_size: int = 0
     validation_timestamp: str = ""
     ref_genome_size_bp: Optional[int] = None
@@ -77,6 +79,7 @@ class NextflowParams:
             "run_nanopore": self.run_nanopore,
             "run_pacbio": self.run_pacbio,
             "pacbio_read_type": self.pacbio_read_type,
+            "organism_type": self.organism_type,
             "contig_file_size": self.contig_file_size,
             "validation_timestamp": self.validation_timestamp,
             "illumina_fastqs": self.illumina_fastqs,
@@ -101,6 +104,7 @@ def build_params(
     validation_results: dict,
     run_timestamp: str = None,
     base_dir: Path = None,
+    organism_type: str = "prokaryote",
 ) -> NextflowParams:
     """
     Build a Nextflow params dataclass from validation results.
@@ -243,6 +247,7 @@ def build_params(
             else "pacbio-clr" if ("pacbio-clr" in fastqs_by_type or "pacbio-clr" in bams_by_type)
             else None
         ),
+        organism_type=organism_type,
         contig_file_size=len(contig_files),
         validation_timestamp=run_timestamp or datetime.now().strftime("%Y%m%d_%H%M%S"),
         ref_genome_size_bp=ref_genome_size_bp,
