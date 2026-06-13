@@ -1,6 +1,6 @@
 # Tool Parameter Reference
 
-This page documents the hardcoded analysis parameters used by the pipeline's bioinformatics tools. The pipeline supports both **prokaryotic** and **eukaryotic** genomes (set via the `type` field in `config.json`). The current parameter values are suitable for both organism types under typical sequencing conditions.
+This page documents the hardcoded analysis parameters used by the pipeline's bioinformatics tools. The pipeline supports both **prokaryotic** and **eukaryotic** genomes (set via the `type` field in `config.json`). 
 
 ---
 
