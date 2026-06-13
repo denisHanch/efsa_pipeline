@@ -150,7 +150,7 @@ EUPL-1.2 is a copyleft license. Its Appendix explicitly lists compatible license
 | ecomolegmo/survivor | v1.0.3@sha256:90263d6b... | Internal build (based on SURVIVOR MIT) |
 | ecomolegmo/syri | v1.0.4@sha256:789d5cdf... | Internal build (based on SyRI MIT) |
 | ecomolegmo/trimgalore | v1.0.1@sha256:802cc917... | Internal build (based on TrimGalore GPL-3.0) |
-| ecomolegmo/validation | v1.0.12@sha256:aae33bd4... | Internal validation/runtime support image |
+| ecomolegmo/validation | v1.0.13@sha256:0709076d... | Internal validation/runtime support image |
 
 ---
 
