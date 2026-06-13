@@ -10,13 +10,14 @@ process freebayes {
     each path(fasta_file)
     tuple val(pair_id), path(bam_file), path(bam_index)
     val out_folder_name
+    val ploidy
 
     output:
     tuple val(pair_id), path("${pair_id}.vcf")
 
     script:
     """
-    freebayes -f $fasta_file --min-coverage 10 --min-base-quality 20 --min-mapping-quality 30 --min-alternate-count 3 $bam_file > ${pair_id}.vcf
+    freebayes -f $fasta_file --ploidy $ploidy --min-coverage 10 --min-base-quality 20 --min-mapping-quality 30 --min-alternate-count 3 $bam_file > ${pair_id}.vcf
     """
 }
 

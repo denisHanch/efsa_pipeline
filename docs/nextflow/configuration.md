@@ -24,7 +24,7 @@ As a result, operational runtime messages are primarily captured in `data/output
 | `cleanup` | `true` | Enables end-of-run cleanup hooks (for example, work directory cleanup) |
 | `validation_level` | `null` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — `null` means not forwarded; `config.json` governs |
 | `logging_level` | `null` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — `null` means not forwarded; `config.json` governs |
-| `organism_type` | `null` | Organism type: `PROKARYOTE` or `EUKARYOTE` — `null` means not forwarded; `config.json` governs |
+| `organism_type` | `null` | Organism type: `prokaryote` or `eukaryote` — `null` means not forwarded; `config.json` governs. The validated value is written to `validated_params.json` and used to derive FreeBayes ploidy. |
 | `force_defragment_ref` | `false` | Force reference defragmentation — unsupported workaround, use with caution |
 | `help` | `false` | Print help message and exit |
 
@@ -42,6 +42,17 @@ For options shared between Nextflow and `config.json` (`validation_level`, `logg
 When a param is `null` in `nextflow.config`, the flag is not forwarded to the validation script at all, so `config.json` has full control. A `WARNING` is logged whenever a per-file setting overrides a global `config.json` option.
 
 > `threads` follows the same hierarchy but is not exposed as a Nextflow CLI flag — set it only inside `config.json`.
+
+### Derived Analysis Parameters
+
+The workflow derives FreeBayes ploidy from the validated `organism_type` instead of exposing ploidy as a separate user parameter:
+
+| `organism_type` in `validated_params.json` | Derived FreeBayes argument |
+|--------------------------------------------|----------------------------|
+| `prokaryote` | `--ploidy 1` |
+| `eukaryote` | `--ploidy 2` |
+
+See [Tool Parameter Reference](tool-parameters.md#freebayes-variant-calling) for the full FreeBayes command and rationale.
 
 ## Per-Process Configuration
 

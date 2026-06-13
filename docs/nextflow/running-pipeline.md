@@ -59,7 +59,7 @@ NXF_QUIET=false nextflow run main.nf --max_cpu $(nproc)
 | `--max_cpu <n>` | Maximum CPUs per process (default: `1`) |
 | `--validation_level <level>` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — overridden by `config.json` when set there |
 | `--logging_level <level>` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — overridden by `config.json` when set there |
-| `--organism_type <type>` | Organism type: `PROKARYOTE` or `EUKARYOTE` — overridden by `config.json` when set there |
+| `--organism_type <type>` | Organism type: `prokaryote` or `eukaryote` — overridden by `config.json` when set there. The validated value determines FreeBayes ploidy (`1` for prokaryote, `2` for eukaryote). |
 | `--force_defragment_ref` | Force reference defragmentation — unsupported workaround |
 | `--help` | Print help message and exit |
 
