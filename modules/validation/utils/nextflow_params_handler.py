@@ -15,6 +15,7 @@ general_options (pipeline execution switches):
   run_illumina         – True when validated Illumina reads are present
   run_nanopore         – True when validated Nanopore (ONT) reads are present
   run_pacbio           – True when validated PacBio reads are present
+  pacbio_read_type     – "pacbio-hifi" or "pacbio-clr" when run_pacbio is True; null otherwise
   contig_file_size     – number of contig files from inter-genome characterisation
   ref_genome_size_bp   – validated reference genome size in base pairs, when available
   mod_genome_size_bp   – validated modified genome size in base pairs, when available
@@ -49,6 +50,7 @@ class NextflowParams:
     run_illumina: bool = False
     run_nanopore: bool = False
     run_pacbio: bool = False
+    pacbio_read_type: Optional[str] = None
     contig_file_size: int = 0
     validation_timestamp: str = ""
     ref_genome_size_bp: Optional[int] = None
@@ -74,6 +76,7 @@ class NextflowParams:
             "run_illumina": self.run_illumina,
             "run_nanopore": self.run_nanopore,
             "run_pacbio": self.run_pacbio,
+            "pacbio_read_type": self.pacbio_read_type,
             "contig_file_size": self.contig_file_size,
             "validation_timestamp": self.validation_timestamp,
             "illumina_fastqs": self.illumina_fastqs,
@@ -231,7 +234,15 @@ def build_params(
                        and gxg.get("passed", False)),
         run_illumina="illumina" in fastqs_by_type,
         run_nanopore=("ont" in fastqs_by_type or "ont" in bams_by_type),
-        run_pacbio=("pacbio" in fastqs_by_type or "pacbio" in bams_by_type),
+        run_pacbio=(
+            "pacbio-hifi" in fastqs_by_type or "pacbio-hifi" in bams_by_type
+            or "pacbio-clr" in fastqs_by_type or "pacbio-clr" in bams_by_type
+        ),
+        pacbio_read_type=(
+            "pacbio-hifi" if ("pacbio-hifi" in fastqs_by_type or "pacbio-hifi" in bams_by_type)
+            else "pacbio-clr" if ("pacbio-clr" in fastqs_by_type or "pacbio-clr" in bams_by_type)
+            else None
+        ),
         contig_file_size=len(contig_files),
         validation_timestamp=run_timestamp or datetime.now().strftime("%Y%m%d_%H%M%S"),
         ref_genome_size_bp=ref_genome_size_bp,
@@ -244,8 +255,8 @@ def build_params(
         illumina_fastqs=fastqs_by_type.get("illumina", []),
         ont_fastqs=fastqs_by_type.get("ont", []),
         ont_bams=bams_by_type.get("ont", []),
-        pacbio_fastqs=fastqs_by_type.get("pacbio", []),
-        pacbio_bams=bams_by_type.get("pacbio", []),
+        pacbio_fastqs=fastqs_by_type.get("pacbio-hifi", []) + fastqs_by_type.get("pacbio-clr", []),
+        pacbio_bams=bams_by_type.get("pacbio-hifi", []) + bams_by_type.get("pacbio-clr", []),
         contig_files=contig_files,
     )
 

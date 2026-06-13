@@ -221,7 +221,7 @@ ReadValidator(read_config, settings=None)
 - `validation_level`: Validation level
 - `threads`: Number of threads for compression
 - `input_path`: Input file path
-- `ngs_type`: Sequencing platform (illumina, ont, pacbio)
+- `ngs_type`: Sequencing platform (illumina, ont, pacbio-hifi, pacbio-clr)
 - `settings`: Validator settings object
 
 ### Methods
@@ -333,7 +333,7 @@ settings = ReadValidator.Settings(outdir_by_ngs_type=True)
 #   ont/
 #     nanopore_reads.fastq.gz
 #   pacbio/
-#     pacbio_reads.fastq.gz
+#     pacbio_reads.fastq.gz   # both pacbio-hifi and pacbio-clr write here
 ```
 
 ---

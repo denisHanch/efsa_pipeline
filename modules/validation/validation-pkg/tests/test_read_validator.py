@@ -650,13 +650,31 @@ class TestReadValidatorNGSTypes:
 
         assert len(validator.sequences) == 1
 
-    def test_pacbio_reads(self, simple_fastq, output_dir):
-        """Test processing PacBio reads."""
+    def test_pacbio_hifi_reads(self, simple_fastq, output_dir):
+        """Test processing PacBio HiFi reads."""
         read_config = ReadConfig(
             filename="reads.fastq",
             basename="reads",
             filepath=simple_fastq,
-            ngs_type="pacbio",
+            ngs_type="pacbio-hifi",
+            coding_type=CT.NONE,
+            detected_format=ReadFormat.FASTQ,
+            output_dir=output_dir,
+            global_options={}
+        )
+
+        validator = ReadValidator(read_config, ReadValidator.Settings())
+        validator.run()
+
+        assert len(validator.sequences) == 1
+
+    def test_pacbio_clr_reads(self, simple_fastq, output_dir):
+        """Test processing PacBio CLR reads."""
+        read_config = ReadConfig(
+            filename="reads.fastq",
+            basename="reads",
+            filepath=simple_fastq,
+            ngs_type="pacbio-clr",
             coding_type=CT.NONE,
             detected_format=ReadFormat.FASTQ,
             output_dir=output_dir,

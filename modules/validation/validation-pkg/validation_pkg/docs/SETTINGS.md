@@ -555,6 +555,7 @@ Automatically create a subdirectory named after the NGS type.
 settings = ReadValidator.Settings(outdir_by_ngs_type=True)
 # Output: {output_dir}/illumina/reads.fastq.gz
 #         {output_dir}/ont/reads.fastq.gz
+#         {output_dir}/pacbio/reads.fastq.gz  # both pacbio-hifi and pacbio-clr
 ```
 
 ---

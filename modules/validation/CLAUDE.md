@@ -165,7 +165,7 @@ Full specification is in `validation-pkg/docs/CONFIG_GUIDE.md`.
     {"filename": "illumina_R1.fastq.gz", "ngs_type": "illumina"},
     {"filename": "illumina_R2.fastq.gz", "ngs_type": "illumina"},
     {"filename": "ont_reads.fastq.gz",   "ngs_type": "ont"},
-    {"filename": "pacbio_reads.bam",     "ngs_type": "pacbio"}
+    {"filename": "pacbio_reads.bam",     "ngs_type": "pacbio-hifi"}
   ],
   "ref_feature_filename": {"filename": "ref.gff3"},
   "mod_feature_filename": {"filename": "mod.gff3"},
@@ -220,7 +220,7 @@ n_sequence_limit : Optional[int]  # default 5; forbidden for plasmid configs
 **`ReadConfig`** (extends `BaseValidatorConfig`)
 ```
 detected_format : ReadFormat    # FASTQ or BAM
-ngs_type        : str           # "illumina", "ont", "pacbio" — validated in __post_init__
+ngs_type        : str           # "illumina", "ont", "pacbio-hifi", "pacbio-clr" — validated in __post_init__
 ```
 
 **`FeatureConfig`** (extends `BaseValidatorConfig`)
@@ -372,10 +372,10 @@ DEBUG, INFO, WARNING, ERROR
 
 ### `NgsType`
 ```
-ILLUMINA, ONT, PACBIO
+ILLUMINA, ONT, PACBIO_HIFI, PACBIO_CLR
 
-.normalize(val)  → NgsType (no default — raises ValueError if None)
-.value           → "illumina" / "ont" / "pacbio"
+.normalize(val)  → NgsType (no default — raises ValueError if None or "pacbio")
+.value           → "illumina" / "ont" / "pacbio-hifi" / "pacbio-clr"
 ```
 
 ---
@@ -545,7 +545,7 @@ output_filename_suffix, output_subdir_name
 input_file, output_file, validation_level, elapsed_time
 base_name                  : str     # filename without R1/R2 suffix
 read_number                : int     # 1 or 2 (0 if not detected)
-ngs_type                   : str     # "illumina", "ont", "pacbio"
+ngs_type                   : str     # "illumina", "ont", "pacbio-hifi", "pacbio-clr"
 illumina_pairing_detected  : str     # "illumina" if R1/R2 pattern matched; else ""
 num_reads                  : int
 
@@ -843,6 +843,7 @@ run_ref_x_mod     : bool = False   # both genomes validated + not fragmented + g
 run_illumina      : bool = False   # illumina reads validated
 run_nanopore      : bool = False   # ont reads validated
 run_pacbio        : bool = False   # pacbio reads validated
+pacbio_read_type  : Optional[str] = None  # "pacbio-hifi" or "pacbio-clr"; null when run_pacbio is False
 contig_file_size  : int  = 0       # len(gxg_metadata['contig_files'])
 validation_timestamp : str = ""    # YYYYMMDD_HHMMSS
 ref_genome_size_bp : Optional[int] = None  # validated reference genome size, bp

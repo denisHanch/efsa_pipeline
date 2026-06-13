@@ -457,25 +457,25 @@ class TestConfigManager:
         (temp_dir / "illumina.fastq").write_text("@read1\nATCG\n+\nIIII\n")
         (temp_dir / "ont.fastq").write_text("@read1\nATCG\n+\nIIII\n")
         (temp_dir / "pacbio.fastq").write_text("@read1\nATCG\n+\nIIII\n")
-        
+
         config = {
             "ref_genome_filename": {"filename": "ref.fasta"},
             "mod_genome_filename": {"filename": "mod.fasta"},
             "reads": [
                 {"filename": "illumina.fastq", "ngs_type": "illumina"},
                 {"filename": "ont.fastq", "ngs_type": "ont"},
-                {"filename": "pacbio.fastq", "ngs_type": "pacbio"}
+                {"filename": "pacbio.fastq", "ngs_type": "pacbio-hifi"}
             ]
         }
-        
+
         config_file = temp_dir / "config.json"
         config_file.write_text(json.dumps(config))
-        
+
         loaded_config = ConfigManager.load(str(config_file))
         assert len(loaded_config.reads) == 3
         assert loaded_config.reads[0].ngs_type.value == "illumina"
         assert loaded_config.reads[1].ngs_type.value == "ont"
-        assert loaded_config.reads[2].ngs_type.value == "pacbio"
+        assert loaded_config.reads[2].ngs_type.value == "pacbio-hifi"
         
         # Check all paths are absolute
         assert all(read.filepath.is_absolute() for read in loaded_config.reads)
@@ -1096,14 +1096,33 @@ class TestConfigValidatorSettings:
 
         config = {
             "ref_genome_filename": {"filename": "ref.fasta"},
-            "reads": [{"directory": "pb_reads/", "ngs_type": "pacbio"}]
+            "reads": [{"directory": "pb_reads/", "ngs_type": "pacbio-hifi"}]
         }
         config_file = temp_dir / "config.json"
         config_file.write_text(json.dumps(config, indent=2))
 
         loaded_config = ConfigManager.load(str(config_file))
         assert len(loaded_config.reads) == 2
-        assert all(r.ngs_type.value == "pacbio" for r in loaded_config.reads)
+        assert all(r.ngs_type.value == "pacbio-hifi" for r in loaded_config.reads)
+
+    def test_mixed_pacbio_types_rejected(self, temp_dir):
+        """Mixing pacbio-hifi and pacbio-clr in the same run must raise ValueError."""
+        (temp_dir / "ref.fasta").write_text(">seq1\nATCG\n")
+        (temp_dir / "hifi.fastq").write_text("@read1\nATCG\n+\nIIII\n")
+        (temp_dir / "clr.fastq").write_text("@read1\nATCG\n+\nIIII\n")
+
+        config = {
+            "ref_genome_filename": {"filename": "ref.fasta"},
+            "reads": [
+                {"filename": "hifi.fastq", "ngs_type": "pacbio-hifi"},
+                {"filename": "clr.fastq", "ngs_type": "pacbio-clr"},
+            ]
+        }
+        config_file = temp_dir / "config.json"
+        config_file.write_text(json.dumps(config, indent=2))
+
+        with pytest.raises((ConfigurationError, ValueError), match="Cannot mix pacbio-hifi and pacbio-clr"):
+            ConfigManager.load(str(config_file))
 
     def test_global_and_file_level_options_merge(self, temp_dir):
         """Test that global options and file-level options merge correctly."""
