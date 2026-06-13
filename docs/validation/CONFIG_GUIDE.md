@@ -182,8 +182,6 @@ All files in the directory inherit the same settings. Each file becomes a separa
 | `"pacbio-hifi"` | PacBio HiFi (CCS) long reads | 10-25 kb |
 | `"pacbio-clr"` | PacBio CLR long reads | 10-50+ kb |
 
-> **Note:** Plain `"pacbio"` is no longer accepted. You must specify either `"pacbio-hifi"` or `"pacbio-clr"`. Mixing both types in a single run is not allowed. Both types use the same Nextflow workflow path but different SV-calling parameters tuned for each chemistry.
-
 ### FeatureConfig Object
 
 Specifies feature annotation files (BED, GFF, GTF).
