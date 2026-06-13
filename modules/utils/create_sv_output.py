@@ -39,7 +39,8 @@ Genome-percentage columns:
     pct_of_ref_genome and pct_of_mod_genome are calculated when the pipeline sets
     SV_REF_GENOME_SIZE_BP and SV_MOD_GENOME_SIZE_BP from validated genome-size
     context. These are internal Nextflow-provided values, not manual script arguments.
-    The columns are NaN when the genome size or event length is unavailable.
+    The columns are NaN when the genome size or event length is unavailable. For
+    reference-only runs, SV_MOD_GENOME_SIZE_BP is 0 and pct_of_mod_genome is 0.
 
 Any of the inputs may be omitted; the script will process whichever of the assembly, long_ont,
 long_pacbio or short tables are provided. Long-read inputs (ONT and PacBio) are treated
@@ -260,7 +261,7 @@ def _parse_genome_size(value: Optional[str]) -> Optional[int]:
     """Parse a genome size string into an integer number of base pairs.
 
     The value is normally read from an internal pipeline environment variable
-    populated by Nextflow from validated parameters or validated FASTA files.
+    populated by Nextflow from validated parameters.
     Plain integers are treated as bp;
     suffixes k/kb/kbp, m/mb/mbp, and g/gb/gbp are accepted for compatibility.
     """
@@ -281,14 +282,14 @@ def _parse_genome_size(value: Optional[str]) -> Optional[int]:
         m = re.fullmatch(pat, s)
         if m:
             parsed = int(float(m.group(1)) * mult)
-            return parsed if parsed > 0 else None
+            return parsed if parsed >= 0 else None
     try:
         parsed = int(float(s))
-        return parsed if parsed > 0 else None
+        return parsed if parsed >= 0 else None
     except ValueError as exc:
         raise ValueError(
             f"Cannot parse genome size {s!r}. "
-            "Use a positive integer number of bp or a value with suffix "
+            "Use a non-negative integer number of bp or a value with suffix "
             "k/kb/kbp, m/mb/mbp, g/gb/gbp."
         ) from exc
 
@@ -1002,7 +1003,9 @@ def build_output_table(
         else:
             pct_of_ref = np.nan
 
-        if mod_genome_size_bp and pd.notna(event_length_bp) and mod_genome_size_bp > 0:
+        if mod_genome_size_bp == 0:
+            pct_of_mod = 0
+        elif mod_genome_size_bp and pd.notna(event_length_bp) and mod_genome_size_bp > 0:
             pct_of_mod = (event_length_bp / mod_genome_size_bp) * 100
         else:
             pct_of_mod = np.nan

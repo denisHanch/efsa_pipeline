@@ -15,7 +15,7 @@ At the moment, integration is done through a **JSON handoff**:
 ## Where It Happens
 
 - Validation process definition: `modules/validate.nf`
-- Validation entrypoint script: `validation.sh` is within the pinned `ecomolegmo/validation` image defined in `nextflow.config` (`v1.0.12` at the time of writing)
+- Validation entrypoint script: `validation.sh` is within the pinned `ecomolegmo/validation` image defined in `nextflow.config` (`v1.0.13` at the time of writing)
 - JSON handoff artifact: `validated_params.json`
 - Consumer side (Nextflow): analysis workflow that parses the JSON and maps values into pipeline logic
 
@@ -47,7 +47,7 @@ Validation now writes two optional internal parameters when genome sizes are ava
 | `ref_genome_size_bp` | `workflows/analysis.nf` → `restructure_sv_tbl` | Calculates `pct_of_ref_genome` in the final SV CSV tables. |
 | `mod_genome_size_bp` | `workflows/analysis.nf` → `restructure_sv_tbl` | Calculates `pct_of_mod_genome` in the final SV CSV tables. |
 
-These values are derived from validation metadata and passed through the workflow automatically. `restructure_sv_tbl` also receives the validated FASTA files and computes genome sizes as a fallback when the optional params are absent. Users do not pass genome sizes to `modules/utils/create_sv_output.py` manually.
+These values are derived from validation metadata and passed through the workflow automatically. `restructure_sv_tbl` does not compute genome sizes from FASTA files; it uses only the values from `validated_params.json`. In reference-only runs where no modified genome is provided, `mod_genome_size_bp` is passed downstream as `0`, producing `pct_of_mod_genome = 0`. Users do not pass genome sizes to `modules/utils/create_sv_output.py` manually.
 
 ## Related Documentation
 

@@ -129,9 +129,9 @@ The pipeline writes unified structural variant (SV) tables under `data/outputs/t
 Genome sizes are handled by the workflow, not by manual command-line parameters:
 
 - `ref_genome_size_bp`: total reference genome size in base pairs, derived from the validated reference FASTA when available
-- `mod_genome_size_bp`: total modified genome size in base pairs, derived from the validated modified FASTA when available
+- `mod_genome_size_bp`: total modified genome size in base pairs, derived from the validated modified FASTA when available; reference-only runs pass this downstream as `0`
 
-These values are emitted by validation into the validated parameter output and passed through the Nextflow workflow to the SV table creation utility. If validated size values are not present, the SV aggregation process can derive them directly from the validated FASTA inputs as a fallback.
+These values are emitted by validation into the validated parameter output and passed through the Nextflow workflow to the SV table creation utility. The SV aggregation process does not derive genome sizes from FASTA files.
 
 Do not pass genome sizes manually to `modules/utils/create_sv_output.py`. The utility is intended to be run by the Nextflow pipeline and no longer exposes `--ref_size` or `--mod_size` command-line options.
 
