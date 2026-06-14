@@ -23,11 +23,10 @@ workflow analysis {
 
         // Core genome file channels (single-item value channels)
         ref_fasta = pmap.map { file(it.ref_fasta_validated) }
-        // Allow reference-only execution when mod_fasta_validated is absent
-        mod_fasta = pmap
-            .filter { it.mod_fasta_validated }
-            .map { file(it.mod_fasta_validated) }
-        mod_fasta = pmap.map { file(it.mod_fasta_validated) }
+        // Zero-or-one modified FASTA. Flatten for branches that require a real file.
+        mod_fasta = pmap.map {
+            it.mod_fasta_validated ? [file(it.mod_fasta_validated)] : []
+        }
         ref_genome_size_bp = pmap.map { it.ref_genome_size_bp ?: "" }
         mod_genome_size_bp = pmap.map { it.mod_genome_size_bp ?: "" }
         freebayes_ploidy = pmap.map {
@@ -70,7 +69,7 @@ workflow analysis {
         pacbio_read_type = pmap.map { it.pacbio_read_type ?: "" }
 
         long_ref_pacbio(pacbio_fastqs, ref_fasta, "map-pb", ref_plasmid, "pacbio/long-ref", pacbio_read_type)
-        long_mod_pacbio(pacbio_fastqs, mod_fasta, "map-pb", mod_plasmid, "pacbio/long-mod", pacbio_read_type)
+        long_mod_pacbio(pacbio_fastqs, mod_fasta.flatten(), "map-pb", mod_plasmid, "pacbio/long-mod", pacbio_read_type)
         compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
 
         // Empty pacbio table when not active
@@ -85,7 +84,7 @@ workflow analysis {
         ont_read_type = pmap.map { it.run_nanopore ? "ont" : "" }
 
         long_ref_ont(ont_fastqs, ref_fasta, "map-ont", ref_plasmid, "ont/long-ref", ont_read_type)
-        long_mod_ont(ont_fastqs, mod_fasta, "map-ont", mod_plasmid, "ont/long-mod", ont_read_type)
+        long_mod_ont(ont_fastqs, mod_fasta.flatten(), "map-ont", mod_plasmid, "ont/long-mod", ont_read_type)
         compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
 
         // Empty ont table when not active
@@ -140,8 +139,6 @@ workflow analysis {
             script,
             tbl_channel,
             supp_reads_ch.collect().ifEmpty(file('NO_FILE')),
-            ref_fasta,
-            mod_fasta,
             ref_genome_size_bp,
             mod_genome_size_bp
         )

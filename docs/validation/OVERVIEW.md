@@ -98,7 +98,7 @@ It is used at runtime by the analysis workflow to determine which pipelines to e
 | `organism_type`         | string  | `"prokaryote"` or `"eukaryote"`, taken from the `type` field in `config.json` options.               |
 | `contig_file_size`      | integer | Number of contig files produced by inter-genome characterisation.                                     |
 | `ref_genome_size_bp`    | integer | Validated reference genome size in base pairs, used by `restructure_sv_tbl` to calculate `pct_of_ref_genome`. Omitted when unavailable. |
-| `mod_genome_size_bp`    | integer | Validated modified genome size in base pairs, used by `restructure_sv_tbl` to calculate `pct_of_mod_genome`. Omitted when unavailable. |
+| `mod_genome_size_bp`    | integer | Validated modified genome size in base pairs, used by `restructure_sv_tbl` to calculate `pct_of_mod_genome`. Omitted from `validated_params.json` when no modified genome is provided; the Nextflow aggregation step passes this downstream as `0` for reference-only runs. |
 | `validation_timestamp`  | string  | Timestamp of the validation run (`YYYYMMDD_HHMMSS`).                                                  |
 
 #### File paths (null or empty list when absent)
@@ -106,7 +106,7 @@ It is used at runtime by the analysis workflow to determine which pipelines to e
 | Parameter             | Type          | Description                                                    |
 | --------------------- | ------------- | -------------------------------------------------------------- |
 | `ref_fasta_validated` | string        | Path to the validated reference genome FASTA.                  |
-| `mod_fasta_validated` | string        | Path to the validated modified genome FASTA.                   |
+| `mod_fasta_validated` | string        | Path to the validated modified genome FASTA. Omitted when no modified genome is provided. |
 | `ref_plasmid_fasta`   | string        | Path to the validated reference plasmid FASTA (if present).    |
 | `mod_plasmid_fasta`   | string        | Path to the validated modified plasmid FASTA (if present).     |
 | `gff`                 | string        | Path to the validated reference GFF/GFF3 file.                 |
