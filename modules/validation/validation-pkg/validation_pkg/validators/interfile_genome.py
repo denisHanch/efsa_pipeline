@@ -237,14 +237,18 @@ def genomexgenome_validation(
     return result
 
 
-def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
-    """Parse PAF output and return the best hit per query (largest alignment block length).
+_MIN_QUERY_COVERAGE = 0.80
+_MIN_IDENTITY = 0.90
+_MIN_MAPQ = 20
 
+
+def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
+    """Parse PAF output and return the best qualifying hit per query.
+
+    A hit must pass: query_coverage >= 0.80, identity >= 0.90, mapq >= 20.
     Returns dict mapping query_name -> {'ref_name': str, 'strand': str, 'alignment_len': int}.
     """
     best_hits: Dict[str, Dict] = {}
-    # Track (q_start, r_start) per (query_name, ref_name) pair to detect ambiguous alignments
-    # pair_starts: Dict[tuple, tuple] = {}
     for line in paf_output.splitlines():
         if not line.strip():
             continue
@@ -255,10 +259,22 @@ def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
         strand = cols[4]
         ref_name = cols[5]
         try:
-            # q_start = int(cols[2])
-            # r_start = int(cols[7])
+            query_len = int(cols[1])
+            query_start = int(cols[2])
+            query_end = int(cols[3])
+            residue_matches = int(cols[9])
             alignment_block_len = int(cols[10])
+            mapq = int(cols[11])
         except ValueError:
+            continue
+
+        if query_len == 0 or alignment_block_len == 0:
+            continue
+
+        query_coverage = (query_end - query_start) / query_len
+        identity = residue_matches / alignment_block_len
+
+        if query_coverage < _MIN_QUERY_COVERAGE or identity < _MIN_IDENTITY or mapq < _MIN_MAPQ:
             continue
 
         current = best_hits.get(query_name)

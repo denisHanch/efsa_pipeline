@@ -44,11 +44,22 @@ def _make_paf_line(
     alignment_len: int = 100,
     q_start: int = 0,
     r_start: int = 0,
+    query_len: int = None,
+    residue_matches: int = None,
+    mapq: int = 255,
 ) -> str:
-    """Build a minimal valid PAF line (12 tab-separated columns)."""
+    """Build a minimal valid PAF line (12 tab-separated columns).
+
+    query_len defaults to alignment_len (100% coverage).
+    residue_matches defaults to alignment_len (100% identity).
+    """
+    if query_len is None:
+        query_len = alignment_len
+    if residue_matches is None:
+        residue_matches = alignment_len
     return (
-        f"{query_id}\t{alignment_len}\t{q_start}\t{q_start + alignment_len}\t{strand}\t"
-        f"{ref_name}\t1000000\t{r_start}\t{r_start + alignment_len}\t{alignment_len}\t{alignment_len}\t255"
+        f"{query_id}\t{query_len}\t{q_start}\t{q_start + alignment_len}\t{strand}\t"
+        f"{ref_name}\t1000000\t{r_start}\t{r_start + alignment_len}\t{residue_matches}\t{alignment_len}\t{mapq}"
     )
 
 
@@ -431,3 +442,159 @@ class TestOrientationHandling:
         )
         written_seq = str(SeqIO.read(chr1_file, "fasta").seq)
         assert written_seq == known_seq
+
+
+# ---------------------------------------------------------------------------
+# Quality threshold tests for _parse_paf_best_hits
+# ---------------------------------------------------------------------------
+
+class TestParsePafBestHitsThresholds:
+    """Tests for the query_coverage / identity / mapq thresholds."""
+
+    # --- query_coverage ---
+
+    def test_low_coverage_hit_excluded(self):
+        """query_coverage=0.50 is below the 0.80 threshold — sequence absent from hits."""
+        paf = _make_paf_line("chr1", alignment_len=500, query_len=1000)
+        assert _parse_paf_best_hits(paf) == {}
+
+    def test_coverage_exactly_at_threshold_passes(self):
+        """query_coverage==0.80 is exactly the threshold — must be accepted."""
+        paf = _make_paf_line("chr1", alignment_len=800, query_len=1000)
+        assert "chr1" in _parse_paf_best_hits(paf)
+
+    def test_coverage_above_threshold_passes(self):
+        paf = _make_paf_line("chr1", alignment_len=950, query_len=1000)
+        assert "chr1" in _parse_paf_best_hits(paf)
+
+    # --- identity ---
+
+    def test_low_identity_hit_excluded(self):
+        """identity=0.85 is below the 0.90 threshold — sequence absent from hits."""
+        paf = _make_paf_line("chr1", alignment_len=1000, residue_matches=850)
+        assert _parse_paf_best_hits(paf) == {}
+
+    def test_identity_exactly_at_threshold_passes(self):
+        """identity==0.90 is exactly the threshold — must be accepted."""
+        paf = _make_paf_line("chr1", alignment_len=1000, residue_matches=900)
+        assert "chr1" in _parse_paf_best_hits(paf)
+
+    # --- mapq ---
+
+    def test_mapq_below_threshold_excluded(self):
+        """mapq=19 is below the 20 threshold — sequence absent from hits."""
+        paf = _make_paf_line("chr1", mapq=19)
+        assert _parse_paf_best_hits(paf) == {}
+
+    def test_mapq_zero_excluded(self):
+        paf = _make_paf_line("chr1", mapq=0)
+        assert _parse_paf_best_hits(paf) == {}
+
+    def test_mapq_exactly_at_threshold_passes(self):
+        paf = _make_paf_line("chr1", mapq=20)
+        assert "chr1" in _parse_paf_best_hits(paf)
+
+    # --- interactions ---
+
+    def test_best_qualifying_hit_wins_when_larger_fails_mapq(self):
+        """Largest alignment block is disqualified; smaller qualifying hit wins."""
+        lines = [
+            _make_paf_line("chr1", alignment_len=5000, ref_name="ref_big", mapq=10),
+            _make_paf_line("chr1", alignment_len=1000, ref_name="ref_good", mapq=60),
+        ]
+        hits = _parse_paf_best_hits("\n".join(lines))
+        assert hits["chr1"]["ref_name"] == "ref_good"
+        assert hits["chr1"]["alignment_len"] == 1000
+
+    def test_sequence_absent_when_all_hits_fail(self):
+        """All alignments for a query fail thresholds → query absent from results."""
+        lines = [
+            _make_paf_line("chr1", alignment_len=400, query_len=1000, mapq=5),
+            _make_paf_line("chr1", alignment_len=700, query_len=1000, mapq=10),
+        ]
+        assert _parse_paf_best_hits("\n".join(lines)) == {}
+
+    def test_partial_homology_plasmid_not_misclassified(self):
+        """Plasmid with partial chromosomal homology (20% coverage) stays unmapped."""
+        paf = _make_paf_line("plasmid1", alignment_len=200, query_len=1000, mapq=30)
+        assert _parse_paf_best_hits(paf) == {}
+
+    def test_other_queries_unaffected_when_one_fails(self):
+        """A failing query does not prevent qualifying queries from being recorded."""
+        lines = [
+            _make_paf_line("chr1", alignment_len=1000),                         # passes
+            _make_paf_line("chr2", alignment_len=1000, query_len=5000, mapq=5), # fails coverage + mapq
+        ]
+        hits = _parse_paf_best_hits("\n".join(lines))
+        assert "chr1" in hits
+        assert "chr2" not in hits
+
+
+# ---------------------------------------------------------------------------
+# Integration: threshold-driven plasmid classification
+# ---------------------------------------------------------------------------
+
+class TestCharacterizationThresholdIntegration:
+
+    @pytest.fixture
+    def fasta_setup(self, tmp_path):
+        ref_seqs = _make_records(["chr1", "chr2"])
+        mod_seqs = _make_records(["chr1", "chr2", "plasmid1"])
+        ref_path = tmp_path / "ref.fasta"
+        mod_path = tmp_path / "mod.fasta"
+        _write_fasta(ref_path, ref_seqs)
+        _write_fasta(mod_path, mod_seqs)
+        ref_result = GenomeOutputMetadata(
+            output_file=str(ref_path), output_filename="ref.fasta", num_sequences=2
+        )
+        mod_result = GenomeOutputMetadata(
+            output_file=str(mod_path), output_filename="mod.fasta", num_sequences=3
+        )
+        settings = GenomeXGenomeSettings(same_number_of_sequences=False, characterize=True)
+        return tmp_path, ref_result, mod_result, settings
+
+    def test_low_mapq_sequence_goes_to_plasmid_bucket(self, fasta_setup):
+        """A sequence whose only alignment has mapq<20 must land in plasmids, not contigs."""
+        tmp_path, ref_result, mod_result, settings = fasta_setup
+        paf = "\n".join([
+            _make_paf_line("chr1", mapq=255),
+            _make_paf_line("chr2", mapq=5),   # disqualified → plasmid
+        ])
+        with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
+             patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout=paf, returncode=0)
+            result = genomexgenome_validation(ref_result, mod_result, settings)
+
+        assert result["metadata"]["contigs_found"] == 1
+        assert result["metadata"]["plasmids_found"] == 2   # chr2 + plasmid1
+
+    def test_low_coverage_sequence_goes_to_plasmid_bucket(self, fasta_setup):
+        """A sequence with 50% query coverage must land in plasmids, not contigs."""
+        tmp_path, ref_result, mod_result, settings = fasta_setup
+        # chr2 has alignment_len=50 but query_len=100 → coverage=0.50 < 0.80
+        paf = "\n".join([
+            _make_paf_line("chr1", alignment_len=100),
+            _make_paf_line("chr2", alignment_len=50, query_len=100),
+        ])
+        with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
+             patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout=paf, returncode=0)
+            result = genomexgenome_validation(ref_result, mod_result, settings)
+
+        assert result["metadata"]["contigs_found"] == 1
+        assert result["metadata"]["plasmids_found"] == 2   # chr2 + plasmid1
+
+    def test_low_identity_sequence_goes_to_plasmid_bucket(self, fasta_setup):
+        """A sequence with 85% identity must land in plasmids, not contigs."""
+        tmp_path, ref_result, mod_result, settings = fasta_setup
+        paf = "\n".join([
+            _make_paf_line("chr1", alignment_len=1000, residue_matches=1000),
+            _make_paf_line("chr2", alignment_len=1000, residue_matches=850),  # identity=0.85 < 0.90
+        ])
+        with patch("validation_pkg.validators.interfile_genome.check_tool_available", return_value=True), \
+             patch("validation_pkg.validators.interfile_genome.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout=paf, returncode=0)
+            result = genomexgenome_validation(ref_result, mod_result, settings)
+
+        assert result["metadata"]["contigs_found"] == 1
+        assert result["metadata"]["plasmids_found"] == 2   # chr2 + plasmid1

@@ -72,6 +72,22 @@ result = genomexgenome_validation(
 
 ---
 
+### Contig Classification Thresholds
+
+When `characterize=True`, the modified genome sequences are aligned to the reference with `minimap2 -x asm5`. A sequence is classified as a **contig** (chromosomal) only if its best alignment passes all three quality filters:
+
+| Filter | Threshold | PAF columns used |
+|--------|-----------|-----------------|
+| Query coverage | ≥ 0.80 | `(query_end − query_start) / query_length` |
+| Sequence identity | ≥ 0.90 | `residue_matches / alignment_block_length` |
+| Mapping quality | ≥ 20 | `mapq` |
+
+Sequences that do not have any qualifying alignment are classified as **plasmids** and written to the plasmid output file. This prevents plasmids with partial chromosomal homology (e.g., integrated elements) from being incorrectly assigned to the chromosomal bucket.
+
+When multiple alignments exist for the same query, only qualifying hits (those passing all three filters) compete for "best hit" by alignment block length. If no alignment qualifies, the sequence is treated as unmapped.
+
+---
+
 ### GenomeXGenomeSettings
 
 Settings for genome-to-genome validation.
@@ -230,10 +246,12 @@ The `metadata` dict contains detailed validation information:
         # sequence_id: {'ref_length': int, 'mod_length': int, 'difference': int}
     },
     # Populated when settings.characterize=True (requires minimap2):
-    'contigs_found': True,           # whether mapped sequences were identified
-    'plasmids_found': True,          # whether unmapped sequences were identified
+    'contigs_found': True,           # number of sequences classified as contigs (passed quality thresholds)
+    'plasmids_found': True,          # number of sequences classified as plasmids (no qualifying alignment)
     'contig_files': ['/path/to/contig_0.fasta'],  # individual contig FASTA files
-    'plasmid_file': '/path/to/plasmid.fasta'      # merged plasmid FASTA (None if none found)
+    'plasmid_file': '/path/to/plasmid.fasta',     # merged plasmid FASTA (None if none found)
+    'contig_orientations': {'chr1': '+', 'chr2': '-'},  # strand of best qualifying hit per contig
+    'contig_ref_names': {'chr1': 'ref_chr1', 'chr2': 'ref_chr2'},  # reference sequence matched per contig
 }
 ```
 
