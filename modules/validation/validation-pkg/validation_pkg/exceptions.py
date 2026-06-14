@@ -31,7 +31,6 @@ class GenBankFormatError(FileFormatError):
     pass
 
 
-
 class FastqFormatError(FileFormatError):
     """Raised when FASTQ file has invalid format."""
     pass
@@ -50,7 +49,6 @@ class CompressionError(ValidationError):
 class GenomeValidationError(ValidationError):
     """Raised when genome validation fails."""
     pass
-
 
 
 class ReadValidationError(ValidationError):

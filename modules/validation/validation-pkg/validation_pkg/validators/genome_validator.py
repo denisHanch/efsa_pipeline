@@ -1,6 +1,5 @@
 """Genome file validator and processor for FASTA and GenBank formats."""
 
-from collections import Counter
 from pathlib import Path
 from typing import Optional, List, Type
 from dataclasses import dataclass
@@ -14,7 +13,7 @@ from validation_pkg.exceptions import (
     FastaFormatError,
     GenBankFormatError
 )
-from validation_pkg.utils.file_handler import open_compressed_writer, copy_file
+from validation_pkg.utils.file_handler import open_compressed_writer, copy_file, deduplicate_fasta_ids
 from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
 from validation_pkg.utils.base_validator import BaseValidator
 
@@ -80,6 +79,13 @@ class GenomeValidator(BaseValidator):
                     "main_first selects the first sequence as main."
                 )
 
+            if not self.is_plasmid and not self.main_longest and not self.main_first:
+                raise GenomeValidationError(
+                    "Either main_longest or main_first must be True when is_plasmid=False. "
+                    "Set main_longest=True to pick the longest sequence as the chromosome, "
+                    "or main_first=True to pick the first sequence."
+                )
+
     def __init__(self, genome_config, settings: Optional[Settings] = None) -> None:
         # Call base class initialization
         super().__init__(genome_config, settings)
@@ -92,6 +98,7 @@ class GenomeValidator(BaseValidator):
         self.num_sequences_filtered = 0
         self.plasmid_filenames = []
         self.plasmid_output_paths = []
+        self._sequence_limit_exceeded = False
 
     _validator_type = 'genome'
     OutputMetadata = GenomeOutputMetadata
@@ -107,7 +114,7 @@ class GenomeValidator(BaseValidator):
         # Trust/Strict modes - full validation and processing
         self._parse_file()
         self._validate_sequences()
-        if getattr(self, '_sequence_limit_exceeded', False):
+        if self._sequence_limit_exceeded:
             return self.output_path
         self._apply_edits()  # include plasmid handle
         output_path = self._write_output()
@@ -157,7 +164,7 @@ class GenomeValidator(BaseValidator):
             self.output_metadata.plasmid_output_paths = self.plasmid_output_paths
 
         self.output_metadata.num_sequences_filtered = self.num_sequences_filtered
-        self.output_metadata.fragmented = getattr(self, '_sequence_limit_exceeded', False)
+        self.output_metadata.fragmented = self._sequence_limit_exceeded
 
         # Strict mode only
         if self.validation_level == ValidationLevel.STRICT and self.sequences:
@@ -380,36 +387,18 @@ class GenomeValidator(BaseValidator):
 
         Called after copy_file() for fragmented/eukaryote genomes so that
         downstream tools (e.g. samtools) do not encounter duplicate SAM header
-        entries.  The file is rewritten only when duplicates are actually found.
+        entries.
         """
         if not self.output_path or not self.output_path.exists():
             return
-        records = list(SeqIO.parse(str(self.output_path), 'fasta'))
-        duplicated = {sid for sid, n in Counter(r.id for r in records).items() if n > 1}
-        if not duplicated:
-            return
-
-        seen: dict = {}
-        renamed = []
-        for record in records:
-            orig_id = record.id
-            n = seen.get(orig_id, 0)
-            seen[orig_id] = n + 1
-            if n > 0:
-                new_id = f"{orig_id}_{n}"
-                renamed.append((orig_id, new_id))
-                record.id = new_id
-                record.description = ''
-
-        with open(str(self.output_path), 'w') as fh:
-            SeqIO.write(records, fh, 'fasta')
-
-        pairs = ', '.join(f"{old} → {new}" for old, new in renamed)
-        self.logger.warning(
-            f"Deduplicated {len(renamed)} sequence ID(s) in copied genome output: {pairs}"
-        )
-        # Refresh self.sequences so metadata reflects renamed IDs
-        self.sequences = records
+        renamed = deduplicate_fasta_ids(self.output_path)
+        if renamed:
+            pairs = ', '.join(f"{old} → {new}" for old, new in renamed)
+            self.logger.warning(
+                f"Deduplicated {len(renamed)} sequence ID(s) in copied genome output: {pairs}"
+            )
+            # Refresh self.sequences so metadata reflects renamed IDs
+            self.sequences = list(SeqIO.parse(str(self.output_path), 'fasta'))
 
     def _select_main_sequence(self, sequences: List[SeqRecord]) -> tuple[SeqRecord, List[SeqRecord]]:
         """Select main chromosome from sequences based on settings."""
@@ -425,7 +414,6 @@ class GenomeValidator(BaseValidator):
             plasmid_sequences = sequences[1:]
             self.logger.debug(f"Selected first sequence as main: {main_sequence.id} ({len(main_sequence.seq)} bp)")
         else:
-            # This should not happen due to __post_init__ validation
             raise GenomeValidationError("Either main_longest or main_first must be True")
 
         return main_sequence, plasmid_sequences

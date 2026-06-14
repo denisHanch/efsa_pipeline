@@ -78,7 +78,7 @@ pytest tests/
 
 | File | Location | Description |
 |---|---|---|
-| `validation_<run_id>.log` | `data/outputs/logs/` | Structured JSON log (structlog). Falls back to `validation.log` when no run ID. Auto-incremented if exists. |
+| `validation.log` | `data/outputs/logs/` | Structured JSON log (structlog). Auto-incremented to `validation_001.log`, `validation_002.log`, … if the file already exists. |
 | Validated genome/reads/feature files | `data/valid/run_YYYYMMDD_HHMMSS/` | Standardised copies of every input file. |
 | `validated_params.json` | `data/valid/` | Nextflow `-params-file`; consumed by the main pipeline. |
 
@@ -88,7 +88,7 @@ pytest tests/
 
 ```
 1.  Parse sys.argv → config_path
-2.  setup_logging() → data/outputs/logs/validation_<run_id>.log
+2.  setup_logging() → data/outputs/logs/validation.log
 3.  ConfigManager.load(config_path) → Config   # returns 1 on failure
 4.  Instantiate per-validator Settings objects
 5.  GenomeValidator(ref_genome_config, ref_settings).run()        # required
@@ -247,8 +247,6 @@ ValidationError                    # base
 ├── FileFormatError                # unrecognised or malformed format
 │   ├── FastaFormatError
 │   ├── GenBankFormatError
-│   ├── BedFormatError
-│   ├── GffFormatError
 │   ├── FastqFormatError
 │   └── BamFormatError
 ├── CompressionError               # decompression/compression failure
@@ -596,7 +594,7 @@ Singleton pattern. There is exactly one `ValidationLogger` instance throughout a
 ```python
 from validation_pkg import setup_logging, get_logger
 
-logger = setup_logging(console_level='DEBUG', log_file=Path('data/outputs/logs/validation_<run_id>.log'))
+logger = setup_logging(console_level='DEBUG', log_file=Path('data/outputs/logs/validation.log'))
 logger = get_logger()   # retrieve singleton anywhere
 ```
 
@@ -623,7 +621,7 @@ All shared state (`validation_issues`, `_timers`, `file_timings`) is protected b
 `threading.Lock`.
 
 ### Log file auto-increment
-If `validation.log` already exists it creates `validation_1.log`, `validation_2.log`,
+If `validation.log` already exists it creates `validation_001.log`, `validation_002.log`,
 and so on — the old log is never overwritten.
 
 ---

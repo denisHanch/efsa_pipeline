@@ -8,7 +8,7 @@ from Bio import SeqIO
 from ..utils.base_settings import BaseSettings
 from ..exceptions import InterFileValidationError, ValidationError
 from ..utils.logger import get_logger
-from ..utils.file_handler import check_tool_available, open_compressed_writer
+from ..utils.file_handler import check_tool_available, open_compressed_writer, deduplicate_fasta_ids
 from ..utils.path_utils import strip_all_extensions
 from ..utils.formats import CodingType
 
@@ -41,36 +41,6 @@ class GenomeXGenomeSettings(BaseSettings):
                 "(cannot compare lengths without matching IDs)"
             )
 
-
-def _deduplicate_plasmid_ids(plasmid_path: str, logger) -> List[tuple]:
-    """Rename duplicate sequence IDs in-place in a plasmid FASTA file.
-
-    For each ID appearing more than once the second occurrence becomes <id>_1,
-    the third <id>_2, etc. The file is rewritten only when duplicates are found.
-    Returns a list of (original_id, new_id) pairs for every renamed sequence.
-    """
-    from collections import Counter
-    records = list(SeqIO.parse(str(plasmid_path), 'fasta'))
-    duplicated = {seq_id for seq_id, n in Counter(r.id for r in records).items() if n > 1}
-    if not duplicated:
-        return []
-
-    renamed: List[tuple] = []
-    seen: Dict[str, int] = {}
-    for record in records:
-        orig_id = record.id
-        n = seen.get(orig_id, 0)
-        seen[orig_id] = n + 1
-        if n > 0:
-            new_id = f"{orig_id}_{n}"
-            renamed.append((orig_id, new_id))
-            record.id = new_id
-            record.description = ''
-
-    with open(str(plasmid_path), 'w') as handle:
-        SeqIO.write(records, handle, 'fasta')
-
-    return renamed
 
 
 def genomexgenome_validation(
@@ -208,7 +178,7 @@ def genomexgenome_validation(
 
     for label, ppath in [('ref', ref_plasmid_path), ('mod', mod_plasmid_path)]:
         if ppath and Path(ppath).exists():
-            renamed = _deduplicate_plasmid_ids(ppath, logger)
+            renamed = deduplicate_fasta_ids(ppath)
             if renamed:
                 pairs = ', '.join(f"{old} → {new}" for old, new in renamed)
                 warning_msg = (
@@ -243,8 +213,6 @@ def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
     Returns dict mapping query_name -> {'ref_name': str, 'strand': str, 'alignment_len': int}.
     """
     best_hits: Dict[str, Dict] = {}
-    # Track (q_start, r_start) per (query_name, ref_name) pair to detect ambiguous alignments
-    # pair_starts: Dict[tuple, tuple] = {}
     for line in paf_output.splitlines():
         if not line.strip():
             continue
@@ -255,8 +223,6 @@ def _parse_paf_best_hits(paf_output: str) -> Dict[str, Dict]:
         strand = cols[4]
         ref_name = cols[5]
         try:
-            # q_start = int(cols[2])
-            # r_start = int(cols[7])
             alignment_block_len = int(cols[10])
         except ValueError:
             continue
@@ -327,19 +293,17 @@ def _characterize_into_metadata(ref_genome_result, mod_genome_result, metadata, 
     contig_files: List[str] = []
     for i, seq in enumerate(contig_seqs):
         hit = best_hits[seq.id]
-        new_id = seq.id.rstrip('0123456789')
         if hit['strand'] == '-':
-            out_seq = seq.reverse_complement(id=new_id, description='')
+            out_seq = seq.reverse_complement(id=seq.id, description='')
         else:
             out_seq = seq[:]
-            out_seq.id = new_id
             out_seq.description = ''
         contig_path = output_dir / f"{base_name}_contig_{i}.fasta"
         with open_compressed_writer(contig_path, CodingType.NONE) as handle:
             SeqIO.write([out_seq], handle, 'fasta')
         contig_files.append(str(contig_path))
         logger.debug(
-            f"Contig {i}: {new_id} ({len(out_seq.seq)} bp) "
+            f"Contig {i}: {seq.id} ({len(out_seq.seq)} bp) "
             f"→ {hit['ref_name']} [{hit['strand']}] → {contig_path.name}"
         )
 

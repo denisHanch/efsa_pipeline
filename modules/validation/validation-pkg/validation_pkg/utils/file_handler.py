@@ -6,8 +6,9 @@ import re
 import shutil
 import subprocess
 import threading
+from collections import Counter
 from pathlib import Path
-from typing import Union, TextIO, Type, Tuple, Any, Dict, Optional
+from typing import Union, TextIO, Type, Tuple, Any, Dict, List, Optional
 
 from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat
 from validation_pkg.utils.logger import get_logger
@@ -26,6 +27,9 @@ __all__ = [
     # Detection functions
     'detect_compression_type',
     'detect_file_format',
+
+    # FASTA utilities
+    'deduplicate_fasta_ids',
 
     # ConfigManager helpers
     'parse_config_file_value',
@@ -489,6 +493,40 @@ def convert_file_compression(
         raise CompressionError(
             f"Unsupported compression conversion: {input_coding} -> {output_coding}"
         )
+
+
+def deduplicate_fasta_ids(file_path: Union[str, Path]) -> List[tuple]:
+    """Rename duplicate sequence IDs in-place in a FASTA file.
+
+    For each ID appearing more than once the second occurrence becomes <id>_1,
+    the third <id>_2, etc.  The file is rewritten only when duplicates exist.
+    Returns a list of (original_id, new_id) pairs for every renamed sequence,
+    or an empty list when no duplicates were found.
+    """
+    from Bio import SeqIO  # lazy import — BioPython not needed by most file_handler callers
+
+    file_path = Path(file_path)
+    records = list(SeqIO.parse(str(file_path), 'fasta'))
+    duplicated = {sid for sid, n in Counter(r.id for r in records).items() if n > 1}
+    if not duplicated:
+        return []
+
+    renamed: List[tuple] = []
+    seen: dict = {}
+    for record in records:
+        orig_id = record.id
+        n = seen.get(orig_id, 0)
+        seen[orig_id] = n + 1
+        if n > 0:
+            new_id = f"{orig_id}_{n}"
+            renamed.append((orig_id, new_id))
+            record.id = new_id
+            record.description = ''
+
+    with open(str(file_path), 'w') as fh:
+        SeqIO.write(records, fh, 'fasta')
+
+    return renamed
 
 
 def copy_file(
