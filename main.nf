@@ -45,6 +45,8 @@ workflow {
     validate(config_ch)
     analysis(validate.out.params_json)
 
+    def cleanWorkdir = params.clean_workdir
+
     workflow.onComplete { wf ->
         def workDir = resolveWorkDir(wf)
         def logDir = getLogDir()
@@ -53,7 +55,12 @@ workflow {
         generateProcessManifest(logDir, wf)
         logCompletionSummary(wf, workDir)
 
-        if (workDir.deleteDir()) {
+        def keepWorkdir = cleanWorkdir == false || cleanWorkdir?.toString()?.toLowerCase() == 'false'
+
+        if (keepWorkdir) {
+            logToNextflowFile("Keeping work directory: ${workDir.absolutePath}\n")
+        }
+        else if (workDir.deleteDir()) {
             logToNextflowFile("🧹 Removed work directory: ${workDir.absolutePath}\n")
         }
         else {

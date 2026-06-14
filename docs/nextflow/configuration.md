@@ -21,7 +21,7 @@ As a result, operational runtime messages are primarily captured in `data/output
 | `log_dir` | `data/outputs/logs` | Directory for pipeline logs and reports |
 | `valid_dir` | `data/outputs/valid` | Directory where only `validated_params.json` is saved |
 | `max_cpu` | `1` | Maximum CPUs available per process (override with `--max_cpu`) |
-| `cleanup` | `true` | Enables end-of-run cleanup hooks (for example, work directory cleanup) |
+| `clean_workdir` | `false` | Controls whether the Nextflow work directory is deleted at the end of a run; set to `true` to delete it |
 | `validation_level` | `null` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — `null` means not forwarded; `config.json` governs |
 | `logging_level` | `null` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — `null` means not forwarded; `config.json` governs |
 | `organism_type` | `null` | Organism type: `prokaryote` or `eukaryote` — `null` means not forwarded; `config.json` governs |
