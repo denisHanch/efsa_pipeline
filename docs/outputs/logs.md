@@ -99,7 +99,7 @@ The pipeline uses `errorStrategy = 'terminate'` globally — see [Configuration]
 
 ## Log Copying Behavior
 
-Process logs (`.command.*` files) are copied from the Nextflow `work/` directory to `data/outputs/logs/` **regardless of whether the pipeline succeeds or fails**. This ensures failure diagnostics are always available even after the work directory is cleaned up.
+Process logs (`.command.*` files) are copied from the Nextflow `work/` directory to `data/outputs/logs/` **regardless of whether the pipeline succeeds or fails**. This ensures failure diagnostics are always available when `clean_workdir` is enabled and the work directory is deleted.
 
 ## Usage
 
@@ -112,7 +112,7 @@ These log files are useful for:
 
 ## Accessing Logs
 
-During execution, logs reside in the Nextflow `work/` directory under each process-specific subdirectory. At pipeline completion (success or failure), all `.command.*` files are automatically copied to `data/outputs/logs/`. The pipeline then attempts to remove the `work/` directory, while preserving copied logs in the output directory.
+During execution, logs reside in the Nextflow `work/` directory under each process-specific subdirectory. At pipeline completion (success or failure), all `.command.*` files are automatically copied to `data/outputs/logs/`. If `clean_workdir` is `true`, the pipeline then attempts to remove the `work/` directory while preserving copied logs in the output directory. If `clean_workdir` is `false`, the `work/` directory is kept.
 
 To quickly check which processes failed, inspect `data/outputs/logs/process_manifest.txt`.
 
