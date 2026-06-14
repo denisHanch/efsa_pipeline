@@ -3,7 +3,7 @@
 Merge SV summaries from:
   1) assembly/syri summary (required columns: chrom, start, end, svtype)
   2) long-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score) both pacbio and ont
-  3) short-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score)
+  3) short-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, PE, SR, DV, RV, score)
 
 Outputs a folder with single CSV for each type of variations:
   Insertions, Deletions, Duplications, Replacements, Inversions, Translocations
@@ -360,12 +360,11 @@ def _resolve_delly_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
       * FORMAT/DV + FORMAT/RV: sample-level high-quality variant pairs and
         variant junction reads.
 
-    Older pipeline summaries sometimes populated ``supporting_reads`` from PE
-    only, which dropped split-read support and produced zero/incomplete short
-    read counts in the merged per-SV CSVs.  To avoid under-counting, calculate
-    every available variant-support candidate and keep the largest one.  This
-    never sums INFO and FORMAT evidence together, so it avoids double-counting
-    the same support reported at two granularities.
+    Prefer the sample-level FORMAT evidence (DV + RV) when present.  Fall back
+    to site-level INFO evidence (PE + SR), then to the legacy
+    ``supporting_reads`` column.  This never sums INFO and FORMAT evidence
+    together, so it avoids double-counting the same support reported at two
+    granularities.
     """
     pe = _first_int(row, ["PE", "INFO_PE", "INFO/PE", "info_PE", "info_pe"])
     sr = _first_int(row, ["SR", "INFO_SR", "INFO/SR", "info_SR", "info_sr"])
@@ -373,25 +372,17 @@ def _resolve_delly_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
     rv = _first_int(row, ["RV", "FORMAT_RV", "FORMAT/RV", "format_RV", "format_rv"])
     generic = _first_int(row, ["supporting_reads", "supporting_read_count", "read_support"])
 
-    candidates: List[int] = []
+    # Delly FORMAT fields: variant-supporting paired-end and junction reads.
+    if dv is not None or rv is not None:
+        return (dv or 0) + (rv or 0)
 
     # Delly INFO fields: both PE and SR are support for the SV, not reference support.
     if pe is not None or sr is not None:
-        candidates.append((pe or 0) + (sr or 0))
-
-    # Delly FORMAT fields: variant-supporting paired-end and junction reads.
-    if dv is not None or rv is not None:
-        candidates.append((dv or 0) + (rv or 0))
+        return (pe or 0) + (sr or 0)
 
     # Preserve pre-computed values when they are the only support available,
     # or when an upstream parser already summed multiple support fields.
-    if generic is not None:
-        candidates.append(generic)
-
-    if not candidates:
-        return None
-
-    return max(candidates)
+    return generic
 
 
 def _resolve_long_read_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
@@ -466,7 +457,6 @@ class Record:
     info_svtype: Optional[str] = None
     supporting_reads: Optional[int] = None
     score: Optional[float] = None
-    copy_number: Optional[int] = None
     chr2: Optional[str] = None
     pos2: Optional[int] = None
     supporting_methods: Optional[str] = None
@@ -801,7 +791,6 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
 
         # treat any long* sources as long for supporting_methods
         supporting_methods = row.get("supporting_methods") if str(source).startswith("long") else None
-        copy_number = _to_int(row.get("RDCN")) if source == "short" else None
         chr2 = row.get("chr2") if source == "short" else None
         pos2 = _to_int(row.get("pos2")) if source == "short" else None
         start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
@@ -919,7 +908,6 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 row.get("info_svtype"),
                 resolved_supporting_reads,
                 _to_float(row.get("score")),
-                copy_number,
                 chr2,
                 pos2,
                 supporting_methods,
@@ -1112,7 +1100,6 @@ def build_output_table(
             "short_pos2": sht.pos2 if sht else np.nan,
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
-            "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
             "short_coverage_before_100bp": sht.coverage_before_100bp if sht else np.nan,
             "short_coverage_sv_span": sht.coverage_sv_span if sht else np.nan,
             "short_coverage_after_100bp": sht.coverage_after_100bp if sht else np.nan,

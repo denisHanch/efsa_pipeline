@@ -42,8 +42,9 @@ The pipeline extracts variants from VCF files using different fields depending o
 
 **Short-read (delly) variants:**
 - **Variant type source:** VCF `INFO/SVTYPE` field (e.g., DEL, DUP, INV, INS, TRA)
-- **Extraction command:** `bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/CHR2\t%POS2\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%QUAL\t[%RDCN]\n'`
+- **Extraction command:** `bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/CHR2\t%POS2\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%INFO/PE\t%INFO/SR\t[%DV]\t[%RV]\t%QUAL\t[%RDCN]\n'`
 - **Key feature:** Includes `svlen` directly from VCF for accurate insertion/translocation lengths
+- **Supporting reads:** `short_supporting_reads` is resolved in priority order: first sample-level FORMAT evidence `DV + RV` when either field is present, otherwise site-level INFO evidence `PE + SR`, otherwise the legacy `supporting_reads` value. INFO and FORMAT support are not summed together because they can represent overlapping evidence at different granularities.
 
 **Long-read (cuteSV/sniffles/debreak/SURVIVOR) variants:**
 - **Variant type source:** VCF `ID` field or `SVTYPE` in INFO
@@ -195,9 +196,9 @@ The examples below use simplified coordinates for clarity.
 | **long_(ont\|pacbio)_coverage_before_100bp** | Mean depth in the 100 bp flank before the long-read SV event, computed by `mosdepth`. |
 | **long_(ont\|pacbio)_coverage_sv_span** | Mean depth across the full long-read SV event span (`start..end`), computed by `mosdepth`. |
 | **long_(ont\|pacbio)_coverage_after_100bp** | Mean depth in the 100 bp flank after the long-read SV event, computed by `mosdepth`. |
+| **short_supporting_reads** | Delly short-read support resolved in priority order: FORMAT `DV + RV`, then INFO `PE + SR`, then legacy `supporting_reads`. Paired-end fields count supporting pairs/fragments, not individual mates. |
 | **short_chr2** | Partner chromosome for short-read translocation/breakend calls (from short-read TSV `chr2`, extracted from VCF `INFO/CHR2`). Empty for non-translocation short-read events or when unavailable. |
 | **short_pos2** | Partner breakpoint position for short-read translocation/breakend calls (from short-read TSV `pos2`, extracted from VCF `INFO/POS2`). Empty for non-translocation short-read events or when unavailable. |
-| **short_reads_copy_number_estimate** | Estimated copy number derived from short-read depth information (VCF `FORMAT` field `RDCN`). |
 | **short_coverage_before_100bp** | Mean depth in the 100 bp flank before the short-read SV event, computed by `mosdepth`. |
 | **short_coverage_sv_span** | Mean depth across the full short-read SV event span (`start..end`), computed by `mosdepth`. |
 | **short_coverage_after_100bp** | Mean depth in the 100 bp flank after the short-read SV event, computed by `mosdepth`. |
