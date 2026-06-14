@@ -20,6 +20,7 @@ workflow short_read {
         fasta
         out_folder_name
         plasmid_fasta
+        freebayes_ploidy
 
     main:
         // mapping to the reference
@@ -48,7 +49,7 @@ workflow short_read {
          if (out_folder_name == "illumina/short-ref") { 
             
             // SNP & variant calling
-            freebayes(fasta, indexed_bam, out_folder_name) | set { vcf }
+            freebayes(fasta, indexed_bam, out_folder_name, freebayes_ploidy) | set { vcf }
             bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
             
             // Annotation module disabled

@@ -30,6 +30,16 @@ workflow analysis {
         mod_fasta = pmap.map { file(it.mod_fasta_validated) }
         ref_genome_size_bp = pmap.map { it.ref_genome_size_bp ?: "" }
         mod_genome_size_bp = pmap.map { it.mod_genome_size_bp ?: "" }
+        freebayes_ploidy = pmap.map {
+            def organismType = (it.organism_type ?: "").toString().toLowerCase()
+            if (organismType == "prokaryote") {
+                return 1
+            }
+            if (organismType == "eukaryote") {
+                return 2
+            }
+            throw new IllegalArgumentException("Invalid organism_type '${it.organism_type}'. Expected 'prokaryote' or 'eukaryote'.")
+        }
 
         ref_plasmid = pmap.map { it.ref_plasmid_fasta ? [file(it.ref_plasmid_fasta)] : [] }
         mod_plasmid = pmap.map { it.mod_plasmid_fasta ? [file(it.mod_plasmid_fasta)] : [] }
@@ -94,8 +104,8 @@ workflow analysis {
 
         qc(illumina_reads, "illumina/qc_trimming") | set { trimmed }
 
-        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid)
-        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
+        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid, freebayes_ploidy)
+        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid, freebayes_ploidy)
         compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
 
         // Empty short table when not active
