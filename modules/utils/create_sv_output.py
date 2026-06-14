@@ -54,6 +54,7 @@ import logging
 import glob
 import os
 import re
+from io import StringIO
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -128,12 +129,13 @@ ROW_LOG_FIELDS = (
     "coverage_sv_span",
     "coverage_after_100bp",
     # Delly raw fields (short-read)
-    "PE",   # paired-end support (reference pairs)
-    "DV",   # high-quality variant pairs
-    "SR",   # split-read support (reference junction reads)
-    "RV",   # high-quality variant junction reads
+    "PE",   # INFO paired-end support of the structural variant
+    "SR",   # INFO split-read support
+    "DR",   # FORMAT high-quality reference pairs
+    "DV",   # FORMAT high-quality variant pairs
+    "RR",   # FORMAT high-quality reference junction reads
+    "RV",   # FORMAT high-quality variant junction reads
     # Long-read caller raw fields (sniffles / cuteSV use DR+DV; debreak uses RE)
-    "DR",   # reference-supporting reads (sniffles / cuteSV)
     "RE",   # supporting reads (debreak)
 )
 
@@ -336,32 +338,60 @@ def _to_float(x: Any) -> Optional[float]:
         return None
 
 
+def _first_int(row: Dict[str, Any], names: List[str]) -> Optional[int]:
+    """Return the first parseable integer from a row, matching column names case-insensitively."""
+    lower_to_key = {str(k).lower(): k for k in row.keys()}
+    for name in names:
+        key = name if name in row else lower_to_key.get(name.lower())
+        if key is None:
+            continue
+        value = _to_int(row.get(key))
+        if value is not None:
+            return value
+    return None
+
+
 def _resolve_delly_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
-    """Compute supporting reads for a Delly short-read VCF row.
+    """Compute supporting reads for a Delly short-read SV summary row.
 
-    Delly reports four FORMAT fields relevant to read support:
-      PE - paired-end reads supporting the *reference* allele
-      DV - high-quality paired-end reads supporting the *variant* allele
-      SR - split-reads supporting the reference allele
-      RV - high-quality split-reads supporting the variant allele
+    Delly exposes support in two common ways:
+      * INFO/PE + INFO/SR: site-level paired-end and split-read support for
+        the structural variant.
+      * FORMAT/DV + FORMAT/RV: sample-level high-quality variant pairs and
+        variant junction reads.
 
-    We sum the variant-supporting counts (DV + RV) because those directly
-    measure evidence for the called SV.  If neither DV nor RV is present in
-    the row we fall back to the pre-computed ``supporting_reads`` column; if
-    that is also absent the result is ``None`` (serialised as NaN in the CSV).
-
-    Note: PE and SR (reference-supporting reads) are intentionally excluded
-    from the sum - they represent reads that do NOT support the variant.
+    Older pipeline summaries sometimes populated ``supporting_reads`` from PE
+    only, which dropped split-read support and produced zero/incomplete short
+    read counts in the merged per-SV CSVs.  To avoid under-counting, calculate
+    every available variant-support candidate and keep the largest one.  This
+    never sums INFO and FORMAT evidence together, so it avoids double-counting
+    the same support reported at two granularities.
     """
-    dv = _to_int(row.get("DV"))
-    rv = _to_int(row.get("RV"))
+    pe = _first_int(row, ["PE", "INFO_PE", "INFO/PE", "info_PE", "info_pe"])
+    sr = _first_int(row, ["SR", "INFO_SR", "INFO/SR", "info_SR", "info_sr"])
+    dv = _first_int(row, ["DV", "FORMAT_DV", "FORMAT/DV", "format_DV", "format_dv"])
+    rv = _first_int(row, ["RV", "FORMAT_RV", "FORMAT/RV", "format_RV", "format_rv"])
+    generic = _first_int(row, ["supporting_reads", "supporting_read_count", "read_support"])
 
+    candidates: List[int] = []
+
+    # Delly INFO fields: both PE and SR are support for the SV, not reference support.
+    if pe is not None or sr is not None:
+        candidates.append((pe or 0) + (sr or 0))
+
+    # Delly FORMAT fields: variant-supporting paired-end and junction reads.
     if dv is not None or rv is not None:
-        return (dv or 0) + (rv or 0)
+        candidates.append((dv or 0) + (rv or 0))
 
-    # Fall back to whatever was already computed upstream (e.g. from a
-    # pre-processed TSV that already merged these fields).
-    return _to_int(row.get("supporting_reads"))
+    # Preserve pre-computed values when they are the only support available,
+    # or when an upstream parser already summed multiple support fields.
+    if generic is not None:
+        candidates.append(generic)
+
+    if not candidates:
+        return None
+
+    return max(candidates)
 
 
 def _resolve_long_read_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
@@ -540,7 +570,30 @@ def choose_best_record(recs: List[Record]) -> Optional[Record]:
     return max(recs, key=key)
 
 def read_tsv(path: Union[str, Path]) -> pd.DataFrame:
-    return pd.read_csv(path, sep="\t", dtype=str, comment="#")
+    """Read a TSV summary while preserving a leading ``#chrom`` header.
+
+    Several upstream tools emit TSV headers as ``#chrom``.  Passing
+    ``comment="#"`` to pandas drops that header and causes the first data row
+    to be interpreted as column names, which in turn makes all records look
+    malformed.  We therefore remove true comment lines ourselves but keep a
+    ``#chrom`` header intact.
+    """
+    path = Path(path)
+    lines: List[str] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.lstrip()
+            if stripped.startswith("#") and not stripped.lower().startswith("#chrom"):
+                continue
+            lines.append(line)
+
+    if not lines:
+        return pd.DataFrame()
+
+    df = pd.read_csv(StringIO("".join(lines)), sep="\t", dtype=str)
+    if "#chrom" in df.columns and "chrom" not in df.columns:
+        df = df.rename(columns={"#chrom": "chrom"})
+    return df
 
 
 # ----------------------------
