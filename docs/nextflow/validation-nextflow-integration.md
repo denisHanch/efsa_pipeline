@@ -15,7 +15,7 @@ At the moment, integration is done through a **JSON handoff**:
 ## Where It Happens
 
 - Validation process definition: `modules/validate.nf`
-- Validation entrypoint script: `validation.sh` is within the pinned `ecomolegmo/validation` image defined in `nextflow.config` (`v1.0.13` at the time of writing)
+- Validation entrypoint script: `validation.sh` is within the pinned `ecomolegmo/validation` image defined in `nextflow.config` (`v1.0.13`)
 - JSON handoff artifact: `validated_params.json`
 - Consumer side (Nextflow): analysis workflow that parses the JSON and maps values into pipeline logic
 

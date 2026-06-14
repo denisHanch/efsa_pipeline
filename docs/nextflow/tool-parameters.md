@@ -1,6 +1,6 @@
 # Tool Parameter Reference
 
-This page documents the hardcoded analysis parameters used by the pipeline's bioinformatics tools. The pipeline supports both **prokaryotic** and **eukaryotic** genomes (set via the `type` field in `config.json`). The current parameter values are suitable for both organism types under typical sequencing conditions.
+This page documents the hardcoded and automatically derived analysis parameters used by the pipeline's bioinformatics tools. The pipeline supports both **prokaryotic** and **eukaryotic** genomes. 
 
 ---
 
@@ -11,17 +11,25 @@ This page documents the hardcoded analysis parameters used by the pipeline's bio
 **Module:** `modules/variant_calling.nf`
 
 ```bash
-freebayes -f <ref> --min-coverage 10 --min-base-quality 20 --min-mapping-quality 30 --min-alternate-count 3 <bam>
+freebayes -f <ref> --ploidy <1|2> --min-coverage 10 --min-base-quality 20 --min-mapping-quality 30 --min-alternate-count 3 <bam>
 ```
 
 | Parameter | Value | Freebayes Default | Description |
 |-----------|-------|-------------------|-------------|
+| `--ploidy` | Derived from `organism_type`: `1` for `prokaryote`, `2` for `eukaryote` | 2 | Sample ploidy used by FreeBayes. The value is not user-supplied directly; it is derived from the validated organism type and passed through the short-read workflow to FreeBayes. |
 | `--min-coverage` | 10 | 0 | Minimum number of reads covering a locus to call a variant. The default (0) would attempt calls at sites with a single read, producing many false positives. A value of 10 is a standard threshold for reliable variant calling with moderate Illumina coverage. |
 | `--min-base-quality` | 20 | 0 | Minimum per-base Phred quality score. Q20 (99% per-base accuracy) is the widely accepted quality floor for Illumina data. The default (0) would include low-confidence bases, significantly increasing error-driven false calls. |
 | `--min-mapping-quality` | 30 | 1 | Minimum read mapping Phred score. Q30 (99.9% mapping confidence) ensures only confidently placed reads contribute to variant calls. The default (1) would include multi-mapped and ambiguously placed reads, which is problematic in repetitive regions of both prokaryotic and eukaryotic genomes. |
 | `--min-alternate-count` | 3 | 2 | Minimum number of reads supporting the alternate allele. Slightly stricter than the default (2), providing an additional guard against sequencing-error-driven false positives. |
 
-**Rationale:** These are standard community thresholds for calling SNPs and small indels with moderate Illumina coverage (30–100×). Each value departs from the freebayes default to reduce false positives — particularly important in a regulatory/safety context (GMO assessment). The freebayes defaults are intentionally permissive to support diverse use cases (e.g., low-frequency somatic variants); for GMO detection pipelines these permissive defaults would produce excessive noise.
+**Ploidy derivation:** The validated `organism_type` controls the ploidy passed to FreeBayes:
+
+| `organism_type` | FreeBayes `--ploidy` |
+|-----------------|----------------------|
+| `prokaryote` | `1` |
+| `eukaryote` | `2` |
+
+**Rationale:** `--ploidy 1` matches haploid prokaryotic variant calling, while `--ploidy 2` matches diploid eukaryotic calling. The remaining thresholds are standard community thresholds for calling SNPs and small indels with moderate Illumina coverage (30–100×). Each value departs from the freebayes default to reduce false positives — particularly important in a regulatory/safety context (GMO assessment). The freebayes defaults are intentionally permissive to support diverse use cases (e.g., low-frequency somatic variants); for GMO detection pipelines these permissive defaults would produce excessive noise.
 
 **Trade-offs:**
 
@@ -139,7 +147,7 @@ delta-filter -m -i 90 -l 100 <delta>
 
 | Tool | Pipeline | Module | Key Non-Default Parameters |
 |------|----------|--------|---------------------------|
-| Freebayes | Short-read | `variant_calling.nf` | `--min-coverage 10`, `--min-base-quality 20`, `--min-mapping-quality 30`, `--min-alternate-count 3` |
+| Freebayes | Short-read | `variant_calling.nf` | `--ploidy 1` for `prokaryote` or `--ploidy 2` for `eukaryote`, `--min-coverage 10`, `--min-base-quality 20`, `--min-mapping-quality 30`, `--min-alternate-count 3` |
 | Delly | Short-read | `sv_calling.nf` | Defaults only |
 | cuteSV | Long-read | `sv_calling.nf` | `-t ${task.cpus}` |
 | Sniffles | Long-read | `sv_calling.nf` | Defaults only |
