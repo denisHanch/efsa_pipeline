@@ -3,7 +3,18 @@
 Merge SV summaries from:
   1) assembly/syri summary (required columns: chrom, start, end, svtype)
   2) long-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score) both pacbio and ont
-  3) short-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score)
+  3) short-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, PE, SR, DV, RV, score)
+
+Short-read Delly support is reported in the final CSV as:
+  - short_supporting_reads: selected non-double-counted support value
+  - short_supporting_reads_info: INFO/PE + INFO/SR when present
+  - short_supporting_reads_format: FORMAT/DV + FORMAT/RV when present
+  - short_supporting_reads_source: which value was selected
+
+Missing numeric values are written to CSV as the literal string ``NaN`` instead
+of blank cells.  Long-read coverage/depth columns are retained separately; they
+are not mixed into supporting_reads unless a true caller read-count field is
+present.
 
 Outputs a folder with single CSV for each type of variations:
   Insertions, Deletions, Duplications, Replacements, Inversions, Translocations
@@ -54,6 +65,7 @@ import logging
 import glob
 import os
 import re
+from io import StringIO
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -128,12 +140,13 @@ ROW_LOG_FIELDS = (
     "coverage_sv_span",
     "coverage_after_100bp",
     # Delly raw fields (short-read)
-    "PE",   # paired-end support (reference pairs)
-    "DV",   # high-quality variant pairs
-    "SR",   # split-read support (reference junction reads)
-    "RV",   # high-quality variant junction reads
+    "PE",   # INFO paired-end support of the structural variant
+    "SR",   # INFO split-read support
+    "DR",   # FORMAT high-quality reference pairs
+    "DV",   # FORMAT high-quality variant pairs
+    "RR",   # FORMAT high-quality reference junction reads
+    "RV",   # FORMAT high-quality variant junction reads
     # Long-read caller raw fields (sniffles / cuteSV use DR+DV; debreak uses RE)
-    "DR",   # reference-supporting reads (sniffles / cuteSV)
     "RE",   # supporting reads (debreak)
 )
 
@@ -336,32 +349,83 @@ def _to_float(x: Any) -> Optional[float]:
         return None
 
 
-def _resolve_delly_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
-    """Compute supporting reads for a Delly short-read VCF row.
+def _first_int(row: Dict[str, Any], names: List[str]) -> Optional[int]:
+    """Return the first parseable integer from a row, matching column names case-insensitively."""
+    lower_to_key = {str(k).lower(): k for k in row.keys()}
+    for name in names:
+        key = name if name in row else lower_to_key.get(name.lower())
+        if key is None:
+            continue
+        value = _to_int(row.get(key))
+        if value is not None:
+            return value
+    return None
 
-    Delly reports four FORMAT fields relevant to read support:
-      PE - paired-end reads supporting the *reference* allele
-      DV - high-quality paired-end reads supporting the *variant* allele
-      SR - split-reads supporting the reference allele
-      RV - high-quality split-reads supporting the variant allele
 
-    We sum the variant-supporting counts (DV + RV) because those directly
-    measure evidence for the called SV.  If neither DV nor RV is present in
-    the row we fall back to the pre-computed ``supporting_reads`` column; if
-    that is also absent the result is ``None`` (serialised as NaN in the CSV).
+def _resolve_delly_supporting_reads_details(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Compute Delly short-read support and preserve its provenance.
 
-    Note: PE and SR (reference-supporting reads) are intentionally excluded
-    from the sum - they represent reads that do NOT support the variant.
+    Delly can expose support at two granularities:
+      * INFO/PE + INFO/SR: site-level paired-end plus split-read support.
+      * FORMAT/DV + FORMAT/RV: sample-level high-quality variant pairs plus
+        high-quality variant junction reads.
+
+    These two totals should not be added together because they can describe
+    overlapping evidence at different granularities.  The final legacy
+    ``short_supporting_reads`` value is therefore the largest available
+    non-double-counted candidate, while the component columns keep the INFO
+    and FORMAT totals visible for debugging and reporting.
     """
-    dv = _to_int(row.get("DV"))
-    rv = _to_int(row.get("RV"))
+    pe = _first_int(row, ["PE", "INFO_PE", "INFO/PE", "info_PE", "info_pe"])
+    sr = _first_int(row, ["SR", "INFO_SR", "INFO/SR", "info_SR", "info_sr"])
+    dv = _first_int(row, ["DV", "FORMAT_DV", "FORMAT/DV", "format_DV", "format_dv"])
+    rv = _first_int(row, ["RV", "FORMAT_RV", "FORMAT/RV", "format_RV", "format_rv"])
+    generic = _first_int(row, ["supporting_reads", "supporting_read_count", "read_support"])
 
-    if dv is not None or rv is not None:
-        return (dv or 0) + (rv or 0)
+    info_total = (pe or 0) + (sr or 0) if (pe is not None or sr is not None) else None
+    format_total = (dv or 0) + (rv or 0) if (dv is not None or rv is not None) else None
 
-    # Fall back to whatever was already computed upstream (e.g. from a
-    # pre-processed TSV that already merged these fields).
-    return _to_int(row.get("supporting_reads"))
+    candidates: List[Tuple[str, int]] = []
+    if info_total is not None:
+        candidates.append(("INFO_PE_PLUS_SR", info_total))
+    if format_total is not None:
+        candidates.append(("FORMAT_DV_PLUS_RV", format_total))
+    if generic is not None:
+        candidates.append(("supporting_reads", generic))
+
+    if candidates:
+        # Keep the largest non-double-counted representation.  Ties are resolved
+        # in a deterministic preference order: FORMAT, INFO, generic.
+        preference = {"FORMAT_DV_PLUS_RV": 2, "INFO_PE_PLUS_SR": 1, "supporting_reads": 0}
+        selected_source, selected_value = max(
+            candidates,
+            key=lambda item: (item[1], preference.get(item[0], -1)),
+        )
+    else:
+        selected_source, selected_value = None, None
+
+    if selected_value is None:
+        note = "No Delly support-count fields were present; reported as NaN."
+    elif selected_source == "FORMAT_DV_PLUS_RV":
+        note = "short_supporting_reads selected from Delly FORMAT/DV + FORMAT/RV."
+    elif selected_source == "INFO_PE_PLUS_SR":
+        note = "short_supporting_reads selected from Delly INFO/PE + INFO/SR."
+    else:
+        note = "short_supporting_reads selected from generic supporting_reads fallback."
+
+    return {
+        "supporting_reads": selected_value,
+        "supporting_reads_source": selected_source,
+        "supporting_reads_info": info_total,
+        "supporting_reads_format": format_total,
+        "supporting_reads_generic": generic,
+        "supporting_reads_note": note,
+    }
+
+
+def _resolve_delly_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
+    """Backward-compatible helper returning only the selected Delly support value."""
+    return _resolve_delly_supporting_reads_details(row).get("supporting_reads")
 
 
 def _resolve_long_read_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
@@ -436,7 +500,6 @@ class Record:
     info_svtype: Optional[str] = None
     supporting_reads: Optional[int] = None
     score: Optional[float] = None
-    copy_number: Optional[int] = None
     chr2: Optional[str] = None
     pos2: Optional[int] = None
     supporting_methods: Optional[str] = None
@@ -446,6 +509,11 @@ class Record:
     coverage_before_100bp: Optional[float] = None
     coverage_sv_span: Optional[float] = None
     coverage_after_100bp: Optional[float] = None
+    supporting_reads_source: Optional[str] = None
+    supporting_reads_info: Optional[int] = None
+    supporting_reads_format: Optional[int] = None
+    supporting_reads_generic: Optional[int] = None
+    supporting_reads_note: Optional[str] = None
 
 @dataclass
 class EventCluster:
@@ -540,7 +608,30 @@ def choose_best_record(recs: List[Record]) -> Optional[Record]:
     return max(recs, key=key)
 
 def read_tsv(path: Union[str, Path]) -> pd.DataFrame:
-    return pd.read_csv(path, sep="\t", dtype=str, comment="#")
+    """Read a TSV summary while preserving a leading ``#chrom`` header.
+
+    Several upstream tools emit TSV headers as ``#chrom``.  Passing
+    ``comment="#"`` to pandas drops that header and causes the first data row
+    to be interpreted as column names, which in turn makes all records look
+    malformed.  We therefore remove true comment lines ourselves but keep a
+    ``#chrom`` header intact.
+    """
+    path = Path(path)
+    lines: List[str] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.lstrip()
+            if stripped.startswith("#") and not stripped.lower().startswith("#chrom"):
+                continue
+            lines.append(line)
+
+    if not lines:
+        return pd.DataFrame()
+
+    df = pd.read_csv(StringIO("".join(lines)), sep="\t", dtype=str)
+    if "#chrom" in df.columns and "chrom" not in df.columns:
+        df = df.rename(columns={"#chrom": "chrom"})
+    return df
 
 
 # ----------------------------
@@ -632,6 +723,21 @@ def resolve_supporting_reads(records: List[Record], supp_files: List[str], tol: 
 
     return records
 
+def _validate_supplied_input_path(path: Union[str, Path], source: str) -> Path:
+    """Fail fast when a CLI-supplied input path is missing or unreadable.
+
+    Optional inputs may still be omitted entirely.  But once a path is supplied,
+    silently treating a typo as an empty dataset produces misleading header-only
+    final reports, so this is a hard error.
+    """
+    resolved = Path(path)
+    if not resolved.exists():
+        raise FileNotFoundError(f"Input file for {source!r} does not exist: {resolved}")
+    if not resolved.is_file():
+        raise FileNotFoundError(f"Input path for {source!r} is not a file: {resolved}")
+    return resolved
+
+
 def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = None) -> List[Record]:
     """Load records from a TSV file into Record objects.
 
@@ -657,6 +763,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
     source_logger = logger.bind(source=source, input_path=path_str) if logger is not None else None
 
     try:
+        path = _validate_supplied_input_path(path, source)
         df = read_tsv(path)
     except Exception as exc:
         if source_logger is not None:
@@ -664,7 +771,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 "load_records_read_failed",
                 error=str(exc),
             )
-        return []
+        raise
 
     out = []
     rows_seen = 0
@@ -748,7 +855,6 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
 
         # treat any long* sources as long for supporting_methods
         supporting_methods = row.get("supporting_methods") if str(source).startswith("long") else None
-        copy_number = _to_int(row.get("RDCN")) if source == "short" else None
         chr2 = row.get("chr2") if source == "short" else None
         pos2 = _to_int(row.get("pos2")) if source == "short" else None
         start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
@@ -848,10 +954,28 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
         # available, falling back to the generic `supporting_reads` column.
         # This prevents false zeros when a caller (e.g. Delly) only populates
         # split-read fields (RV) but not paired-end fields (DV), or vice-versa.
+        supporting_reads_source = None
+        supporting_reads_info = None
+        supporting_reads_format = None
+        supporting_reads_generic = None
+        supporting_reads_note = None
+
         if source == "short":
-            resolved_supporting_reads = _resolve_delly_supporting_reads(row)
+            support_details = _resolve_delly_supporting_reads_details(row)
+            resolved_supporting_reads = support_details["supporting_reads"]
+            supporting_reads_source = support_details["supporting_reads_source"]
+            supporting_reads_info = support_details["supporting_reads_info"]
+            supporting_reads_format = support_details["supporting_reads_format"]
+            supporting_reads_generic = support_details["supporting_reads_generic"]
+            supporting_reads_note = support_details["supporting_reads_note"]
         elif str(source).startswith("long"):
             resolved_supporting_reads = _resolve_long_read_supporting_reads(row)
+            if resolved_supporting_reads is None:
+                supporting_reads_note = (
+                    "No caller read-count field was present; kept as NaN. "
+                    "coverage_sv_span is available separately as a depth proxy, "
+                    "but is not mixed into supporting_reads."
+                )
         else:
             resolved_supporting_reads = _to_int(row.get("supporting_reads"))
 
@@ -866,7 +990,6 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 row.get("info_svtype"),
                 resolved_supporting_reads,
                 _to_float(row.get("score")),
-                copy_number,
                 chr2,
                 pos2,
                 supporting_methods,
@@ -876,6 +999,11 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 coverage_before_100bp,
                 coverage_sv_span,
                 coverage_after_100bp,
+                supporting_reads_source,
+                supporting_reads_info,
+                supporting_reads_format,
+                supporting_reads_generic,
+                supporting_reads_note,
             )
         )
 
@@ -1034,6 +1162,7 @@ def build_output_table(
             "long_ont_info_svtype": long_ont.info_svtype if long_ont else "",
             "long_ont_score": long_ont.score if long_ont else np.nan,
             "long_ont_supporting_reads": long_ont.supporting_reads if long_ont else np.nan,
+            "long_ont_supporting_reads_note": long_ont.supporting_reads_note if long_ont else "",
             "long_ont_supporting_methods": long_ont.supporting_methods if long_ont else np.nan,
             "long_ont_coverage_before_100bp": long_ont.coverage_before_100bp if long_ont else np.nan,
             "long_ont_coverage_sv_span": long_ont.coverage_sv_span if long_ont else np.nan,
@@ -1045,6 +1174,7 @@ def build_output_table(
             "long_pacbio_info_svtype": long_pacbio.info_svtype if long_pacbio else "",
             "long_pacbio_score": long_pacbio.score if long_pacbio else np.nan,
             "long_pacbio_supporting_reads": long_pacbio.supporting_reads if long_pacbio else np.nan,
+            "long_pacbio_supporting_reads_note": long_pacbio.supporting_reads_note if long_pacbio else "",
             "long_pacbio_supporting_methods": long_pacbio.supporting_methods if long_pacbio else np.nan,
             "long_pacbio_coverage_before_100bp": long_pacbio.coverage_before_100bp if long_pacbio else np.nan,
             "long_pacbio_coverage_sv_span": long_pacbio.coverage_sv_span if long_pacbio else np.nan,
@@ -1059,7 +1189,11 @@ def build_output_table(
             "short_pos2": sht.pos2 if sht else np.nan,
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
-            "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
+            "short_supporting_reads_info": sht.supporting_reads_info if sht else np.nan,
+            "short_supporting_reads_format": sht.supporting_reads_format if sht else np.nan,
+            "short_supporting_reads_generic": sht.supporting_reads_generic if sht else np.nan,
+            "short_supporting_reads_source": sht.supporting_reads_source if sht else "",
+            "short_supporting_reads_note": sht.supporting_reads_note if sht else "",
             "short_coverage_before_100bp": sht.coverage_before_100bp if sht else np.nan,
             "short_coverage_sv_span": sht.coverage_sv_span if sht else np.nan,
             "short_coverage_after_100bp": sht.coverage_after_100bp if sht else np.nan,
@@ -1237,7 +1371,7 @@ def write_csv_tables(df: pd.DataFrame, outdir: str | os.PathLike[str]) -> None:
                 errors="ignore",
             ).iloc[0:0]
 
-            header_df.to_csv(os.path.join(outdir, f"{name}.csv"), index=False)
+            header_df.to_csv(os.path.join(outdir, f"{name}.csv"), index=False, na_rep="NaN")
 
         return
 
@@ -1253,7 +1387,7 @@ def write_csv_tables(df: pd.DataFrame, outdir: str | os.PathLike[str]) -> None:
         if not sub.empty:
             sub = sub.sort_values(["chrom", "event_start", "event_end"])
 
-        sub.to_csv(os.path.join(outdir, f"{name}.csv"), index=False)
+        sub.to_csv(os.path.join(outdir, f"{name}.csv"), index=False, na_rep="NaN")
 
     other = df[~df["std_svtype"].isin(TAB_BY_TYPE)].copy()
     if not other.empty:
@@ -1261,7 +1395,7 @@ def write_csv_tables(df: pd.DataFrame, outdir: str | os.PathLike[str]) -> None:
             columns=["std_svtype", "asm_start_mod", "asm_end_mod"],
             errors="ignore",
         )
-        other.to_csv(os.path.join(outdir, "Other.csv"), index=False)
+        other.to_csv(os.path.join(outdir, "Other.csv"), index=False, na_rep="NaN")
 
 # Main
 
@@ -1281,6 +1415,18 @@ def main() -> None:
     )
 
     args = p.parse_args()
+
+    for source_name, supplied_path in (
+        ("asm", args.asm),
+        ("long_ont", args.long_ont),
+        ("long_pacbio", args.long_pacbio),
+        ("short", args.short_reads),
+    ):
+        if supplied_path:
+            try:
+                _validate_supplied_input_path(supplied_path, source_name)
+            except FileNotFoundError as exc:
+                p.error(str(exc))
 
     logger, log_path = setup_logging()
     ref_genome_size_bp = _read_genome_size_from_env("SV_REF_GENOME_SIZE_BP", logger=logger)

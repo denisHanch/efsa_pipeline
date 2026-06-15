@@ -212,8 +212,8 @@ process vcf_to_table_short {
     """
     set -euxo pipefail
 
-    echo -e "chrom\tstart\tend\tsvtype\tchr2\tpos2\tinfo_svtype\tsvlen\tsupporting_reads\tscore\tRDCN" > "${name}_short_sv_summary.tsv"
-    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/CHR2\t%POS2\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%QUAL\t[%RDCN]\n' "${vcf}"  >> "${name}_short_sv_summary.tsv"
+    echo -e "chrom\tstart\tend\tsvtype\tchr2\tpos2\tinfo_svtype\tsvlen\tsupporting_reads\tPE\tSR\tDV\tRV\tscore\tRDCN" > "${name}_short_sv_summary.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/CHR2\t%POS2\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%INFO/PE\t%INFO/SR\t[%DV]\t[%RV]\t%QUAL\t[%RDCN]\n' "${vcf}"  >> "${name}_short_sv_summary.tsv"
     """
 }
 
