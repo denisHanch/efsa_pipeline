@@ -23,9 +23,14 @@ workflow short_read {
         freebayes_ploidy
 
     main:
+        fasta
+            .filter { it && !(it instanceof Collection && it.isEmpty()) }
+            .flatten()
+            | set { fasta_present }
+
         // mapping to the reference
-        bwa_index(fasta, out_folder_name) | set { fasta_index } 
-        mapping(fasta, fasta_index, trimmed, out_folder_name) | set { indexed_bam }
+        bwa_index(fasta_present, out_folder_name) | set { fasta_index }
+        mapping(fasta_present, fasta_index, trimmed, out_folder_name) | set { indexed_bam }
 
         get_unmapped_reads(indexed_bam, out_folder_name) | set { unmapped_fastq }
         
@@ -49,14 +54,14 @@ workflow short_read {
          if (out_folder_name == "illumina/short-ref") { 
             
             // SNP & variant calling
-            freebayes(fasta, indexed_bam, out_folder_name, freebayes_ploidy) | set { vcf }
+            freebayes(fasta_present, indexed_bam, out_folder_name, freebayes_ploidy) | set { vcf }
             bcftools_stats(vcf, out_folder_name) | set { bcftools_out }
             
             // Annotation module disabled
             multiqc(bcftools_out, out_folder_name, "varint_calling")
         
             // SVs variant calling
-            sv(fasta, indexed_bam, out_folder_name) | set { sv_vcf }
+            sv(fasta_present, indexed_bam, out_folder_name) | set { sv_vcf }
             vcf_to_table_short(sv_vcf) | set { sv_tbl_raw }
 
             sv_tbl_keyed = sv_tbl_raw.map { tsv ->
