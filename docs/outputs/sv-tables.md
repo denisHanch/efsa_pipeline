@@ -30,6 +30,7 @@ flowchart LR
 - Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
 - `linked_event` is the only relationship column in the final CSVs. It includes both same-type and cross-type overlaps.
 - Final event anchoring is deterministic and size-aware: `event_length_bp` uses minimum absolute `svlen`, and event coordinates are anchored to the same selected source call. Equal-length ties are resolved by strongest intersection with the other source calls.
+- Likely artifact rows can be filtered before clustering when the source TSV provides contig length: by default, events larger than 50% of their contig are removed.
 
 ### VCF Extraction and Variant Type Handling
 
@@ -147,6 +148,24 @@ During normal Nextflow runs, genome-size context is supplied automatically from 
 | `--out` | Output directory for the per-SV CSV files. Required. |
 | `--tol` | Within-type clustering tolerance in base pairs. Determines whether raw SV calls get merged into the same event. Default: `10`. |
 | `--cross_type_tol` | Tolerance in base pairs for linking final events with near-identical coordinates in `linked_event`. Default: `0`, which keeps overlap-only linking. |
+| `--max_event_contig_fraction` | Filters source rows whose event length is greater than this fraction of the row's contig length. Default: `0.5` (50%). Set to `0` to disable. Rows without a supported contig-length column are retained. |
+
+### Artifact filtering and known limitations
+
+As per EFSA request, a few events for filtering out has been created. Those filters are used to remove incorrect events (artifacts) or consolidate overlapping events into single, unique event. Currently handled artifact categories:
+
+- **Too-large source events:** before clustering, a source row is removed when `abs(svlen) > contig_length * --max_event_contig_fraction`. The default threshold is `0.5`. Supported optional contig-length column names include `contig_length_bp`, `contig_length`, `contig_size_bp`, `contig_size`, `chrom_length_bp`, `chrom_length`, `chrom_size_bp`, `chrom_size`, `chromosome_length_bp`, `chromosome_length`, `chromosome_size_bp`, `chromosome_size`, `sequence_length_bp`, `sequence_length`, `ref_contig_length_bp`, `ref_contig_length`, `ref_chrom_length_bp`, and `ref_chrom_length`.
+- **Rows without contig length:** retained deliberately and counted in the structured log as unevaluated by the too-large-event filter. The script does not guess contig size from total genome size or observed coordinates.
+- **Malformed source rows:** rows missing required fields or valid coordinates are skipped during loading.
+- **Normalization artifacts:** reversed coordinates are swapped; signed or inconsistent `svlen` values are normalized for interval SV classes (`DEL`, `DUP`, `INV`, `RPL`) before filtering and output.
+- **Nested/overlapping final events:** not filtered automatically, but reported through `linked_event` relations such as `nested_in`, `contains`, `overlap`, and `exact_coordinates`.
+
+Known unresolved or only partially resolved artifact categories:
+
+- **Deletion plus substitution double-calls from non-clean deletion boundaries:** not collapsed automatically because the final table builder does not read BAM/IGV evidence or base-level alignment context.
+- **Substitution events duplicated as deletion/insertion calls:** not safely filtered from the current columns alone; these are exposed only through coordinate/type relationships when they overlap.
+- **Deletion-inside-deletion artifacts:** not removed automatically. Nested relationships are annotated in `linked_event` for review, but the script avoids deleting nested calls without stronger evidence.
+- **Coverage/visual-review artifacts:** no BAM- or IGV-derived artifact logic is applied in `create_sv_output.py`; only fields already present in the TSV inputs are used.
 
 ### Explanation of `csv_per_sv_summary` CSV columns
 
@@ -274,28 +293,30 @@ The `create_sv_output.py` script processes SV records through the following step
 
 1. **Load and standardize records** from all available source pipelines (assembly, long-read ONT/PacBio, short-read)
 
-2. **Cluster records by (chromosome, standardized SV type)** using interval overlap with a tolerance window (`--tol`, default 10 bp). Records are considered part of the same event if:
+2. **Filter supported too-large source events** before clustering. A row is removed only when both event length and contig length are available and `abs(svlen)` exceeds `contig_length * --max_event_contig_fraction`.
+
+3. **Cluster records by (chromosome, standardized SV type)** using interval overlap with a tolerance window (`--tol`, default 10 bp). Records are considered part of the same event if:
    - They share the same chromosome and standardized SV type
    - Their intervals overlap (accounting for tolerance)
    - At least one of the breakpoints (start or end) is within tolerance between members
 
-3. **Select best representative per source** within each cluster using a ranking strategy:
+4. **Select best representative per source** within each cluster using a ranking strategy:
    - Rank 1: Supporting reads / evidence count (higher is better)
    - Rank 2: Quality score (higher is better)
    - Rank 3: Absolute SV size (`abs(svlen)`), with smaller values preferred as tie-breaker
    
    This ensures the highest-confidence call from each source is carried forward.
 
-4. **Build source length candidates** from selected source representatives:
+5. **Build source length candidates** from selected source representatives:
    - `asm_length`, `long_ont_length`, `long_pacbio_length`, `short_length` from source `svlen`
    - Event-level comparison uses absolute lengths (`abs(svlen)`) to normalize caller sign conventions
 
-5. **Select event anchor and event length:**
+6. **Select event anchor and event length:**
    - Set `event_length_bp = min(abs(svlen))` across available source representatives
    - Set `event_start` and `event_end` to the coordinates of the same selected source call
    - If multiple sources share the same minimum absolute length, choose the one with the largest total interval intersection against other source representatives
    - If no usable source `svlen` exists, keep `event_length_bp = NaN` and use type-aware fallback coordinates
 
-6. **Assemble final row** with all source-specific fields, filtering unnecessary columns (e.g., removing `asm_start_mod/asm_end_mod` from deletions, removing internal type fields)
+7. **Assemble final row** with all source-specific fields, filtering unnecessary columns (e.g., removing `asm_start_mod/asm_end_mod` from deletions, removing internal type fields)
 
-7. **Final pass: link overlapping events** by scanning all final rows on the same chromosome and recording any coordinate overlaps or near-overlaps (if `--cross_type_tol` is set)
+8. **Final pass: link overlapping events** by scanning all final rows on the same chromosome and recording any coordinate overlaps or near-overlaps (if `--cross_type_tol` is set)
