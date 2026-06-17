@@ -44,7 +44,14 @@ events for both same-type and cross-type SV rows. Set --cross_type_tol to a smal
 integer to also link near-identical final coordinates.
 
 Usage:
-    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10 --cross_type_tol 0
+    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10 --cross_type_tol 0 --max_event_contig_fraction 0.5
+
+Too-large event artifact filter:
+    Source rows are filtered before clustering when both event length and contig
+    length are available and abs(svlen) is greater than the configured fraction
+    of the contig length. The default maximum fraction is 0.5 (50%). Rows with
+    unavailable event length or contig length are retained and logged as not
+    evaluated by this filter.
 
 Genome-percentage columns:
     pct_of_ref_genome and pct_of_mod_genome are calculated when the pipeline sets
@@ -63,6 +70,7 @@ import atexit
 import argparse
 import logging
 import glob
+import math
 import os
 import re
 from io import StringIO
@@ -120,6 +128,29 @@ ASM_PREFIX_MAP = [
 ]
 
 DEFAULT_LOG_DIR = Path("data") / "outputs" / "logs"
+DEFAULT_MAX_EVENT_CONTIG_FRACTION = 0.5
+
+CONTIG_LENGTH_COLUMNS = (
+    "contig_length_bp",
+    "contig_length",
+    "contig_size_bp",
+    "contig_size",
+    "chrom_length_bp",
+    "chrom_length",
+    "chrom_size_bp",
+    "chrom_size",
+    "chromosome_length_bp",
+    "chromosome_length",
+    "chromosome_size_bp",
+    "chromosome_size",
+    "sequence_length_bp",
+    "sequence_length",
+    "ref_contig_length_bp",
+    "ref_contig_length",
+    "ref_chrom_length_bp",
+    "ref_chrom_length",
+)
+
 ROW_LOG_FIELDS = (
     "chrom",
     "#chrom",
@@ -139,6 +170,7 @@ ROW_LOG_FIELDS = (
     "coverage_before_100bp",
     "coverage_sv_span",
     "coverage_after_100bp",
+    *CONTIG_LENGTH_COLUMNS,
     # Delly raw fields (short-read)
     "PE",   # INFO paired-end support of the structural variant
     "SR",   # INFO split-read support
@@ -362,6 +394,27 @@ def _first_int(row: Dict[str, Any], names: List[str]) -> Optional[int]:
     return None
 
 
+def _resolve_contig_length_bp(row: Dict[str, Any]) -> Optional[int]:
+    """Return a positive contig length from supported optional TSV columns."""
+    contig_length = _first_int(row, list(CONTIG_LENGTH_COLUMNS))
+    if contig_length is None or contig_length <= 0:
+        return None
+    return contig_length
+
+
+def _parse_nonnegative_finite_float(value: str) -> float:
+    """argparse type for non-negative finite floating-point options."""
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a valid number") from exc
+
+    if not math.isfinite(parsed) or parsed < 0:
+        raise argparse.ArgumentTypeError("value must be a non-negative finite number")
+
+    return parsed
+
+
 def _resolve_delly_supporting_reads_details(row: Dict[str, Any]) -> Dict[str, Any]:
     """Compute Delly short-read support and preserve its provenance.
 
@@ -514,6 +567,7 @@ class Record:
     supporting_reads_format: Optional[int] = None
     supporting_reads_generic: Optional[int] = None
     supporting_reads_note: Optional[str] = None
+    contig_length_bp: Optional[int] = None
 
 @dataclass
 class EventCluster:
@@ -606,6 +660,118 @@ def choose_best_record(recs: List[Record]) -> Optional[Record]:
         )
 
     return max(recs, key=key)
+
+
+def _record_event_length_bp(record: Record) -> Optional[int]:
+    """Return the absolute source-event length used by artifact filters."""
+    if record.svlen is None:
+        return None
+    try:
+        if pd.isna(record.svlen):
+            return None
+    except Exception:
+        pass
+
+    try:
+        return abs(int(record.svlen))
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_too_large_event_artifact(
+    record: Record,
+    max_contig_fraction: float,
+) -> Tuple[bool, Optional[int], Optional[float]]:
+    """Identify source rows whose event length is implausibly large for the contig.
+
+    Rows without event length or contig length are deliberately not filtered here;
+    callers can report that they were unevaluated.
+    """
+    event_length_bp = _record_event_length_bp(record)
+    contig_length_bp = record.contig_length_bp
+
+    if max_contig_fraction <= 0:
+        return False, event_length_bp, None
+
+    if event_length_bp is None or contig_length_bp is None or contig_length_bp <= 0:
+        return False, event_length_bp, None
+
+    event_contig_fraction = event_length_bp / contig_length_bp
+    return event_contig_fraction > max_contig_fraction, event_length_bp, event_contig_fraction
+
+
+def filter_too_large_events(
+    records: List[Record],
+    max_contig_fraction: float = DEFAULT_MAX_EVENT_CONTIG_FRACTION,
+    logger: Any = None,
+) -> List[Record]:
+    """Remove likely artifact source rows that exceed a fraction of contig length."""
+    if not records:
+        return records
+
+    if max_contig_fraction <= 0:
+        if logger is not None:
+            logger.info(
+                "too_large_event_filter_disabled",
+                max_event_contig_fraction=max_contig_fraction,
+                total_records=len(records),
+            )
+        return records
+
+    kept: List[Record] = []
+    filtered_count = 0
+    missing_event_length_count = 0
+    missing_contig_length_count = 0
+
+    for record in records:
+        event_length_bp = _record_event_length_bp(record)
+        if event_length_bp is None:
+            missing_event_length_count += 1
+            kept.append(record)
+            continue
+
+        if record.contig_length_bp is None or record.contig_length_bp <= 0:
+            missing_contig_length_count += 1
+            kept.append(record)
+            continue
+
+        is_artifact, _, event_contig_fraction = _is_too_large_event_artifact(
+            record,
+            max_contig_fraction,
+        )
+        if is_artifact:
+            filtered_count += 1
+            if logger is not None:
+                logger.warning(
+                    "sv_artifact_row_filtered",
+                    reason="event_length_gt_contig_fraction",
+                    source=record.source,
+                    chrom=record.chrom,
+                    start=record.start,
+                    end=record.end,
+                    std_type=record.std_type,
+                    raw_svtype=record.raw_svtype,
+                    event_length_bp=event_length_bp,
+                    contig_length_bp=record.contig_length_bp,
+                    event_contig_fraction=event_contig_fraction,
+                    max_event_contig_fraction=max_contig_fraction,
+                )
+            continue
+
+        kept.append(record)
+
+    if logger is not None:
+        logger.info(
+            "too_large_event_filter_completed",
+            max_event_contig_fraction=max_contig_fraction,
+            total_records=len(records),
+            kept_records=len(kept),
+            filtered_records=filtered_count,
+            unevaluated_missing_event_length=missing_event_length_count,
+            unevaluated_missing_contig_length=missing_contig_length_count,
+        )
+
+    return kept
 
 def read_tsv(path: Union[str, Path]) -> pd.DataFrame:
     """Read a TSV summary while preserving a leading ``#chrom`` header.
@@ -862,6 +1028,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
         coverage_before_100bp = _to_float(row.get("coverage_before_100bp"))
         coverage_sv_span = _to_float(row.get("coverage_sv_span"))
         coverage_after_100bp = _to_float(row.get("coverage_after_100bp"))
+        contig_length_bp = _resolve_contig_length_bp(row)
         svlen_input = _to_int(row.get("svlen"))
         svlen = abs(svlen_input) if svlen_input is not None else None
         coord_len = (end - start) if (start is not None and end is not None and end >= start) else None
@@ -1004,6 +1171,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 supporting_reads_format,
                 supporting_reads_generic,
                 supporting_reads_note,
+                contig_length_bp=contig_length_bp,
             )
         )
 
@@ -1413,6 +1581,16 @@ def main() -> None:
         default=0,
         help="Tolerance in bp for linking near-identical final event coordinates in linked_event. Default 0 keeps overlap-only linking.",
     )
+    p.add_argument(
+        "--max_event_contig_fraction",
+        type=_parse_nonnegative_finite_float,
+        default=DEFAULT_MAX_EVENT_CONTIG_FRACTION,
+        help=(
+            "Filter source SV rows whose event length is greater than this "
+            "fraction of the available contig length. Default 0.5. Set 0 to disable. "
+            "Rows without contig length are retained."
+        ),
+    )
 
     args = p.parse_args()
 
@@ -1436,6 +1614,7 @@ def main() -> None:
         output_dir=str(args.out),
         tol=args.tol,
         cross_type_tol=args.cross_type_tol,
+        max_event_contig_fraction=args.max_event_contig_fraction,
         ref_genome_size_bp=ref_genome_size_bp,
         mod_genome_size_bp=mod_genome_size_bp,
         inputs=_clean_dict(
@@ -1470,14 +1649,22 @@ def main() -> None:
         records = resolve_supporting_reads(records, supp_files, tol=args.tol)
         logger.info("resolve_supporting_reads_completed", total_records=len(records))
 
+    records_before_artifact_filter = len(records)
+    records = filter_too_large_events(
+        records,
+        max_contig_fraction=args.max_event_contig_fraction,
+        logger=logger,
+    )
+
     if not records:
         os.makedirs(args.out, exist_ok=True)
         logger.warning(
             "create_sv_output_no_valid_records",
             output_dir=str(args.out),
+            records_before_artifact_filter=records_before_artifact_filter,
         )
         write_csv_tables(pd.DataFrame(), args.out)
-        print("No valid input records found; wrote empty header-only CSV tables.")
+        print("No valid input records found after input validation/artifact filtering; wrote empty header-only CSV tables.")
         print(f"Load-record audit log: {log_path}")
         return
 
@@ -1511,6 +1698,7 @@ def main() -> None:
         total_records=len(records),
         total_clusters=len(clusters),
         total_output_rows=int(len(df.index)),
+        records_before_artifact_filter=records_before_artifact_filter,
     )
 
     print(f"Wrote CSV tables to: {args.out}")
