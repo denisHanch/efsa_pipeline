@@ -8,7 +8,6 @@ Documentation for advanced features in the validation_pkg package.
 - [Format Conversion](#format-conversion)
 - [Sequence ID Management](#sequence-id-management)
 - [Paired-End Detection](#paired-end-detection)
-- [Coordinate System Conversion](#coordinate-system-conversion)
 - [Parallel Compression](#parallel-compression)
 
 ---
@@ -26,7 +25,7 @@ from validation_pkg import GenomeValidator
 
 # Default: longest sequence = chromosome, others = plasmids
 settings = GenomeValidator.Settings(main_longest=True)
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 print(f"Chromosome: {result.longest_sequence_id} ({result.longest_sequence_length} bp)")
 print(f"Plasmids: {result.plasmid_count}")
@@ -41,7 +40,7 @@ print(f"Plasmids: {result.plasmid_count}")
 
 ```python
 settings = GenomeValidator.Settings(plasmid_split=True)
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Output files:
 # - reference_genome.fasta (main chromosome)
@@ -58,7 +57,7 @@ print(f"Plasmids: {result.plasmid_filenames}")
 
 ```python
 settings = GenomeValidator.Settings(plasmids_to_one=True)
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Output files:
 # - reference_genome.fasta (chromosome only)
@@ -76,7 +75,7 @@ For files containing only plasmids (no chromosome):
 
 ```python
 settings = GenomeValidator.Settings(is_plasmid=True)
-result = validate_genome(config.plasmid_config, settings)
+result = GenomeValidator(config.plasmid_config, settings).run()
 
 # All sequences treated as plasmids
 # No "main" chromosome selection
@@ -99,7 +98,7 @@ settings = GenomeValidator.Settings(
     replace_id_with='seq'       # Rename sequences
 )
 
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Output:
 # - reference_genome.fasta: seq (chromosome)
@@ -119,7 +118,7 @@ GenomeValidator automatically converts GenBank to FASTA:
 
 ```python
 # Input: genome.gbk (GenBank)
-result = validate_genome(config.ref_genome)
+result = GenomeValidator(config.ref_genome).run()
 # Output: genome.fasta (FASTA)
 ```
 
@@ -140,29 +139,6 @@ DEFINITION  Escherichia coli str. K-12 substr. MG1655, complete genome.
 ```
 >NC_000913 Escherichia coli str. K-12 substr. MG1655, complete genome.
 AGCTTTTCATTCTGACTGCAACGGGCAATATGTCTCTGTGTGGATTAAAAAAAGAGTGT...
-```
-
-### BED → GFF3
-
-FeatureValidator automatically converts BED to GFF3:
-
-```python
-# Input: features.bed
-result = validate_feature(config.ref_feature)
-# Output: features.gff3
-```
-
-**Coordinate Conversion:**
-- BED: 0-based, half-open `[start, end)`
-- GFF: 1-based, closed `[start, end]`
-
-**Example Conversion:**
-```
-# Input BED (0-based):
-chr1  100  200  gene1  500  +
-
-# Output GFF3 (1-based):
-chr1  .  .  101  200  500  +  .  ID=gene1
 ```
 
 ### BAM → FASTQ
@@ -195,7 +171,7 @@ Advanced sequence ID modification and tracking.
 
 ```python
 settings = GenomeValidator.Settings(replace_id_with='chr')
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Input IDs: NC_000913.3, plasmid_pA
 # Output IDs: chr, chr1
@@ -215,7 +191,7 @@ Original IDs are stored in the description field of each sequence record:
 
 ```python
 settings = GenomeValidator.Settings(replace_id_with='chromosome')
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Output FASTA:
 # >chromosome NC_000913.3
@@ -225,23 +201,6 @@ result = validate_genome(config.ref_genome, settings)
 The description field contains the original sequence ID. This information is available in the FASTA output but is not specially formatted with any prefix.
 
 **Use Case:** Standardize IDs while keeping the original identifier visible in the FASTA description.
-
-### Feature Sequence ID Replacement
-
-Replace chromosome names in feature files (strict mode only):
-
-```python
-settings = FeatureValidator.Settings(replace_id_with='chr1')
-result = validate_feature(config.ref_feature, settings)
-
-# Input GFF:
-# NC_000913.3  source  gene  100  200  .  +  .  ID=gene1
-#
-# Output GFF:
-# chr1  source  gene  100  200  .  +  .  ID=gene1
-```
-
-**Note:** The original seqname is not preserved in the output. This operation replaces all values in column 1 and is only applied in strict mode.
 
 ---
 
@@ -265,7 +224,7 @@ ReadValidator detects these patterns:
 ### Access Pattern Information
 
 ```python
-result = validate_read(config.reads[0])
+result = ReadValidator(config.reads[0]).run()
 
 if result.read_number:
     print(f"Paired-end detected:")
@@ -293,7 +252,7 @@ Use inter-file validation to check R1↔R2 matching:
 ```python
 from validation_pkg import readxread_validation, ReadXReadSettings
 
-reads_results = validate_reads(config.reads)
+reads_results = [ReadValidator(rc).run() for rc in config.reads]
 
 settings = ReadXReadSettings(pair_end_basename=True)
 check = readxread_validation(reads_results, settings)
@@ -303,61 +262,6 @@ if check['passed']:
 else:
     print(f"✗ Missing pairs: {check['metadata']['missing_r1']}")
 ```
-
----
-
-## Coordinate System Conversion
-
-BED to GFF coordinate transformation.
-
-### Understanding Coordinate Systems
-
-**BED Format (0-based, half-open):**
-- Start: 0-based index (first position = 0)
-- End: Exclusive (not included in feature)
-- Example: `chr1  100  200` = positions 100-199
-
-**GFF Format (1-based, closed):**
-- Start: 1-based index (first position = 1)
-- End: Inclusive (included in feature)
-- Example: `chr1  source  type  101  200` = positions 101-200
-
-### Automatic Conversion
-
-BED-to-GFF3 conversion is delegated to `gffread`. Manual (fallback) parsing of BED
-is **not supported** — if `gffread` is unavailable, the validator falls back to a
-direct GFF3 parser that cannot read BED format and produces 0 features, which causes
-`FeatureValidationError` to be raised.
-
-The coordinate mapping applied by `gffread` is:
-
-```
-# Input BED:
-chr1  100  200  gene1  500  +
-
-# Conversion applied:
-# BED start (0-based): 100 → GFF start (1-based): 101  (+1)
-# BED end (half-open): 200 → GFF end (closed): 200     (unchanged)
-
-# Output GFF3:
-chr1  .  .  101  200  500  +  .  ID=gene1
-```
-
-The end coordinate stays the same because BED's exclusive end already identifies
-the same last base as GFF3's inclusive end (e.g. BED `100 200` and GFF3 `101 200`
-both cover positions 101–200 in 1-based coordinates).
-
-### Manual Verification
-
-```python
-result = validate_feature(config.ref_feature)
-
-# Input was BED format
-# Output is GFF3 format with corrected coordinates
-print(f"Converted to: {result.output_file}")
-```
-
-**Important:** Always verify coordinate systems when comparing features across tools.
 
 ---
 
@@ -386,7 +290,7 @@ No code changes required:
 ```python
 # Automatically uses pigz if available
 settings = GenomeValidator.Settings(coding_type='gz')
-result = validate_genome(config.ref_genome, settings)
+result = GenomeValidator(config.ref_genome, settings).run()
 
 # Falls back to standard gzip if pigz not found
 ```
@@ -405,7 +309,7 @@ Control compression threads:
 config.options['threads'] = 16
 
 # Compression will use 16 threads
-result = validate_genome(config.ref_genome)
+result = GenomeValidator(config.ref_genome).run()
 ```
 
 ### Compression Comparison
@@ -416,7 +320,7 @@ result = validate_genome(config.ref_genome)
 | **bzip2/pbzip2** | Better | Slower | Archival, space-critical |
 | **None** | - | - | Temporary files, speed |
 
-**Recommendation:** Use `gzip` (pigz) for reads, uncompressed for genomes/features.
+**Recommendation:** Use `gzip` (pigz) for reads, uncompressed for genomes.
 
 ---
 

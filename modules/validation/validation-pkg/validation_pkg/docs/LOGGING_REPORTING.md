@@ -1,11 +1,10 @@
-# Logging and Reporting
+# Logging
 
-Documentation for logging and report generation in the validation_pkg package.
+Documentation for the logging system in the `validation_pkg` package.
 
 ## Table of Contents
 
 - [Logging System](#logging-system)
-- [Validation Reports](#validation-reports)
 - [Log File Structure](#log-file-structure)
 - [Examples](#examples)
 
@@ -139,123 +138,6 @@ timings = logger.get_timers()
 
 ---
 
-## Validation Reports
-
-Generate comprehensive validation reports.
-
-### ValidationReport Class
-
-```python
-from validation_pkg import ValidationReport
-
-# Create report
-report = ValidationReport('./logs/validation_report.txt')
-
-# Add validation results
-report.write(genome_result, 'genome')
-report.write(reads_results, 'read')  # Can be list
-report.write(feature_result, 'feature')
-
-# Add inter-file validation
-report.write(genome_check, 'genomexgenome')
-report.write(read_check, 'readxread')
-
-# Generate report file
-report.flush(format='text')  # or 'json'
-```
-
-### Report Formats
-
-#### Text Format (Default)
-
-Human-readable report with sections:
-
-```python
-report.flush(format='text')
-```
-
-**Output Structure:**
-```
-==================================================================================================
-  VALIDATION PIPELINE REPORT
-==================================================================================================
-  Generated:       2024-12-05 15:30:45
-  Total Duration:  45.23s
-
-SUMMARY
-==================================================================================================
-  Overall Status: ✓ PASSED
-  Files Processed: 5
-    ├─ Genomes:  2
-    ├─ Reads:    2
-    └─ Features: 1
-  Inter-file Validations: 2
-    ├─ Passed:  2 ✓
-
-==================================================================================================
-FILE VALIDATION RESULTS
-==================================================================================================
-
-[1] GENOME FILE
-  Input:  /data/inputs/reference.fasta
-  Output: /data/valid/reference_genome.fasta
-  Time:   12.34s
-
-  Statistics:
-    Sequences: 1
-    Total Length: 4,641,652 bp
-    Sequence IDs: NC_000913.3
-
-...
-```
-
-#### JSON Format
-
-Machine-readable report:
-
-```python
-report.flush(format='json')
-```
-
-**Output Structure:**
-```json
-{
-  "report_metadata": {
-    "generated": "2024-12-05T15:30:45",
-    "duration_seconds": 45.23,
-    "version": "1.0.0"
-  },
-  "summary": {
-    "total_files": 5,
-    "genome_files": 2,
-    "read_files": 2,
-    "feature_files": 1,
-    "overall_status": "PASSED"
-  },
-  "file_validations": [
-    {
-      "validator_type": "genome",
-      "output_data": {...},
-      "input_settings": {...}
-    }
-  ],
-  "inter_file_validations": [...]
-}
-```
-
-### Auto-Incrementing Reports
-
-Reports auto-increment if file exists:
-
-```python
-# First run: validation_report.txt
-# Second run: validation_report_1.txt
-# Third run: validation_report_2.txt
-report = ValidationReport('./logs/validation_report.txt')
-```
-
----
-
 ## Log File Structure
 
 ### Log File Location
@@ -286,20 +168,9 @@ Each log entry includes:
 2024-12-05 15:30:55 [ERROR   ] [feature] Validation failed: Invalid coordinates
 ```
 
-### Log File Rotation
+### Log File Auto-Increment
 
-For long-running processes, implement log rotation:
-
-```python
-from pathlib import Path
-from datetime import datetime
-
-# Create timestamped log file
-timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-log_file = Path(f'./logs/validation_{timestamp}.log')
-
-setup_logging(log_file=log_file)
-```
+If `validation.log` already exists, a new run creates `validation_001.log`, `validation_002.log`, etc. — previous logs are never overwritten.
 
 ---
 
@@ -308,7 +179,7 @@ setup_logging(log_file=log_file)
 ### Example 1: Basic Logging
 
 ```python
-from validation_pkg import setup_logging, get_logger, ConfigManager, validate_genome
+from validation_pkg import setup_logging, get_logger, ConfigManager, GenomeValidator
 
 # Setup logging
 setup_logging(
@@ -325,7 +196,7 @@ try:
     config = ConfigManager.load("config.json")
     logger.info(f"Loaded config with {len(config.reads)} read files")
 
-    result = validate_genome(config.ref_genome)
+    result = GenomeValidator(config.ref_genome).run()
     logger.info(f"✓ Validated {result.num_sequences} sequences")
 
 except Exception as e:
@@ -333,61 +204,10 @@ except Exception as e:
     raise
 ```
 
-### Example 2: Complete Workflow with Report
+### Example 2: Debug Mode with Timing
 
 ```python
-from validation_pkg import (
-    setup_logging,
-    get_logger,
-    ConfigManager,
-    validate_genome,
-    validate_reads,
-    genomexgenome_validation,
-    ValidationReport
-)
-
-# Setup
-setup_logging(console_level='INFO', log_file='./logs/validation.log')
-logger = get_logger()
-
-# Create report
-report = ValidationReport('./logs/validation_report.txt')
-
-# Load config
-logger.info("Loading configuration...")
-config = ConfigManager.load("config.json")
-
-# Validate genomes
-logger.info("Validating genomes...")
-ref_result = validate_genome(config.ref_genome)
-mod_result = validate_genome(config.mod_genome)
-report.write(ref_result, 'genome')
-report.write(mod_result, 'genome')
-
-# Validate reads
-logger.info("Validating reads...")
-reads_results = validate_reads(config.reads)
-report.write(reads_results, 'read')
-
-# Inter-file validation
-logger.info("Running inter-file validation...")
-genome_check = genomexgenome_validation(ref_result, mod_result)
-report.write(genome_check, 'genomexgenome')
-
-if genome_check['passed']:
-    logger.info("✓ All validations passed")
-else:
-    logger.warning("⚠ Some validations failed")
-
-# Generate report
-report.flush(format='text')
-logger.info(f"Report written to: {report.report_path}")
-```
-
-### Example 3: Debug Mode with Timing
-
-```python
-from validation_pkg import setup_logging, get_logger, validate_genome
+from validation_pkg import setup_logging, get_logger, GenomeValidator
 
 # Enable debug logging
 setup_logging(console_level='DEBUG', log_file='./logs/debug.log')
@@ -396,7 +216,7 @@ logger = get_logger()
 # Time validation
 logger.start_timer('genome_validation')
 
-result = validate_genome(config.ref_genome)
+result = GenomeValidator(config.ref_genome).run()
 
 elapsed = logger.stop_timer('genome_validation')
 logger.info(f"Validation completed in {elapsed:.2f}s")
@@ -406,7 +226,7 @@ for name, time in logger.get_timers().items():
     logger.debug(f"{name}: {time:.2f}s")
 ```
 
-### Example 4: Custom Validation Issues
+### Example 3: Custom Validation Issues
 
 ```python
 from validation_pkg import get_logger
@@ -426,19 +246,8 @@ def validate_custom_rules(genome_result):
             }
         )
 
-    if genome_result.gc_content < 30 or genome_result.gc_content > 70:
-        logger.add_validation_issue(
-            level='WARNING',
-            category='genome',
-            message='GC content outside typical range',
-            details={
-                'gc_content': genome_result.gc_content,
-                'normal_range': '30-70%'
-            }
-        )
-
 # Run custom validation
-result = validate_genome(config.ref_genome)
+result = GenomeValidator(config.ref_genome).run()
 validate_custom_rules(result)
 
 # Review issues
@@ -449,31 +258,9 @@ if issues:
         logger.warning(f"{issue['category']}: {issue['message']}")
 ```
 
-### Example 5: Multi-Format Reports
-
-```python
-from validation_pkg import ValidationReport
-
-report = ValidationReport('./logs/validation_report.txt')
-
-# Add all results
-report.write(ref_result, 'genome')
-report.write(mod_result, 'genome')
-report.write(reads_results, 'read')
-
-# Generate both text and JSON
-report.flush(format='text')  # Creates validation_report.txt
-report.flush(format='json')  # Creates validation_report.json
-
-print("Reports generated:")
-print(f"  Text: {report.report_path}")
-print(f"  JSON: {report.report_path.with_suffix('.json')}")
-```
-
 ---
 
 ## See Also
 
 - [API_REFERENCE.md](API_REFERENCE.md) - API documentation
 - [ERROR_HANDLING.md](ERROR_HANDLING.md) - Exception handling
-- [EXAMPLES.md](EXAMPLES.md) - Complete examples

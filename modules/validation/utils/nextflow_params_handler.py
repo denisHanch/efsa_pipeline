@@ -117,7 +117,6 @@ def build_params(
           mod_genome    – GenomeOutputMetadata or None
           genomexgenome – dict with 'contig_files' key (from genomexgenome_validation), or None
           reads         – List[ReadOutputMetadata], each with a .ngs_type attribute
-          ref_feature   – FeatureOutputMetadata or None
     Returns
     -------
     NextflowParams

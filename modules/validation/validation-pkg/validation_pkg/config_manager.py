@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any, Type, TypeVar
 from dataclasses import dataclass
 
-from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, FeatureFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType
+from validation_pkg.utils.formats import CodingType, GenomeFormat, ReadFormat, OrganismType, ValidationLevel, LoggingLevel, NgsType
 from validation_pkg.utils import file_handler, path_utils
 from validation_pkg.utils.logger import get_logger
 from validation_pkg.exceptions import (
@@ -23,8 +23,6 @@ ALLOWED_GLOBAL_OPTIONS = {'threads', 'validation_level', 'logging_level', 'type'
 # Only these fields can be overridden at the file level
 ALLOWED_FILE_OPTIONS = {'threads', 'validation_level'}
 MAX_RECOMMENDED_THREADS = 16
-
-# Default thread count when not specified in config
 DEFAULT_THREADS = 8
 
 
@@ -84,16 +82,6 @@ class ReadConfig(BaseValidatorConfig):
         self._extract_basename()
 
 
-@dataclass
-class FeatureConfig(BaseValidatorConfig):
-    """Configuration for feature annotation files."""
-    detected_format: FeatureFormat = None
-
-    def __post_init__(self):
-        self._initialize_defaults()
-        self._extract_basename()
-
-
 class Config:
     """Main configuration container for validation workflow."""
 
@@ -106,7 +94,6 @@ class Config:
         self.mod_genome: Optional[GenomeConfig] = None
         self.ref_plasmid: Optional[GenomeConfig] = None
         self.mod_plasmid: Optional[GenomeConfig] = None
-        self.ref_feature: Optional[FeatureConfig] = None
         self.options: Dict[str, Any] = {}
 
         # Internal fields
@@ -152,8 +139,6 @@ class Config:
             parts.append(f"  ref_plasmid={self.ref_plasmid.filename}")
         if self.mod_plasmid:
             parts.append(f"  mod_plasmid={self.mod_plasmid.filename}")
-        if self.ref_feature:
-            parts.append(f"  ref_feature={self.ref_feature.filename}")
 
         # Options
         if self.options:
@@ -219,8 +204,6 @@ class ConfigManager:
             ConfigManager._parse_genome_configs(data, config)
             logger.debug("Parsing reads configurations...")
             ConfigManager._parse_reads_configs(data, config)
-            logger.debug("Parsing feature configurations...")
-            ConfigManager._parse_feature_configs(data, config)
 
             logger.info("✓ Configuration loaded and validated successfully")
             return config
@@ -459,27 +442,6 @@ class ConfigManager:
             format_class=ReadFormat,
             global_options=global_options,
             extra_fields={'ngs_type': ngs_type}
-        )
-
-    @staticmethod
-    def _parse_feature_configs(data: dict, config: Config):
-        """Parse feature configurations (internal method)."""
-        if 'ref_feature_filename' in data and data['ref_feature_filename']:
-            config.ref_feature = ConfigManager._parse_feature_config(
-                data['ref_feature_filename'], 'ref_feature_filename', config.config_dir, config.output_dir, config.options
-            )
-
-    @staticmethod
-    def _parse_feature_config(value: Any, field_name: str, config_dir: Path, output_dir : Path, global_options: Dict[str, Any] = None) -> FeatureConfig:
-        """Parse a single feature config entry and resolve paths."""
-        return ConfigManager._parse_file_config(
-            value=value,
-            field_name=field_name,
-            config_dir=config_dir,
-            output_dir=output_dir,
-            config_class=FeatureConfig,
-            format_class=FeatureFormat,
-            global_options=global_options
         )
 
     @staticmethod
