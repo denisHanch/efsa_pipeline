@@ -30,11 +30,11 @@ SHORT-READ VARIANT TYPE CONVENTIONS (from delly):
   The code correctly handles all these conventions by:
   - Preserving start and end as reported
   - Using svlen for event_length_bp calculation (not end-start)
-  - Clustering by position proximity with configurable tolerance
+  - Clustering by type-aware interval/proximity rules with configurable tolerance
 
-Events are clustered by (chrom, standardized_svtype) using interval overlap with an optional tolerance (bp),
-PLUS breakpoint proximity (start or end must be within tol bp). This avoids merging very large calls with
-many unrelated smaller calls.
+Events are clustered by (chrom, standardized_svtype). Deletions are consolidated when their
+intervals overlap or touch within the configured tolerance, even if neither breakpoint is nearby.
+Other SV types keep the conservative legacy rule: interval overlap plus nearby start or end breakpoint.
 
 Within each event, at most one record per source is chosen (best by supporting_reads then score).
 
@@ -581,20 +581,52 @@ class EventCluster:
 
 # Clustering
 
+def intervals_overlap_or_touch(a_start: int, a_end: int, b_start: int, b_end: int, tol: int) -> bool:
+    """Return True when two intervals overlap or are separated by at most ``tol`` bp."""
+    return (b_start <= a_end + tol) and (b_end >= a_start - tol)
+
+
 def intervals_overlap(a_start: int, a_end: int, b_start: int, b_end: int, tol: int) -> bool:
-    """Check if two intervals overlap or are close enough to cluster together.
-    
-    Works correctly for all variant types:
-    - Interval variants (DEL, DUP, INV): real intervals with start < end
-    - Point variants (INS): start == end at insertion point
-    - Breakpoint variants (TRA): start == end at breakpoint
-    
-    For point variants, the condition simplifies correctly since start == end.
+    """Conservative legacy clustering rule for non-deletion SV types.
+
+    The intervals must overlap or touch within ``tol`` and at least one
+    breakpoint pair must also be within ``tol``. This avoids merging large
+    non-deletion calls with unrelated smaller calls.
     """
-    overlap = (b_start <= a_end + tol) and (b_end >= a_start - tol)
-    if not overlap:
+    if not intervals_overlap_or_touch(a_start, a_end, b_start, b_end, tol):
         return False
     return abs(a_start - b_start) <= tol or abs(a_end - b_end) <= tol
+
+
+def deletion_intervals_overlap(a_start: int, a_end: int, b_start: int, b_end: int, tol: int) -> bool:
+    """Deletion-specific clustering rule: interval overlap/touch is enough.
+
+    Deletions describe removed sequence spans, and exact breakpoints can shift
+    between callers or alignments. Nested/overlapping deletion calls therefore
+    consolidate when their intervals overlap or touch within tolerance, even
+    when neither endpoint is close; for example, 100-1000 and 450-550 are
+    treated as one deletion event.
+    """
+    return intervals_overlap_or_touch(a_start, a_end, b_start, b_end, tol)
+
+
+def _interval_overlap_percentage(a_start: int, a_end: int, b_start: int, b_end: int) -> float:
+    overlap_len = max(0, min(a_end, b_end) - max(a_start, b_start) + 1)
+    len_a = a_end - a_start + 1
+    len_b = b_end - b_start + 1
+    denom = max(len_a, len_b) if max(len_a, len_b) > 0 else 1
+    return (overlap_len / denom) * 100 if denom else 0.0
+
+
+def _record_clusters_with_current_deletion_span(
+    current_start: int,
+    current_end: int,
+    record: Record,
+    tol: int,
+) -> bool:
+    """Return True when a deletion record should merge into the current deletion cluster."""
+    return deletion_intervals_overlap(current_start, current_end, record.start, record.end, tol)
+
 
 def cluster_records(records: List[Record], tol: int) -> List[EventCluster]:
     clusters = []
@@ -606,38 +638,46 @@ def cluster_records(records: List[Record], tol: int) -> List[EventCluster]:
     for (chrom, std_type), recs in key_to_recs.items():
         recs = sorted(recs, key=lambda r: (r.start, r.end))
         cur = [recs[0]]
+        cur_start = recs[0].start
+        cur_end = recs[0].end
         cur_percs: List[float] = []
 
         for r in recs[1:]:
             last = cur[-1]
-            if intervals_overlap(last.start, last.end, r.start, r.end, tol):
-                overlap_len = max(0, min(last.end, r.end) - max(last.start, r.start) + 1)
-                len_last = last.end - last.start + 1
-                len_r = r.end - r.start + 1
-                denom = max(len_last, len_r) if max(len_last, len_r) > 0 else 1
-                pct = (overlap_len / denom) * 100 if denom else 0.0
+            if std_type == "DEL":
+                should_merge = _record_clusters_with_current_deletion_span(cur_start, cur_end, r, tol)
+                pct = _interval_overlap_percentage(cur_start, cur_end, r.start, r.end)
+            else:
+                should_merge = intervals_overlap(last.start, last.end, r.start, r.end, tol)
+                pct = _interval_overlap_percentage(last.start, last.end, r.start, r.end)
+
+            if should_merge:
                 cur.append(r)
                 cur_percs.append(pct)
+                cur_start = min(cur_start, r.start)
+                cur_end = max(cur_end, r.end)
             else:
                 clusters.append(
                     EventCluster(
                         chrom,
                         std_type,
-                        min(x.start for x in cur),
-                        max(x.end for x in cur),
+                        cur_start,
+                        cur_end,
                         cur,
                         percentage_overlaps=cur_percs,
                     )
                 )
                 cur = [r]
+                cur_start = r.start
+                cur_end = r.end
                 cur_percs = []
 
         clusters.append(
             EventCluster(
                 chrom,
                 std_type,
-                min(x.start for x in cur),
-                max(x.end for x in cur),
+                cur_start,
+                cur_end,
                 cur,
                 percentage_overlaps=cur_percs,
             )
