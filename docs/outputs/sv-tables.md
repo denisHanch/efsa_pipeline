@@ -28,6 +28,7 @@ flowchart LR
 - `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
 - Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
+- Deletion clustering is interval-based: same-chromosome `DEL` calls merge when their intervals overlap or touch within `--tol`, even when neither breakpoint is nearby. Other SV types keep the more conservative breakpoint-proximity rule.
 - `linked_event` is the only relationship column in the final CSVs. It includes both same-type and cross-type overlaps.
 - Final event anchoring is deterministic and size-aware: `event_length_bp` uses minimum absolute `svlen`, and event coordinates are anchored to the same selected source call. Equal-length ties are resolved by strongest intersection with the other source calls.
 - Likely artifact rows can be filtered before clustering when the source TSV provides contig length: by default, events larger than 50% of their contig are removed.
@@ -146,25 +147,35 @@ During normal Nextflow runs, genome-size context is supplied automatically from 
 | `--long_pacbio` | TSV file containing structural variant summary from PacBio long-read data. Optional. |
 | `--short` | TSV file containing structural variant summary from short-read sequencing data. Optional. |
 | `--out` | Output directory for the per-SV CSV files. Required. |
-| `--tol` | Within-type clustering tolerance in base pairs. Determines whether raw SV calls get merged into the same event. Default: `10`. |
+| `--tol` | Within-type clustering tolerance in base pairs. For `DEL`, intervals that overlap or touch within this distance are merged. For other SV types, intervals must overlap/touch and have a nearby start or end breakpoint. Default: `10`. |
 | `--cross_type_tol` | Tolerance in base pairs for linking final events with near-identical coordinates in `linked_event`. Default: `0`, which keeps overlap-only linking. |
 | `--max_event_contig_fraction` | Filters source rows whose event length is greater than this fraction of the row's contig length. Default: `0.5` (50%). Set to `0` to disable. Rows without a supported contig-length column are retained. |
 
 ### Artifact filtering and known limitations
 
-As per EFSA request, a few events for filtering out has been created. Those filters are used to remove incorrect events (artifacts) or consolidate overlapping events into single, unique event. Currently handled artifact categories:
+As per EFSA request, filtering and consolidation rules are used to remove likely incorrect events (artifacts) or consolidate overlapping calls into a single event when the current TSV columns support doing so safely.
+
+Currently handled artifact categories:
 
 - **Too-large source events:** before clustering, a source row is removed when `abs(svlen) > contig_length * --max_event_contig_fraction`. The default threshold is `0.5`. Supported optional contig-length column names include `contig_length_bp`, `contig_length`, `contig_size_bp`, `contig_size`, `chrom_length_bp`, `chrom_length`, `chrom_size_bp`, `chrom_size`, `chromosome_length_bp`, `chromosome_length`, `chromosome_size_bp`, `chromosome_size`, `sequence_length_bp`, `sequence_length`, `ref_contig_length_bp`, `ref_contig_length`, `ref_chrom_length_bp`, and `ref_chrom_length`.
 - **Rows without contig length:** retained deliberately and counted in the structured log as unevaluated by the too-large-event filter. The script does not guess contig size from total genome size or observed coordinates.
+- **Overlapping same-type deletions:** after loading and too-large-event filtering, same-chromosome `DEL` calls are consolidated when their intervals overlap or touch within `--tol`, even if neither breakpoint is close. This handles nested deletion-inside-deletion calls and shifted deletion boundaries as one event when they are represented as overlapping deletion intervals.
+- **Conservative clustering for non-deletion SV types:** `DUP`, `INS`, `INV`, `RPL`, and `TRA` records still require interval overlap/touch plus a nearby start or end breakpoint. This avoids broad, fragile merges for SV classes where interval overlap alone is less reliable.
 - **Malformed source rows:** rows missing required fields or valid coordinates are skipped during loading.
 - **Normalization artifacts:** reversed coordinates are swapped; signed or inconsistent `svlen` values are normalized for interval SV classes (`DEL`, `DUP`, `INV`, `RPL`) before filtering and output.
-- **Nested/overlapping final events:** not filtered automatically, but reported through `linked_event` relations such as `nested_in`, `contains`, `overlap`, and `exact_coordinates`.
+- **Overlapping final events:** final rows that still overlap, including cross-type overlaps, are reported through `linked_event` relations such as `nested_in`, `contains`, `overlap`, and `exact_coordinates`.
+
+Deletion clustering recommendation implemented here:
+
+- A deletion is treated as an interval event, so overlap is more informative than exact breakpoint agreement. For example, `DEL A: 100-1000` and `DEL B: 450-550` are consolidated because the second deletion is fully inside the first, even though neither breakpoint is close.
+- The current rule also merges deletions with only a small edge overlap, such as DEL A: 100-1000 and DEL B: 995-1500. This permissive behavior can help reconcile imprecise breakpoints in noisy or repetitive regions, but it may also incorrectly consolidate distinct nearby deletions. 
+- A future refinement could require a minimum overlap fraction before merging such calls.
 
 Known unresolved or only partially resolved artifact categories:
 
 - **Deletion plus substitution double-calls from non-clean deletion boundaries:** not collapsed automatically because the final table builder does not read BAM/IGV evidence or base-level alignment context.
 - **Substitution events duplicated as deletion/insertion calls:** not safely filtered from the current columns alone; these are exposed only through coordinate/type relationships when they overlap.
-- **Deletion-inside-deletion artifacts:** not removed automatically. Nested relationships are annotated in `linked_event` for review, but the script avoids deleting nested calls without stronger evidence.
+- **Cross-type or biologically ambiguous nested artifacts:** same-type overlapping `DEL` calls are consolidated, but nested calls involving different standardized SV types are not removed automatically. They remain visible through `linked_event` for review.
 - **Coverage/visual-review artifacts:** no BAM- or IGV-derived artifact logic is applied in `create_sv_output.py`; only fields already present in the TSV inputs are used.
 
 ### Explanation of `csv_per_sv_summary` CSV columns
@@ -203,7 +214,7 @@ The examples below use simplified coordinates for clarity.
 | `DEL_2` at `chr1:23-67` | `RPL_1 (RPL, chr1:23-67, exact_coordinates)` | The linked event has exactly the same coordinates as the current event. |
 | `DEL_2` at `chr1:23-67` | `INV_1 (INV, chr1:10-90, nested_in)` | The current event is fully inside the linked event interval. |
 | `RPL_1` at `chr1:10-90` | `DEL_2 (DEL, chr1:23-67, contains)` | The current event fully contains the linked event interval. |
-| `DEL_2` at `chr1:23-67` | `DEL_3 (DEL, chr1:60-100, overlap)` | The two events partially overlap, but neither fully contains the other. |
+| `DEL_2` at `chr1:23-67` | `RPL_2 (RPL, chr1:60-100, overlap)` | The two events partially overlap, but neither fully contains the other. Same-type overlapping deletions are usually consolidated before this final linking step. |
 | `DEL_2` at `chr1:23-67` with `--cross_type_tol 5` | `RPL_2 (RPL, chr1:25-69, same_coordinates_within_5bp)` | The events do not overlap exactly, but their start and end coordinates are both within the specified tolerance. |
 
 ### Additional pipeline-specific columns
@@ -295,10 +306,12 @@ The `create_sv_output.py` script processes SV records through the following step
 
 2. **Filter supported too-large source events** before clustering. A row is removed only when both event length and contig length are available and `abs(svlen)` exceeds `contig_length * --max_event_contig_fraction`.
 
-3. **Cluster records by (chromosome, standardized SV type)** using interval overlap with a tolerance window (`--tol`, default 10 bp). Records are considered part of the same event if:
+3. **Cluster records by (chromosome, standardized SV type)** using type-aware interval rules with a tolerance window (`--tol`, default 10 bp). Records are considered part of the same event if:
    - They share the same chromosome and standardized SV type
-   - Their intervals overlap (accounting for tolerance)
-   - At least one of the breakpoints (start or end) is within tolerance between members
+   - For `DEL`: their intervals overlap or touch within `--tol`; nearby breakpoints are not required
+   - For non-`DEL` types: their intervals overlap or touch within `--tol`, and at least one breakpoint pair (start or end) is within `--tol`
+   - Example recommended merge: `DEL 100-1000` plus `DEL 450-550` becomes one deletion event because the smaller interval is inside the larger one even though neither breakpoint is close.
+   - Known caveat: `DEL 100-1000` plus `DEL 995-1500` also merges because the intervals overlap. This can be aggressive; if real data shows over-merging, add a minimum overlap-fraction threshold as a future refinement.
 
 4. **Select best representative per source** within each cluster using a ranking strategy:
    - Rank 1: Supporting reads / evidence count (higher is better)
