@@ -2,6 +2,8 @@
 
 This guide shows you how to run the EFSA Pipeline in a Docker container with access to input/output folders.
 
+This container is the pipeline runtime environment built from the root `Dockerfile`. Individual bioinformatics and validation steps still run in their own pinned tool images through Nextflow, as configured in `nextflow.config`.
+
 ## Prerequisites
 
 - Docker installed on your system

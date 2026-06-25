@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import IO, Any, Type, Optional
+from typing import IO, Any, ClassVar, Type, Optional
 
 from validation_pkg.utils.logger import get_logger
 from validation_pkg.utils.base_settings import BaseSettings
@@ -205,31 +205,15 @@ class BaseValidator(ABC):
 
         return copy_file(self.input_path, self.output_path, self.logger)
 
-    # ===== Abstract Properties and Methods =====
+    # ===== Class variables (subclasses must define these) =====
 
-    @property
-    @abstractmethod
-    def _validator_type(self) -> str:
-        """Return validator type string."""
-        pass
+    # Subclasses must set these as class attributes, e.g.: _validator_type = 'genome'
+    _validator_type: ClassVar[str]
+    OutputMetadata: ClassVar[Type]
+    _output_format: ClassVar[str]
+    _expected_format: ClassVar[Any]
 
-    @property
-    @abstractmethod
-    def OutputMetadata(self) -> Type:
-        """Return OutputMetadata class for this validator."""
-        pass
-
-    @property
-    @abstractmethod
-    def _output_format(self) -> str:
-        """Return output format string for build_output_path."""
-        pass
-
-    @property
-    @abstractmethod
-    def _expected_format(self) -> Any:
-        """Return expected format for minimal mode validation."""
-        pass
+    # ===== Abstract Methods =====
 
     @abstractmethod
     def _get_validator_exception(self) -> Type[Exception]:

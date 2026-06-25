@@ -8,7 +8,6 @@ Complete reference for all validator settings in the validation_pkg package.
 - [Global Options](#global-options)
 - [GenomeValidator Settings](#genomevalidator-settings)
 - [ReadValidator Settings](#readvalidator-settings)
-- [FeatureValidator Settings](#featurevalidator-settings)
 - [Settings Inheritance](#settings-inheritance)
 - [Performance Impact](#performance-impact)
 
@@ -105,7 +104,6 @@ Validation thoroughness level.
 **Behavior by Validator:**
 - **Genome**: See [GenomeValidator Settings](#genomevalidator-settings)
 - **Read**: See [ReadValidator Settings](#readvalidator-settings)
-- **Feature**: See [FeatureValidator Settings](#featurevalidator-settings)
 
 ### `logging_level`
 
@@ -168,7 +166,7 @@ Validation thoroughness (overrides global option if set).
 - Parse all sequences with BioPython
 - Validate all sequence IDs (no duplicates, no empty IDs)
 - Check for empty sequences
-- Calculate statistics (GC content, N50, total size)
+- Calculate total genome size
 - Apply all edits
 
 **Trust Mode:**
@@ -435,7 +433,7 @@ settings = ReadValidator.Settings()
 # Custom settings
 settings = ReadValidator.Settings(
     validation_level='trust',
-    check_invalid_chars=False
+    allow_empty_id=True
 )
 ```
 
@@ -452,14 +450,10 @@ Validation thoroughness.
 **Strict Mode:**
 - Parse all reads with BioPython
 - Validate all read IDs and sequences
-- Check for invalid characters (if enabled)
-- Calculate statistics (N50, total bases, length distribution)
 - Output: gzip compressed FASTQ
 
 **Trust Mode:**
-- Parse all reads (fast line counting)
 - Validate only first 10 reads
-- Count total reads
 - Output: gzip compressed FASTQ
 - ~10-15x faster than strict
 
@@ -468,23 +462,6 @@ Validation thoroughness.
 - Copy and compress file
 - Requires FASTQ input
 - ~100x+ faster than strict
-
-#### `check_invalid_chars`
-
-Check for invalid characters in read sequences.
-
-**Type:** `bool`
-**Default:** `False`
-
-**Valid Characters:** A, T, C, G, N (case-insensitive)
-
-**Example:**
-```python
-# Enable character checking
-settings = ReadValidator.Settings(check_invalid_chars=True)
-```
-
-**Performance Impact:** Moderate (5-10% slower when enabled in strict mode)
 
 #### `allow_empty_id`
 
@@ -555,144 +532,7 @@ Automatically create a subdirectory named after the NGS type.
 settings = ReadValidator.Settings(outdir_by_ngs_type=True)
 # Output: {output_dir}/illumina/reads.fastq.gz
 #         {output_dir}/ont/reads.fastq.gz
-```
-
----
-
-## FeatureValidator Settings
-
-Settings for `FeatureValidator` class.
-
-### Creating Settings
-
-```python
-from validation_pkg import FeatureValidator
-
-# Default settings
-settings = FeatureValidator.Settings()
-
-# Custom settings
-settings = FeatureValidator.Settings(
-    sort_by_position=True,
-    replace_id_with='chr1'
-)
-```
-
-### Validation Options
-
-#### `validation_level`
-
-Validation thoroughness.
-
-**Type:** `str`
-**Default:** Inherited from global options or `"strict"`
-**Options:** `"strict"`, `"trust"`, `"minimal"`
-
-**Strict Mode:**
-- Parse all features via gffread (validates syntax, coordinates, structure)
-- Apply Python edits (sorting, ID replacement)
-- Convert to GFF3 format
-
-**Trust Mode:**
-- Parse all features via gffread (same validation as strict)
-- Skip Python edits (no sorting or ID replacement)
-- Similar speed to strict (gffread runs in both modes)
-
-**Minimal Mode:**
-- No parsing/validation (gffread not used)
-- Direct file copy
-- Requires GFF format input
-
-#### `sort_by_position`
-
-Sort features by genomic position.
-
-**Type:** `bool`
-**Default:** `True`
-
-**Sort Order:** seqname → start → end
-
-**Example:**
-```python
-settings = FeatureValidator.Settings(sort_by_position=True)
-```
-
-**Use Case:** Required by many downstream tools (e.g., tabix, bedtools).
-
-#### `check_coordinates`
-
-Enable Python-level coordinate validation after parsing.
-
-**Type:** `bool`
-**Default:** `True`
-
-When `True`, each parsed feature is checked for `start >= 1` and `start <= end`. In **strict** mode all features are validated (in parallel when `threads > 1` and ≥ 1 000 features are present); in **trust** mode only the first 10 features are validated. Issues are logged as `WARNING` validation events and do not stop processing.
-
-### Editing Options
-
-#### `replace_id_with`
-
-Replace sequence IDs (column 1) for all features.
-
-**Type:** `str` or `None`
-**Default:** `None` (no replacement)
-
-**Behavior:**
-- All features get the same sequence ID in column 1
-- Only applied in strict mode
-- Original sequence IDs are not preserved
-
-**Example:**
-```python
-settings = FeatureValidator.Settings(replace_id_with='chr1')
-
-# Input GFF:
-# NC_000913.3  source  gene  100  200  .  +  .  ID=gene1
-#
-# Output GFF:
-# chr1  source  gene  100  200  .  +  .  ID=gene1
-```
-
-### Output Format
-
-#### `coding_type`
-
-Output compression format.
-
-**Type:** `str` or `None`
-**Default:** `None` (uncompressed)
-**Options:** `"gz"`, `"bz2"`, `None`
-
-**Example:**
-```python
-settings = FeatureValidator.Settings(coding_type='gz')
-```
-
-#### `output_filename_suffix`
-
-Add suffix to output filename.
-
-**Type:** `str` or `None`
-**Default:** `None`
-
-**Example:**
-```python
-settings = FeatureValidator.Settings(output_filename_suffix='_sorted')
-# Input: features.gff
-# Output: features_sorted.gff3
-```
-
-#### `output_subdir_name`
-
-Create subdirectory for output files.
-
-**Type:** `str` or `None`
-**Default:** `None`
-
-**Example:**
-```python
-settings = FeatureValidator.Settings(output_subdir_name='annotations')
-# Output: {output_dir}/annotations/features.gff3
+#         {output_dir}/pacbio/reads.fastq.gz  # both pacbio-hifi and pacbio-clr
 ```
 
 ---
@@ -751,7 +591,6 @@ WARNING: File-level option 'validation_level=strict' overrides
 |-----------|--------|-------|---------|
 | **Genome** | 1x | ~10x faster (first seq only) | 100x+ faster |
 | **Read** | 1x | ~10x faster (first 10 reads) | 100x+ faster |
-| **Feature** | 1x | Similar (gffread, no Python edits) | 100x+ faster |
 
 ### Threading Performance
 
@@ -775,8 +614,6 @@ Threading mainly benefits compression:
 
 | Option | Performance Impact | Notes |
 |--------|-------------------|-------|
-| `check_invalid_chars=False` | 5-10% faster | Reads only |
-| `sort_by_position=False` | 10-20% faster | Features only |
 | `plasmid_split=True` | 5-10% slower | Genomes only (extra I/O) |
 | `min_sequence_length>0` | Negligible | Filtering is fast |
 | `replace_id_with` | Negligible | String replacement is fast |

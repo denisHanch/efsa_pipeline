@@ -1,8 +1,8 @@
 """Read file validator and processor for FASTQ and BAM formats."""
 
 from pathlib import Path
-from typing import Optional, List, Union, Dict, Any, Type
-from dataclasses import dataclass, asdict
+from typing import Optional, Any, Type
+from dataclasses import dataclass
 from Bio import SeqIO
 import shutil
 from multiprocessing import Pool
@@ -23,8 +23,6 @@ from validation_pkg.utils.file_handler import (
     open_compressed_writer
 )
 from validation_pkg.utils.file_handler import copy_file
-from validation_pkg.utils.sequence_stats import calculate_n50
-from collections import Counter
 from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
 
 
@@ -64,7 +62,7 @@ ILLUMINA_PAIRED_END_PATTERNS = [
 ]
 
 # Standalone function for parallel processing (must be picklable - defined at module level)
-def _validate_single_read(record, check_invalid_chars: bool, allow_empty_id: bool):
+def _validate_single_read(record, allow_empty_id: bool):
     """Validate a single read record (parallelizable)."""
     # Check empty ID
     if not record.id and not allow_empty_id:
@@ -73,23 +71,6 @@ def _validate_single_read(record, check_invalid_chars: bool, allow_empty_id: boo
             'record_id': None,
             'details': {'sequence_index': None}  # Index will be added by caller
         }
-
-    # Check invalid characters
-    if check_invalid_chars:
-        valid_chars = set('ATCGNatcgn')
-        seq_str = str(record.seq)
-        invalid_chars = set(seq_str) - valid_chars
-
-        if invalid_chars:
-            char_count = sum(1 for c in seq_str if c in invalid_chars)
-            return {
-                'error': f"Contains {char_count} invalid character(s): {', '.join(sorted(invalid_chars))}",
-                'record_id': record.id,
-                'details': {
-                    'invalid_chars': list(invalid_chars),
-                    'count': char_count
-                }
-            }
 
     return {'success': True, 'record_id': record.id}
 
@@ -103,90 +84,6 @@ class ReadOutputMetadata(BaseOutputMetadata):
     ngs_type: str = None      # Configured NGS type from config (pacbio, illumina, ont, etc.)
     input_format: str = None  # Detected input format: "fastq" or "bam"
     illumina_pairing_detected: str = None  # "illumina" if Illumina paired-end pattern detected
-    num_reads: int = None
-
-    # Strict mode statistics
-    n50: int = None
-    total_bases: int = None
-    mean_read_length: float = None
-    longest_read_length: int = None
-    shortest_read_length: int = None
-
-    def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
-        """Format read-specific statistics for report output."""
-        lines = []
-
-        # Helper to check if key has value
-        def has_value(key):
-            data = self.to_dict()
-            return key in data and data[key] is not None
-
-        # Helper to format values
-        def format_value(value):
-            if isinstance(value, float):
-                return f"{value:.2f}"
-            elif isinstance(value, int) and value > 999:
-                return f"{value:,}"
-            return str(value)
-
-        # Iterate through all fields, skipping common ones
-        skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
-        special_fields = {'base_name', 'read_number', 'illumina_pairing_detected', 'longest_read_length', 'shortest_read_length'}
-
-        data = self.to_dict()
-
-        for key, value in data.items():
-            if key in skip_fields or value is None:
-                continue
-
-            # Special handling for specific fields
-            if key == 'base_name' and has_value('read_number'):
-                lines.append(f"{indent}paired_end: R{data['read_number']} (base: {value})")
-            elif key == 'read_number' and not has_value('base_name'):
-                # Only show if base_name wasn't already handled
-                lines.append(f"{indent}{key}: R{value}")
-            elif key == 'illumina_pairing_detected':
-                # Show Illumina pairing detection status
-                if value == 'illumina':
-                    lines.append(f"{indent}illumina_pairing_detected: yes")
-            elif key == 'longest_read_length' and has_value('shortest_read_length'):
-                # Show length range
-                lines.append(f"{indent}length_range: {data['shortest_read_length']:,} - {value:,} bp")
-            elif key == 'shortest_read_length':
-                # Skip, handled with longest_read_length
-                continue
-            elif key not in special_fields:
-                # Generic field formatting
-                formatted_value = format_value(value)
-                lines.append(f"{indent}{key}: {formatted_value}")
-
-        return lines
-
-    def __str__(self):
-        parts = [f"Validation Level: {self.validation_level or 'N/A'}"]
-        parts.append(f"Output File: {self.output_file or 'N/A'}")
-        parts.append(f"Output Filename: {self.output_filename or 'N/A'}")
-
-        # Add Illumina pattern info if available
-        if self.base_name or self.read_number or self.ngs_type or self.illumina_pairing_detected or self.num_reads is not None:
-            parts.append("\n--- Pattern & Read Info ---")
-            parts.append(f"NGS Type: {self.ngs_type or 'N/A'}")
-            parts.append(f"Base Name: {self.base_name or 'N/A'}")
-            parts.append(f"Read Number: {self.read_number if self.read_number is not None else 'N/A'}")
-            parts.append(f"Illumina Pairing Detected: {self.illumina_pairing_detected or 'N/A'}")
-            parts.append(f"Number of Reads: {self.num_reads if self.num_reads is not None else 'N/A'}")
-
-        # Add strict statistics if present
-        if any(v is not None for v in [self.n50, self.total_bases, self.mean_read_length,
-                                       self.longest_read_length, self.shortest_read_length]):
-            parts.append("\n--- Strict Statistics ---")
-            parts.append(f"N50: {self.n50 if self.n50 is not None else 'N/A'} bp")
-            parts.append(f"Total Bases: {self.total_bases if self.total_bases is not None else 'N/A'} bp")
-            parts.append(f"Mean Read Length: {self.mean_read_length if self.mean_read_length is not None else 'N/A'} bp")
-            parts.append(f"Longest Read Length: {self.longest_read_length if self.longest_read_length is not None else 'N/A'} bp")
-            parts.append(f"Shortest Read Length: {self.shortest_read_length if self.shortest_read_length is not None else 'N/A'} bp")
-
-        return "\n".join(parts)
 
 
 class ReadValidator(BaseValidator):
@@ -196,9 +93,7 @@ class ReadValidator(BaseValidator):
     class Settings(BaseValidatorSettings):
         """Settings for read validation and processing."""
         # Validation options
-        check_invalid_chars: bool = False
         allow_empty_id: bool = False
-        allow_duplicate_ids: bool = True
 
         # Editing specifications
         ignore_bam: bool = True
@@ -223,31 +118,18 @@ class ReadValidator(BaseValidator):
 
         # Apply outdir_by_ngs_type if enabled
         if self.settings.outdir_by_ngs_type:
-            # Override output_subdir_name with ngs_type
-            self.settings = self.settings.update(output_subdir_name=self.read_config.ngs_type.value)
-            self.logger.debug(f"Applied outdir_by_ngs_type: output_subdir_name set to '{self.read_config.ngs_type.value}'")
+            # Both pacbio subtypes share the same output subdirectory
+            subdir = (
+                "pacbio" if self.read_config.ngs_type.value in ("pacbio-hifi", "pacbio-clr")
+                else self.read_config.ngs_type.value
+            )
+            self.settings = self.settings.update(output_subdir_name=subdir)
+            self.logger.debug(f"Applied outdir_by_ngs_type: output_subdir_name set to '{subdir}'")
 
-    # Required abstract properties and methods from BaseValidator
-
-    @property
-    def _validator_type(self) -> str:
-        """Return validator type string."""
-        return 'read'
-
-    @property
-    def OutputMetadata(self) -> Type:
-        """Return ReadOutputMetadata class for this validator."""
-        return ReadOutputMetadata
-
-    @property
-    def _output_format(self) -> str:
-        """Return output format string for build_output_path."""
-        return 'fastq'
-
-    @property
-    def _expected_format(self) -> Any:
-        """Return expected format for minimal mode validation."""
-        return ReadFormat.FASTQ
+    _validator_type = 'read'
+    OutputMetadata = ReadOutputMetadata
+    _output_format = 'fastq'
+    _expected_format = ReadFormat.FASTQ
 
     def _get_validator_exception(self) -> Type[Exception]:
         """Return the validator-specific exception class."""
@@ -358,52 +240,14 @@ class ReadValidator(BaseValidator):
 
         return filename
 
-    def _calculate_read_statistics(self) -> dict:
-        """Calculate read statistics for strict mode."""
-        if not self.sequences:
-            return {
-                'n50': 0,
-                'total_bases': 0,
-                'mean_read_length': 0.0,
-                'longest_read_length': 0,
-                'shortest_read_length': 0
-            }
-
-        # Get read lengths
-        lengths = [len(seq.seq) for seq in self.sequences]
-
-        # Calculate statistics
-        total_length = sum(lengths)
-        n50 = calculate_n50(lengths)
-
-        return {
-            'n50': n50,
-            'total_bases': total_length,
-            'mean_read_length': total_length / len(lengths) if lengths else 0.0,
-            'longest_read_length': max(lengths) if lengths else 0,
-            'shortest_read_length': min(lengths) if lengths else 0
-        }
-
     def _fill_output_metadata(self, output_path: Path) -> None:
         """Populate output metadata with validation results."""
         # Fill common fields from base class
         self._fill_base_metadata(output_path)
 
-        # Add read-specific fields
-        self.output_metadata.num_reads = len(self.sequences)
-
         # Store configured NGS type and detected input format
         self.output_metadata.ngs_type = self.read_config.ngs_type.value
         self.output_metadata.input_format = self.read_config.detected_format.to_biopython()
-
-        # Calculate read statistics in strict mode only
-        if self.validation_level == ValidationLevel.STRICT and self.sequences:
-            stats = self._calculate_read_statistics()
-            self.output_metadata.n50 = stats['n50']
-            self.output_metadata.total_bases = stats['total_bases']
-            self.output_metadata.mean_read_length = stats['mean_read_length']
-            self.output_metadata.longest_read_length = stats['longest_read_length']
-            self.output_metadata.shortest_read_length = stats['shortest_read_length']
 
     def _run_validation(self) -> Path:
         """Execute validation and processing workflow for trust/strict modes."""
@@ -566,7 +410,6 @@ class ReadValidator(BaseValidator):
             # Create partial function with settings
             validator_func = partial(
                 _validate_single_read,
-                check_invalid_chars=self.settings.check_invalid_chars,
                 allow_empty_id=self.settings.allow_empty_id
             )
 
@@ -613,7 +456,6 @@ class ReadValidator(BaseValidator):
                 # Use the same validation function as parallel mode
                 result = _validate_single_read(
                     record,
-                    check_invalid_chars=self.settings.check_invalid_chars,
                     allow_empty_id=self.settings.allow_empty_id
                 )
 
@@ -626,22 +468,6 @@ class ReadValidator(BaseValidator):
                         details={**result['details'], 'sequence_index': idx}
                     )
                     raise ReadValidationError(error_msg)
-
-        # Check for duplicate IDs (always sequential - requires full list)
-        if not self.settings.allow_duplicate_ids:
-            seq_ids = [record.id for record in self.sequences]
-            if len(seq_ids) != len(set(seq_ids)):
-                # Use Counter for O(n) instead of O(n²) duplicate detection
-                id_counts = Counter(seq_ids)
-                duplicates = [sid for sid, count in id_counts.items() if count > 1]
-                error_msg = f"Duplicate sequence IDs not allowed: {duplicates}"
-                self.logger.add_validation_issue(
-                    level='ERROR',
-                    category='read',
-                    message=error_msg,
-                    details={'duplicate_ids': duplicates}
-                )
-                raise ReadValidationError(error_msg)
 
         # Final success message (if not already logged in parallel mode)
         if not use_parallel:

@@ -65,7 +65,7 @@ EUPL-1.2 is a copyleft license. Its Appendix explicitly lists compatible license
 |---|---|---|---|
 | FastQC | 0.11.9 | GPL-3.0-or-later | https://github.com/s-andrews/FastQC |
 | MultiQC | 1.33 | GPL-3.0-or-later | https://github.com/MultiQC/MultiQC |
-| mosdepth | 0.3.12 | MIT | https://github.com/brentp/mosdepth |
+| mosdepth | 0.3.11 | MIT | https://github.com/brentp/mosdepth |
 
 ### Read Processing
 
@@ -141,13 +141,16 @@ EUPL-1.2 is a copyleft license. Its Appendix explicitly lists compatible license
 | broadinstitute/picard | 3.4.0@sha256:dda3ad26... | https://hub.docker.com/r/broadinstitute/picard |
 | dellytools/delly | v1.7.3@sha256:045aba10... | https://github.com/dellytools/delly |
 | ecomolegmo/cutesv | v1.0.4@sha256:9c29e67b... | Internal build (based on cuteSV MIT) |
-| ecomolegmo/debreak | v1.0.3@sha256:f2d8f9b5... | Internal build (based on DeBreak MIT) |
+| ecomolegmo/debreak | v1.0.4@sha256:d3d0737... | Internal build (based on DeBreak MIT) |
+| ecomolegmo/gffread | v0.12.7@sha256:dad98757... | Internal build (based on gffread MIT); copied into the validation image |
 | ecomolegmo/minimap2 | v2.30@sha256:50d38b71... | Internal build (based on minimap2 MIT) |
+| ecomolegmo/mosdepth | 0.3.11@sha256:b24676b8... | Internal build (based on mosdepth MIT) |
+| ecomolegmo/pbzip2 | v1.1.13@sha256:4a308661... | Internal build (based on pbzip2 BSD-3-Clause); copied into the validation image |
 | ecomolegmo/sniffles | v1.0.3@sha256:d3875e4e... | Internal build (based on Sniffles MIT) |
 | ecomolegmo/survivor | v1.0.3@sha256:90263d6b... | Internal build (based on SURVIVOR MIT) |
 | ecomolegmo/syri | v1.0.4@sha256:789d5cdf... | Internal build (based on SyRI MIT) |
-| ecomolegmo/mosdepth | v1.0.1@sha256:802cc917... | Internal build (based on Mosdepth GPL-3.0) |
 | ecomolegmo/trimgalore | v1.0.1@sha256:802cc917... | Internal build (based on TrimGalore GPL-3.0) |
+| ecomolegmo/validation | v1.0.13@sha256:0709076d... | Internal validation/runtime support image |
 
 ---
 
@@ -167,5 +170,5 @@ Full license texts for each component are available at their respective source U
 
 ---
 
-*Last updated: 2026-03-29*
+*Last updated: 2026-06-13*
 *Generated from Nextflow config, Dockerfiles, and requirements.txt in the efsa_pipeline repository.*

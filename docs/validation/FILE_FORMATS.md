@@ -28,22 +28,6 @@ The EFSA Pipeline validation module supports various file formats for genomic da
 - Compressed reads are kept compressed (using gzip)
 - BAM files have limited support and require special handling
 
-## Feature Files
-
-| Supported Input Formats | Final Output Format |
-|------------------------|---------------------|
-| GFF: `.gff`, `.gff3`, `.gtf` | `.gff3` |
-| BED: `.bed` | `.gff3` |
-| Compression: `.gz`, `.bz2`, `.gzip`, `.bzip2` | Uncompressed |
-
-### Details
-- All feature formats are converted to GFF3 via `gffread`
-- BED files are automatically converted to GFF3 format
-- Output is always uncompressed
-- If `gffread` fails or returns 0 features, the validator falls back to direct GFF3 parsing
-- If both `gffread` and the fallback parser return 0 features, validation fails: no output file is created
-- Coordinate validation (`start >= 1`, `start <= end`) runs in strict mode; issues are reported as warnings
-
 ## File Organization
 
 Input files should be placed in:
@@ -58,7 +42,6 @@ data/valid/
 ├── reference_genome.fasta
 ├── ref_plasmid.fa
 ├── mod_plasmid.fa
-├── ref_feature.gff
 ├── illumina/
 ├── ont/
 └── pacbio/

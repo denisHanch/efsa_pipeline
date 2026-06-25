@@ -16,7 +16,7 @@ When the pipeline is running, `nextflow.log` contains messages like:
 ```
 
 These messages help track execution order for whichever branches are enabled by validated inputs.
-If `mod_fasta` is missing, modified-genome branches are skipped and reference-only branches continue.
+Modified-genome branches are expected only when validation provides the required modified FASTA and enables the corresponding workflow branch.
 
 ## Unmapped Reads Statistics
 

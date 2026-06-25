@@ -1,13 +1,12 @@
 # Validator Classes
 
-Detailed documentation for `GenomeValidator`, `ReadValidator`, and `FeatureValidator` classes.
+Detailed documentation for `GenomeValidator` and `ReadValidator` classes.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [GenomeValidator](#genomevalidator)
 - [ReadValidator](#readvalidator)
-- [FeatureValidator](#featurevalidator)
 - [Validation Levels](#validation-levels)
 - [Common Patterns](#common-patterns)
 
@@ -21,7 +20,6 @@ The validation package provides three main validator classes, each specialized f
 |-----------|------------|---------------|---------------|
 | **GenomeValidator** | Genome, Plasmid | FASTA, GenBank | FASTA |
 | **ReadValidator** | Sequencing Reads | FASTQ, BAM | FASTQ (compressed) |
-| **FeatureValidator** | Annotations | GFF, GTF, BED | GFF3 |
 
 All validators support:
 - Three validation levels (strict, trust, minimal)
@@ -48,7 +46,6 @@ result = validator.run()
 
 print(f"Sequences: {result.num_sequences}")
 print(f"Total size: {result.total_genome_size} bp")
-print(f"GC content: {result.gc_content:.2f}%")
 ```
 
 ### Constructor
@@ -101,7 +98,7 @@ print(f"Processing time: {result.elapsed_time:.2f}s")
 - ✓ Parse all sequences
 - ✓ Validate all sequence IDs (no empty IDs)
 - ✓ Check for empty sequences
-- ✓ Calculate statistics (GC content, N50, total size)
+- ✓ Calculate total genome size
 - ✓ Apply all edits (filtering, ID replacement, plasmid handling)
 
 #### Trust Mode
@@ -200,9 +197,8 @@ config = ConfigManager.load("config.json")
 validator = ReadValidator(config.reads[0])
 result = validator.run()
 
-print(f"Reads: {result.num_reads:,}")
-print(f"N50: {result.n50:,} bp")
-print(f"Mean length: {result.mean_read_length:.1f} bp")
+print(f"NGS type: {result.ngs_type}")
+print(f"Pairing detected: {result.illumina_pairing_detected}")
 ```
 
 ### Constructor
@@ -221,7 +217,7 @@ ReadValidator(read_config, settings=None)
 - `validation_level`: Validation level
 - `threads`: Number of threads for compression
 - `input_path`: Input file path
-- `ngs_type`: Sequencing platform (illumina, ont, pacbio)
+- `ngs_type`: Sequencing platform (illumina, ont, pacbio-hifi, pacbio-clr)
 - `settings`: Validator settings object
 
 ### Methods
@@ -236,8 +232,7 @@ Execute the validation workflow.
 1. Parse read file (FASTQ or BAM)
 2. Validate reads based on validation level
 3. Detect paired-end patterns (Illumina)
-4. Calculate statistics (N50, mean length, etc.)
-5. Save to compressed FASTQ format
+4. Save to compressed FASTQ format
 
 **Example:**
 ```python
@@ -255,16 +250,12 @@ if result.read_number:
 #### Strict Mode
 - ✓ Parse all reads
 - ✓ Validate all read IDs and sequences
-- ✓ Check for invalid characters (if enabled)
-- ✓ Calculate statistics (N50, total bases, length distribution)
 - ✓ Compress output with gzip
 
 #### Trust Mode
 - ✓ Parse first 10 reads for validation
 - ✓ Validate first 10 reads only
 - ✓ Copy original file to output with compression conversion
-- ○ Skip full read count
-- ○ Skip statistics calculation
 - ○ Skip extensive validation
 
 #### Minimal Mode
@@ -333,231 +324,8 @@ settings = ReadValidator.Settings(outdir_by_ngs_type=True)
 #   ont/
 #     nanopore_reads.fastq.gz
 #   pacbio/
-#     pacbio_reads.fastq.gz
+#     pacbio_reads.fastq.gz   # both pacbio-hifi and pacbio-clr write here
 ```
-
----
-
-## FeatureValidator
-
-Validates and processes feature annotation files in GFF, GTF, and BED formats using **gffread** as the primary processing engine.
-
-### Basic Usage
-
-```python
-from validation_pkg import FeatureValidator, ConfigManager
-
-config = ConfigManager.load("config.json")
-
-# Validate feature file
-validator = FeatureValidator(config.ref_feature)
-result = validator.run()
-
-print(f"Features: {result.num_features}")
-print(f"Types: {result.feature_types}")
-print(f"Sequences: {result.sequence_ids}")
-```
-
-### Constructor
-
-```python
-FeatureValidator(feature_config, settings=None)
-```
-
-**Parameters:**
-- `feature_config` (FeatureConfig): Configuration from ConfigManager
-- `settings` (FeatureValidator.Settings, optional): Custom validation settings
-
-**Attributes:**
-- `feature_config`: Input feature configuration
-- `output_dir`: Output directory path
-- `validation_level`: Validation level
-- `threads`: Number of threads for compression
-- `input_path`: Input file path
-- `settings`: Validator settings object
-- `features`: List of parsed Feature objects (after validation)
-
-### Architecture
-
-FeatureValidator uses a **simplified 3-step workflow**:
-
-```
-1. _parse_input()   → Parse using gffread (strict/trust) or skip (minimal)
-2. _edit_features() → Apply edits in Python (strict mode only)
-3. _save_output()   → Write GFF3 output
-```
-
-**Key Design Principles:**
-- **Trust gffread**: Validation handled by gffread's `-v -E` flags
-- **Standards compliance**: gffread follows GFF3 specification exactly
-- **Separation of concerns**: gffread for parsing, Python for editing
-
-### Methods
-
-#### `run()`
-
-Execute the validation workflow.
-
-**Returns:** `OutputMetadata`
-
-**Workflow by Mode:**
-
-**Strict Mode:**
-```
-Input → gffread (parse + validate) → Edit (sort, ID replace) → Save GFF3
-```
-
-**Trust Mode:**
-```
-Input → gffread (parse + validate) → Save GFF3 (no edits)
-```
-
-**Minimal Mode:**
-```
-Input → Copy file (no gffread, no parsing)
-```
-
-**Example:**
-```python
-# Strict mode with sorting and ID replacement
-settings = FeatureValidator.Settings(
-    sort_by_position=True,
-    replace_id_with='chr1'
-)
-validator = FeatureValidator(config.ref_feature, settings)
-result = validator.run()
-
-print(f"Output: {result.output_file}")
-print(f"Features: {result.num_features}")
-```
-
-### Validation Modes
-
-#### Strict Mode
-- ✓ Parse all features via **gffread**
-- ✓ Validate with gffread's `-v -E` flags (structure, syntax, coordinates)
-- ✓ Convert formats (GTF/BED → GFF3)
-- ✓ Apply edits (sorting, ID replacement)
-- ✓ Trust gffread for standards compliance
-
-**Use when:** Processing new/untrusted files, need editing, require strict GFF3 compliance
-
-#### Trust Mode
-- ✓ Parse all features via **gffread**
-- ✓ Validate with gffread's `-v -E` flags
-- ✓ Convert formats (GTF/BED → GFF3)
-- ○ Skip edits (sorting and ID replacement not applied)
-- ✓ Trust gffread for standards compliance
-
-**Use when:** Processing trusted files, want fast validation and format conversion without edits
-
-#### Minimal Mode
-- ✗ No parsing (gffread not used)
-- ✗ No validation
-- ✗ No format conversion
-- ✓ Direct file copy
-- ⚠️ **Requires:** GFF format + matching compression
-
-**Use when:** Pre-validated files, need fastest processing, no changes required
-
-### Special Features
-
-#### Format Conversion (Automatic)
-
-All format conversions handled by **gffread**:
-
-**GTF → GFF3:**
-```python
-# Input: genes.gtf
-# Output: genes.gff3
-validator = FeatureValidator(config.ref_feature)
-result = validator.run()
-
-# gffread handles:
-# - Attribute conversion (gene_id → ID, transcript_id → Parent)
-# - Feature hierarchy (gene → transcript → exon)
-# - Coordinate validation
-```
-
-**BED → GFF3:**
-```python
-# Input: features.bed (0-based, half-open)
-# Output: features.gff3 (1-based, closed)
-validator = FeatureValidator(config.ref_feature)
-result = validator.run()
-
-# gffread handles:
-# - Coordinate system transformation
-# - BED columns → GFF3 attributes
-# - Feature type inference
-```
-
-#### Feature Sorting (Strict and Trust Modes)
-
-Sort features by genomic position in Python:
-
-```python
-settings = FeatureValidator.Settings(sort_by_position=True)
-validator = FeatureValidator(config.ref_feature, settings)
-result = validator.run()
-
-# Features sorted by: seqname → start → end
-# Applied AFTER gffread parsing
-```
-
-**Note:** Only applied in strict mode. Skipped in trust and minimal modes.
-
-#### Sequence ID Replacement (Strict Mode Only)
-
-Replace sequence IDs in Python:
-
-```python
-# Replace all seqnames with 'chr1'
-settings = FeatureValidator.Settings(replace_id_with='chr1')
-validator = FeatureValidator(config.ref_feature, settings)
-result = validator.run()
-
-# All features in column 1 get 'chr1' as seqname
-# Applied AFTER gffread parsing
-```
-
-**Note:** Only applied in strict mode. Skipped in trust and minimal modes.
-
-### gffread Integration
-
-**What gffread does:**
-- Parse and validate GFF/GTF/BED files
-- Convert formats to GFF3
-- Check syntax and structure (`-v` verbose, `-E` expose errors)
-- Adjust parent features to match children coordinates
-- Infer missing features (e.g., mRNA from CDS)
-
-**What Python does:**
-- Sort features by position (**strict mode only**)
-- Replace sequence IDs (**strict mode only**)
-- Write compressed output
-
-**Installation:**
-```bash
-conda install -c bioconda gffread
-```
-
-### Settings Reference
-
-```python
-class Settings:
-    sort_by_position: bool = True        # Sort features — strict mode only
-    check_coordinates: bool = True       # Python-level coordinate validation (start≥1, start≤end)
-    replace_id_with: str = None          # Replace seqnames — strict mode only
-    coding_type: str = None              # Output compression ('gz', 'bz2')
-    output_filename_suffix: str = None   # Add suffix to output filename
-    output_subdir_name: str = None       # Save to subdirectory
-```
-
-**Notes:**
-- `check_coordinates`: validates `start >= 1` and `start <= end` after parsing; strict mode checks all features (parallel when threads > 1 and ≥ 1 000 features), trust mode checks first 10 only; issues are logged as warnings and do not stop processing
-- Editing settings (`sort_by_position`, `replace_id_with`) apply in **strict mode only**
-- Trust and minimal modes skip all editing
 
 ---
 
@@ -570,15 +338,13 @@ All validators support three validation levels that control thoroughness vs perf
 | Aspect | Strict | Trust | Minimal |
 |--------|--------|-------|---------|
 | **Parse file** | ✓ All | ✓ All | ✗ None |
-| **Validate** | ✓ All records | ✓ All records* | ✗ None |
+| **Validate** | ✓ All records | ✓ All records | ✗ None |
 | **Statistics** | ✓ Full | ○ Limited | ✗ None |
 | **Edits** | ✓ Apply | ✓ Apply | ✗ None |
-| **Speed** | 1x (baseline) | ~1x (FeatureValidator)† | 100x+ faster |
+| **Speed** | 1x (baseline) | 10-15x faster | 100x+ faster |
 | **Use case** | First run, full validation | Trusted data, need edits | Pre-validated files |
 
 **Notes:**
-- \* **FeatureValidator**: Both strict and trust modes use gffread for validation (same thoroughness), but only strict mode applies Python edits (sort, ID replace)
-- † **FeatureValidator**: Trust mode is similar speed to strict (both use gffread); strict mode is slightly slower due to Python edits
 - **GenomeValidator**: Trust mode validates first sequence only (faster)
 - **ReadValidator**: Trust mode parses only first 10 reads, then copies original file (faster)
 
@@ -677,8 +443,7 @@ except ValidationError as e:
 ```python
 # Optimize for large files
 settings = ReadValidator.Settings(
-    validation_level='trust',  # Skip extensive validation
-    check_invalid_chars=False  # Skip character checking
+    validation_level='trust'  # Skip extensive validation
 )
 
 # Use maximum threads

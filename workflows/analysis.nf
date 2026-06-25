@@ -9,6 +9,18 @@ include { qc } from "./subworkflows.nf"
 include { compare_unmapped; compare_unmapped as compare_unmapped_ont; compare_unmapped as compare_unmapped_pacbio } from "../modules/mapping.nf"
 include { restructure_sv_tbl; create_empty_tbl as create_ont_tbl; create_empty_tbl as create_asm_tbl; create_empty_tbl as create_pacbio_tbl; create_empty_tbl as create_short_tbl } from "../modules/sv_calling.nf"
 
+def requiredExistingFasta(value, label) {
+    if (!value) {
+        error "${label} is required but was not provided in validated_params.json"
+    }
+
+    def fasta = file(value)
+    if (!fasta.exists()) {
+        error "${label} does not exist: ${value}"
+    }
+
+    return fasta
+}
 
 workflow analysis {
     
@@ -22,14 +34,31 @@ workflow analysis {
         }.first()
 
         // Core genome file channels (single-item value channels)
-        ref_fasta = pmap.map { file(it.ref_fasta_validated) }
-        // Allow reference-only execution when mod_fasta_validated is absent
-        mod_fasta = pmap
-            .filter { it.mod_fasta_validated }
-            .map { file(it.mod_fasta_validated) }
-        mod_fasta = pmap.map { file(it.mod_fasta_validated) }
+        ref_fasta = pmap.map {
+            requiredExistingFasta(it.ref_fasta_validated, "Reference FASTA")
+        }
+        // Zero-or-one modified FASTA. Emit a real path when present; emit nothing when absent.
+        mod_fasta = pmap.flatMap {
+            if (it.mod_fasta_validated) {
+                return [requiredExistingFasta(it.mod_fasta_validated, "Modified FASTA")]
+            }
+            if (it.run_ref_x_mod) {
+                error "Modified FASTA is required for reference-vs-modified analysis but was not provided in validated_params.json"
+            }
+            return []
+        }
         ref_genome_size_bp = pmap.map { it.ref_genome_size_bp ?: "" }
         mod_genome_size_bp = pmap.map { it.mod_genome_size_bp ?: "" }
+        freebayes_ploidy = pmap.map {
+            def organismType = (it.organism_type ?: "").toString().toLowerCase()
+            if (organismType == "prokaryote") {
+                return 1
+            }
+            if (organismType == "eukaryote") {
+                return 2
+            }
+            throw new IllegalArgumentException("Invalid organism_type '${it.organism_type}'. Expected 'prokaryote' or 'eukaryote'.")
+        }
 
         ref_plasmid = pmap.map { it.ref_plasmid_fasta ? [file(it.ref_plasmid_fasta)] : [] }
         mod_plasmid = pmap.map { it.mod_plasmid_fasta ? [file(it.mod_plasmid_fasta)] : [] }
@@ -57,8 +86,10 @@ workflow analysis {
             .flatMap { it.pacbio_fastqs }
             .map(toNamedFastq)
 
-        long_ref_pacbio(pacbio_fastqs, ref_fasta, "map-pb", ref_plasmid, "pacbio/long-ref")
-        long_mod_pacbio(pacbio_fastqs, mod_fasta, "map-pb", mod_plasmid, "pacbio/long-mod")
+        pacbio_read_type = pmap.map { it.pacbio_read_type ?: "" }
+
+        long_ref_pacbio(pacbio_fastqs, ref_fasta, "map-pb", ref_plasmid, "pacbio/long-ref", pacbio_read_type)
+        long_mod_pacbio(pacbio_fastqs, mod_fasta, "map-pb", mod_plasmid, "pacbio/long-mod", pacbio_read_type)
         compare_unmapped_pacbio(long_ref_pacbio.out.unmapped_fastq, long_mod_pacbio.out.unmapped_fastq, "pacbio")
 
         // Empty pacbio table when not active
@@ -70,8 +101,10 @@ workflow analysis {
             .flatMap { it.ont_fastqs }
             .map(toNamedFastq)
 
-        long_ref_ont(ont_fastqs, ref_fasta, "map-ont", ref_plasmid, "ont/long-ref")
-        long_mod_ont(ont_fastqs, mod_fasta, "map-ont", mod_plasmid, "ont/long-mod")
+        ont_read_type = pmap.map { it.run_nanopore ? "ont" : "" }
+
+        long_ref_ont(ont_fastqs, ref_fasta, "map-ont", ref_plasmid, "ont/long-ref", ont_read_type)
+        long_mod_ont(ont_fastqs, mod_fasta, "map-ont", mod_plasmid, "ont/long-mod", ont_read_type)
         compare_unmapped_ont(long_ref_ont.out.unmapped_fastq, long_mod_ont.out.unmapped_fastq, "ont")
 
         // Empty ont table when not active
@@ -90,8 +123,8 @@ workflow analysis {
 
         qc(illumina_reads, "illumina/qc_trimming") | set { trimmed }
 
-        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid)
-        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid)
+        short_ref(trimmed, ref_fasta, "illumina/short-ref", ref_plasmid, freebayes_ploidy)
+        short_mod(trimmed, mod_fasta, "illumina/short-mod", mod_plasmid, freebayes_ploidy)
         compare_unmapped(short_ref.out.unmapped_fastq, short_mod.out.unmapped_fastq, "short")
 
         // Empty short table when not active
@@ -126,8 +159,6 @@ workflow analysis {
             script,
             tbl_channel,
             supp_reads_ch.collect().ifEmpty(file('NO_FILE')),
-            ref_fasta,
-            mod_fasta,
             ref_genome_size_bp,
             mod_genome_size_bp
         )

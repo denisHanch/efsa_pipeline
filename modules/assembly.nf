@@ -68,6 +68,20 @@ process syri {
 
     script:
     """
+    set -euo pipefail
+
+    if [ ! -s "$coords" ] || [ ! -s "$filtered_delta" ]; then
+        printf '%s\\n' \\
+            '##fileformat=VCFv4.2' \\
+            '##source=syri_empty_coords_guard' \\
+            '##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant">' \\
+            '##INFO=<ID=StartB,Number=1,Type=Integer,Description="Start position in query genome">' \\
+            '##INFO=<ID=EndB,Number=1,Type=Integer,Description="End position in query genome">' \\
+            '#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO' \\
+            > ${prefix}syri.vcf
+        exit 0
+    fi
+        
     syri -c $coords -d $filtered_delta  -r $ref -q $mod --prefix ${prefix} --nosnp
     """
 }

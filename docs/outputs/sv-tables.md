@@ -28,8 +28,10 @@ flowchart LR
 - `restructure_sv_tbl` process: the merge step accepts any subset of (assembly, long_ont, long_pacbio, short) and ignores missing files.
 - Long reads are handled as two separate sources: `long_ont` and `long_pacbio`. Output CSVs keep these in distinct `long_ont_*` and `long_pacbio_*` columns.
 - Final event rows are first built by clustering records within the same chromosome and standardized SV type, then a final pass adds `linked_event` entries for overlapping final SV rows on the same chromosome.
+- Deletion clustering is interval-based: same-chromosome `DEL` calls merge when their intervals overlap or touch within `--tol`, even when neither breakpoint is nearby. Other SV types keep the more conservative breakpoint-proximity rule.
 - `linked_event` is the only relationship column in the final CSVs. It includes both same-type and cross-type overlaps.
 - Final event anchoring is deterministic and size-aware: `event_length_bp` uses minimum absolute `svlen`, and event coordinates are anchored to the same selected source call. Equal-length ties are resolved by strongest intersection with the other source calls.
+- Likely artifact rows can be filtered before clustering when the source TSV provides contig length: by default, events larger than 50% of their contig are removed.
 
 ### VCF Extraction and Variant Type Handling
 
@@ -42,8 +44,9 @@ The pipeline extracts variants from VCF files using different fields depending o
 
 **Short-read (delly) variants:**
 - **Variant type source:** VCF `INFO/SVTYPE` field (e.g., DEL, DUP, INV, INS, TRA)
-- **Extraction command:** `bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/CHR2\t%POS2\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%QUAL\t[%RDCN]\n'`
+- **Extraction command:** `bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/CHR2\t%POS2\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%INFO/PE\t%INFO/SR\t[%DV]\t[%RV]\t%QUAL\t[%RDCN]\n'`
 - **Key feature:** Includes `svlen` directly from VCF for accurate insertion/translocation lengths
+- **Supporting reads:** `short_supporting_reads` is resolved in priority order: first sample-level FORMAT evidence `DV + RV` when either field is present, otherwise site-level INFO evidence `PE + SR`, otherwise the legacy `supporting_reads` value. INFO and FORMAT support are not summed together because they can represent overlapping evidence at different granularities.
 
 **Long-read (cuteSV/sniffles/debreak/SURVIVOR) variants:**
 - **Variant type source:** VCF `ID` field or `SVTYPE` in INFO
@@ -133,7 +136,7 @@ python3 modules/utils/create_sv_output.py --asm assembly_sv_summary.tsv \
   --out csv_per_sv_sumary
 ```
 
-During normal Nextflow runs, genome-size context is supplied automatically from `data/valid/validated_params.json` when present, or by counting bases in the validated FASTA files. Direct script runs do not expose manual genome-size arguments; the percentage columns are left empty/`NaN` unless the internal pipeline environment variables are set.
+During normal Nextflow runs, genome-size context is supplied automatically from `data/outputs/valid/validated_params.json` through internal pipeline environment variables. `restructure_sv_tbl` does not count bases from FASTA files. In reference-only runs, the modified genome size is passed downstream as `0`, so `pct_of_mod_genome` is `0`. Direct script runs do not expose manual genome-size arguments; percentage columns are left empty/`NaN` unless the internal environment variables are set.
 
 ### All supported processing script options
 
@@ -144,8 +147,36 @@ During normal Nextflow runs, genome-size context is supplied automatically from 
 | `--long_pacbio` | TSV file containing structural variant summary from PacBio long-read data. Optional. |
 | `--short` | TSV file containing structural variant summary from short-read sequencing data. Optional. |
 | `--out` | Output directory for the per-SV CSV files. Required. |
-| `--tol` | Within-type clustering tolerance in base pairs. Determines whether raw SV calls get merged into the same event. Default: `10`. |
+| `--tol` | Within-type clustering tolerance in base pairs. For `DEL`, intervals that overlap or touch within this distance are merged. For other SV types, intervals must overlap/touch and have a nearby start or end breakpoint. Default: `10`. |
 | `--cross_type_tol` | Tolerance in base pairs for linking final events with near-identical coordinates in `linked_event`. Default: `0`, which keeps overlap-only linking. |
+| `--max_event_contig_fraction` | Filters source rows whose event length is greater than this fraction of the row's contig length. Default: `0.5` (50%). Set to `0` to disable. Rows without a supported contig-length column are retained. |
+
+### Artifact filtering and known limitations
+
+As per EFSA request, filtering and consolidation rules are used to remove likely incorrect events (artifacts) or consolidate overlapping calls into a single event when the current TSV columns support doing so safely.
+
+Currently handled artifact categories:
+
+- **Too-large source events:** before clustering, a source row is removed when `abs(svlen) > contig_length * --max_event_contig_fraction`. The default threshold is `0.5`. Supported optional contig-length column names include `contig_length_bp`, `contig_length`, `contig_size_bp`, `contig_size`, `chrom_length_bp`, `chrom_length`, `chrom_size_bp`, `chrom_size`, `chromosome_length_bp`, `chromosome_length`, `chromosome_size_bp`, `chromosome_size`, `sequence_length_bp`, `sequence_length`, `ref_contig_length_bp`, `ref_contig_length`, `ref_chrom_length_bp`, and `ref_chrom_length`.
+- **Rows without contig length:** retained deliberately and counted in the structured log as unevaluated by the too-large-event filter. The script does not guess contig size from total genome size or observed coordinates.
+- **Overlapping same-type deletions:** after loading and too-large-event filtering, same-chromosome `DEL` calls are consolidated when their intervals overlap or touch within `--tol`, even if neither breakpoint is close. This handles nested deletion-inside-deletion calls and shifted deletion boundaries as one event when they are represented as overlapping deletion intervals.
+- **Conservative clustering for non-deletion SV types:** `DUP`, `INS`, `INV`, `RPL`, and `TRA` records still require interval overlap/touch plus a nearby start or end breakpoint. This avoids broad, fragile merges for SV classes where interval overlap alone is less reliable.
+- **Malformed source rows:** rows missing required fields or valid coordinates are skipped during loading.
+- **Normalization artifacts:** reversed coordinates are swapped; signed or inconsistent `svlen` values are normalized for interval SV classes (`DEL`, `DUP`, `INV`, `RPL`) before filtering and output.
+- **Overlapping final events:** final rows that still overlap, including cross-type overlaps, are reported through `linked_event` relations such as `nested_in`, `contains`, `overlap`, and `exact_coordinates`.
+
+Deletion clustering recommendation implemented here:
+
+- A deletion is treated as an interval event, so overlap is more informative than exact breakpoint agreement. For example, `DEL A: 100-1000` and `DEL B: 450-550` are consolidated because the second deletion is fully inside the first, even though neither breakpoint is close.
+- The current rule also merges deletions with only a small edge overlap, such as DEL A: 100-1000 and DEL B: 995-1500. This permissive behavior can help reconcile imprecise breakpoints in noisy or repetitive regions, but it may also incorrectly consolidate distinct nearby deletions. 
+- A future refinement could require a minimum overlap fraction before merging such calls.
+
+Known unresolved or only partially resolved artifact categories:
+
+- **Deletion plus substitution double-calls from non-clean deletion boundaries:** not collapsed automatically because the final table builder does not read BAM/IGV evidence or base-level alignment context.
+- **Substitution events duplicated as deletion/insertion calls:** not safely filtered from the current columns alone; these are exposed only through coordinate/type relationships when they overlap.
+- **Cross-type or biologically ambiguous nested artifacts:** same-type overlapping `DEL` calls are consolidated, but nested calls involving different standardized SV types are not removed automatically. They remain visible through `linked_event` for review.
+- **Coverage/visual-review artifacts:** no BAM- or IGV-derived artifact logic is applied in `create_sv_output.py`; only fields already present in the TSV inputs are used.
 
 ### Explanation of `csv_per_sv_summary` CSV columns
 
@@ -168,8 +199,8 @@ The final table in each CSV file contains one row per final structural variant (
 | **event_start** | Start coordinate of the selected representative call used to anchor the final event. This is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
 | **event_end** | End coordinate of the selected representative call used to anchor the final event. This is taken from the same source call that determines `event_length_bp` (minimum absolute `svlen`). |
 | **event_length_bp** | Representative event size in base pairs, computed as the minimum available **absolute** source length (`min(abs(svlen))`) across assembly, long ONT, long PacBio, and short source representatives. If no source provides `svlen`, this field is `NaN` and coordinates use fallback cluster logic. |
-| **pct_of_ref_genome** | Percentage of the reference genome covered by the representative event length, calculated as `event_length_bp / ref_genome_size_bp * 100`. `ref_genome_size_bp` comes from `data/valid/validated_params.json` when available, otherwise `restructure_sv_tbl` derives it from the validated reference FASTA. Empty/`NaN` when the genome size or `event_length_bp` is unavailable. |
-| **pct_of_mod_genome** | Percentage of the modified genome or assembly covered by the representative event length, calculated as `event_length_bp / mod_genome_size_bp * 100`. `mod_genome_size_bp` comes from `data/valid/validated_params.json` when available, otherwise `restructure_sv_tbl` derives it from the validated modified FASTA. Empty/`NaN` when the genome size or `event_length_bp` is unavailable. |
+| **pct_of_ref_genome** | Percentage of the reference genome covered by the representative event length, calculated as `event_length_bp / ref_genome_size_bp * 100`. `ref_genome_size_bp` comes from `data/outputs/valid/validated_params.json`. Empty/`NaN` when the genome size or `event_length_bp` is unavailable. |
+| **pct_of_mod_genome** | Percentage of the modified genome or assembly covered by the representative event length, calculated as `event_length_bp / mod_genome_size_bp * 100`. `mod_genome_size_bp` comes from `data/outputs/valid/validated_params.json`. In reference-only runs, `mod_genome_size_bp` is `0` and this column is `0`. Empty/`NaN` when the modified genome size is unavailable for any other reason or `event_length_bp` is unavailable. |
 | **support_score** | Number of input sources contributing to the final event row. In the current implementation this is the count of non-empty calls among `asm`, `long_ont`, `long_pacbio`, and `short`. |
 | **percentage_overlap** | Comma-separated overlap percentages collected during same-type event clustering. Each value is calculated during one clustering merge step as `(intersection length / longer interval length) × 100`. This field is empty when the final event was built from a single record only. |
 | **linked_event** | Semicolon-separated list of overlapping final SV events on the same chromosome. This single column includes both same-type and cross-type links. Each linked entry has the format `<event_id> (<std_svtype>, <chrom>:<start>-<end>, <relation>)`. Standard relation values are `exact_coordinates`, `overlap`, `nested_in`, and `contains`, always from the point of view of the current row. If `--cross_type_tol` is set above `0`, near-identical boundaries may also be reported as `same_coordinates_within_<N>bp`. Leave empty when no linked events are found. |
@@ -183,7 +214,7 @@ The examples below use simplified coordinates for clarity.
 | `DEL_2` at `chr1:23-67` | `RPL_1 (RPL, chr1:23-67, exact_coordinates)` | The linked event has exactly the same coordinates as the current event. |
 | `DEL_2` at `chr1:23-67` | `INV_1 (INV, chr1:10-90, nested_in)` | The current event is fully inside the linked event interval. |
 | `RPL_1` at `chr1:10-90` | `DEL_2 (DEL, chr1:23-67, contains)` | The current event fully contains the linked event interval. |
-| `DEL_2` at `chr1:23-67` | `DEL_3 (DEL, chr1:60-100, overlap)` | The two events partially overlap, but neither fully contains the other. |
+| `DEL_2` at `chr1:23-67` | `RPL_2 (RPL, chr1:60-100, overlap)` | The two events partially overlap, but neither fully contains the other. Same-type overlapping deletions are usually consolidated before this final linking step. |
 | `DEL_2` at `chr1:23-67` with `--cross_type_tol 5` | `RPL_2 (RPL, chr1:25-69, same_coordinates_within_5bp)` | The events do not overlap exactly, but their start and end coordinates are both within the specified tolerance. |
 
 ### Additional pipeline-specific columns
@@ -195,9 +226,9 @@ The examples below use simplified coordinates for clarity.
 | **long_(ont\|pacbio)_coverage_before_100bp** | Mean depth in the 100 bp flank before the long-read SV event, computed by `mosdepth`. |
 | **long_(ont\|pacbio)_coverage_sv_span** | Mean depth across the full long-read SV event span (`start..end`), computed by `mosdepth`. |
 | **long_(ont\|pacbio)_coverage_after_100bp** | Mean depth in the 100 bp flank after the long-read SV event, computed by `mosdepth`. |
+| **short_supporting_reads** | Delly short-read support resolved in priority order: FORMAT `DV + RV`, then INFO `PE + SR`, then legacy `supporting_reads`. Paired-end fields count supporting pairs/fragments, not individual mates. |
 | **short_chr2** | Partner chromosome for short-read translocation/breakend calls (from short-read TSV `chr2`, extracted from VCF `INFO/CHR2`). Empty for non-translocation short-read events or when unavailable. |
 | **short_pos2** | Partner breakpoint position for short-read translocation/breakend calls (from short-read TSV `pos2`, extracted from VCF `INFO/POS2`). Empty for non-translocation short-read events or when unavailable. |
-| **short_reads_copy_number_estimate** | Estimated copy number derived from short-read depth information (VCF `FORMAT` field `RDCN`). |
 | **short_coverage_before_100bp** | Mean depth in the 100 bp flank before the short-read SV event, computed by `mosdepth`. |
 | **short_coverage_sv_span** | Mean depth across the full short-read SV event span (`start..end`), computed by `mosdepth`. |
 | **short_coverage_after_100bp** | Mean depth in the 100 bp flank after the short-read SV event, computed by `mosdepth`. |
@@ -273,28 +304,32 @@ The `create_sv_output.py` script processes SV records through the following step
 
 1. **Load and standardize records** from all available source pipelines (assembly, long-read ONT/PacBio, short-read)
 
-2. **Cluster records by (chromosome, standardized SV type)** using interval overlap with a tolerance window (`--tol`, default 10 bp). Records are considered part of the same event if:
-   - They share the same chromosome and standardized SV type
-   - Their intervals overlap (accounting for tolerance)
-   - At least one of the breakpoints (start or end) is within tolerance between members
+2. **Filter supported too-large source events** before clustering. A row is removed only when both event length and contig length are available and `abs(svlen)` exceeds `contig_length * --max_event_contig_fraction`.
 
-3. **Select best representative per source** within each cluster using a ranking strategy:
+3. **Cluster records by (chromosome, standardized SV type)** using type-aware interval rules with a tolerance window (`--tol`, default 10 bp). Records are considered part of the same event if:
+   - They share the same chromosome and standardized SV type
+   - For `DEL`: their intervals overlap or touch within `--tol`; nearby breakpoints are not required
+   - For non-`DEL` types: their intervals overlap or touch within `--tol`, and at least one breakpoint pair (start or end) is within `--tol`
+   - Example recommended merge: `DEL 100-1000` plus `DEL 450-550` becomes one deletion event because the smaller interval is inside the larger one even though neither breakpoint is close.
+   - Known caveat: `DEL 100-1000` plus `DEL 995-1500` also merges because the intervals overlap. This can be aggressive; if real data shows over-merging, add a minimum overlap-fraction threshold as a future refinement.
+
+4. **Select best representative per source** within each cluster using a ranking strategy:
    - Rank 1: Supporting reads / evidence count (higher is better)
    - Rank 2: Quality score (higher is better)
    - Rank 3: Absolute SV size (`abs(svlen)`), with smaller values preferred as tie-breaker
    
    This ensures the highest-confidence call from each source is carried forward.
 
-4. **Build source length candidates** from selected source representatives:
+5. **Build source length candidates** from selected source representatives:
    - `asm_length`, `long_ont_length`, `long_pacbio_length`, `short_length` from source `svlen`
    - Event-level comparison uses absolute lengths (`abs(svlen)`) to normalize caller sign conventions
 
-5. **Select event anchor and event length:**
+6. **Select event anchor and event length:**
    - Set `event_length_bp = min(abs(svlen))` across available source representatives
    - Set `event_start` and `event_end` to the coordinates of the same selected source call
    - If multiple sources share the same minimum absolute length, choose the one with the largest total interval intersection against other source representatives
    - If no usable source `svlen` exists, keep `event_length_bp = NaN` and use type-aware fallback coordinates
 
-6. **Assemble final row** with all source-specific fields, filtering unnecessary columns (e.g., removing `asm_start_mod/asm_end_mod` from deletions, removing internal type fields)
+7. **Assemble final row** with all source-specific fields, filtering unnecessary columns (e.g., removing `asm_start_mod/asm_end_mod` from deletions, removing internal type fields)
 
-7. **Final pass: link overlapping events** by scanning all final rows on the same chromosome and recording any coordinate overlaps or near-overlaps (if `--cross_type_tol` is set)
+8. **Final pass: link overlapping events** by scanning all final rows on the same chromosome and recording any coordinate overlaps or near-overlaps (if `--cross_type_tol` is set)

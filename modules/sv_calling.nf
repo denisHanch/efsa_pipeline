@@ -87,15 +87,24 @@ process cute_sv {
     each path(fai)
     tuple val(pair_id), path(bam_file), path(bam_index) 
     val out_folder_name
+    val read_type
 
     output:
     tuple val(pair_id), path("${pair_id}_cutesv.vcf")
     
 
     script:
+    def cutesv_args = [
+        "pacbio-clr":  "--max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 200 --diff_ratio_merging_DEL 0.5",
+        "pacbio-hifi": "--max_cluster_bias_INS 1000 --diff_ratio_merging_INS 0.9 --max_cluster_bias_DEL 1000 --diff_ratio_merging_DEL 0.5",
+        "ont":         "--max_cluster_bias_INS 100 --diff_ratio_merging_INS 0.3 --max_cluster_bias_DEL 100 --diff_ratio_merging_DEL 0.3"
+    ][read_type]
+    if (!cutesv_args) {
+        error "Unsupported validated read_type '${read_type}' for CuteSV in ${out_folder_name}. Expected one of: pacbio-hifi, pacbio-clr, ont."
+    }
     """
     mkdir ${pair_id}_out
-    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t ${task.cpus}
+    cuteSV $bam_file $fasta_file ${pair_id}_cutesv.vcf ${pair_id}_out -t ${task.cpus} ${cutesv_args}
     """
 }
 
@@ -115,7 +124,7 @@ process debreak {
 
     script:
     """
-    debreak --bam $bam_file -r $fasta_file -o debreak_out -t ${task.cpus}
+    debreak --bam $bam_file -o debreak_out -t ${task.cpus} --rescue_large_ins --rescue_dup --poa --ref $fasta_file
     mv debreak_out/debreak.vcf debreak_out/${pair_id}_debreak.vcf
     """
 }
@@ -203,8 +212,8 @@ process vcf_to_table_short {
     """
     set -euxo pipefail
 
-    echo -e "chrom\tstart\tend\tsvtype\tchr2\tpos2\tinfo_svtype\tsvlen\tsupporting_reads\tscore\tRDCN" > "${name}_short_sv_summary.tsv"
-    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/CHR2\t%POS2\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%QUAL\t[%RDCN]\n' "${vcf}"  >> "${name}_short_sv_summary.tsv"
+    echo -e "chrom\tstart\tend\tsvtype\tchr2\tpos2\tinfo_svtype\tsvlen\tsupporting_reads\tPE\tSR\tDV\tRV\tscore\tRDCN" > "${name}_short_sv_summary.tsv"
+    bcftools query -f '%CHROM\t%POS\t%INFO/END\t%INFO/SVTYPE\t%INFO/CHR2\t%POS2\t%ALT\t%INFO/SVLEN\t%INFO/PE\t%INFO/PE\t%INFO/SR\t[%DV]\t[%RV]\t%QUAL\t[%RDCN]\n' "${vcf}"  >> "${name}_short_sv_summary.tsv"
     """
 }
 
@@ -238,8 +247,6 @@ process restructure_sv_tbl {
     path script
     tuple path(assembly_tsv), path(long_ont_tsv), path(long_pb_tsv), path(short_tsv)
     path supp_reads
-    path ref_fasta
-    path mod_fasta
     val ref_genome_size_bp
     val mod_genome_size_bp
 
@@ -247,48 +254,11 @@ process restructure_sv_tbl {
     path "csv_per_sv_summary"
 
     script:
-    def refGenomeSize = ref_genome_size_bp ?: ""
-    def modGenomeSize = mod_genome_size_bp ?: ""
+    def refGenomeSize = ref_genome_size_bp ?: "0"
+    def modGenomeSize = mod_genome_size_bp ?: "0"
     """
-    compute_fasta_size() {
-        python - "\$1" <<'PY'
-import bz2
-import gzip
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-if not path.exists():
-    print("")
-    sys.exit(0)
-
-if path.suffix == ".gz":
-    opener = gzip.open
-elif path.suffix == ".bz2":
-    opener = bz2.open
-else:
-    opener = open
-
-total = 0
-with opener(path, "rt", encoding="utf-8", errors="ignore") as handle:
-    for line in handle:
-        if not line or line.startswith(">"):
-            continue
-        total += len(line.strip().replace(" ", "").replace("\\t", ""))
-
-print(total if total > 0 else "")
-PY
-    }
-
     ref_genome_size="${refGenomeSize}"
     mod_genome_size="${modGenomeSize}"
-
-    if [ -z "\$ref_genome_size" ]; then
-        ref_genome_size=\$(compute_fasta_size "${ref_fasta}")
-    fi
-    if [ -z "\$mod_genome_size" ]; then
-        mod_genome_size=\$(compute_fasta_size "${mod_fasta}")
-    fi
 
     export SV_REF_GENOME_SIZE_BP="\$ref_genome_size"
     export SV_MOD_GENOME_SIZE_BP="\$mod_genome_size"

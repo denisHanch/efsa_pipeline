@@ -12,13 +12,8 @@ from validation_pkg import (
     ConfigManager,
     GenomeValidator,
     ReadValidator,
-    FeatureValidator,
     ReadXReadSettings,
     GenomeXGenomeSettings,
-    ValidationReport,
-    validate_genome,
-    validate_reads,
-    validate_feature,
     setup_logging,
     get_logger,
     readxread_validation,
@@ -35,9 +30,9 @@ def main():
     parser = argparse.ArgumentParser(description="Validation pipeline for genomic input files")
     parser.add_argument("config_path", help="Path to config.json")
     parser.add_argument("--threads",          type=int,  help="Number of threads (overrides config.json)")
-    parser.add_argument("--validation-level", choices=["strict", "trust", "minimal"], help="Validation depth (overrides config.json)")
-    parser.add_argument("--logging-level",    choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Log verbosity (overrides config.json)")
-    parser.add_argument("--type",             dest="organism_type", choices=["prokaryote", "eukaryote"], help="Organism type (overrides config.json)")
+    parser.add_argument("--validation-level", type=str.lower, choices=["strict", "trust", "minimal"], help="Validation depth (overrides config.json)")
+    parser.add_argument("--logging-level",    type=str.upper, choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Log verbosity (overrides config.json)")
+    parser.add_argument("--type",             dest="organism_type", type=str.lower, choices=["prokaryote", "eukaryote"], help="Organism type (overrides config.json)")
     parser.add_argument("--force-defragment-ref", action="store_true", default=False, help="Merge fragmented reference contigs (unsupported workaround)")
     parsed = parser.parse_args()
 
@@ -81,7 +76,6 @@ def main():
     _all_sub_configs = [
         config.ref_genome, config.mod_genome,
         config.ref_plasmid, config.mod_plasmid,
-        config.ref_feature,
     ] + list(config.reads or [])
     for sub_cfg in _all_sub_configs:
         if sub_cfg is not None:
@@ -180,15 +174,6 @@ def main():
             outdir_by_ngs_type=True
         )
 
-        # Settings for reference features
-        ref_feature_settings = FeatureValidator.Settings(
-            sort_by_position=False,
-            check_coordinates=False,
-            replace_id_with='chr',
-            coding_type=None,
-            output_filename_suffix='ref'
-        )
-
         # Inter genome validation settings (using defaults)
         genomexgenome_settings = GenomeXGenomeSettings(
             characterize=True,
@@ -205,40 +190,23 @@ def main():
 
 
     # ========================================================================
-    # Step 3: Run validation using functional API
+    # Step 3: Run validation
     # ========================================================================
-    report_filename = "report.txt"
-    report = ValidationReport(logs_dir / report_filename)
-    fatal_errors: list[str] = []
-
-    def register_required_failure(label: str, exc: Exception) -> None:
-        message = f"{label} validation failed: {exc}"
-        logger.error(message)
-        fatal_errors.append(message)
-
-    def register_missing_output(label: str, result) -> None:
-        output_file = getattr(result, "output_file", None) if result is not None else None
-        if not output_file:
-            message = f"{label} validation produced no usable output file"
-            logger.error(message)
-            fatal_errors.append(message)
-
     # Validate reference genome (required)
     ref_genome_res = None
     if hasattr(config, 'ref_genome') and config.ref_genome:
         try:
-            ref_genome_res = validate_genome(config.ref_genome, ref_genome_settings)
-            report.write(ref_genome_res, file_type="genome")
-            register_missing_output("ref_genome", ref_genome_res)
+            ref_genome_res = GenomeValidator(config.ref_genome, ref_genome_settings).run()
+            if not getattr(ref_genome_res, "output_file", None):
+                logger.error("ref_genome validation produced no usable output file")
         except ValidationError as e:
-            register_required_failure("ref_genome", e)
+            logger.error(f"ref_genome validation failed: {e}")
 
     # Validate modified genome (optional)
     mod_genome_res = None
     if hasattr(config, 'mod_genome') and config.mod_genome:
         try:
-            mod_genome_res = validate_genome(config.mod_genome, mod_genome_settings)
-            report.write(mod_genome_res, file_type="genome")
+            mod_genome_res = GenomeValidator(config.mod_genome, mod_genome_settings).run()
         except ValidationError as e:
             logger.error(f"Optional mod_genome validation failed: {e}")
 
@@ -251,16 +219,14 @@ def main():
                 merge_into_plasmid=genome_plasmid_paths[0]
             )
         try:
-            ref_plasmid_res = validate_genome(config.ref_plasmid, ref_plasmid_settings)
-            report.write(ref_plasmid_res, file_type="genome")
+            ref_plasmid_res = GenomeValidator(config.ref_plasmid, ref_plasmid_settings).run()
         except ValidationError as e:
             logger.error(f"Optional ref_plasmid validation failed: {e}")
 
     mod_plasmid_res = None
     if hasattr(config, 'mod_plasmid') and config.mod_plasmid:
         try:
-            mod_plasmid_res = validate_genome(config.mod_plasmid, mod_plasmid_settings)
-            report.write(mod_plasmid_res, file_type="genome")
+            mod_plasmid_res = GenomeValidator(config.mod_plasmid, mod_plasmid_settings).run()
         except ValidationError as e:
             logger.error(f"Optional mod_plasmid validation failed: {e}")
 
@@ -271,7 +237,6 @@ def main():
             and not getattr(ref_genome_res, 'fragmented', False)):
         try:
             genomexgenome_res = genomexgenome_validation(ref_genome_res, mod_genome_res, genomexgenome_settings, mod_plasmid_res, ref_plasmid_res)
-            report.write(genomexgenome_res, file_type="genomexgenome")
         except ValidationError as e:
             logger.error(f"Inter-genome validation failed: {e}")
     else:
@@ -281,12 +246,12 @@ def main():
     reads_res = None
     if hasattr(config, 'reads') and config.reads:
         try:
-            reads_res = validate_reads(config.reads, reads_settings)
-            report.write(reads_res, file_type="read")
+            reads_res = [ReadValidator(rc, reads_settings).run() for rc in config.reads]
             for read_result in reads_res:
-                register_missing_output("reads", read_result)
+                if not getattr(read_result, "output_file", None):
+                    logger.error("reads validation produced no usable output file")
         except ValidationError as e:
-            register_required_failure("reads", e)
+            logger.error(f"reads validation failed: {e}")
 
     # Add interread validation — skip when all reads are BAM (pairing check is meaningless)
     readxread_res = None
@@ -294,25 +259,11 @@ def main():
     if reads_res is not None and fastq_reads:
         try:
             readxread_res = readxread_validation(fastq_reads, readxread_settings)
-            report.write(readxread_res, file_type="readxread")
         except ValidationError as e:
             logger.error(f"Inter-read validation failed: {e}")
     else:
         logger.info("Inter-read validation skipped")
 
-    # Validate features (optional — non-fatal)
-    ref_feature_res = None
-    if hasattr(config, 'ref_feature') and config.ref_feature and not force_defragment:
-        try:
-            ref_feature_res = validate_feature(config.ref_feature, ref_feature_settings)
-            report.write(ref_feature_res, file_type="feature")
-        except ValidationError as e:
-            logger.error(f"Optional ref_feature validation failed: {e}")
-
-    if fatal_errors:
-        report.add_fatal_errors(fatal_errors)
-
-    report.flush(format='text')
     print(f"Log file: {log_file}")
 
     # ========================================================================
@@ -346,15 +297,9 @@ def main():
         "mod_plasmid":   mod_plasmid_res,
         "genomexgenome": genomexgenome_res,
         "reads":         reads_res,
-        "ref_feature":   ref_feature_res,
     }
-    if force_defragment:
-        logger.warning(
-            "force_defragment_ref is active: GFF validation for the reference is "
-            "skipped. Feature coordinates are not meaningful on a defragmented reference."
-        )
     repo_root = config_path.parent.parent.parent
-    params = nf_params.build_params(validation_results, base_dir=repo_root)
+    params = nf_params.build_params(validation_results, base_dir=repo_root, organism_type=config.type.value)
     nf_params.write_params(params, output_dir / "validated_params.json")
 
     return 0
@@ -367,7 +312,7 @@ if __name__ == '__main__':
         logger = get_logger()
         logger.error(f"✗ Fatal error: {e}")
         logger.debug(traceback.format_exc())
-        if len(sys.argv) >= 2:
-            actual_log_file = getattr(get_logger(), 'log_file', None) or (Path(sys.argv[1]).resolve().parent.parent / "valid" / "validation.log")
-            print(f"Log file: {actual_log_file}")
+        log_file = getattr(logger, 'log_file', None)
+        if log_file:
+            print(f"Log file: {log_file}")
         sys.exit(1)

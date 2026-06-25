@@ -70,9 +70,10 @@ workflow mapping_long {
         fasta
         mapping_tag
         out_folder_name
+        read_type
 
     main:
-        minimap2(fastqs, fasta, mapping_tag, out_folder_name) | set { sam }
+        minimap2(fastqs, fasta, mapping_tag, out_folder_name, read_type) | set { sam }
         samtools_sort(sam, out_folder_name) | set { sorted_bam }
         samtools_index_bam(sorted_bam, out_folder_name) | set { indexed_bam }
 
@@ -87,10 +88,11 @@ workflow sv_long {
         indexed_bam
         mapping_tag
         out_folder_name
+        read_type
         
 
     main:
-        cute_sv(fasta, fai, indexed_bam, out_folder_name) | set { cute_vcf }
+        cute_sv(fasta, fai, indexed_bam, out_folder_name, read_type) | set { cute_vcf }
         debreak(fasta, indexed_bam, out_folder_name) | set { debreak_vcf }
         sniffles(fasta, indexed_bam, out_folder_name) | set { sniffles_vcf }
         

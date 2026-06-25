@@ -1,13 +1,10 @@
 """Genome file validator and processor for FASTA and GenBank formats."""
 
-from collections import Counter
 from pathlib import Path
-from typing import Optional, List, Type, Any
+from typing import Optional, List, Type
 from dataclasses import dataclass
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
-from Bio.SeqUtils import gc_fraction
-
 from validation_pkg.utils.base_settings import BaseOutputMetadata, BaseValidatorSettings
 from validation_pkg.utils.formats import GenomeFormat, ValidationLevel, OrganismType
 from validation_pkg.exceptions import (
@@ -16,10 +13,10 @@ from validation_pkg.exceptions import (
     FastaFormatError,
     GenBankFormatError
 )
-from validation_pkg.utils.file_handler import open_compressed_writer, copy_file
+from validation_pkg.utils.file_handler import open_compressed_writer, copy_file, deduplicate_fasta_ids
 from validation_pkg.utils.path_utils import build_safe_output_dir, strip_all_extensions
 from validation_pkg.utils.base_validator import BaseValidator
-from validation_pkg.utils.sequence_stats import calculate_n50
+
 
 @dataclass
 class GenomeOutputMetadata(BaseOutputMetadata):
@@ -27,10 +24,6 @@ class GenomeOutputMetadata(BaseOutputMetadata):
     # Genome-specific fields
     num_sequences: int = None
     total_genome_size: int = None  # strict only
-    longest_sequence_length: int = None
-    longest_sequence_id: str = None
-    gc_content: float = None  # strict only
-    n50: int = None  # strict only
     plasmid_count: int = None
     plasmid_filenames: List[str] = None
     plasmid_output_paths: List[str] = None  # full absolute paths, one per plasmid file
@@ -43,68 +36,6 @@ class GenomeOutputMetadata(BaseOutputMetadata):
     # Fragmented assembly flag (sequence limit exceeded — inter-genome validation skipped)
     fragmented: bool = False
 
-    def format_statistics(self, indent: str = "    ", input_settings: dict = None) -> list[str]:
-        """Format genome-specific statistics for report output."""
-        lines = []
-
-        # Helper to format values
-        def format_value(value):
-            if isinstance(value, float):
-                return f"{value:.2f}"
-            elif isinstance(value, int) and value > 999:
-                return f"{value:,}"
-            return str(value)
-
-        # Iterate through all fields, skipping common ones and internal fields
-        skip_fields = {'input_file', 'output_file', 'output_filename', 'validation_level', 'elapsed_time'}
-        special_fields = {'sequence_ids', 'sequence_lengths', 'plasmid_filenames'}
-
-        data = self.to_dict()
-
-        for key, value in data.items():
-            if key in skip_fields or value is None:
-                continue
-
-            # Special handling for specific fields
-            if key == 'sequence_ids' and isinstance(value, list):
-                if len(value) <= 3:
-                    lines.append(f"{indent}sequence_ids: {', '.join(value)}")
-                else:
-                    lines.append(f"{indent}sequence_ids: {value[0]}, {value[1]}, ... (+{len(value)-2} more)")
-
-            elif key == 'sequence_lengths' and isinstance(value, dict):
-                total_len = sum(value.values())
-                lines.append(f"{indent}total_length: {total_len:,} bp")
-
-            elif key == 'plasmid_count' and value > 0:
-                # Show plasmid extraction section
-                lines.append("")
-                lines.append(f"{indent}plasmid_count: {value}")
-
-            elif key == 'plasmid_filenames' and isinstance(value, list):
-                # Show plasmid filenames with tree structure
-                for i, filename in enumerate(value):
-                    if i < len(value) - 1:
-                        lines.append(f"{indent}  ├─ {filename}")
-                    else:
-                        lines.append(f"{indent}  └─ {filename}")
-
-                # Show plasmid handling strategy
-                if input_settings:
-                    if input_settings.get('plasmid_split'):
-                        lines.append(f"{indent}plasmid_handling: split to separate files")
-                    elif input_settings.get('plasmids_to_one'):
-                        lines.append(f"{indent}plasmid_handling: merged to one file")
-
-            elif key == 'num_sequences_filtered' and value > 0:
-                lines.append(f"{indent}{key}: {value:,}")
-
-            elif key not in special_fields:
-                # Generic field formatting
-                formatted_value = format_value(value)
-                lines.append(f"{indent}{key}: {formatted_value}")
-
-        return lines
 
 class GenomeValidator(BaseValidator):
     """Validates and processes genome files in FASTA and GenBank formats."""
@@ -148,6 +79,13 @@ class GenomeValidator(BaseValidator):
                     "main_first selects the first sequence as main."
                 )
 
+            if not self.is_plasmid and not self.main_longest and not self.main_first:
+                raise GenomeValidationError(
+                    "Either main_longest or main_first must be True when is_plasmid=False. "
+                    "Set main_longest=True to pick the longest sequence as the chromosome, "
+                    "or main_first=True to pick the first sequence."
+                )
+
     def __init__(self, genome_config, settings: Optional[Settings] = None) -> None:
         # Call base class initialization
         super().__init__(genome_config, settings)
@@ -160,28 +98,12 @@ class GenomeValidator(BaseValidator):
         self.num_sequences_filtered = 0
         self.plasmid_filenames = []
         self.plasmid_output_paths = []
+        self._sequence_limit_exceeded = False
 
-    # Required abstract properties and methods from BaseValidator
-
-    @property
-    def _validator_type(self) -> str:
-        """Return validator type string."""
-        return 'genome'
-
-    @property
-    def OutputMetadata(self) -> Type:
-        """Return GenomeOutputMetadata class for this validator."""
-        return GenomeOutputMetadata
-
-    @property
-    def _output_format(self) -> str:
-        """Return output format string for build_output_path."""
-        return 'fasta'
-
-    @property
-    def _expected_format(self) -> Any:
-        """Return expected format for minimal mode validation."""
-        return GenomeFormat.FASTA
+    _validator_type = 'genome'
+    OutputMetadata = GenomeOutputMetadata
+    _output_format = 'fasta'
+    _expected_format = GenomeFormat.FASTA
 
     def _get_validator_exception(self) -> Type[Exception]:
         """Return the validator-specific exception class."""
@@ -192,7 +114,7 @@ class GenomeValidator(BaseValidator):
         # Trust/Strict modes - full validation and processing
         self._parse_file()
         self._validate_sequences()
-        if getattr(self, '_sequence_limit_exceeded', False):
+        if self._sequence_limit_exceeded:
             return self.output_path
         self._apply_edits()  # include plasmid handle
         output_path = self._write_output()
@@ -231,12 +153,6 @@ class GenomeValidator(BaseValidator):
         if self.sequences:
             self.output_metadata.num_sequences = len(self.sequences)
 
-            # Find longest sequence
-            if self.sequences:
-                longest_seq = max(self.sequences, key=lambda x: len(x.seq))
-                self.output_metadata.longest_sequence_length = len(longest_seq.seq)
-                self.output_metadata.longest_sequence_id = str(longest_seq.id)
-
             # Inter-file validation fields (trust and strict modes)
             self.output_metadata.sequence_ids = [str(seq.id) for seq in self.sequences]
             self.output_metadata.sequence_lengths = {str(seq.id): len(seq.seq) for seq in self.sequences}
@@ -246,51 +162,15 @@ class GenomeValidator(BaseValidator):
             self.output_metadata.plasmid_count = len(self.plasmid_filenames)
             self.output_metadata.plasmid_filenames = self.plasmid_filenames
             self.output_metadata.plasmid_output_paths = self.plasmid_output_paths
-        elif self.num_sequences_filtered > 0:
-            # No plasmids split, but sequences were filtered
-            pass
 
         self.output_metadata.num_sequences_filtered = self.num_sequences_filtered
-        self.output_metadata.fragmented = getattr(self, '_sequence_limit_exceeded', False)
+        self.output_metadata.fragmented = self._sequence_limit_exceeded
 
-        # Strict mode only - compute expensive statistics
+        # Strict mode only
         if self.validation_level == ValidationLevel.STRICT and self.sequences:
-            # Total genome size
             self.output_metadata.total_genome_size = sum(len(seq.seq) for seq in self.sequences)
 
-            # GC content
-            self.output_metadata.gc_content = self._calculate_gc_content(self.sequences)
-
-            # N50
-            self.output_metadata.n50 = self._calculate_n50(self.sequences)
-
     # ===== Validator Helper Functions =====
-
-    def _calculate_gc_content(self, sequences: List[SeqRecord]) -> float:
-        """Calculate GC content percentage for all sequences using BioPython."""
-        if not sequences:
-            return 0.0
-
-        total_gc = 0.0
-        total_bases = 0
-
-        for seq in sequences:
-            seq_length = len(seq.seq)
-            if seq_length > 0:
-                # gc_fraction returns value between 0 and 1
-                total_gc += gc_fraction(seq.seq) * seq_length
-                total_bases += seq_length
-
-        if total_bases == 0:
-            return 0.0
-
-        # Return as percentage (0-100)
-        return (total_gc / total_bases) * 100
-
-    def _calculate_n50(self, sequences: List[SeqRecord]) -> int:
-        """Calculate N50 assembly quality metric."""
-        lengths = [len(seq.seq) for seq in sequences]
-        return calculate_n50(lengths)
 
     def _parse_file(self) -> None:
         """Parse file using BioPython and validate format from genome_config."""
@@ -447,11 +327,6 @@ class GenomeValidator(BaseValidator):
         """Apply editing specifications to sequences based on settings."""
         self.logger.debug("Applying editing specifications from settings...")
 
-        # Minimal mode - skip edits, file will be copied as-is
-        if self.validation_level == ValidationLevel.MINIMAL:
-            self.logger.debug("Minimal mode - skipping edits")
-            return
-
         # 1. Remove short sequences
         if self.settings.min_sequence_length > 0:
             min_length = self.settings.min_sequence_length
@@ -512,36 +387,18 @@ class GenomeValidator(BaseValidator):
 
         Called after copy_file() for fragmented/eukaryote genomes so that
         downstream tools (e.g. samtools) do not encounter duplicate SAM header
-        entries.  The file is rewritten only when duplicates are actually found.
+        entries.
         """
         if not self.output_path or not self.output_path.exists():
             return
-        records = list(SeqIO.parse(str(self.output_path), 'fasta'))
-        duplicated = {sid for sid, n in Counter(r.id for r in records).items() if n > 1}
-        if not duplicated:
-            return
-
-        seen: dict = {}
-        renamed = []
-        for record in records:
-            orig_id = record.id
-            n = seen.get(orig_id, 0)
-            seen[orig_id] = n + 1
-            if n > 0:
-                new_id = f"{orig_id}_{n}"
-                renamed.append((orig_id, new_id))
-                record.id = new_id
-                record.description = ''
-
-        with open(str(self.output_path), 'w') as fh:
-            SeqIO.write(records, fh, 'fasta')
-
-        pairs = ', '.join(f"{old} → {new}" for old, new in renamed)
-        self.logger.warning(
-            f"Deduplicated {len(renamed)} sequence ID(s) in copied genome output: {pairs}"
-        )
-        # Refresh self.sequences so metadata reflects renamed IDs
-        self.sequences = records
+        renamed = deduplicate_fasta_ids(self.output_path)
+        if renamed:
+            pairs = ', '.join(f"{old} → {new}" for old, new in renamed)
+            self.logger.warning(
+                f"Deduplicated {len(renamed)} sequence ID(s) in copied genome output: {pairs}"
+            )
+            # Refresh self.sequences so metadata reflects renamed IDs
+            self.sequences = list(SeqIO.parse(str(self.output_path), 'fasta'))
 
     def _select_main_sequence(self, sequences: List[SeqRecord]) -> tuple[SeqRecord, List[SeqRecord]]:
         """Select main chromosome from sequences based on settings."""
@@ -557,7 +414,6 @@ class GenomeValidator(BaseValidator):
             plasmid_sequences = sequences[1:]
             self.logger.debug(f"Selected first sequence as main: {main_sequence.id} ({len(main_sequence.seq)} bp)")
         else:
-            # This should not happen due to __post_init__ validation
             raise GenomeValidationError("Either main_longest or main_first must be True")
 
         return main_sequence, plasmid_sequences

@@ -3,7 +3,18 @@
 Merge SV summaries from:
   1) assembly/syri summary (required columns: chrom, start, end, svtype)
   2) long-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score) both pacbio and ont
-  3) short-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, score)
+  3) short-read SV summary (required columns: chrom, start, end, svtype; optional: info_svtype, supporting_reads, PE, SR, DV, RV, score)
+
+Short-read Delly support is reported in the final CSV as:
+  - short_supporting_reads: selected non-double-counted support value
+  - short_supporting_reads_info: INFO/PE + INFO/SR when present
+  - short_supporting_reads_format: FORMAT/DV + FORMAT/RV when present
+  - short_supporting_reads_source: which value was selected
+
+Missing numeric values are written to CSV as the literal string ``NaN`` instead
+of blank cells.  Long-read coverage/depth columns are retained separately; they
+are not mixed into supporting_reads unless a true caller read-count field is
+present.
 
 Outputs a folder with single CSV for each type of variations:
   Insertions, Deletions, Duplications, Replacements, Inversions, Translocations
@@ -19,11 +30,11 @@ SHORT-READ VARIANT TYPE CONVENTIONS (from delly):
   The code correctly handles all these conventions by:
   - Preserving start and end as reported
   - Using svlen for event_length_bp calculation (not end-start)
-  - Clustering by position proximity with configurable tolerance
+  - Clustering by type-aware interval/proximity rules with configurable tolerance
 
-Events are clustered by (chrom, standardized_svtype) using interval overlap with an optional tolerance (bp),
-PLUS breakpoint proximity (start or end must be within tol bp). This avoids merging very large calls with
-many unrelated smaller calls.
+Events are clustered by (chrom, standardized_svtype). Deletions are consolidated when their
+intervals overlap or touch within the configured tolerance, even if neither breakpoint is nearby.
+Other SV types keep the conservative legacy rule: interval overlap plus nearby start or end breakpoint.
 
 Within each event, at most one record per source is chosen (best by supporting_reads then score).
 
@@ -33,13 +44,21 @@ events for both same-type and cross-type SV rows. Set --cross_type_tol to a smal
 integer to also link near-identical final coordinates.
 
 Usage:
-    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10 --cross_type_tol 0
+    python create_sv_output.py --asm assembly.tsv --long_ont long_ont.tsv --long_pacbio long_pb.tsv --short short.tsv --out outdir --tol 10 --cross_type_tol 0 --max_event_contig_fraction 0.5
+
+Too-large event artifact filter:
+    Source rows are filtered before clustering when both event length and contig
+    length are available and abs(svlen) is greater than the configured fraction
+    of the contig length. The default maximum fraction is 0.5 (50%). Rows with
+    unavailable event length or contig length are retained and logged as not
+    evaluated by this filter.
 
 Genome-percentage columns:
     pct_of_ref_genome and pct_of_mod_genome are calculated when the pipeline sets
     SV_REF_GENOME_SIZE_BP and SV_MOD_GENOME_SIZE_BP from validated genome-size
     context. These are internal Nextflow-provided values, not manual script arguments.
-    The columns are NaN when the genome size or event length is unavailable.
+    The columns are NaN when the genome size or event length is unavailable. For
+    reference-only runs, SV_MOD_GENOME_SIZE_BP is 0 and pct_of_mod_genome is 0.
 
 Any of the inputs may be omitted; the script will process whichever of the assembly, long_ont,
 long_pacbio or short tables are provided. Long-read inputs (ONT and PacBio) are treated
@@ -51,8 +70,10 @@ import atexit
 import argparse
 import logging
 import glob
+import math
 import os
 import re
+from io import StringIO
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -107,6 +128,29 @@ ASM_PREFIX_MAP = [
 ]
 
 DEFAULT_LOG_DIR = Path("data") / "outputs" / "logs"
+DEFAULT_MAX_EVENT_CONTIG_FRACTION = 0.5
+
+CONTIG_LENGTH_COLUMNS = (
+    "contig_length_bp",
+    "contig_length",
+    "contig_size_bp",
+    "contig_size",
+    "chrom_length_bp",
+    "chrom_length",
+    "chrom_size_bp",
+    "chrom_size",
+    "chromosome_length_bp",
+    "chromosome_length",
+    "chromosome_size_bp",
+    "chromosome_size",
+    "sequence_length_bp",
+    "sequence_length",
+    "ref_contig_length_bp",
+    "ref_contig_length",
+    "ref_chrom_length_bp",
+    "ref_chrom_length",
+)
+
 ROW_LOG_FIELDS = (
     "chrom",
     "#chrom",
@@ -126,13 +170,15 @@ ROW_LOG_FIELDS = (
     "coverage_before_100bp",
     "coverage_sv_span",
     "coverage_after_100bp",
+    *CONTIG_LENGTH_COLUMNS,
     # Delly raw fields (short-read)
-    "PE",   # paired-end support (reference pairs)
-    "DV",   # high-quality variant pairs
-    "SR",   # split-read support (reference junction reads)
-    "RV",   # high-quality variant junction reads
+    "PE",   # INFO paired-end support of the structural variant
+    "SR",   # INFO split-read support
+    "DR",   # FORMAT high-quality reference pairs
+    "DV",   # FORMAT high-quality variant pairs
+    "RR",   # FORMAT high-quality reference junction reads
+    "RV",   # FORMAT high-quality variant junction reads
     # Long-read caller raw fields (sniffles / cuteSV use DR+DV; debreak uses RE)
-    "DR",   # reference-supporting reads (sniffles / cuteSV)
     "RE",   # supporting reads (debreak)
 )
 
@@ -260,7 +306,7 @@ def _parse_genome_size(value: Optional[str]) -> Optional[int]:
     """Parse a genome size string into an integer number of base pairs.
 
     The value is normally read from an internal pipeline environment variable
-    populated by Nextflow from validated parameters or validated FASTA files.
+    populated by Nextflow from validated parameters.
     Plain integers are treated as bp;
     suffixes k/kb/kbp, m/mb/mbp, and g/gb/gbp are accepted for compatibility.
     """
@@ -281,14 +327,14 @@ def _parse_genome_size(value: Optional[str]) -> Optional[int]:
         m = re.fullmatch(pat, s)
         if m:
             parsed = int(float(m.group(1)) * mult)
-            return parsed if parsed > 0 else None
+            return parsed if parsed >= 0 else None
     try:
         parsed = int(float(s))
-        return parsed if parsed > 0 else None
+        return parsed if parsed >= 0 else None
     except ValueError as exc:
         raise ValueError(
             f"Cannot parse genome size {s!r}. "
-            "Use a positive integer number of bp or a value with suffix "
+            "Use a non-negative integer number of bp or a value with suffix "
             "k/kb/kbp, m/mb/mbp, g/gb/gbp."
         ) from exc
 
@@ -335,32 +381,104 @@ def _to_float(x: Any) -> Optional[float]:
         return None
 
 
-def _resolve_delly_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
-    """Compute supporting reads for a Delly short-read VCF row.
+def _first_int(row: Dict[str, Any], names: List[str]) -> Optional[int]:
+    """Return the first parseable integer from a row, matching column names case-insensitively."""
+    lower_to_key = {str(k).lower(): k for k in row.keys()}
+    for name in names:
+        key = name if name in row else lower_to_key.get(name.lower())
+        if key is None:
+            continue
+        value = _to_int(row.get(key))
+        if value is not None:
+            return value
+    return None
 
-    Delly reports four FORMAT fields relevant to read support:
-      PE - paired-end reads supporting the *reference* allele
-      DV - high-quality paired-end reads supporting the *variant* allele
-      SR - split-reads supporting the reference allele
-      RV - high-quality split-reads supporting the variant allele
 
-    We sum the variant-supporting counts (DV + RV) because those directly
-    measure evidence for the called SV.  If neither DV nor RV is present in
-    the row we fall back to the pre-computed ``supporting_reads`` column; if
-    that is also absent the result is ``None`` (serialised as NaN in the CSV).
+def _resolve_contig_length_bp(row: Dict[str, Any]) -> Optional[int]:
+    """Return a positive contig length from supported optional TSV columns."""
+    contig_length = _first_int(row, list(CONTIG_LENGTH_COLUMNS))
+    if contig_length is None or contig_length <= 0:
+        return None
+    return contig_length
 
-    Note: PE and SR (reference-supporting reads) are intentionally excluded
-    from the sum - they represent reads that do NOT support the variant.
+
+def _parse_nonnegative_finite_float(value: str) -> float:
+    """argparse type for non-negative finite floating-point options."""
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a valid number") from exc
+
+    if not math.isfinite(parsed) or parsed < 0:
+        raise argparse.ArgumentTypeError("value must be a non-negative finite number")
+
+    return parsed
+
+
+def _resolve_delly_supporting_reads_details(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Compute Delly short-read support and preserve its provenance.
+
+    Delly can expose support at two granularities:
+      * INFO/PE + INFO/SR: site-level paired-end plus split-read support.
+      * FORMAT/DV + FORMAT/RV: sample-level high-quality variant pairs plus
+        high-quality variant junction reads.
+
+    These two totals should not be added together because they can describe
+    overlapping evidence at different granularities.  The final legacy
+    ``short_supporting_reads`` value is therefore the largest available
+    non-double-counted candidate, while the component columns keep the INFO
+    and FORMAT totals visible for debugging and reporting.
     """
-    dv = _to_int(row.get("DV"))
-    rv = _to_int(row.get("RV"))
+    pe = _first_int(row, ["PE", "INFO_PE", "INFO/PE", "info_PE", "info_pe"])
+    sr = _first_int(row, ["SR", "INFO_SR", "INFO/SR", "info_SR", "info_sr"])
+    dv = _first_int(row, ["DV", "FORMAT_DV", "FORMAT/DV", "format_DV", "format_dv"])
+    rv = _first_int(row, ["RV", "FORMAT_RV", "FORMAT/RV", "format_RV", "format_rv"])
+    generic = _first_int(row, ["supporting_reads", "supporting_read_count", "read_support"])
 
-    if dv is not None or rv is not None:
-        return (dv or 0) + (rv or 0)
+    info_total = (pe or 0) + (sr or 0) if (pe is not None or sr is not None) else None
+    format_total = (dv or 0) + (rv or 0) if (dv is not None or rv is not None) else None
 
-    # Fall back to whatever was already computed upstream (e.g. from a
-    # pre-processed TSV that already merged these fields).
-    return _to_int(row.get("supporting_reads"))
+    candidates: List[Tuple[str, int]] = []
+    if info_total is not None:
+        candidates.append(("INFO_PE_PLUS_SR", info_total))
+    if format_total is not None:
+        candidates.append(("FORMAT_DV_PLUS_RV", format_total))
+    if generic is not None:
+        candidates.append(("supporting_reads", generic))
+
+    if candidates:
+        # Keep the largest non-double-counted representation.  Ties are resolved
+        # in a deterministic preference order: FORMAT, INFO, generic.
+        preference = {"FORMAT_DV_PLUS_RV": 2, "INFO_PE_PLUS_SR": 1, "supporting_reads": 0}
+        selected_source, selected_value = max(
+            candidates,
+            key=lambda item: (item[1], preference.get(item[0], -1)),
+        )
+    else:
+        selected_source, selected_value = None, None
+
+    if selected_value is None:
+        note = "No Delly support-count fields were present; reported as NaN."
+    elif selected_source == "FORMAT_DV_PLUS_RV":
+        note = "short_supporting_reads selected from Delly FORMAT/DV + FORMAT/RV."
+    elif selected_source == "INFO_PE_PLUS_SR":
+        note = "short_supporting_reads selected from Delly INFO/PE + INFO/SR."
+    else:
+        note = "short_supporting_reads selected from generic supporting_reads fallback."
+
+    return {
+        "supporting_reads": selected_value,
+        "supporting_reads_source": selected_source,
+        "supporting_reads_info": info_total,
+        "supporting_reads_format": format_total,
+        "supporting_reads_generic": generic,
+        "supporting_reads_note": note,
+    }
+
+
+def _resolve_delly_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
+    """Backward-compatible helper returning only the selected Delly support value."""
+    return _resolve_delly_supporting_reads_details(row).get("supporting_reads")
 
 
 def _resolve_long_read_supporting_reads(row: Dict[str, Any]) -> Optional[int]:
@@ -435,7 +553,6 @@ class Record:
     info_svtype: Optional[str] = None
     supporting_reads: Optional[int] = None
     score: Optional[float] = None
-    copy_number: Optional[int] = None
     chr2: Optional[str] = None
     pos2: Optional[int] = None
     supporting_methods: Optional[str] = None
@@ -445,6 +562,12 @@ class Record:
     coverage_before_100bp: Optional[float] = None
     coverage_sv_span: Optional[float] = None
     coverage_after_100bp: Optional[float] = None
+    supporting_reads_source: Optional[str] = None
+    supporting_reads_info: Optional[int] = None
+    supporting_reads_format: Optional[int] = None
+    supporting_reads_generic: Optional[int] = None
+    supporting_reads_note: Optional[str] = None
+    contig_length_bp: Optional[int] = None
 
 @dataclass
 class EventCluster:
@@ -458,20 +581,52 @@ class EventCluster:
 
 # Clustering
 
+def intervals_overlap_or_touch(a_start: int, a_end: int, b_start: int, b_end: int, tol: int) -> bool:
+    """Return True when two intervals overlap or are separated by at most ``tol`` bp."""
+    return (b_start <= a_end + tol) and (b_end >= a_start - tol)
+
+
 def intervals_overlap(a_start: int, a_end: int, b_start: int, b_end: int, tol: int) -> bool:
-    """Check if two intervals overlap or are close enough to cluster together.
-    
-    Works correctly for all variant types:
-    - Interval variants (DEL, DUP, INV): real intervals with start < end
-    - Point variants (INS): start == end at insertion point
-    - Breakpoint variants (TRA): start == end at breakpoint
-    
-    For point variants, the condition simplifies correctly since start == end.
+    """Conservative legacy clustering rule for non-deletion SV types.
+
+    The intervals must overlap or touch within ``tol`` and at least one
+    breakpoint pair must also be within ``tol``. This avoids merging large
+    non-deletion calls with unrelated smaller calls.
     """
-    overlap = (b_start <= a_end + tol) and (b_end >= a_start - tol)
-    if not overlap:
+    if not intervals_overlap_or_touch(a_start, a_end, b_start, b_end, tol):
         return False
     return abs(a_start - b_start) <= tol or abs(a_end - b_end) <= tol
+
+
+def deletion_intervals_overlap(a_start: int, a_end: int, b_start: int, b_end: int, tol: int) -> bool:
+    """Deletion-specific clustering rule: interval overlap/touch is enough.
+
+    Deletions describe removed sequence spans, and exact breakpoints can shift
+    between callers or alignments. Nested/overlapping deletion calls therefore
+    consolidate when their intervals overlap or touch within tolerance, even
+    when neither endpoint is close; for example, 100-1000 and 450-550 are
+    treated as one deletion event.
+    """
+    return intervals_overlap_or_touch(a_start, a_end, b_start, b_end, tol)
+
+
+def _interval_overlap_percentage(a_start: int, a_end: int, b_start: int, b_end: int) -> float:
+    overlap_len = max(0, min(a_end, b_end) - max(a_start, b_start) + 1)
+    len_a = a_end - a_start + 1
+    len_b = b_end - b_start + 1
+    denom = max(len_a, len_b) if max(len_a, len_b) > 0 else 1
+    return (overlap_len / denom) * 100 if denom else 0.0
+
+
+def _record_clusters_with_current_deletion_span(
+    current_start: int,
+    current_end: int,
+    record: Record,
+    tol: int,
+) -> bool:
+    """Return True when a deletion record should merge into the current deletion cluster."""
+    return deletion_intervals_overlap(current_start, current_end, record.start, record.end, tol)
+
 
 def cluster_records(records: List[Record], tol: int) -> List[EventCluster]:
     clusters = []
@@ -483,38 +638,46 @@ def cluster_records(records: List[Record], tol: int) -> List[EventCluster]:
     for (chrom, std_type), recs in key_to_recs.items():
         recs = sorted(recs, key=lambda r: (r.start, r.end))
         cur = [recs[0]]
+        cur_start = recs[0].start
+        cur_end = recs[0].end
         cur_percs: List[float] = []
 
         for r in recs[1:]:
             last = cur[-1]
-            if intervals_overlap(last.start, last.end, r.start, r.end, tol):
-                overlap_len = max(0, min(last.end, r.end) - max(last.start, r.start) + 1)
-                len_last = last.end - last.start + 1
-                len_r = r.end - r.start + 1
-                denom = max(len_last, len_r) if max(len_last, len_r) > 0 else 1
-                pct = (overlap_len / denom) * 100 if denom else 0.0
+            if std_type == "DEL":
+                should_merge = _record_clusters_with_current_deletion_span(cur_start, cur_end, r, tol)
+                pct = _interval_overlap_percentage(cur_start, cur_end, r.start, r.end)
+            else:
+                should_merge = intervals_overlap(last.start, last.end, r.start, r.end, tol)
+                pct = _interval_overlap_percentage(last.start, last.end, r.start, r.end)
+
+            if should_merge:
                 cur.append(r)
                 cur_percs.append(pct)
+                cur_start = min(cur_start, r.start)
+                cur_end = max(cur_end, r.end)
             else:
                 clusters.append(
                     EventCluster(
                         chrom,
                         std_type,
-                        min(x.start for x in cur),
-                        max(x.end for x in cur),
+                        cur_start,
+                        cur_end,
                         cur,
                         percentage_overlaps=cur_percs,
                     )
                 )
                 cur = [r]
+                cur_start = r.start
+                cur_end = r.end
                 cur_percs = []
 
         clusters.append(
             EventCluster(
                 chrom,
                 std_type,
-                min(x.start for x in cur),
-                max(x.end for x in cur),
+                cur_start,
+                cur_end,
                 cur,
                 percentage_overlaps=cur_percs,
             )
@@ -538,8 +701,143 @@ def choose_best_record(recs: List[Record]) -> Optional[Record]:
 
     return max(recs, key=key)
 
+
+def _record_event_length_bp(record: Record) -> Optional[int]:
+    """Return the absolute source-event length used by artifact filters."""
+    if record.svlen is None:
+        return None
+    try:
+        if pd.isna(record.svlen):
+            return None
+    except Exception:
+        pass
+
+    try:
+        return abs(int(record.svlen))
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_too_large_event_artifact(
+    record: Record,
+    max_contig_fraction: float,
+) -> Tuple[bool, Optional[int], Optional[float]]:
+    """Identify source rows whose event length is implausibly large for the contig.
+
+    Rows without event length or contig length are deliberately not filtered here;
+    callers can report that they were unevaluated.
+    """
+    event_length_bp = _record_event_length_bp(record)
+    contig_length_bp = record.contig_length_bp
+
+    if max_contig_fraction <= 0:
+        return False, event_length_bp, None
+
+    if event_length_bp is None or contig_length_bp is None or contig_length_bp <= 0:
+        return False, event_length_bp, None
+
+    event_contig_fraction = event_length_bp / contig_length_bp
+    return event_contig_fraction > max_contig_fraction, event_length_bp, event_contig_fraction
+
+
+def filter_too_large_events(
+    records: List[Record],
+    max_contig_fraction: float = DEFAULT_MAX_EVENT_CONTIG_FRACTION,
+    logger: Any = None,
+) -> List[Record]:
+    """Remove likely artifact source rows that exceed a fraction of contig length."""
+    if not records:
+        return records
+
+    if max_contig_fraction <= 0:
+        if logger is not None:
+            logger.info(
+                "too_large_event_filter_disabled",
+                max_event_contig_fraction=max_contig_fraction,
+                total_records=len(records),
+            )
+        return records
+
+    kept: List[Record] = []
+    filtered_count = 0
+    missing_event_length_count = 0
+    missing_contig_length_count = 0
+
+    for record in records:
+        event_length_bp = _record_event_length_bp(record)
+        if event_length_bp is None:
+            missing_event_length_count += 1
+            kept.append(record)
+            continue
+
+        if record.contig_length_bp is None or record.contig_length_bp <= 0:
+            missing_contig_length_count += 1
+            kept.append(record)
+            continue
+
+        is_artifact, _, event_contig_fraction = _is_too_large_event_artifact(
+            record,
+            max_contig_fraction,
+        )
+        if is_artifact:
+            filtered_count += 1
+            if logger is not None:
+                logger.warning(
+                    "sv_artifact_row_filtered",
+                    reason="event_length_gt_contig_fraction",
+                    source=record.source,
+                    chrom=record.chrom,
+                    start=record.start,
+                    end=record.end,
+                    std_type=record.std_type,
+                    raw_svtype=record.raw_svtype,
+                    event_length_bp=event_length_bp,
+                    contig_length_bp=record.contig_length_bp,
+                    event_contig_fraction=event_contig_fraction,
+                    max_event_contig_fraction=max_contig_fraction,
+                )
+            continue
+
+        kept.append(record)
+
+    if logger is not None:
+        logger.info(
+            "too_large_event_filter_completed",
+            max_event_contig_fraction=max_contig_fraction,
+            total_records=len(records),
+            kept_records=len(kept),
+            filtered_records=filtered_count,
+            unevaluated_missing_event_length=missing_event_length_count,
+            unevaluated_missing_contig_length=missing_contig_length_count,
+        )
+
+    return kept
+
 def read_tsv(path: Union[str, Path]) -> pd.DataFrame:
-    return pd.read_csv(path, sep="\t", dtype=str, comment="#")
+    """Read a TSV summary while preserving a leading ``#chrom`` header.
+
+    Several upstream tools emit TSV headers as ``#chrom``.  Passing
+    ``comment="#"`` to pandas drops that header and causes the first data row
+    to be interpreted as column names, which in turn makes all records look
+    malformed.  We therefore remove true comment lines ourselves but keep a
+    ``#chrom`` header intact.
+    """
+    path = Path(path)
+    lines: List[str] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.lstrip()
+            if stripped.startswith("#") and not stripped.lower().startswith("#chrom"):
+                continue
+            lines.append(line)
+
+    if not lines:
+        return pd.DataFrame()
+
+    df = pd.read_csv(StringIO("".join(lines)), sep="\t", dtype=str)
+    if "#chrom" in df.columns and "chrom" not in df.columns:
+        df = df.rename(columns={"#chrom": "chrom"})
+    return df
 
 
 # ----------------------------
@@ -631,6 +929,21 @@ def resolve_supporting_reads(records: List[Record], supp_files: List[str], tol: 
 
     return records
 
+def _validate_supplied_input_path(path: Union[str, Path], source: str) -> Path:
+    """Fail fast when a CLI-supplied input path is missing or unreadable.
+
+    Optional inputs may still be omitted entirely.  But once a path is supplied,
+    silently treating a typo as an empty dataset produces misleading header-only
+    final reports, so this is a hard error.
+    """
+    resolved = Path(path)
+    if not resolved.exists():
+        raise FileNotFoundError(f"Input file for {source!r} does not exist: {resolved}")
+    if not resolved.is_file():
+        raise FileNotFoundError(f"Input path for {source!r} is not a file: {resolved}")
+    return resolved
+
+
 def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = None) -> List[Record]:
     """Load records from a TSV file into Record objects.
 
@@ -656,6 +969,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
     source_logger = logger.bind(source=source, input_path=path_str) if logger is not None else None
 
     try:
+        path = _validate_supplied_input_path(path, source)
         df = read_tsv(path)
     except Exception as exc:
         if source_logger is not None:
@@ -663,7 +977,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 "load_records_read_failed",
                 error=str(exc),
             )
-        return []
+        raise
 
     out = []
     rows_seen = 0
@@ -747,7 +1061,6 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
 
         # treat any long* sources as long for supporting_methods
         supporting_methods = row.get("supporting_methods") if str(source).startswith("long") else None
-        copy_number = _to_int(row.get("RDCN")) if source == "short" else None
         chr2 = row.get("chr2") if source == "short" else None
         pos2 = _to_int(row.get("pos2")) if source == "short" else None
         start_mod = _to_int(row.get("start_mod")) if source == "asm" else None
@@ -755,6 +1068,7 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
         coverage_before_100bp = _to_float(row.get("coverage_before_100bp"))
         coverage_sv_span = _to_float(row.get("coverage_sv_span"))
         coverage_after_100bp = _to_float(row.get("coverage_after_100bp"))
+        contig_length_bp = _resolve_contig_length_bp(row)
         svlen_input = _to_int(row.get("svlen"))
         svlen = abs(svlen_input) if svlen_input is not None else None
         coord_len = (end - start) if (start is not None and end is not None and end >= start) else None
@@ -847,10 +1161,28 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
         # available, falling back to the generic `supporting_reads` column.
         # This prevents false zeros when a caller (e.g. Delly) only populates
         # split-read fields (RV) but not paired-end fields (DV), or vice-versa.
+        supporting_reads_source = None
+        supporting_reads_info = None
+        supporting_reads_format = None
+        supporting_reads_generic = None
+        supporting_reads_note = None
+
         if source == "short":
-            resolved_supporting_reads = _resolve_delly_supporting_reads(row)
+            support_details = _resolve_delly_supporting_reads_details(row)
+            resolved_supporting_reads = support_details["supporting_reads"]
+            supporting_reads_source = support_details["supporting_reads_source"]
+            supporting_reads_info = support_details["supporting_reads_info"]
+            supporting_reads_format = support_details["supporting_reads_format"]
+            supporting_reads_generic = support_details["supporting_reads_generic"]
+            supporting_reads_note = support_details["supporting_reads_note"]
         elif str(source).startswith("long"):
             resolved_supporting_reads = _resolve_long_read_supporting_reads(row)
+            if resolved_supporting_reads is None:
+                supporting_reads_note = (
+                    "No caller read-count field was present; kept as NaN. "
+                    "coverage_sv_span is available separately as a depth proxy, "
+                    "but is not mixed into supporting_reads."
+                )
         else:
             resolved_supporting_reads = _to_int(row.get("supporting_reads"))
 
@@ -865,7 +1197,6 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 row.get("info_svtype"),
                 resolved_supporting_reads,
                 _to_float(row.get("score")),
-                copy_number,
                 chr2,
                 pos2,
                 supporting_methods,
@@ -875,6 +1206,12 @@ def load_records(path: Optional[Union[str, Path]], source: str, logger: Any = No
                 coverage_before_100bp,
                 coverage_sv_span,
                 coverage_after_100bp,
+                supporting_reads_source,
+                supporting_reads_info,
+                supporting_reads_format,
+                supporting_reads_generic,
+                supporting_reads_note,
+                contig_length_bp=contig_length_bp,
             )
         )
 
@@ -1002,7 +1339,9 @@ def build_output_table(
         else:
             pct_of_ref = np.nan
 
-        if mod_genome_size_bp and pd.notna(event_length_bp) and mod_genome_size_bp > 0:
+        if mod_genome_size_bp == 0:
+            pct_of_mod = 0
+        elif mod_genome_size_bp and pd.notna(event_length_bp) and mod_genome_size_bp > 0:
             pct_of_mod = (event_length_bp / mod_genome_size_bp) * 100
         else:
             pct_of_mod = np.nan
@@ -1031,6 +1370,7 @@ def build_output_table(
             "long_ont_info_svtype": long_ont.info_svtype if long_ont else "",
             "long_ont_score": long_ont.score if long_ont else np.nan,
             "long_ont_supporting_reads": long_ont.supporting_reads if long_ont else np.nan,
+            "long_ont_supporting_reads_note": long_ont.supporting_reads_note if long_ont else "",
             "long_ont_supporting_methods": long_ont.supporting_methods if long_ont else np.nan,
             "long_ont_coverage_before_100bp": long_ont.coverage_before_100bp if long_ont else np.nan,
             "long_ont_coverage_sv_span": long_ont.coverage_sv_span if long_ont else np.nan,
@@ -1042,6 +1382,7 @@ def build_output_table(
             "long_pacbio_info_svtype": long_pacbio.info_svtype if long_pacbio else "",
             "long_pacbio_score": long_pacbio.score if long_pacbio else np.nan,
             "long_pacbio_supporting_reads": long_pacbio.supporting_reads if long_pacbio else np.nan,
+            "long_pacbio_supporting_reads_note": long_pacbio.supporting_reads_note if long_pacbio else "",
             "long_pacbio_supporting_methods": long_pacbio.supporting_methods if long_pacbio else np.nan,
             "long_pacbio_coverage_before_100bp": long_pacbio.coverage_before_100bp if long_pacbio else np.nan,
             "long_pacbio_coverage_sv_span": long_pacbio.coverage_sv_span if long_pacbio else np.nan,
@@ -1056,7 +1397,11 @@ def build_output_table(
             "short_pos2": sht.pos2 if sht else np.nan,
             "short_score": sht.score if sht else np.nan,
             "short_supporting_reads": sht.supporting_reads if sht else np.nan,
-            "short_reads_copy_number_estimate": (sht.copy_number if sht else np.nan),
+            "short_supporting_reads_info": sht.supporting_reads_info if sht else np.nan,
+            "short_supporting_reads_format": sht.supporting_reads_format if sht else np.nan,
+            "short_supporting_reads_generic": sht.supporting_reads_generic if sht else np.nan,
+            "short_supporting_reads_source": sht.supporting_reads_source if sht else "",
+            "short_supporting_reads_note": sht.supporting_reads_note if sht else "",
             "short_coverage_before_100bp": sht.coverage_before_100bp if sht else np.nan,
             "short_coverage_sv_span": sht.coverage_sv_span if sht else np.nan,
             "short_coverage_after_100bp": sht.coverage_after_100bp if sht else np.nan,
@@ -1234,7 +1579,7 @@ def write_csv_tables(df: pd.DataFrame, outdir: str | os.PathLike[str]) -> None:
                 errors="ignore",
             ).iloc[0:0]
 
-            header_df.to_csv(os.path.join(outdir, f"{name}.csv"), index=False)
+            header_df.to_csv(os.path.join(outdir, f"{name}.csv"), index=False, na_rep="NaN")
 
         return
 
@@ -1250,7 +1595,7 @@ def write_csv_tables(df: pd.DataFrame, outdir: str | os.PathLike[str]) -> None:
         if not sub.empty:
             sub = sub.sort_values(["chrom", "event_start", "event_end"])
 
-        sub.to_csv(os.path.join(outdir, f"{name}.csv"), index=False)
+        sub.to_csv(os.path.join(outdir, f"{name}.csv"), index=False, na_rep="NaN")
 
     other = df[~df["std_svtype"].isin(TAB_BY_TYPE)].copy()
     if not other.empty:
@@ -1258,7 +1603,7 @@ def write_csv_tables(df: pd.DataFrame, outdir: str | os.PathLike[str]) -> None:
             columns=["std_svtype", "asm_start_mod", "asm_end_mod"],
             errors="ignore",
         )
-        other.to_csv(os.path.join(outdir, "Other.csv"), index=False)
+        other.to_csv(os.path.join(outdir, "Other.csv"), index=False, na_rep="NaN")
 
 # Main
 
@@ -1276,8 +1621,30 @@ def main() -> None:
         default=0,
         help="Tolerance in bp for linking near-identical final event coordinates in linked_event. Default 0 keeps overlap-only linking.",
     )
+    p.add_argument(
+        "--max_event_contig_fraction",
+        type=_parse_nonnegative_finite_float,
+        default=DEFAULT_MAX_EVENT_CONTIG_FRACTION,
+        help=(
+            "Filter source SV rows whose event length is greater than this "
+            "fraction of the available contig length. Default 0.5. Set 0 to disable. "
+            "Rows without contig length are retained."
+        ),
+    )
 
     args = p.parse_args()
+
+    for source_name, supplied_path in (
+        ("asm", args.asm),
+        ("long_ont", args.long_ont),
+        ("long_pacbio", args.long_pacbio),
+        ("short", args.short_reads),
+    ):
+        if supplied_path:
+            try:
+                _validate_supplied_input_path(supplied_path, source_name)
+            except FileNotFoundError as exc:
+                p.error(str(exc))
 
     logger, log_path = setup_logging()
     ref_genome_size_bp = _read_genome_size_from_env("SV_REF_GENOME_SIZE_BP", logger=logger)
@@ -1287,6 +1654,7 @@ def main() -> None:
         output_dir=str(args.out),
         tol=args.tol,
         cross_type_tol=args.cross_type_tol,
+        max_event_contig_fraction=args.max_event_contig_fraction,
         ref_genome_size_bp=ref_genome_size_bp,
         mod_genome_size_bp=mod_genome_size_bp,
         inputs=_clean_dict(
@@ -1321,14 +1689,22 @@ def main() -> None:
         records = resolve_supporting_reads(records, supp_files, tol=args.tol)
         logger.info("resolve_supporting_reads_completed", total_records=len(records))
 
+    records_before_artifact_filter = len(records)
+    records = filter_too_large_events(
+        records,
+        max_contig_fraction=args.max_event_contig_fraction,
+        logger=logger,
+    )
+
     if not records:
         os.makedirs(args.out, exist_ok=True)
         logger.warning(
             "create_sv_output_no_valid_records",
             output_dir=str(args.out),
+            records_before_artifact_filter=records_before_artifact_filter,
         )
         write_csv_tables(pd.DataFrame(), args.out)
-        print("No valid input records found; wrote empty header-only CSV tables.")
+        print("No valid input records found after input validation/artifact filtering; wrote empty header-only CSV tables.")
         print(f"Load-record audit log: {log_path}")
         return
 
@@ -1362,6 +1738,7 @@ def main() -> None:
         total_records=len(records),
         total_clusters=len(clusters),
         total_output_rows=int(len(df.index)),
+        records_before_artifact_filter=records_before_artifact_filter,
     )
 
     print(f"Wrote CSV tables to: {args.out}")

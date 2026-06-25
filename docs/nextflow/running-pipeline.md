@@ -19,7 +19,7 @@ nextflow run main.nf --max_cpu $(nproc)
 
 This first validates input data from `data/inputs/config.json`, then automatically runs eligible processing workflows (short-read, long-read, ref-vs-mod comparison) based on the validated inputs.
 
-`mod_fasta` is optional after validation. If no validated modified FASTA is present, the pipeline runs in reference-only mode and skips modified-genome mapping/comparison branches.
+Modified-genome mapping and reference-vs-modified comparison branches run only when validation emits a modified FASTA (`mod_fasta_validated`). Reference-only runs skip those branches automatically and still execute eligible reference-read workflows.
 
 Validated files are produced by the `validate` process and passed directly to downstream workflows through channels. A `validated_params.json` file is also emitted for runtime consumption. See the [Validation Overview](../validation/OVERVIEW.md) for details on what this file contains.
 
@@ -59,7 +59,7 @@ NXF_QUIET=false nextflow run main.nf --max_cpu $(nproc)
 | `--max_cpu <n>` | Maximum CPUs per process (default: `1`) |
 | `--validation_level <level>` | Validation depth: `STRICT`, `TRUST`, or `MINIMAL` — overridden by `config.json` when set there |
 | `--logging_level <level>` | Log verbosity: `DEBUG`, `INFO`, `WARNING`, or `ERROR` — overridden by `config.json` when set there |
-| `--organism_type <type>` | Organism type: `PROKARYOTE` or `EUKARYOTE` — overridden by `config.json` when set there |
+| `--organism_type <type>` | Organism type: `prokaryote` or `eukaryote` — overridden by `config.json` when set there. The validated value determines FreeBayes ploidy (`1` for prokaryote, `2` for eukaryote). |
 | `--force_defragment_ref` | Force reference defragmentation — unsupported workaround |
 | `--help` | Print help message and exit |
 
